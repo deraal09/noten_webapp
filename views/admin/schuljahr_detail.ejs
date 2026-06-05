@@ -1,0 +1,29 @@
+<h1>Schuljahr: <%= schuljahr.bezeichnung %></h1>
+<p><a href="/admin">← Zurück</a></p>
+
+<h2>Klassen</h2>
+<form method="post" action="/admin/schuljahre/<%= schuljahr.id %>/klassen/neu" class="inline">
+  <input type="text" name="name" placeholder="z. B. 12BFI1" required>
+  <select name="notenschluessel">
+    <option value="IHK">IHK (1–6)</option>
+    <option value="BG">BG (0–15)</option>
+  </select>
+  <button type="submit">+ Klasse anlegen</button>
+</form>
+<table class="data">
+  <thead><tr><th>Name</th><th>Notenschlüssel</th><th>Aktion</th></tr></thead>
+  <tbody>
+    <% klassen.forEach(function(k) { %>
+      <tr>
+        <td><a href="/admin/klassen/<%= k.id %>"><%= k.name %></a></td>
+        <td><%= k.notenschluessel %></td>
+        <td>
+          <a class="btn" href="/export/klasse/<%= k.id %>.csv">📥 CSV</a>
+          <form method="post" action="/admin/klassen/<%= k.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
+            <button type="submit" class="danger">🗑</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>

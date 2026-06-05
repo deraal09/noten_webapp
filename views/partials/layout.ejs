@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' – ' : '' %><%= appName %></title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/">📚 <%= appName %></a>
+    <% if (typeof user !== 'undefined' && user) { %>
+      <nav class="nav">
+        <% if (user.isAdmin) { %>
+          <a href="/admin">Dashboard</a>
+          <a href="/admin/users">Lehrkräfte</a>
+          <a href="/admin/einladungen">Einladungen</a>
+          <a href="/admin/zuweisungen">Zuweisungen</a>
+        <% } %>
+        <a href="/teacher">Fächer</a>
+        <a href="/klassenlehrer">Klassenleitung</a>
+      </nav>
+      <div class="userbox">
+        <span class="user"><%= user.displayName || user.username %></span>
+        <% if (user.isAdmin) { %><span class="role">Admin</span><% } %>
+        <a class="logout" href="/logout">Abmelden</a>
+      </div>
+    <% } %>
+  </div>
+</header>
+<% if (typeof flash !== 'undefined' && flash) { %>
+  <div class="flash flash-<%= flash.type %>"><%= flash.message %></div>
+<% } %>
+<main class="container">
+<%- body %>
+</main>
+<footer class="footer">
+  <small>Notenverwaltung · <%= now.getFullYear() %></small>
+</footer>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<h1>Lehrkräfte</h1>
+
+<table class="data">
+  <thead>
+    <tr><th>Benutzername</th><th>Anzeigename</th><th>Rolle</th><th>Status</th><th>Aktion</th></tr>
+  </thead>
+  <tbody>
+    <% users.forEach(function(u) { %>
+      <tr>
+        <td><%= u.username %></td>
+        <td><%= u.display_name || '—' %></td>
+        <td><%= u.role %></td>
+        <td><%= u.active ? '✅ aktiv' : '🚫 inaktiv' %></td>
+        <td>
+          <details>
+            <summary>Aktionen</summary>
+            <form method="post" action="/admin/users/<%= u.id %>/toggle" class="inline">
+              <button type="submit"><%= u.active ? 'Deaktivieren' : 'Aktivieren' %></button>
+            </form>
+            <form method="post" action="/admin/users/<%= u.id %>/reset" class="inline">
+              <input type="password" name="password" placeholder="neues Passwort" minlength="8" required>
+              <button type="submit">Passwort zurücksetzen</button>
+            </form>
+          </details>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<p><a href="/admin/einladungen">→ Neue Lehrkraft per Einladungslink anlegen</a></p>

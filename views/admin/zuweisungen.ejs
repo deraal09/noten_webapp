@@ -1,0 +1,99 @@
+<h1>Zuweisungen</h1>
+
+<h2>Lehrkraft → Fach</h2>
+<form method="post" action="/admin/zuweisungen/neu" class="card">
+  <label>Lehrkraft
+    <select name="user_id" required>
+      <option value="">— wählen —</option>
+      <% users.forEach(function(u) { %><option value="<%= u.id %>"><%= u.display_name || u.username %></option><% }); %>
+    </select>
+  </label>
+  <label>Fach
+    <select name="fach_id" required>
+      <option value="">— wählen —</option>
+      <% faecher.forEach(function(f) { %><option value="<%= f.id %>"><%= f.schuljahr_bezeichnung %> · <%= f.klasse_name %> · <%= f.name %></option><% }); %>
+    </select>
+  </label>
+  <button type="submit">+ Zuweisen</button>
+</form>
+<table class="data">
+  <thead><tr><th>Lehrkraft</th><th>Schuljahr</th><th>Klasse</th><th>Fach</th><th>Aktion</th></tr></thead>
+  <tbody>
+    <% zuweisungen.forEach(function(z) { %>
+      <tr>
+        <td><%= z.display_name || z.username %></td>
+        <td><%= z.schuljahr_bezeichnung %></td>
+        <td><%= z.klasse_name %></td>
+        <td><%= z.fach_name %></td>
+        <td>
+          <form method="post" action="/admin/zuweisungen/<%= z.id %>/loeschen" class="inline">
+            <button type="submit" class="danger">🗑</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<h2>Klassenleitung</h2>
+<form method="post" action="/admin/klassenlehrer/neu" class="card">
+  <label>Lehrkraft
+    <select name="user_id" required>
+      <option value="">— wählen —</option>
+      <% users.forEach(function(u) { %><option value="<%= u.id %>"><%= u.display_name || u.username %></option><% }); %>
+    </select>
+  </label>
+  <label>Klasse
+    <select id="klasse-lehrer" required></select>
+  </label>
+  <label>Fach
+    <select name="fach_id" id="fach-lehrer" required></select>
+  </label>
+  <button type="submit">+ Zuweisen</button>
+</form>
+<table class="data">
+  <thead><tr><th>Lehrkraft</th><th>Schuljahr</th><th>Klasse</th><th>Fach</th><th>Aktion</th></tr></thead>
+  <tbody>
+    <% klassenlehrer.forEach(function(k) { %>
+      <tr>
+        <td><%= k.display_name || k.username %></td>
+        <td><%= k.schuljahr_bezeichnung %></td>
+        <td><%= k.klasse_name %></td>
+        <td><%= k.fach_name %></td>
+        <td>
+          <form method="post" action="/admin/klassenlehrer/<%= k.id %>/loeschen" class="inline">
+            <button type="submit" class="danger">🗑</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+<script>
+  var faecher = <%- JSON.stringify(faecher.map(function(f){return {id:f.id, klasse_name:f.klasse_name, schuljahr_bezeichnung:f.schuljahr_bezeichnung, name:f.name})) %>;
+  var klasseSel = document.getElementById('klasse-lehrer');
+  var fachSel = document.getElementById('fach-lehrer');
+  var grouped = {};
+  faecher.forEach(function(f) {
+    var key = f.schuljahr_bezeichnung + ' · ' + f.klasse_name;
+    if (!grouped[key]) grouped[key] = { id: f.id, faecher: [] };
+    grouped[key].faecher.push(f);
+  });
+  Object.keys(grouped).forEach(function(key) {
+    var opt = document.createElement('option');
+    opt.value = key; opt.textContent = key;
+    klasseSel.appendChild(opt);
+  });
+  function updateFaecher() {
+    fachSel.innerHTML = '';
+    var key = klasseSel.value;
+    (grouped[key]?.faecher || []).forEach(function(f) {
+      var opt = document.createElement('option');
+      opt.value = f.id; opt.textContent = f.name;
+      fachSel.appendChild(opt);
+    });
+  }
+  klasseSel.addEventListener('change', updateFaecher);
+  klasseSel.addEventListener('input', updateFaecher);
+  if (klasseSel.options.length) { klasseSel.selectedIndex = 0; updateFaecher(); }
+</script>

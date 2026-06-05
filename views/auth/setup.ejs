@@ -1,0 +1,18 @@
+<h1>Erstes Konto anlegen</h1>
+<p>Es existieren noch keine Benutzer. Bitte lege das Admin-Konto an, mit dem du die App verwalten möchtest.</p>
+<% if (error) { %><p class="err"><%= error %></p><% } %>
+<form method="post" action="/setup" class="card">
+  <label>Benutzername <small>(min. 3 Zeichen)</small>
+    <input type="text" name="username" required autofocus>
+  </label>
+  <label>Anzeigename
+    <input type="text" name="display_name">
+  </label>
+  <label>Passwort <small>(min. 8 Zeichen)</small>
+    <input type="password" name="password" required>
+  </label>
+  <label>Passwort bestätigen
+    <input type="password" name="password2" required>
+  </label>
+  <button type="submit">Konto anlegen und starten</button>
+</form>

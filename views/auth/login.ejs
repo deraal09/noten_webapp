@@ -1,0 +1,15 @@
+<h1>Anmelden</h1>
+<% if (typeof error !== 'undefined' && error) { %><p class="err"><%= error %></p><% } %>
+<% if (typeof query !== 'undefined' && query.msg === 'invite_expired') { %>
+  <p class="err">Dieser Einladungslink ist abgelaufen.</p>
+<% } %>
+<form method="post" action="/login" class="card">
+  <input type="hidden" name="next" value="<%= next %>">
+  <label>Benutzername
+    <input type="text" name="username" autofocus required>
+  </label>
+  <label>Passwort
+    <input type="password" name="password" required>
+  </label>
+  <button type="submit">Anmelden</button>
+</form>

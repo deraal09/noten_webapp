@@ -1,0 +1,28 @@
+{
+  "name": "noten-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-User-Notenverwaltung als Single-Process-Node.js-App, deploybar via Plesk Node.js-Support ohne Reverse-Proxy.",
+  "main": "app.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "test": "node --test test/",
+    "seed:admin": "node src/cli/seed-admin.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^9.4.0",
+    "@fastify/formbody": "^7.4.0",
+    "@fastify/session": "^10.9.0",
+    "@fastify/static": "^7.0.4",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "ejs": "^3.1.10",
+    "fastify": "^4.28.1",
+    "semver": "^7.6.0"
+  }
+}

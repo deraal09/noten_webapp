@@ -1,0 +1,202 @@
+<h1><%= fach.name %> – <%= fach.klasse_name %> <small>(<%= fach.schuljahr_bezeichnung %>, <%= fach.notenschluessel %>)</small></h1>
+<p><a href="/teacher">← Meine Fächer</a></p>
+
+<div class="hj-tabs">
+  <% HALBJAHRE.forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
+  <% }); %>
+</div>
+
+<details class="card">
+  <summary>+ Klausur anlegen</summary>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/klausuren/neu" class="inline">
+    <input type="text" name="name" placeholder="Name (z. B. K1)" required>
+    <input type="number" name="aufgaben" min="1" value="1" size="3">
+    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+    <button type="submit">+ Klausur</button>
+  </form>
+</details>
+<details class="card">
+  <summary>+ Unterrichtsleistung anlegen</summary>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/uls/neu" class="inline">
+    <input type="text" name="name" placeholder="Name (z. B. UL 1)" required>
+    <input type="number" name="aufgaben" min="1" value="1" size="3">
+    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+    <button type="submit">+ UL</button>
+  </form>
+</details>
+<details class="card">
+  <summary>Gewichtung (Schriftlich <%= schriftlichPct %>% / Mündlich <%= ulPct %>%)</summary>
+  <p>Wird pro Klausur/UL überschrieben – die Summe aller schriftlichen Gewichtungen sollte <strong><%= schriftlichPct %>%</strong>, die der ULs <strong><%= ulPct %>%</strong> ergeben.</p>
+</details>
+
+<h2>Klausuren</h2>
+<% if (!klausuren.length) { %><p class="hint">Noch keine Klausuren.</p><% } %>
+<% klausuren.forEach(function(k) { %>
+  <% var maxArr = JSON.parse(k.max_punkte_pro_aufgabe); %>
+  <div class="card">
+    <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
+      <button type="submit" class="danger">🗑</button>
+    </form>
+    <h3><%= k.name %></h3>
+    <form method="post" action="/teacher/klausuren/<%= k.id %>/gewichtung" class="inline">
+      Gewichtung: <input type="number" name="gewichtung" value="<%= k.gewichtung %>" min="0" max="100" step="0.1" size="5">%
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">💾</button>
+    </form>
+    <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="inline">
+      Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
+      <% maxArr.forEach(function(mp, i) { %>
+        <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3" title="Max. Punkte Aufgabe <%= i+1 %>">
+      <% }); %>
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">💾 Max-Punkte</button>
+    </form>
+  </div>
+<% }); %>
+
+<h2>Unterrichtsleistungen</h2>
+<% if (!uls.length) { %><p class="hint">Noch keine ULs.</p><% } %>
+<% uls.forEach(function(u) { %>
+  <% var maxArr = JSON.parse(u.max_punkte_pro_aufgabe); %>
+  <div class="card">
+    <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('UL löschen?')">
+      <button type="submit" class="danger">🗑</button>
+    </form>
+    <h3><%= u.name %></h3>
+    <form method="post" action="/teacher/uls/<%= u.id %>/gewichtung" class="inline">
+      Gewichtung: <input type="number" name="gewichtung" value="<%= u.gewichtung %>" min="0" max="100" step="0.1" size="5">%
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">💾</button>
+    </form>
+    <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" class="inline">
+      Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
+      <% maxArr.forEach(function(mp, i) { %>
+        <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3">
+      <% }); %>
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">💾 Max-Punkte</button>
+    </form>
+  </div>
+<% }); %>
+
+<h2>Notentafel</h2>
+<p class="hint">Punkte direkt eintragen – Gesamtnote aktualisiert sich live.</p>
+<table class="tafel" id="tafel">
+  <thead>
+    <tr>
+      <th rowspan="2">Schüler/in</th>
+      <% klausuren.forEach(function(k) { %>
+        <th colspan="<%= JSON.parse(k.max_punkte_pro_aufgabe).length %>" class="klausur-col"><%= k.name %><br><small><%= k.gewichtung %>%</small></th>
+        <th rowspan="2" class="note-col">Note</th>
+      <% }); %>
+      <th colspan="<%= uls.length || 1 %>">ULs</th>
+      <th colspan="2">Manuelle Noten</th>
+      <th rowspan="2">Gesamt</th>
+    </tr>
+    <tr>
+      <% klausuren.forEach(function(k) {
+           var maxArr = JSON.parse(k.max_punkte_pro_aufgabe);
+           maxArr.forEach(function(_, i) { %>
+            <th class="aufgabe-head" title="Aufgabe <%= i+1 %> (max <%= maxArr[i] %>)">A<%= i+1 %></th>
+      <%  }); }); %>
+      <% uls.forEach(function(u) { %>
+        <th class="ul-col" title="<%= u.name %>"><%= u.name %><br><small><%= u.gewichtung %>%</small></th>
+      <% }); %>
+      <th>M</th><th>S</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% schueler.forEach(function(s) { %>
+      <tr data-schueler="<%= s.id %>">
+        <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
+        <% klausuren.forEach(function(k) {
+             var maxArr = JSON.parse(k.max_punkte_pro_aufgabe);
+             maxArr.forEach(function(mp, i) {
+               var p = (ergebnisseMap[s.id] && ergebnisseMap[s.id]['k'+k.id]) ? ergebnisseMap[s.id]['k'+k.id][i] : null;
+        %>
+          <td><input type="number" class="punkt" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= s.id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null ? '' : p %>" placeholder="–"></td>
+        <%  });
+             var k_ergebnis = (typeof klausurNote !== 'undefined' ? null : null);
+        %>
+          <td class="note-cell k-note" data-sid="<%= s.id %>" data-kid="<%= k.id %>">–</td>
+        <% }); %>
+        <% uls.forEach(function(u) {
+             var p = (ergebnisseMap[s.id] && ergebnisseMap[s.id]['u'+u.id]) ? ergebnisseMap[s.id]['u'+u.id][0] : null;
+             var maxArr = JSON.parse(u.max_punkte_pro_aufgabe);
+             var p0 = (ergebnisseMap[s.id] && ergebnisseMap[s.id]['u'+u.id]) ? ergebnisseMap[s.id]['u'+u.id][0] : null;
+        %>
+          <td><input type="number" class="punkt" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= s.id %>" data-idx="0" min="0" max="<%= maxArr[0] %>" step="0.5" value="<%= p0 === null ? '' : p0 %>" placeholder="–"></td>
+        <% }); %>
+        <td class="note-cell" data-muendlich="<%= (notenMap[s.id] && notenMap[s.id].muendlich.length) ? notenMap[s.id].muendlich.join(' ') : '' %>">
+          <% var m = (notenMap[s.id] && notenMap[s.id].muendlich) || []; %>
+          <% m.forEach(function(v) { %>
+            <form method="post" action="/teacher/noten/<%= v.id %>/loeschen" class="inline">
+              <button type="submit" class="tag" title="löschen"><%= Number(v).toString().replace('.', ',') %></button>
+            </form>
+          <% }); %>
+        </td>
+        <td class="note-cell" data-schriftlich="<%= (notenMap[s.id] && notenMap[s.id].schriftlich.length) ? notenMap[s.id].schriftlich.join(' ') : '' %>">
+          <% var s2 = (notenMap[s.id] && notenMap[s.id].schriftlich) || []; %>
+          <% s2.forEach(function(v) { %>
+            <form method="post" action="/teacher/noten/<%= v.id %>/loeschen" class="inline">
+              <button type="submit" class="tag" title="löschen"><%= Number(v).toString().replace('.', ',') %></button>
+            </form>
+          <% }); %>
+        </td>
+        <td class="gesamt-cell" data-sid="<%= s.id %>">–</td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<h3>Manuelle Note hinzufügen</h3>
+<form method="post" action="/teacher/fach/<%= fach.id %>/noten/hinzufuegen" class="inline">
+  <select name="schueler_id" required>
+    <% schueler.forEach(function(s) { %><option value="<%= s.id %>"><%= s.nachname %>, <%= s.vorname %></option><% }); %>
+  </select>
+  <select name="typ" required>
+    <option value="muendlich">Mündlich</option>
+    <option value="schriftlich">Schriftlich</option>
+  </select>
+  <input type="number" name="wert" step="0.1" min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" required>
+  <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+  <button type="submit">+ Note</button>
+</form>
+
+<script>
+  // Live-Update via JSON-API
+  const API_URL = '/teacher/fach/<%= fach.id %>/noten?hj=' + encodeURIComponent('<%= halbjahr %>');
+  async function refresh() {
+    try {
+      const r = await fetch(API_URL);
+      if (!r.ok) return;
+      const data = await r.json();
+      const tbody = document.querySelector('#tafel tbody');
+      data.schueler.forEach(function(s) {
+        const tr = tbody.querySelector('tr[data-schueler="' + s.schueler_id + '"]');
+        if (!tr) return;
+        s.klausuren.forEach(function(k) {
+          const cell = tr.querySelector('.k-note[data-sid="' + s.schueler_id + '"][data-kid="' + k.id + '"]');
+          if (cell) cell.textContent = k.note !== null ? k.note.toString().replace('.', ',') : '–';
+        });
+        tr.querySelector('.gesamt-cell').textContent = s.gesamt !== null ? s.gesamt.toString().replace('.', ',') : '–';
+      });
+    } catch (e) { console.warn(e); }
+  }
+  function debounce(fn, ms) { let t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
+  document.querySelectorAll('input.punkt').forEach(function(inp) {
+    inp.addEventListener('input', debounce(async function() {
+      const fd = new FormData();
+      fd.append('schueler_id', inp.dataset.sid);
+      fd.append('aufgabe_idx', inp.dataset.idx);
+      fd.append('wert', inp.value);
+      const url = inp.dataset.kind === 'k'
+        ? '/teacher/klausuren/' + inp.dataset.kid + '/punkte'
+        : '/teacher/uls/' + inp.dataset.kid + '/punkte';
+      await fetch(url, { method: 'POST', body: fd });
+      refresh();
+    }, 400));
+  });
+  refresh();
+</script>
