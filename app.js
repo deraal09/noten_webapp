@@ -26,6 +26,9 @@ import { readFile } from 'node:fs/promises';
 
 import { getDb } from './src/db.js';
 import { authPreHandler, SESSION_COOKIE } from './src/auth.js';
+import {
+  HALBJAHRE, NOTE_TYPEN, FEHLZEIT_TYPEN, formatNote, formatNoteG,
+} from './src/grade-calc.js';
 import authRoutes from './src/routes/auth.js';
 import adminRoutes from './src/routes/admin.js';
 import teacherRoutes from './src/routes/teacher.js';
@@ -48,6 +51,9 @@ export async function buildApp(opts = {}) {
       ? { level: 'info' }
       : { level: 'debug' }),
     bodyLimit: 2 * 1024 * 1024,
+    // Hinter Plesks nginx/Passenger terminiert ein Proxy TLS – damit Fastify
+    // Protokoll/Host korrekt aus X-Forwarded-* ableitet.
+    trustProxy: true,
   });
 
   await app.register(fastifyCookie);
@@ -71,7 +77,10 @@ export async function buildApp(opts = {}) {
   // EJS-View-Engine registrieren, ohne @fastify/view (Plesk-Node-Workaround).
   // Wir lesen das Layout manuell und binden den Body ein.
   app.decorateReply('viewEjs', async function(template, data) {
-    const tplPath = path.join(__dirname, 'views', template + '.ejs');
+    // Aufrufer übergeben den Namen mal mit, mal ohne '.ejs' – normalisieren,
+    // sonst entsteht 'setup.ejs.ejs' → ENOENT → 500.
+    const rel = template.endsWith('.ejs') ? template : template + '.ejs';
+    const tplPath = path.join(__dirname, 'views', rel);
     const layoutPath = path.join(__dirname, 'views', 'partials', 'layout.ejs');
     const body = await ejs.renderFile(tplPath, { ...(this.locals || {}), ...(data || {}) }, { async: true });
     let html;
@@ -86,6 +95,13 @@ export async function buildApp(opts = {}) {
     this.send(html);
   });
 
+  // Flash-Messages: in der Session gepuffert, überleben den Redirect,
+  // werden beim nächsten Request angezeigt und geleert.
+  app.decorateRequest('flash', function (type, message) {
+    this.session.flash = this.session.flash || [];
+    this.session.flash.push({ type, message });
+  });
+
   // DB initialisieren
   getDb();
 
@@ -96,6 +112,15 @@ export async function buildApp(opts = {}) {
     reply.locals.appName = 'Notenverwaltung';
     reply.locals.now = new Date();
     reply.locals.PUBLIC_URL = PUBLIC_URL;
+    // Geteilte Anzeige-Konstanten/-Helfer für alle Templates verfügbar machen.
+    reply.locals.HALBJAHRE = HALBJAHRE;
+    reply.locals.NOTE_TYPEN = NOTE_TYPEN;
+    reply.locals.FEHLZEIT_TYPEN = FEHLZEIT_TYPEN;
+    reply.locals.formatNote = formatNote;
+    reply.locals.formatNoteG = formatNoteG;
+    const pending = request.session?.flash;
+    reply.locals.flash = pending && pending.length ? pending : null;
+    if (pending && pending.length) request.session.flash = [];
     done();
   });
 
@@ -133,12 +158,20 @@ export async function buildApp(opts = {}) {
 }
 
 async function start() {
-  const PORT = parseInt(process.env.PORT, 10) || 3001;
-  const HOST = process.env.HOST || '0.0.0.0';
   const app = await buildApp();
+  const portEnv = process.env.PORT;
+  const HOST = process.env.HOST || '0.0.0.0';
+  // Plesk/Passenger übergibt PORT häufig als Unix-Socket-PFAD (keine Zahl).
+  // parseInt() würde das in NaN→3001 verwandeln → Passenger erreicht die App
+  // nicht → 504. Deshalb numerisch vs. Socket-Pfad unterscheiden.
+  const listenOpts = /^\d+$/.test(portEnv ?? '')
+    ? { port: Number(portEnv), host: HOST }
+    : portEnv
+      ? { path: portEnv }
+      : { port: 3001, host: HOST };
   try {
-    await app.listen({ port: PORT, host: HOST });
-    app.log.info(`Notenverwaltung läuft auf http://${HOST}:${PORT}`);
+    const address = await app.listen(listenOpts);
+    app.log.info(`Notenverwaltung läuft auf ${address}`);
   } catch (e) {
     app.log.error(e);
     process.exit(1);

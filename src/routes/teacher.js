@@ -7,7 +7,7 @@ import { getDb } from '../db.js';
 import { requireAuth, userHatFachZgriff } from '../auth.js';
 import {
   HALBJAHRE, NOTE_TYPEN, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr,
-  autoDistribute, nichtBestanden, formatNote, DEFAULT_GEWICHTUNG,
+  autoDistribute, nichtBestanden, formatNote, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from '../grade-calc.js';
 
 export default async function teacherRoutes(fastify) {
@@ -52,9 +52,9 @@ export default async function teacherRoutes(fastify) {
   // ---------- Fach-Detail (Notentafel) ----------
   fastify.get('/fach/:id', async (request, reply) => {
     const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach) return reply.code(404).view('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
     if (!userHatFachZgriff(request.user, fach.id)) {
-      return reply.code(403).view('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
     const schueler = getDb().prepare(
@@ -407,7 +407,7 @@ function getNotenschluesselCsv(fach) {
   const k = getDb().prepare('SELECT notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
     .get(fach.klasse_id);
   if (k?.notenschluessel_csv) return k.notenschluessel_csv;
-  return require('../grade-calc.js').DEFAULT_NS_CSV[k?.notenschluessel] || '';
+  return DEFAULT_NS_CSV[k?.notenschluessel] || '';
 }
 
 function autoVerteileKlausuren(fachId, halbjahr) {

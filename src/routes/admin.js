@@ -62,7 +62,7 @@ export default async function adminRoutes(fastify) {
   // ---------- Schuljahr-Detail (Klassen) ----------
   fastify.get('/schuljahre/:id', async (request, reply) => {
     const sj = getDb().prepare('SELECT * FROM schuljahre WHERE id = ?').get(request.params.id);
-    if (!sj) return reply.code(404).view('error.ejs', { code: 404, message: 'Schuljahr nicht gefunden.' });
+    if (!sj) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schuljahr nicht gefunden.' });
     const klassen = getDb().prepare(
       'SELECT * FROM klassen WHERE schuljahr_id = ? ORDER BY name'
     ).all(sj.id);
@@ -87,7 +87,7 @@ export default async function adminRoutes(fastify) {
   // ---------- Klassen ----------
   fastify.get('/klassen/:id', async (request, reply) => {
     const klasse = getKlasseMitSchuljahr(request.params.id);
-    if (!klasse) return reply.code(404).view('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
     const schueler = getDb().prepare(
       'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
     ).all(klasse.id);
@@ -167,7 +167,7 @@ export default async function adminRoutes(fastify) {
   // ---------- Notenschlüssel ----------
   fastify.get('/klassen/:id/notenschluessel', async (request, reply) => {
     const klasse = getKlasseMitSchuljahr(request.params.id);
-    if (!klasse) return reply.code(404).view('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
     return reply.viewEjs('admin/notenschluessel.ejs', { user: request.user, klasse });
   });
 
@@ -255,7 +255,7 @@ export default async function adminRoutes(fastify) {
       "SELECT * FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
     ).all();
     const faecher = getDb().prepare(`
-      SELECT f.id, f.name, k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
+      SELECT f.id, f.name, k.id AS klasse_id, k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
       FROM faecher f
       JOIN klassen k ON k.id = f.klasse_id
       JOIN schuljahre s ON s.id = k.schuljahr_id

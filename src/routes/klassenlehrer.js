@@ -39,9 +39,9 @@ export default async function klassenlehrerRoutes(fastify) {
       FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
       WHERE k.id = ?
     `).get(request.params.id);
-    if (!klasse) return reply.code(404).view('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
     if (!userIstKlassenlehrer(request.user, klasse.id)) {
-      return reply.code(403).view('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
     const schueler = getDb().prepare(
@@ -52,10 +52,10 @@ export default async function klassenlehrerRoutes(fastify) {
       fehlMap[s.id] = {};
       for (const t of FEHLZEIT_TYPEN) fehlMap[s.id][t] = { stunden: 0, notiz: '' };
     }
-    const rows = getDb().prepare(
+    const rows = schueler.length ? getDb().prepare(
       'SELECT schueler_id, typ, stunden, notiz FROM fehlzeiten WHERE halbjahr = ? AND schueler_id IN (' +
       schueler.map(() => '?').join(',') + ')'
-    ).all(halbjahr, ...schueler.map((s) => s.id));
+    ).all(halbjahr, ...schueler.map((s) => s.id)) : [];
     for (const r of rows) {
       if (fehlMap[r.schueler_id] && fehlMap[r.schueler_id][r.typ]) {
         fehlMap[r.schueler_id][r.typ] = { stunden: r.stunden, notiz: r.notiz || '' };
@@ -70,7 +70,7 @@ export default async function klassenlehrerRoutes(fastify) {
     const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
     if (!klasse) return reply.redirect('/klassenlehrer');
     if (!userIstKlassenlehrer(request.user, klasse.id)) {
-      return reply.code(403).view('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = HALBJAHRE.includes(request.body?.hj) ? request.body.hj : HALBJAHRE[0];
     const schueler = getDb().prepare(

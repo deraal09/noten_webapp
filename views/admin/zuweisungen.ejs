@@ -44,7 +44,7 @@
     </select>
   </label>
   <label>Klasse
-    <select id="klasse-lehrer" required></select>
+    <select name="klasse_id" id="klasse-lehrer" required></select>
   </label>
   <label>Fach
     <select name="fach_id" id="fach-lehrer" required></select>
@@ -70,18 +70,19 @@
   </tbody>
 </table>
 <script>
-  var faecher = <%- JSON.stringify(faecher.map(function(f){return {id:f.id, klasse_name:f.klasse_name, schuljahr_bezeichnung:f.schuljahr_bezeichnung, name:f.name})) %>;
+  var faecher = <%- JSON.stringify(faecher.map(function(f){return {id:f.id, klasse_id:f.klasse_id, klasse_name:f.klasse_name, schuljahr_bezeichnung:f.schuljahr_bezeichnung, name:f.name};})) %>;
   var klasseSel = document.getElementById('klasse-lehrer');
   var fachSel = document.getElementById('fach-lehrer');
   var grouped = {};
   faecher.forEach(function(f) {
-    var key = f.schuljahr_bezeichnung + ' · ' + f.klasse_name;
-    if (!grouped[key]) grouped[key] = { id: f.id, faecher: [] };
-    grouped[key].faecher.push(f);
+    if (!grouped[f.klasse_id]) {
+      grouped[f.klasse_id] = { label: f.schuljahr_bezeichnung + ' · ' + f.klasse_name, faecher: [] };
+    }
+    grouped[f.klasse_id].faecher.push(f);
   });
-  Object.keys(grouped).forEach(function(key) {
+  Object.keys(grouped).forEach(function(klasseId) {
     var opt = document.createElement('option');
-    opt.value = key; opt.textContent = key;
+    opt.value = klasseId; opt.textContent = grouped[klasseId].label;
     klasseSel.appendChild(opt);
   });
   function updateFaecher() {

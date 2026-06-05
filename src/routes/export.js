@@ -15,7 +15,7 @@ export default async function exportRoutes(fastify) {
     if (!klasse) return reply.code(404).send('Klasse nicht gefunden');
     if (!darfExportieren(request.user, klasse)) return reply.code(403).send('Keine Berechtigung');
 
-    const csv = baueKlasseCsv(klasse);
+    const csv = '\ufeff' + [HEADER.join(';'), ...baueKlasseCsv(klasse)].join('\n');
     const filename = `Noten_${klasse.schuljahr_bezeichnung}_${klasse.name}.csv`.replace(/[^\w.-]/g, '_');
     return bauReply(reply, csv, filename);
   });

@@ -30,8 +30,10 @@
     <% } %>
   </div>
 </header>
-<% if (typeof flash !== 'undefined' && flash) { %>
-  <div class="flash flash-<%= flash.type %>"><%= flash.message %></div>
+<% if (typeof flash !== 'undefined' && flash && flash.length) { %>
+  <% flash.forEach(function (f) { %>
+    <div class="flash flash-<%= f.type %>"><%= f.message %></div>
+  <% }) %>
 <% } %>
 <main class="container">
 <%- body %>

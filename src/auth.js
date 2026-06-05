@@ -49,17 +49,19 @@ export async function authPreHandler(request, reply) {
   };
 }
 
-export function requireAuth(request, reply) {
+// WICHTIG: Diese Funktionen werden als Fastify-preHandler eingesetzt und
+// MÜSSEN async sein. Ein synchroner Hook mit Arität 2, der undefined
+// zurückgibt (ohne done()), lässt Fastify v4 unendlich auf den Abschluss
+// warten → jede geschützte Route hängt.
+export async function requireAuth(request, reply) {
   if (!request.user) {
-    reply.code(401).redirect('/login?next=' + encodeURIComponent(request.url));
-    return reply;
+    return reply.code(401).redirect('/login?next=' + encodeURIComponent(request.url));
   }
 }
 
-export function requireAdmin(request, reply) {
+export async function requireAdmin(request, reply) {
   if (!request.user || !request.user.isAdmin) {
-    reply.code(403);
-    return reply.viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
   }
 }
 

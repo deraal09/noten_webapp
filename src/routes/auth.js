@@ -116,7 +116,7 @@ export default async function authRoutes(fastify) {
       .prepare(`SELECT id, token, email, display_name, role, expires_at, used_at
                 FROM invitations WHERE token = ?`)
       .get(request.params.token);
-    if (!inv) return reply.code(404).view('error.ejs', { code: 404, message: 'Einladung nicht gefunden.' });
+    if (!inv) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Einladung nicht gefunden.' });
     const valid = !inv.used_at && (!inv.expires_at || new Date(inv.expires_at) > new Date());
     if (!valid) return reply.redirect('/login?msg=invite_expired');
 
