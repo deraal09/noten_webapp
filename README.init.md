@@ -1,3 +1,0 @@
-# README
-
-Init des Projektes.
