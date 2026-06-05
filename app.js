@@ -133,7 +133,7 @@ export async function buildApp(opts = {}) {
 }
 
 async function start() {
-  const PORT = parseInt(process.env.PORT, 10) || 3000;
+  const PORT = parseInt(process.env.PORT, 10) || 3001;
   const HOST = process.env.HOST || '0.0.0.0';
   const app = await buildApp();
   try {
