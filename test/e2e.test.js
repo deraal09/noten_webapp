@@ -116,15 +116,23 @@ test('Smoketest: vollständiger Workflow', async () => {
   assert.equal(data.schueler[0].gesamt, null);
   assert.equal(data.schueler[0].klausuren.length, 0);
 
-  // 11. Klausur
+  // 11. Klausur (1 Aufgabe)
   r = await req('/teacher/fach/1/klausuren/neu', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: 'name=K1&aufgaben=2&halbjahr=' + encodeURIComponent('1. Halbjahr'),
+    body: 'name=K1&aufgaben=1&halbjahr=' + encodeURIComponent('1. Halbjahr'),
   });
   assert.equal(r.status, 302);
 
-  // 12. Punkt eintragen (8 von 10 → Note 1,6)
+  // 11b. Maximalpunkte der Aufgabe auf 10 setzen (Default ist 1)
+  r = await req('/teacher/klausuren/1/maxpunkte', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'anzahl_aufgaben=1&mp_0=10',
+  });
+  assert.equal(r.status, 302);
+
+  // 12. Punkt eintragen (8 von 10 → 80 %)
   r = await req('/teacher/klausuren/1/punkte', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -134,7 +142,7 @@ test('Smoketest: vollständiger Workflow', async () => {
   const j = await r.json();
   assert.equal(j.ok, true);
 
-  // 13. JSON-API erneut – Gesamt sollte die Klausurnote zeigen
+  // 13. JSON-API erneut – Klausurnote sollte berechnet sein
   r = await req('/teacher/fach/1/noten');
   const data2 = await r.json();
   assert.ok(data2.schueler[0].klausuren[0].note > 0, 'Klausurnote berechnet');
@@ -142,8 +150,9 @@ test('Smoketest: vollständiger Workflow', async () => {
   // 14. CSV-Export
   r = await req('/export/klasse/1.csv');
   assert.equal(r.status, 200);
-  const csv = await r.text();
-  assert.ok(csv.startsWith('\ufeff'), 'CSV muss UTF-8-BOM haben');
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  assert.ok(bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf, 'CSV muss UTF-8-BOM haben');
+  const csv = new TextDecoder('utf-8').decode(bytes);
   assert.ok(csv.includes('Schuljahr'));
   assert.ok(csv.includes('Müller'));
 

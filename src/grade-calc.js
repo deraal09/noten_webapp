@@ -141,7 +141,9 @@ export function nichtBestanden(note, nsTyp) {
 
 export function formatNote(n) {
   if (n === null || n === undefined) return '—';
-  return Number(n).toFixed(2).replace('.', ',');
+  // Bis zu 2 Nachkommastellen, aber eine überflüssige zweite Null abschneiden:
+  // 2,5 statt 2,50 – während Durchschnitte wie 2,33 erhalten bleiben.
+  return Number(n).toFixed(2).replace(/0$/, '').replace('.', ',');
 }
 
 export function formatNoteG(n) {

@@ -20,9 +20,10 @@ test('nsCsvParse liefert korrekte Anzahl und Reihenfolge', () => {
   assert.deepEqual(entries[2], [0, 6]);
 });
 
-test('nsCsvLookup: 100 % → 1, 50 % → 4, 0 % → 6', () => {
+test('nsCsvLookup: 100 % → 1, 50 % → 4,4, 0 % → 6', () => {
   assert.equal(nsCsvLookup(100, IHK_CSV), 1);
-  assert.equal(nsCsvLookup(50, IHK_CSV), 4);
+  // Die IHK-Tabelle bildet 50 % auf 4,4 ab (Eintrag "50,4.4").
+  assert.equal(nsCsvLookup(50, IHK_CSV), 4.4);
   assert.equal(nsCsvLookup(0, IHK_CSV), 6);
 });
 
