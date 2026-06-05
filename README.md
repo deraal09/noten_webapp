@@ -36,9 +36,8 @@ die App direkt und routet die Subdomain darauf.
 
 ```bash
 # Voraussetzungen: Node.js >= 20
-cd webapp
 npm install
-npm start         # → http://localhost:3000
+npm start         # → http://localhost:3001
 ```
 
 Beim ersten Start wirst du auf `/setup` geleitet und legst den Admin an.
@@ -61,48 +60,52 @@ node src/cli/seed-admin.js --username admin --display "T. Lehrer" --password geh
 
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 
-Plesk-Web-Admin-Edition hat **kein** Python/Passenger. Wir nutzen einfach
-Plesks **Node.js-Support** — der ist da.
+Plesk-Web-Admin-Edition hat **kein** Python/Passenger für Flask. Wir nutzen
+Plesks **Node.js-Support** (Phusion Passenger) — der ist vorhanden.
+Das Repository wird direkt per **Git-Pull** ins Application-Root deployed;
+das Repo-Root **ist** das Application-Root (`app.js` liegt oben, es gibt
+**kein** `webapp/`-Unterverzeichnis).
 
-### 1. Dateien hochladen
+### 1. Repository klonen (einmalig)
 
-Per SSH oder Plesk-Dateimanager den **Inhalt** von `webapp/` (ohne
-`node_modules/`, ohne `data/`) in das Application-Root der Subdomain
-hochladen, z. B.:
-
-```
-/var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
-```
-
-### 2. Dependencies installieren (auf dem Server)
+Per SSH ins Application-Root der Subdomain – das Repo-Root ist das App-Root:
 
 ```bash
 ssh ci_cd_account@noten.bbz-rd-eck.com
 cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
-npm install --omit=dev
+git clone <repo-url> .          # Inhalt direkt hierher (Punkt am Ende!)
 ```
 
-Falls `npm install` Probleme macht (z. B. `Cannot find module 'semver'`):
+`node_modules/`, `data/` und `tmp/` sind per `.gitignore` ausgenommen und
+werden auf dem Server erzeugt.
+
+### 2. Dependencies installieren (auf dem Server)
+
 ```bash
-# Schneller Workaround: npm neu installieren
-npm install -g npm@latest
+npm ci --omit=dev
 ```
 
-Oder: Auf dem Server in `node_modules/` leere Platzhalter-Dateien anlegen
-und die `.js`-Dateien aus einem funktionierenden `node_modules` reinkopieren.
-**Aber:** Plesk-Web-Admin sollte Node.js unterstützen, `npm install` ist
-normalerweise problemlos möglich.
+`npm ci` nutzt die committete `package-lock.json` → **reproduzierbar** und
+schneller als `npm install`.
+
+> **⚠ Natives Modul `better-sqlite3`:** Das ist der häufigste Plesk-Stolperstein.
+> `better-sqlite3` wird beim Install **gegen die Node-Version der Subdomain
+> kompiliert** (node-gyp). Voraussetzungen auf dem Server: `python3`, `make`,
+> `g++`/build-essential. **Wichtig:** Wenn in der Plesk-UI später die
+> Node-Version gewechselt wird, muss `npm rebuild better-sqlite3` (oder erneut
+> `npm ci`) laufen, sonst meldet die App beim Start einen ABI-/Modulfehler.
 
 ### 3. Plesk-UI: Node.js aktivieren
 
 1. Plesk → `noten.bbz-rd-eck.com` → **Node.js**
-2. **Anwendungs-Wurzel:** `httpdocs` (oder wo der Code liegt)
+2. **Anwendungs-Wurzel:** das Verzeichnis mit `app.js` (i. d. R. das Repo-Root)
 3. **Anwendungs-Startdatei:** `app.js`
 4. **„Anwendung neu starten"** klicken
 5. Status sollte **„running"** werden
 
-Plesk weist der App automatisch einen Port zu (nicht 3000 — der ist
-meistens von Gogs belegt) und konfiguriert nginx dorthin. **Kein**
+Plesk/Passenger weist der App automatisch einen Port **oder einen Unix-Socket**
+zu und konfiguriert nginx dorthin. `app.js` erkennt beides automatisch
+(`PORT` numerisch → TCP-Port, sonst → Socket-Pfad). **Kein**
 Reverse-Proxy, **kein** gunicorn.
 
 ### 4. Umgebungsvariablen setzen (in Plesk-UI)
@@ -198,8 +201,8 @@ webapp/
 
 | Variable      | Default                       | Bedeutung                          |
 |---------------|-------------------------------|------------------------------------|
-| `PORT`        | `3000`                        | Server-Port (Plesk setzt selbst)   |
-| `HOST`        | `0.0.0.0`                     | Bind-Adresse                       |
+| `PORT`        | `3001` (lokal)                | Plesk/Passenger setzt selbst – Zahl ODER Socket-Pfad |
+| `HOST`        | `0.0.0.0`                     | Bind-Adresse (nur bei TCP-Port)    |
 | `SECRET`      | (zwingend in Produktion)      | Session-Secret (≥32 Zeichen)       |
 | `DB_PFAD`     | `data/noten.sqlite3`          | Pfad zur SQLite-Datei              |
 | `PUBLIC_URL`  | `http(s)://Host:Port`         | Basis-URL für Einladungslinks      |
@@ -230,12 +233,22 @@ gunicorn, **kein** zweiter Port, **kein** nginx-Override.
 
 ## Wartung / Updates
 
+Reguläre Updates laufen vollständig per Git-Pull – **ohne** Plesk-UI-Klick.
+Das Skript `scripts/deploy.sh` holt den Stand, installiert nur bei geänderten
+Dependencies neu und stößt via `tmp/restart.txt` einen Passenger-Neustart an:
+
 ```bash
 ssh ci_cd_account@noten.bbz-rd-eck.com
 cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
-git pull                                # neue Files
-npm install --omit=dev                  # falls package.json geändert
-# Plesk-UI → Node.js → "Anwendung neu starten"
+npm run deploy            # = git pull + (ggf.) npm ci + touch tmp/restart.txt
+```
+
+Manuell entspricht das:
+
+```bash
+git pull --ff-only
+npm ci --omit=dev         # nur falls package(-lock).json geändert
+mkdir -p tmp && touch tmp/restart.txt   # Passenger-Neustart
 ```
 
 ## Entwicklung
