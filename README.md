@@ -130,13 +130,38 @@ cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
 node src/cli/seed-admin.js --username admin --display "Dein Name"
 ```
 
-### 6. Alte Workarounds löschen
+### 6. Alte Workarounds löschen (Plesk-Cleanup)
 
-Falls noch Dateien vom alten Python-Setup existieren, löschen:
+Falls die App frisch deployed wird und noch **Überreste vom alten
+Python/Passenger-Setup** auf dem Server liegen, schlägt Plesks
+Node.js-Handler nicht auf — Symptom: nginx liefert **504 Gateway
+Timeout**, obwohl `node app.js` läuft und intern auf Port 3001 mit
+302 antwortet. Ursache ist in der Regel eine Apache-vhost-Snippet für
+Passenger (`proxy_pass` zeigt noch auf einen alten Port, oder
+`.htaccess` aktiviert Passenger-Modi).
+
+**Lösung:** Das beigelegte Skript räumt auf und regeneriert den
+Plesk-vhost. Auf dem Server ausführen:
+
 ```bash
-rm -f passenger_wsgi.py wsgi.py .htaccess
-rm -rf __pycache__ instance venv
+cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
+git pull                                # scripts/plesk-cleanup.sh mitziehen
+chmod +x scripts/plesk-cleanup.sh
+sudo bash scripts/plesk-cleanup.sh
+# oder via npm:
+npm run deploy:plesk
 ```
+
+Das Skript löscht `passenger_wsgi.py`, `wsgi.py`, `.htaccess`,
+`__pycache__/`, `instance/`, `venv/`, ruft `plesk repair web` und
+startet die Node.js-Anwendung neu. Anschließend verifiziert es die
+Erreichbarkeit intern (Port 3001) und extern (`https://noten.bbz-rd-eck.com`).
+
+Bei wiederholtem 504 nach dem Cleanup:
+- App-Log prüfen: `tail -50 logs/stderr.log` (oder `tmp/stderr.log`)
+- Plesk-UI → Node.js → **„Anwendung neu starten"**
+- ENV-Variablen `SECRET` und `NODE_ENV=production` in Plesk-UI
+  kontrollieren (fehlt `SECRET`, beendet sich die App sofort mit Exit 1)
 
 ## Verzeichnisstruktur
 

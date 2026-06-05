@@ -12,7 +12,8 @@
     "start": "node app.js",
     "dev": "node --watch app.js",
     "test": "node --test test/",
-    "seed:admin": "node src/cli/seed-admin.js"
+    "seed:admin": "node src/cli/seed-admin.js",
+    "deploy:plesk": "bash scripts/plesk-cleanup.sh"
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",
