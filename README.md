@@ -60,55 +60,40 @@ node src/cli/seed-admin.js --username admin --display "T. Lehrer" --password geh
 
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 
+> **Vollständiges Runbook mit Screenshots:** [`docs/DEPLOY.md`](docs/DEPLOY.md).
+> Diese Sektion ist die kompakte Erst-Setup-Anleitung.
+
 Plesk-Web-Admin-Edition hat **kein** Python/Passenger für Flask. Wir nutzen
 Plesks **Node.js-Support** (Phusion Passenger) — der ist vorhanden.
-Das Repository wird direkt per **Git-Pull** ins Application-Root deployed;
-das Repo-Root **ist** das Application-Root (`app.js` liegt oben, es gibt
-**kein** `webapp/`-Unterverzeichnis).
+Plesk-Web-Admin trennt **Git-Repository** und **Node.js-App** in zwei
+voneinander unabhängige UIs ohne Querzugriff. Wir nutzen beide — der
+Deploy läuft vollständig über die Plesk-Web-UI, **kein** SSH nötig.
 
-### 1. Repository klonen (einmalig)
+### 1. Git-Repository in Plesk verknüpfen (einmalig)
 
-Per SSH ins Application-Root der Subdomain – das Repo-Root ist das App-Root:
+1. Plesk → `noten.bbz-rd-eck.com` → **Git** → **Repository hinzufügen**
+2. **URL:** `git@github.com:deraal09/noten_webapp.git` (oder euer Fork)
+3. **Verzweigung:** `devel`
+4. Plesk zeigt einen Public-Key an — den bei GitHub als **Deploy-Key**
+   mit **Read-Only**-Zugriff eintragen
+5. **Bereitstellung:** „Verzweigung devel automatisch zu /noten.bbz-rd-eck.com"
+   aktivieren → ab jetzt läuft Auto-Deploy nach jedem `git push`
 
-```bash
-ssh ci_cd_account@noten.bbz-rd-eck.com
-cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
-git clone <repo-url> .          # Inhalt direkt hierher (Punkt am Ende!)
-```
+> Alternativ (per SSH): `ssh ci_cd_account@…` und `git clone <repo-url> .`
+> im Application-Root. Beide Wege führen zum selben Endstand.
 
-`node_modules/`, `data/` und `tmp/` sind per `.gitignore` ausgenommen und
-werden auf dem Server erzeugt.
-
-### 2. Dependencies installieren (auf dem Server)
-
-```bash
-npm ci --omit=dev
-```
-
-`npm ci` nutzt die committete `package-lock.json` → **reproduzierbar** und
-schneller als `npm install`.
-
-> **⚠ Natives Modul `better-sqlite3`:** Das ist der häufigste Plesk-Stolperstein.
-> `better-sqlite3` wird beim Install **gegen die Node-Version der Subdomain
-> kompiliert** (node-gyp). Voraussetzungen auf dem Server: `python3`, `make`,
-> `g++`/build-essential. **Wichtig:** Wenn in der Plesk-UI später die
-> Node-Version gewechselt wird, muss `npm rebuild better-sqlite3` (oder erneut
-> `npm ci`) laufen, sonst meldet die App beim Start einen ABI-/Modulfehler.
-
-### 3. Plesk-UI: Node.js aktivieren
+### 2. Node.js in Plesk aktivieren (einmalig)
 
 1. Plesk → `noten.bbz-rd-eck.com` → **Node.js**
 2. **Anwendungs-Wurzel:** das Verzeichnis mit `app.js` (i. d. R. das Repo-Root)
 3. **Anwendungs-Startdatei:** `app.js`
-4. **„Anwendung neu starten"** klicken
-5. Status sollte **„running"** werden
+4. **Anwendungsmodus:** `production`
 
 Plesk/Passenger weist der App automatisch einen Port **oder einen Unix-Socket**
 zu und konfiguriert nginx dorthin. `app.js` erkennt beides automatisch
-(`PORT` numerisch → TCP-Port, sonst → Socket-Pfad). **Kein**
-Reverse-Proxy, **kein** gunicorn.
+(`PORT` numerisch → TCP-Port, sonst → Socket-Pfad).
 
-### 4. Umgebungsvariablen setzen (in Plesk-UI)
+### 3. Umgebungsvariablen setzen (in Plesk-UI)
 
 | Variable      | Wert                                            |
 |---------------|-------------------------------------------------|
@@ -119,6 +104,28 @@ Reverse-Proxy, **kein** gunicorn.
 
 Wichtig: `SECRET` ist das Session-Secret — wenn die App neu gestartet
 wird, werden alle Sessions ungültig, wenn du es änderst.
+**Fehlt `SECRET`, beendet sich die App sofort mit Exit 1** → Symptom ist
+dann **504** auf jedem Request.
+
+> **⚠ Natives Modul `better-sqlite3`:** Wird beim Install **gegen die
+> Node-Version der Subdomain kompiliert** (node-gyp). Voraussetzungen
+> auf dem Server: `python3`, `make`, `g++`/build-essential. **Wenn
+> später die Node-Version in der Plesk-UI gewechselt wird, muss
+> `npm rebuild better-sqlite3` (oder erneut `npm ci`) laufen**,
+> sonst meldet die App beim Start einen ABI-/Modulfehler. Dieser
+> Schritt passiert automatisch in Phase 3 des Deploy-Flows
+> (`deploy:plesk-server` → `npm ci --omit=dev`).
+
+### 4. Dependencies installieren (über Plesk-UI)
+
+Plesk → Node.js → **„npm-Installation"** klicken. Damit wird
+`npm install` (mit dem aktuellen `package.json`) ausgeführt. Beim
+ersten Mal und nach jeder Änderung an `package(-lock).json` nötig.
+Idempotent — mehrfaches Klicken schadet nicht.
+
+> Für die Erst-Installation und nach Dependency-Änderungen genügt auch
+> der Deploy-Flow über `deploy:plesk-server` — der führt `npm ci
+> --omit=dev` aus (reproduzierbar, schneller).
 
 ### 5. Ersten Admin anlegen
 
@@ -127,29 +134,30 @@ Nach dem ersten Start:
 https://noten.bbz-rd-eck.com/setup
 ```
 
-Oder per CLI auf dem Server:
+Oder per CLI auf dem Server (nur falls SSH-Zugriff als `ci_cd_account` besteht):
 ```bash
 cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
 node src/cli/seed-admin.js --username admin --display "Dein Name"
 ```
 
-### 6. Alte Workarounds löschen (Plesk-Cleanup)
+### 6. Alte Workarounds löschen (Plesk-Cleanup, nur Notfall)
 
 Falls die App frisch deployed wird und noch **Überreste vom alten
 Python/Passenger-Setup** auf dem Server liegen, schlägt Plesks
 Node.js-Handler nicht auf — Symptom: nginx liefert **504 Gateway
-Timeout**, obwohl `node app.js` läuft und intern auf Port 3001 mit
-302 antwortet. Ursache ist in der Regel eine Apache-vhost-Snippet für
-Passenger (`proxy_pass` zeigt noch auf einen alten Port, oder
-`.htaccess` aktiviert Passenger-Modi).
+Timeout**, obwohl die App intern auf Port 3001 mit 302 antwortet.
+Ursache ist in der Regel eine Apache-vhost-Snippet für Passenger
+(`proxy_pass` zeigt noch auf einen alten Port, oder `.htaccess`
+aktiviert Passenger-Modi).
 
 **Lösung:** Das beigelegte Skript räumt auf und regeneriert den
-Plesk-vhost. Auf dem Server ausführen:
+Plesk-vhost. Braucht SSH + sudo, lässt sich **nicht** über die
+Plesk-UI ausführen (root-Rechte nötig):
 
 ```bash
+ssh ci_cd_account@noten.bbz-rd-eck.com
 cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
 git pull                                # scripts/plesk-cleanup.sh mitziehen
-chmod +x scripts/plesk-cleanup.sh
 sudo bash scripts/plesk-cleanup.sh
 # oder via npm:
 npm run deploy:plesk
@@ -172,6 +180,8 @@ Bei wiederholtem 504 nach dem Cleanup:
 webapp/
 ├── app.js              # Einstiegspunkt (Plesk-Node ruft das auf)
 ├── package.json
+├── docs/
+│   └── DEPLOY.md       # Runbook für Plesk-UI-Deploy
 ├── src/
 │   ├── auth.js         # Session, Passwort-Hashing, Permission-Checks
 │   ├── db.js           # better-sqlite3-Setup + Schema
@@ -191,6 +201,12 @@ webapp/
 │   ├── klassenlehrer/
 │   └── partials/layout.ejs
 ├── static/css/app.css
+├── scripts/            # Deploy-Helfer (LOKAL + SERVER über Plesk-UI)
+│   ├── preflight.sh
+│   ├── plesk-server.sh
+│   ├── post-deploy-verify.sh
+│   ├── deploy.sh       # Legacy: SSH-deploy
+│   └── plesk-cleanup.sh # Notfall: 504-Fix, braucht sudo
 ├── test/
 │   ├── grade-calc.test.js
 │   └── e2e.test.js
@@ -233,23 +249,61 @@ gunicorn, **kein** zweiter Port, **kein** nginx-Override.
 
 ## Wartung / Updates
 
-Reguläre Updates laufen vollständig per Git-Pull – **ohne** Plesk-UI-Klick.
-Das Skript `scripts/deploy.sh` holt den Stand, installiert nur bei geänderten
-Dependencies neu und stößt via `tmp/restart.txt` einen Passenger-Neustart an:
+> **Vollständiges Runbook mit Screenshots-Bezug:** [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+Plesk Web Admin trennt Git-Repo und Node.js-App in zwei voneinander
+unabhängige UIs. Der Deploy ist deshalb ein 4-Phasen-Flow — alle Phasen
+nutzen nur Tools, die direkt in Plesk verfügbar sind, **kein** SSH nötig:
+
+| Phase | Wo          | Befehl / Klick                                              |
+|-------|-------------|-------------------------------------------------------------|
+| 1     | LOKAL       | `npm run deploy:preflight` → `git push origin devel`         |
+| 2     | Plesk Git   | Auto-Deploy (oder „Jetzt Pull ausführen" klicken)           |
+| 3     | Plesk Node  | „Skript ausführen" → `deploy:plesk-server` → Ausführen      |
+| 4     | LOKAL       | `npm run deploy:verify`                                    |
+
+**Phase 3 in einem Klick:** `deploy:plesk-server` führt `npm ci --omit=dev`
++ `touch tmp/restart.txt` + internen Health-Check in einem Aufruf aus.
+Spart die separaten Klicks auf „npm-Installation" und „App neu starten".
 
 ```bash
-ssh ci_cd_account@noten.bbz-rd-eck.com
-cd /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/
-npm run deploy            # = git pull + (ggf.) npm ci + touch tmp/restart.txt
+# LOKAL vor dem Push — Tests grün, Branch & Remote geprüft
+npm run deploy:preflight
+git push origin devel
 ```
-
-Manuell entspricht das:
 
 ```bash
-git pull --ff-only
-npm ci --omit=dev         # nur falls package(-lock).json geändert
-mkdir -p tmp && touch tmp/restart.txt   # Passenger-Neustart
+# LOKAL nach dem Deploy — Health-Check der Public-URL
+npm run deploy:verify
 ```
+
+### Häufige Fehler nach Deploy
+
+- **504 Gateway Timeout** → fast immer `SECRET` fehlt oder < 32 Zeichen in
+  der Plesk-Node.js-UI → App beendet sich sofort. App-Log prüfen:
+  `logs/stderr.log` (über Plesk-Dateimanager) oder `tmp/stderr.log`.
+- **„Die Anwendung wird nach der ersten Anfrage neu gestartet"** (grünes
+  Banner) → **kein Fehler**, das ist Passengers Restart-Hinweis.
+- **App hängt im Restart-Loop** → Plesk → Node.js → „App neu starten"
+  klicken, dann Log sichten.
+- **Erst-Deploy / Konflikt mit altem Python-Setup** (selten) →
+  `sudo bash scripts/plesk-cleanup.sh` per SSH — siehe §6 oben.
+
+### Rollback
+
+`git revert <bad-sha> && git push origin devel` → Auto-Deploy läuft mit
+dem alten Stand. Bei DB-Migrationen: `SCHEMA_VERSION` in `src/db.js`
+beachten — Migrationen sind nicht automatisch rückwärtskompatibel.
+
+### Verfügbare Skripte im Überblick
+
+| `npm run …`              | Wo          | Zweck                                                  |
+|--------------------------|-------------|--------------------------------------------------------|
+| `deploy:preflight`       | LOKAL       | Tests + Branch-/Remote-Check vor `git push`            |
+| `deploy:plesk-server`    | SERVER (UI) | `npm ci` + Passenger-Restart + Health-Check            |
+| `deploy:verify`          | LOKAL/SERVER| curl-Check der Public-URL                              |
+| `deploy` (Legacy)        | SERVER (SSH)| `git pull` + `npm ci` + Restart — **nicht** auf Plesk Web Admin |
+| `deploy:plesk` (Notfall) | SERVER (SSH)| 504-Fix mit `sudo` — braucht root, nicht via UI möglich |
 
 ## Entwicklung
 
