@@ -75,8 +75,16 @@ sudo plesk repair web "${SUBDOMAIN}"
 # --- 3. Node.js-Anwendung neu starten ----------------------------------------
 
 info "3/4 — Starte Node.js-Anwendung neu …"
-sudo plesk ext nodejs --restart "${SUBDOMAIN}" 2>/dev/null \
-  || yellow "  Hinweis: 'plesk ext nodejs --restart' fehlgeschlagen — manuell via Plesk-UI neu starten."
+# 'plesk ext nodejs --restart' existiert auf dieser Plesk-Version NICHT
+# (das nodejs-Extension ist ein Versions-Manager, kein Process-Manager —
+#  verfügbar sind nur --versions/--enable/--disable/--set-version/--install
+#  /--uninstall/--get-version).
+# Stattdessen: Passenger-Restart via tmp/restart.txt (mtime-Trigger).
+cd "${APP_ROOT}"
+mkdir -p tmp
+touch tmp/restart.txt
+green "  ✓ tmp/restart.txt berührt → Passenger startet die App neu"
+info "    (Falls Plesk-UI-Button bevorzugt: Node.js → 'App neu starten')"
 
 # --- 4. Erreichbarkeit verifizieren -----------------------------------------
 

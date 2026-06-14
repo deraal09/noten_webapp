@@ -5,20 +5,31 @@
 
 Plesk Web Admin trennt **Git-Repository-Verwaltung** und **Node.js-App-Verwaltung**
 in zwei voneinander unabhängige UIs. Beide haben keinen Zugriff aufeinander — der
-Deploy ist deshalb ein 4-Phasen-Flow, an dem drei Werkzeuge beteiligt sind
-(Entwicklermaschine, Plesk-Git-UI, Plesk-Node.js-UI).
+Deploy läuft deshalb als bewusst simpler, fragmentierter 4-Phasen-Flow mit
+drei Beteiligten (Entwicklermaschine, Plesk-Git-UI, Plesk-Node.js-UI).
+
+**Grundprinzip: „no magic, manual steps".** Jede Phase hat eine klare Aufgabe
+und lässt sich von einer zweiten Person am Telefon durchführen. Es gibt
+keinen geheimen Klick, kein Auto-Magic, keine Schritte, die nur lokal
+sichtbar sind.
 
 ## Übersicht
 
 ```
 ┌──────────────┐    ┌─────────────────────┐    ┌─────────────────────┐    ┌──────────────┐
-│ LOKAL        │    │ Plesk Git UI        │    │ Plesk Node.js UI    │    │ LOKAL/SERVER │
+│ LOKAL        │    │ Plesk Git UI        │    │ Plesk Node.js UI    │    │ LOKAL        │
 │              │    │                     │    │                     │    │              │
-│ deploy:      │ →  │ "Jetzt Pull         │ →  │ "Skript ausführen"  │ →  │ deploy:      │
-│ preflight +  │    │  ausführen"         │    │  → deploy:plesk-    │    │ verify       │
-│ git push     │    │ (oder Auto-Deploy)  │    │  server             │    │              │
-└──────────────┘    └─────────────────────┘    └─────────────────────┘    └──────────────┘
-    Phase 1              Phase 2                   Phase 3                  Phase 4
+│ deploy:      │ →  │ "Jetzt Pull         │ →  │ Phase 3:            │ →  │ deploy:      │
+│ preflight +  │    │  ausführen"         │    │  2 separate Klicks  │    │ verify       │
+│ git push     │    │ (oder Auto-Deploy)  │    │  (npm-Install +     │    │ (optional)   │
+│              │    │                     │    │   App neu starten)  │    │              │
+└──────────────┘    └─────────────────────┘    │  ──── ODER ────     │    └──────────────┘
+    Phase 1              Phase 2              │  1 Klick:           │
+                                              │  "Skript ausführen" │
+                                              │  → deploy:plesk-    │
+                                              │    server           │
+                                              └─────────────────────┘
+                                                  Phase 3
 ```
 
 ## Voraussetzungen (einmalig)
@@ -76,22 +87,43 @@ jedem `git push` automatisch. In der Git-UI siehst du den frischen Commit unter
 2. Bei `noten_webapp.git` → **„Jetzt Pull ausführen"** klicken
 3. Warten, bis der Balken grün ist und dein Commit oben in „Neueste Commits" steht
 
-## Phase 3 — Plesk Node.js UI: deploy:plesk-server
+> **Diese Phase ist getrennt von der Node.js-UI.** Die Node.js-UI kann und
+> wird kein `git pull` ausführen — die beiden Panels haben keinerlei
+> Querzugriff. Git-Operationen laufen **immer** über die Git-UI.
 
-Dieser Schritt macht in **einem** Klick: `npm ci --omit=dev` + Passenger-Restart
-+ interner Health-Check. Das spart 2 separate UI-Klicks gegenüber dem
-expliziten „npm-Installation" + „App neu starten".
+## Phase 3 — Plesk Node.js UI: installieren + neustarten
+
+**Primärweg (manuell, 2 Klicks):**
+
+1. Plesk → `noten.bbz-rd-eck.com` → **Node.js**
+2. **„npm-Installation"** klicken → wartet kurz, bis grünes ✓ erscheint
+3. **„App neu starten"** klicken → wartet, bis „Die Anwendung wird nach der
+   ersten Anfrage neu gestartet" (grünes Banner) erscheint
+
+Das ist der **empfohlene Pfad** — zwei UI-Klicks, vollständig transparent,
+jederzeit wiederholbar, kein Skript im Spiel.
+
+**Optional (1 Klick über `deploy:plesk-server`):**
+
+Wenn du in `package.json` das Custom-Skript `deploy:plesk-server` hast
+(siehe `scripts/plesk-server.sh`), kannst du Schritt 2 + 3 zusammenlegen:
 
 1. Plesk → `noten.bbz-rd-eck.com` → **Node.js**
 2. **„Skript ausführen"** klicken
-3. Aus dem Dropdown **„deploy:plesk-server"** wählen
+3. In das Textfeld **`deploy:plesk-server`** eintippen (= `npm run deploy:plesk-server`)
 4. **„Ausführen"** klicken
-5. Warten, bis die Ausgabe erscheint (grünes ✓ = ok)
 
-**Alternative ohne den „Skript ausführen"-Button** (etwas mehr Klicks):
-- Stattdessen erst **„npm-Installation"**, dann **„App neu starten"** klicken.
+Das Skript führt dann `npm ci --omit=dev` + `touch tmp/restart.txt` +
+internen Health-Check aus. Spart **einen** Klick.
 
-## Phase 4 — LOKAL: verifizieren
+> **Wichtig zu „Skript ausführen":** Es ist ein **Freitext-Feld**, das
+> `npm run <Eingabe>` ausführt — kein Shell, kein `cd`, kein `&&`, keine
+> Environment-Overrides. Wenn du `start` eintippst, läuft `npm start` →
+> `node app.js`. Tippst du `deploy:plesk-server`, läuft das Custom-Skript
+> aus `package.json`. **Git wird hier nicht ausgeführt** — das ist
+> ausschließlich Sache der Git-UI.
+
+## Phase 4 — LOKAL: verifizieren (optional)
 
 ```bash
 npm run deploy:verify
@@ -111,13 +143,24 @@ Deploy-Verifizierung ok.
 ```
 
 `HTTP 302` ist normal (Login- Redirect auf /login → /setup oder /dashboard).
+Phase 4 ist optional — am schnellsten geht die Verifizierung im Browser
+(`https://noten.bbz-rd-eck.com/login`).
 
 ## Häufige Fehlerbilder
+
+### 500 Internal Server Error nach Deploy
+**Wahrscheinlichste Ursache:** App-Code wirft unbehandelten Fehler. Da wir
+App-Code in diesem Push nicht geändert haben (nur `package.json`, neue Skripte,
+Doku), ist die Ursache meist **nicht** der letzte Deploy.
+
+→ App-Log auslesen (Plesk-Dateimanager):
+  `logs/stderr.log` oder `tmp/stderr.log` (was neuer ist) → letzte 30–50 Zeilen
+→ Suche nach `Error`, `TypeError`, `Cannot find module`, Stacktraces
 
 ### 504 Gateway Timeout nach Deploy
 **Ursache 1: SECRET fehlt oder zu kurz** (App crashed beim Start)
 → Plesk → Node.js → Umgebungsvariablen: `SECRET` muss ≥ 32 Zeichen sein.
-→ App-Log prüfen: `logs/stderr.log` (Plesk-Dateimanager) — steht dort
+→ App-Log prüfen: steht dort
   `FEHLER: ENV-Variable SECRET muss in Produktion gesetzt sein`?
 
 **Ursache 2: App hängt im Crash-Loop**
@@ -140,6 +183,17 @@ erreichen. Fast immer ein Konfigurationsproblem, nicht ein App-Problem.
 **Kein Fehler** — das ist Passengers „Restart queued"-Hinweis. Verschwindet,
 sobald der erste Request eintrifft.
 
+### „git kann nicht ausgeführt werden" in der Skript-Ausgabe
+**Das Custom-Skript `plesk-server.sh` ruft nirgends `git` auf.** Wenn diese
+Meldung von Plesks Node.js-UI kommt, ist die Ursache upstream — Plesk
+prüft vermutlich vor Skript-Start, ob die Working-Copy sauber ist. Mögliche
+Fixes:
+1. **Plesk-Git-UI öffnen** und prüfen, ob das Repo verbunden ist und der
+   letzte Pull grün war
+2. **Phase 2 manuell wiederholen** („Jetzt Pull ausführen")
+3. **Auf den manuellen Primärweg ausweichen** (Phase 3 oben: 2 Klicks
+   `npm-Installation` + `App neu starten` statt Custom-Skript)
+
 ## Rollback
 
 Plesk-Git-UI hat keinen eingebauten Rollback-Button. Workarounds:
@@ -160,7 +214,11 @@ Plesk-Git-UI hat keinen eingebauten Rollback-Button. Workarounds:
 | Skript                          | Wo ausführen  | Zweck                                          |
 |---------------------------------|---------------|------------------------------------------------|
 | `scripts/preflight.sh`          | LOKAL         | Tests + Branch-Check vor `git push`            |
-| `scripts/plesk-server.sh`       | SERVER (UI)   | `npm ci --omit=dev` + `tmp/restart.txt` + Check|
-| `scripts/post-deploy-verify.sh` | LOKAL/SERVER  | curl-Check der Public-URL                      |
+| `scripts/plesk-server.sh`       | SERVER (UI)   | Optional: `npm ci + restart` in einem Klick    |
+| `scripts/post-deploy-verify.sh` | LOKAL         | curl-Check der Public-URL                      |
 | `scripts/deploy.sh`             | SERVER (SSH)  | Legacy: git pull + npm ci + restart (siehe Header) |
 | `scripts/plesk-cleanup.sh`      | SERVER (SSH)  | Notfall: 504-Fix (sudo, braucht root)          |
+
+`scripts/deploy.sh` (Legacy) funktioniert auf Plesk Web Admin **nicht** —
+braucht `git` und SSH-Zugriff, die hier nicht gegeben sind. Ist nur noch
+als historische Referenz im Repo.
