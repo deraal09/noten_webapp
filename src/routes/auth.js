@@ -4,7 +4,7 @@
 
 import { getDb } from '../db.js';
 import {
-  hashPassword, checkPassword, makeToken, SESSION_COOKIE, requireAuth,
+  hashPassword, checkPassword, makeToken, SESSION_COOKIE, requireAuth, destroySession,
 } from '../auth.js';
 
 const MIN_PW_LEN = 8;
@@ -78,12 +78,14 @@ export default async function authRoutes(fastify) {
     }
     request.session.userId = row.id;
     const next = String(request.body?.next || '/');
-    return reply.redirect(next.startsWith('/') ? next : '/');
+    // Nur relative Pfade ohne Host erlauben (Open-Redirect-Schutz).
+    const safeNext = /^\/(?!\/)/.test(next) ? next : '/';
+    return reply.redirect(safeNext);
   });
 
   // ---------- /logout ----------
   fastify.get('/logout', { preHandler: requireAuth }, async (request, reply) => {
-    request.session.destroy();
+    await destroySession(request);
     return reply.redirect('/login');
   });
 

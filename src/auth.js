@@ -36,7 +36,7 @@ export async function authPreHandler(request, reply) {
     .prepare('SELECT id, username, email, role, display_name, active FROM users WHERE id = ?')
     .get(session.userId);
   if (!user || !user.active) {
-    request.session.destroy();
+    await destroySession(request);
     return;
   }
   request.user = {
@@ -57,6 +57,19 @@ export async function requireAuth(request, reply) {
   if (!request.user) {
     return reply.code(401).redirect('/login?next=' + encodeURIComponent(request.url));
   }
+}
+
+/**
+ * Zerstört die Session zuverlässig (Callback-API von @fastify/session
+ * promisifiziert).
+ */
+export function destroySession(request) {
+  return new Promise((resolve, reject) => {
+    request.session.destroy((err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
 }
 
 export async function requireAdmin(request, reply) {

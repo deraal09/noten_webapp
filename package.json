@@ -11,13 +11,9 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
+    "build": "node scripts/build.js",
     "test": "node --test \"test/**/*.test.js\"",
-    "seed:admin": "node src/cli/seed-admin.js",
-    "deploy": "bash scripts/deploy.sh",
-    "deploy:plesk": "bash scripts/plesk-cleanup.sh",
-    "deploy:preflight": "bash scripts/preflight.sh",
-    "deploy:plesk-server": "bash scripts/plesk-server.sh",
-    "deploy:verify": "bash scripts/post-deploy-verify.sh"
+    "seed:admin": "node src/cli/seed-admin.js"
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",
