@@ -1,0 +1,36 @@
+<h1>Admin-Dashboard</h1>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val"><%= stats.users %></div><div class="kpi-lbl">Lehrkräfte</div></div>
+  <div class="kpi"><div class="kpi-val"><%= stats.klassen %></div><div class="kpi-lbl">Klassen</div></div>
+  <div class="kpi"><div class="kpi-val"><%= stats.schueler %></div><div class="kpi-lbl">Schüler/innen</div></div>
+  <div class="kpi"><div class="kpi-val"><%= stats.faecher %></div><div class="kpi-lbl">Fächer</div></div>
+  <div class="kpi"><div class="kpi-val"><%= stats.offene_einladungen %></div><div class="kpi-lbl">offene Einladungen</div></div>
+</div>
+
+<h2>Schuljahre</h2>
+<form method="post" action="/admin/schuljahre/neu" class="inline">
+  <input type="text" name="bezeichnung" placeholder="z. B. 2026/27" required>
+  <button type="submit">+ Schuljahr anlegen</button>
+</form>
+<table class="data">
+  <thead><tr><th>Bezeichnung</th><th>Gewichtung Mündlich</th><th>Aktion</th></tr></thead>
+  <tbody>
+    <% schuljahre.forEach(function(sj) { %>
+      <tr>
+        <td><a href="/admin/schuljahre/<%= sj.id %>"><%= sj.bezeichnung %></a></td>
+        <td>
+          <form method="post" action="/admin/schuljahre/<%= sj.id %>/gewichtung" class="inline">
+            <input type="number" name="gewichtung" min="0" max="100" value="<%= sj.gewichtung_muendlich %>" size="4">%
+            <button type="submit">💾</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/admin/schuljahre/<%= sj.id %>/loeschen" class="inline" onsubmit="return confirm('Schuljahr wirklich löschen?')">
+            <button type="submit" class="danger">🗑 Löschen</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>

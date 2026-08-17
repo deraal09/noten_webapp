@@ -1,0 +1,7 @@
+<h1>Alle Schuljahre</h1>
+<p>Du bist Admin – du kannst direkt in jedes Schuljahr springen:</p>
+<ul>
+  <% schuljahre.forEach(function(sj) { %>
+    <li><a href="/admin/schuljahre/<%= sj.id %>"><%= sj.bezeichnung %></a></li>
+  <% }); %>
+</ul>

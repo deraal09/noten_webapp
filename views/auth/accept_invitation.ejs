@@ -1,0 +1,26 @@
+<% if (!invitation) { %>
+  <h1>Einladung nicht gültig</h1>
+  <p class="err"><%= error %></p>
+  <p><a href="/login">Zur Anmeldung</a></p>
+<% } else { %>
+  <h1>Einladung annehmen</h1>
+  <p>Du wurdest als <strong><%= invitation.role %></strong> eingeladen
+     <% if (invitation.display_name) { %>(<%= invitation.display_name %>)<% } %>.
+     Bitte lege Benutzername und Passwort fest.</p>
+  <% if (error) { %><p class="err"><%= error %></p><% } %>
+  <form method="post" class="card">
+    <label>Benutzername <small>(min. 3 Zeichen)</small>
+      <input type="text" name="username" required autofocus>
+    </label>
+    <label>Anzeigename
+      <input type="text" name="display_name" value="<%= invitation.display_name || '' %>">
+    </label>
+    <label>Passwort <small>(min. 8 Zeichen)</small>
+      <input type="password" name="password" required>
+    </label>
+    <label>Passwort bestätigen
+      <input type="password" name="password2" required>
+    </label>
+    <button type="submit">Konto erstellen</button>
+  </form>
+<% } %>

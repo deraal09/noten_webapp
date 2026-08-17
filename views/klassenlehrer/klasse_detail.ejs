@@ -1,0 +1,40 @@
+<h1>Fehlzeiten: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p><a href="/klassenlehrer">← Klassenleitung</a></p>
+
+<div class="hj-tabs">
+  <% HALBJAHRE.forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
+  <% }); %>
+</div>
+
+<form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/speichern">
+  <input type="hidden" name="hj" value="<%= halbjahr %>">
+  <table class="data fz">
+    <thead>
+      <tr>
+        <th rowspan="2">Schüler/in</th>
+        <th colspan="2">entschuldigt</th>
+        <th colspan="2">unentschuldigt</th>
+        <th colspan="2">betrieblich</th>
+      </tr>
+      <tr>
+        <th>h</th><th>Notiz</th>
+        <th>h</th><th>Notiz</th>
+        <th>h</th><th>Notiz</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% schueler.forEach(function(s) { %>
+        <tr>
+          <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
+          <% ['entschuldigt', 'unentschuldigt', 'betrieblich'].forEach(function(typ) {
+               var fz = fehlMap[s.id][typ]; %>
+            <td><input type="number" name="stunden_<%= s.id %>_<%= typ %>" value="<%= fz.stunden || 0 %>" min="0" step="0.5" size="5"></td>
+            <td><input type="text" name="notiz_<%= s.id %>_<%= typ %>" value="<%= fz.notiz || '' %>" placeholder="optional"></td>
+          <% }); %>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+  <p><button type="submit">💾 Fehlzeiten speichern</button></p>
+</form>

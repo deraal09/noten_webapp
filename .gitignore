@@ -1,0 +1,8 @@
+node_modules/
+data/
+tmp/
+logs/
+*.log
+.DS_Store
+.venv/
+.qwen/

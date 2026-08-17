@@ -1,0 +1,100 @@
+/* Notenverwaltung – eigenes Stylesheet, kein CDN erforderlich. */
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  background: #f7f7f9;
+  color: #1a1a1a;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: #0b66c2; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3 { color: #1a1a1a; }
+h1 { font-size: 1.6rem; margin: 1rem 0; }
+h1 small { font-weight: 400; color: #666; font-size: 0.7em; }
+h2 { font-size: 1.25rem; margin: 1.5rem 0 0.5rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.3rem; }
+h3 { font-size: 1.1rem; margin: 0.5rem 0; }
+
+.container { max-width: 1100px; margin: 1rem auto; padding: 0 1rem; }
+
+.topbar { background: #1d3557; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.topbar-inner { max-width: 1100px; margin: 0 auto; padding: 0 1rem; display: flex; align-items: center; gap: 1rem; height: 56px; }
+.topbar .brand { color: white; font-weight: 600; font-size: 1.1rem; }
+.topbar a { color: #d8e3f0; }
+.topbar a:hover { color: white; }
+.topbar .nav { display: flex; gap: 1rem; flex: 1; }
+.topbar .userbox { display: flex; align-items: center; gap: 0.5rem; }
+.topbar .role { background: #e63946; color: white; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.75rem; }
+.topbar .logout { font-size: 0.9rem; }
+
+.flash { padding: 0.75rem 1rem; border-radius: 4px; margin: 0.5rem 1rem; }
+.flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.flash-error, .err { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 0.5rem 0.75rem; border-radius: 4px; }
+.flash-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }
+.kpi { background: white; padding: 1rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); text-align: center; }
+.kpi-val { font-size: 1.8rem; font-weight: 600; color: #1d3557; }
+.kpi-lbl { font-size: 0.85rem; color: #666; }
+
+table.data, table.tafel { width: 100%; border-collapse: collapse; background: white; margin: 0.5rem 0 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+table.data th, table.data td,
+table.tafel th, table.tafel td { padding: 0.5rem 0.75rem; border: 1px solid #e0e0e0; text-align: left; vertical-align: top; }
+table.data thead th, table.tafel thead th { background: #f1f3f5; font-weight: 600; }
+table.data tbody tr:nth-child(even) { background: #fafafa; }
+table.data .name, table.tafel .name { white-space: nowrap; }
+
+table.tafel input.punkt { width: 50px; padding: 0.2rem; border: 1px solid #ccc; border-radius: 3px; text-align: center; }
+table.tafel .note-cell, table.tafel .gesamt-cell { text-align: center; font-weight: 600; background: #f8f9fa; min-width: 40px; }
+table.tafel .klausur-col, table.tafel .ul-col { background: #e3f2fd; text-align: center; }
+table.tafel .aufgabe-head { background: #f1f8ff; font-size: 0.8rem; }
+table.tafel .gesamt-cell { background: #1d3557; color: white; }
+table.tafel .gesamt-cell.nb { background: #e63946; }
+
+.tag { background: #1d3557; color: white; border: none; border-radius: 50%; padding: 0.2rem 0.4rem; cursor: pointer; font-size: 0.8rem; margin: 0 2px; }
+.tag:hover { background: #e63946; }
+
+form.card, .card { background: white; padding: 1rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 0.5rem 0; }
+form.card label, .card label { display: block; margin: 0.5rem 0; font-weight: 500; }
+form.card input[type=text], form.card input[type=email], form.card input[type=password], form.card input[type=number],
+form.card select, form.card textarea, .card input, .card select, .card textarea {
+  display: block; width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font: inherit;
+}
+form.card input[type=checkbox], .card input[type=checkbox] { width: auto; }
+form.card textarea, .card textarea { min-height: 100px; font-family: monospace; }
+
+button, .btn {
+  display: inline-block; padding: 0.5rem 1rem; background: #1d3557; color: white;
+  border: none; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none;
+}
+button:hover, .btn:hover { background: #15243f; }
+button.danger { background: #e63946; }
+button.danger:hover { background: #b32b35; }
+.btn { background: #0b66c2; }
+.btn:hover { background: #084e96; }
+
+form.inline { display: inline-block; margin: 0; }
+form.inline input, form.inline select { width: auto; display: inline-block; margin-right: 0.5rem; }
+
+.right { float: right; }
+.hint { color: #666; font-size: 0.9rem; }
+
+.hj-tabs { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+.hj-tab { padding: 0.4rem 1rem; background: white; border: 1px solid #ccc; border-radius: 4px 4px 0 0; }
+.hj-tab.active { background: #1d3557; color: white; border-color: #1d3557; }
+
+.klasse-liste { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
+.klasse-liste li { background: white; padding: 1rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
+table.fz input[type=number] { width: 60px; padding: 0.2rem; }
+table.fz input[type=text] { width: 100%; min-width: 100px; }
+
+.footer { text-align: center; color: #666; padding: 1rem; font-size: 0.85rem; }
+
+code.token { background: #f1f3f5; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85rem; }
+details summary { cursor: pointer; padding: 0.3rem 0; font-weight: 500; }

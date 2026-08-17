@@ -1,0 +1,17 @@
+<h1>Notenschlüssel für <%= klasse.name %></h1>
+<p><a href="/admin/klassen/<%= klasse.id %>">← Zurück</a></p>
+
+<form method="post" class="card">
+  <label>Schlüsseltyp
+    <select name="notenschluessel">
+      <option value="IHK" <%= klasse.notenschluessel === 'IHK' ? 'selected' : '' %>>IHK (1–6)</option>
+      <option value="BG"  <%= klasse.notenschluessel === 'BG'  ? 'selected' : '' %>>BG  (0–15)</option>
+    </select>
+  </label>
+  <label>CSV-Definition <small>(Prozent,Note;… absteigend)</small>
+    <textarea name="csv" rows="10"><%= klasse.notenschluessel_csv %></textarea>
+  </label>
+  <p class="hint">Beispiel IHK: <code>100,1;95,1.3;90,1.6;50,4;0,6</code></p>
+  <p class="hint">Beispiel BG:  <code>100,15;85,13;50,6;33,3;20,1;0,0</code></p>
+  <button type="submit">Speichern</button>
+</form>
