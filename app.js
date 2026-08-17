@@ -14,7 +14,7 @@
  */
 
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
@@ -178,7 +178,12 @@ async function start() {
   }
 }
 
-// Nur wenn direkt aufgerufen (nicht im Test-Import)
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+// Plesk/Passenger lädt diese Datei über einen eigenen node-loader.js per
+// require() – dabei stimmt process.argv[1] nie mit dieser Datei überein,
+// ein import.meta.url-Vergleich schlägt unter Passenger also IMMER fehl
+// und start() würde nie aufgerufen (→ Passenger-Timeout, kein Listener).
+// Tests setzen NODE_ENV=test, bevor sie buildApp() selbst aufrufen – das
+// ist der einzige Fall, in dem hier kein automatischer Start passieren darf.
+if (process.env.NODE_ENV !== 'test') {
   start();
 }
