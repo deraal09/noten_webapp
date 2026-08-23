@@ -1,0 +1,92 @@
+<h1>LDAP-Einstellungen</h1>
+<p><a href="/admin/ldap">→ Lehrkräfte importieren</a></p>
+
+<% if (envGesetzt) { %>
+  <p class="flash flash-info">
+    Hinweis: Es sind zusätzlich <code>LDAP_*</code>-Umgebungsvariablen in Plesk gesetzt.
+    Sobald hier eine LDAP-URL gespeichert ist, haben <strong>diese Einstellungen Vorrang</strong>
+    — die Plesk-ENV-Variablen werden dann ignoriert (kein Mischen beider Quellen).
+  </p>
+<% } %>
+
+<form method="post" action="/admin/ldap/einstellungen" class="card">
+  <label>LDAP-URL
+    <input type="text" name="url" value="<%= settings?.url || '' %>" placeholder="ldaps://dc01.schule.local:636">
+  </label>
+  <label>Base-DN
+    <input type="text" name="base_dn" value="<%= settings?.base_dn || '' %>" placeholder="DC=schule,DC=local">
+  </label>
+  <label>Benutzer-Suchfilter
+    <input type="text" name="user_filter" value="<%= settings?.user_filter || '' %>" placeholder="(sAMAccountName={{username}})">
+  </label>
+
+  <h2>Anmeldemodus</h2>
+  <p><small>
+    <strong>Direkt-Bind</strong> (empfohlen): Jede Person meldet sich mit eigener Kennung + Passwort an,
+    kein Service-Account nötig. <strong>Service-Account-Modus</strong>: leer lassen und stattdessen
+    Service-Account-DN/-Passwort unten eintragen.
+  </small></p>
+  <label>Direkt-Bind-Vorlage (LDAP_BIND_USER_TEMPLATE)
+    <input type="text" name="bind_user_template" value="<%= settings?.bind_user_template || '' %>" placeholder="SCHULE\{{username}} oder {{username}}@schule.local">
+  </label>
+
+  <h2>Service-Account</h2>
+  <p><small>
+    Wird für den Login im Service-Account-Modus gebraucht — und <strong>immer</strong> für die
+    Verzeichnis-Suche unter „Lehrkräfte importieren" (Admin → LDAP → Suchen), auch bei Direkt-Bind-Login.
+    Ohne Service-Account bleibt nur das manuelle Anlegen per LDAP-Kennung möglich.
+  </small></p>
+  <label>Service-Account-DN
+    <input type="text" name="bind_dn" value="<%= settings?.bind_dn || '' %>" placeholder="CN=svc-notenverwaltung,OU=ServiceAccounts,DC=schule,DC=local">
+  </label>
+  <label>Service-Account-Passwort
+    <input type="password" name="bind_pw" autocomplete="new-password"
+      placeholder="<%= settings?.bind_pw_encrypted ? '•••••••• (gesetzt – zum Ändern überschreiben, leer lassen = unverändert)' : '(noch nicht gesetzt)' %>">
+  </label>
+  <p><small>
+    Das Passwort wird verschlüsselt gespeichert und kann über die Oberfläche nicht wieder angezeigt werden.
+  </small></p>
+
+  <h2>Attribute</h2>
+  <label>Login-Attribut
+    <input type="text" name="login_attr" value="<%= settings?.login_attr || '' %>" placeholder="sAMAccountName">
+  </label>
+  <label>Name-Attribut
+    <input type="text" name="name_attr" value="<%= settings?.name_attr || '' %>" placeholder="displayName">
+  </label>
+  <label>Suchfilter für Lehrkräfte-Import ({{query}} wird ersetzt)
+    <input type="text" name="teacher_search_filter" value="<%= settings?.teacher_search_filter || '' %>"
+      placeholder="(&(objectClass=person)(|(cn=*{{query}}*)(sAMAccountName=*{{query}}*)(displayName=*{{query}}*)))">
+  </label>
+
+  <h2>TLS</h2>
+  <label>CA-Zertifikat (PEM, optional — bei interner CA empfohlen)
+    <textarea name="tls_ca_pem" rows="4" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"><%= settings?.tls_ca_pem || '' %></textarea>
+  </label>
+  <label>
+    <input type="checkbox" name="tls_insecure" value="1" <%= settings && !settings.tls_reject_unauthorized ? 'checked' : '' %>>
+    Zertifikatsprüfung deaktivieren (nur Notlösung in vertrauenswürdigen Netzen)
+  </label>
+
+  <h2>Anmeldung ohne Vorab-Import</h2>
+  <label>
+    <input type="checkbox" name="auto_provision" value="1" <%= (settings ? Boolean(settings.auto_provision) : true) ? 'checked' : '' %>>
+    Jede Person mit gültigem LDAP-Konto darf sich anmelden — das Konto wird beim ersten
+    erfolgreichen Login automatisch angelegt (kein manueller Import durch den Admin nötig)
+  </label>
+  <p><small>
+    <strong>Achtung:</strong> Das gilt für jeden Bind, der laut Suchfilter/Base-DN passt — stelle
+    sicher, dass Base-DN/Suchfilter oben nur den gewünschten Personenkreis (z. B. die
+    Lehrkräfte-OU) erfassen, falls im Verzeichnis auch andere Konten (z. B. Schüler/innen) liegen.
+    Ist der Haken nicht gesetzt, müssen Konten weiterhin unter „Lehrkräfte importieren" angelegt werden.
+  </small></p>
+
+  <button type="submit">Speichern</button>
+</form>
+
+<% if (settings?.bind_pw_encrypted) { %>
+  <form method="post" action="/admin/ldap/einstellungen/passwort-loeschen" class="inline"
+    onsubmit="return confirm('Service-Account-Passwort wirklich entfernen? Service-Account-Modus/Suche funktionieren danach nicht mehr, bis ein neues Passwort gesetzt wird.')">
+    <button type="submit" class="danger">Service-Account-Passwort entfernen</button>
+  </form>
+<% } %>

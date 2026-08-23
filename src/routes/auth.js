@@ -5,7 +5,7 @@
 import { getDb } from '../db.js';
 import {
   hashPassword, checkPassword, makeToken, SESSION_COOKIE, requireAuth, destroySession,
-  getLdapAuthenticator,
+  getLdapAuthenticator, isLdapConfigured, isAutoProvisionEnabled, provisionLdapUser,
 } from '../auth.js';
 
 const MIN_PW_LEN = 8;
@@ -65,9 +65,35 @@ export default async function authRoutes(fastify) {
   fastify.post('/login', async (request, reply) => {
     const { username = '', password = '' } = request.body || {};
     const next = request.body?.next || '';
-    const row = getDb()
+    const uname = String(username).trim();
+    let row = getDb()
       .prepare('SELECT id, username, password_hash, active, auth_source, login_sub FROM users WHERE username = ?')
-      .get(String(username).trim());
+      .get(uname);
+
+    // Kein lokales/importiertes Konto bekannt: Ist Auto-Provisioning aktiv,
+    // bei erfolgreicher LDAP-Anmeldung automatisch ein Konto anlegen statt
+    // den Login abzulehnen (siehe Admin → LDAP-Einstellungen).
+    if (!row && isLdapConfigured() && isAutoProvisionEnabled() && uname && password) {
+      let ergebnis;
+      try {
+        const ldap = getLdapAuthenticator();
+        ergebnis = ldap ? await ldap.authenticate(uname, password) : null;
+      } catch (e) {
+        request.log.error({ err: e }, 'Auto-Provisioning: LDAP-Anmeldung fehlgeschlagen (technischer Fehler)');
+      }
+      if (ergebnis) {
+        try {
+          const neu = provisionLdapUser(ergebnis, uname);
+          request.session.userId = neu.id;
+          const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';
+          return reply.redirect(safeNext);
+        } catch (e) {
+          request.log.error({ err: e }, 'Auto-Provisioning: Kontoerstellung fehlgeschlagen');
+          return reply.viewEjs('auth/login.ejs', { user: null, error: e.message, next: '' });
+        }
+      }
+    }
+
     if (!row) {
       return reply.viewEjs('auth/login.ejs', {
         user: null, error: 'Benutzername oder Passwort ist falsch.', next,

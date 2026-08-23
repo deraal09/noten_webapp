@@ -67,12 +67,38 @@ LDAP/Active-Directory-Kennung anmelden. Das Vorgehen (Konfiguration,
 Direkt-Bind vs. Service-Account, TLS) ist 1:1 aus `notentabellen-spa`
 übernommen (`src/auth/ldap.js`).
 
-**Wichtig:** Rollen und Berechtigungen kommen weiterhin ausschließlich aus
-der lokalen DB, nicht aus dem Verzeichnis. Eine LDAP-Anmeldung funktioniert
-nur für Konten, die der Admin vorher unter **Admin → LDAP-Import** angelegt
-hat (Verzeichnis durchsuchen → „Als Lehrkraft anlegen"). Ein beliebiger
-AD-Nutzer kann sich also NICHT einfach so einloggen, nur weil er im
-Verzeichnis existiert.
+### Konfigurationsquelle: Admin-Oberfläche oder Plesk-ENV-Variablen
+
+Die LDAP-Konfiguration kann entweder direkt in der App unter
+**Admin → LDAP-Einstellungen** eingetragen werden, oder wie bisher über
+`LDAP_*`-Umgebungsvariablen in der Plesk-Node.js-UI. Ist unter
+„LDAP-Einstellungen" eine LDAP-URL gespeichert, hat sie Vorrang — die
+ENV-Variablen werden dann ignoriert (kein Mischen beider Quellen). Ohne
+gespeicherte Einstellungen greifen wie gehabt die ENV-Variablen.
+
+Das Service-Account-Passwort wird bei Eingabe über die Oberfläche
+**verschlüsselt** in der DB abgelegt (AES-256-GCM, Schlüssel aus `SECRET`
+abgeleitet — siehe `src/auth/secret-crypto.js`) und kann über die
+Oberfläche **nicht wieder im Klartext angezeigt** werden; ein leeres
+Passwort-Feld beim Speichern lässt ein bereits gesetztes Passwort
+unverändert.
+
+### Wer darf sich anmelden?
+
+Zwei Modi, einstellbar unter Admin → LDAP-Einstellungen:
+
+- **Ohne Auto-Provisioning (Standard bei reiner ENV-Konfiguration):**
+  Rollen/Konten kommen ausschließlich aus der lokalen DB. Eine LDAP-Anmeldung
+  funktioniert nur für Konten, die der Admin vorher unter
+  **Admin → LDAP-Import** angelegt hat (Verzeichnis durchsuchen oder
+  LDAP-Kennung manuell eintragen → „Anlegen").
+- **Mit Auto-Provisioning** (Haken „Anmeldung ohne Vorab-Import"): Jede
+  Person mit gültigen LDAP-Zugangsdaten kann sich anmelden — das Konto
+  (Rolle „Lehrkraft") wird beim ersten erfolgreichen Login automatisch
+  angelegt, ganz ohne Admin-Aktion. **Achtung:** Das gilt für jeden Bind,
+  der zu Base-DN/Suchfilter passt — bei einem gemeinsamen Verzeichnis mit
+  z. B. Schüler-Konten unbedingt Base-DN/Filter auf die Lehrkräfte-OU
+  eingrenzen.
 
 ### Env-Variablen (Plesk-Node.js-UI → Umgebungsvariablen)
 
@@ -103,6 +129,18 @@ Externe Lehrkräfte ohne LDAP-Konto laufen unverändert über den
 Einladungslink (Admin → Einladungen) — beide Kontotypen (LDAP / lokal)
 funktionieren parallel und sind in **Admin → Lehrkräfte** an der Spalte
 „Quelle" zu erkennen.
+
+## Klassen selbst anlegen (ohne Admin-Zuweisung)
+
+Jede angemeldete Lehrkraft kann unter **„Meine Klassen"** eigene Klassen in
+einem bestehenden Schuljahr anlegen — eine vorherige Zuweisung durch den
+Admin ist nicht nötig. Beim Anlegen eines Fachs wird die erstellende
+Lehrkraft automatisch diesem Fach zugewiesen (sieht es sofort in der eigenen
+Notentafel). Eine Zuweisung weiterer Lehrkräfte über Admin → Zuweisungen
+bleibt jederzeit zusätzlich möglich — das ist der Weg, wie später eine
+Klassenleitung/Teamleitung Fächer mit bestehenden Klassen verknüpfen kann.
+
+Schuljahre selbst legt weiterhin nur der Admin an (Admin → Dashboard).
 
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 

@@ -1,10 +1,11 @@
 <h1>Lehrkräfte aus LDAP importieren</h1>
+<p><a href="/admin/ldap/einstellungen">→ LDAP-Einstellungen</a></p>
 
 <% if (!konfiguriert) { %>
   <p class="err">
-    LDAP ist auf diesem Server nicht konfiguriert (ENV-Variable <code>LDAP_URL</code> fehlt).
-    Trage die <code>LDAP_*</code>-Variablen in der Plesk-Node.js-Oberfläche ein und starte die
-    App neu — siehe README, Abschnitt „LDAP-Konfiguration".
+    LDAP ist auf diesem Server nicht konfiguriert.
+    Unter <a href="/admin/ldap/einstellungen">LDAP-Einstellungen</a> eintragen und speichern
+    (alternativ: <code>LDAP_*</code>-Umgebungsvariablen in der Plesk-Node.js-Oberfläche).
   </p>
 <% } %>
 

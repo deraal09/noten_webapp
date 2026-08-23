@@ -6,35 +6,73 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { getDb } from './db.js';
-import { ldapConfigAusEnv, LdapAuthenticator } from './auth/ldap.js';
+import { LdapAuthenticator } from './auth/ldap.js';
+import {
+  isLdapConfigured as isLdapConfiguredIntern,
+  isAutoProvisionEnabled as isAutoProvisionEnabledIntern,
+  resolveLdapConfig,
+} from './auth/ldap-settings.js';
 
 export const SESSION_COOKIE = 'noten_session';
 
 export function isLdapConfigured() {
-  return Boolean(process.env.LDAP_URL);
+  return isLdapConfiguredIntern();
 }
 
-let _ldapAuthenticator;
+export function isAutoProvisionEnabled() {
+  return isAutoProvisionEnabledIntern();
+}
+
 let _ldapConfigOverride;
 
 /**
- * Liefert den (gecachten) LDAP-Authenticator, gebaut aus ENV-Variablen.
- * Gibt `null` zurück, wenn LDAP nicht konfiguriert ist oder die Konfiguration
- * fehlerhaft ist (z. B. Pflicht-ENV-Variable fehlt) — der Aufrufer entscheidet,
- * wie er das dem Nutzer meldet.
+ * Baut bei jedem Aufruf einen neuen LDAP-Authenticator aus der aktuellen
+ * Konfiguration (DB-Einstellungen haben Vorrang vor ENV-Variablen, siehe
+ * ldap-settings.js). Kein Caching über Requests hinweg, weil sich die
+ * DB-Einstellungen zur Laufzeit ändern können (Admin-Oberfläche) — der
+ * LDAP-Client selbst verbindet erst beim tatsächlichen Bind, das Bauen ist
+ * also günstig.
+ *
+ * Gibt `null` zurück, wenn LDAP nicht konfiguriert ist. Wirft, wenn LDAP
+ * konfiguriert, aber unvollständig ist (z. B. Base-DN fehlt) — der Aufrufer
+ * entscheidet, wie er das dem Nutzer meldet.
  */
 export function getLdapAuthenticator() {
   if (_ldapConfigOverride !== undefined) return _ldapConfigOverride;
   if (!isLdapConfigured()) return null;
-  if (_ldapAuthenticator) return _ldapAuthenticator;
-  _ldapAuthenticator = new LdapAuthenticator(ldapConfigAusEnv());
-  return _ldapAuthenticator;
+  return new LdapAuthenticator(resolveLdapConfig());
 }
 
 /** Nur für Tests: injiziert einen Fake-Authenticator (oder setzt zurück mit `undefined`). */
 export function setLdapAuthenticatorForTests(authenticator) {
   _ldapConfigOverride = authenticator;
-  _ldapAuthenticator = undefined;
+}
+
+/**
+ * Legt bei erfolgreicher LDAP-Anmeldung eines noch unbekannten Nutzers
+ * automatisch ein Konto an (nur wenn auto_provision aktiv ist, siehe
+ * routes/auth.js). Bei einem Wettlauf zweier gleichzeitiger Erst-Logins
+ * derselben Person wird die bereits angelegte Zeile verwendet statt ein
+ * zweites Mal anzulegen.
+ */
+export function provisionLdapUser(ergebnis, eingegebenerName) {
+  const db = getDb();
+  const loginSub = ergebnis.loginSub || eingegebenerName;
+  const username = loginSub;
+  try {
+    const info = db.prepare(`INSERT INTO users
+      (username, display_name, password_hash, role, active, auth_source, login_sub)
+      VALUES (?, ?, ?, 'teacher', 1, 'ldap', ?)`)
+      .run(username, ergebnis.name || username, hashPassword(makeToken()), loginSub);
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
+  } catch (e) {
+    const existing = db.prepare("SELECT * FROM users WHERE login_sub = ? AND auth_source = 'ldap'").get(loginSub);
+    if (existing) return existing;
+    throw new Error(
+      `Automatische Kontoerstellung fehlgeschlagen: Benutzername "${username}" ist bereits vergeben. ` +
+      'Bitte den Admin bitten, das Konto manuell mit abweichendem Benutzernamen anzulegen (Admin → LDAP-Import).',
+    );
+  }
 }
 
 export function hashPassword(plain) {
@@ -124,4 +162,25 @@ export function userIstKlassenlehrer(user, klasseId) {
     .prepare('SELECT 1 FROM klassen_lehrkraefte WHERE user_id = ? AND klasse_id = ?')
     .get(user.id, klasseId);
   return Boolean(row);
+}
+
+/**
+ * Berechtigungs-Check fürs Selbstbedienungs-Klassenmanagement (Admin →
+ * Klassenlisten können von allen selbst erstellt werden, siehe
+ * routes/teacher.js): Ersteller/in einer Klasse behält immer Zugriff, auch
+ * ohne separate Fach-Zuweisung; ebenso jede Lehrkraft mit Fach-Zuweisung
+ * oder Klassenlehrer-Eintrag in dieser Klasse.
+ */
+export function userHatKlassenZugriff(user, klasseId) {
+  if (user.isAdmin) return true;
+  const db = getDb();
+  const erstellt = db.prepare('SELECT 1 FROM klassen WHERE id = ? AND created_by_id = ?')
+    .get(klasseId, user.id);
+  if (erstellt) return true;
+  const fach = db.prepare(`
+    SELECT 1 FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id
+    WHERE f.klasse_id = ? AND fz.user_id = ?
+  `).get(klasseId, user.id);
+  if (fach) return true;
+  return userIstKlassenlehrer(user, klasseId);
 }

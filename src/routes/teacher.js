@@ -4,7 +4,7 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth, userHatFachZgriff } from '../auth.js';
+import { requireAuth, userHatFachZgriff, userHatKlassenZugriff } from '../auth.js';
 import {
   HALBJAHRE, NOTE_TYPEN, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr,
   autoDistribute, nichtBestanden, formatNote, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
@@ -389,6 +389,154 @@ export default async function teacherRoutes(fastify) {
     if (!userHatFachZgriff(request.user, n.fach_id)) return reply.code(403).send({ error: 'forbidden' });
     getDb().prepare('DELETE FROM noten WHERE id = ?').run(request.params.id);
     return reply.redirect(`/teacher/fach/${n.fach_id}?hj=${encodeURIComponent(n.halbjahr)}`);
+  });
+
+  // ---------- Selbstbedienung: Klassen anlegen/verwalten ohne Admin-Zuweisung ----------
+  // Jede angemeldete Lehrkraft kann eigene Klassen anlegen (Ersteller/in
+  // behält automatisch Zugriff, siehe userHatKlassenZugriff). Eine spätere
+  // Zuweisung weiterer Lehrkräfte über Admin → Zuweisungen bleibt optional.
+
+  fastify.get('/klassen', async (request, reply) => {
+    const db = getDb();
+    const schuljahre = db.prepare('SELECT * FROM schuljahre ORDER BY bezeichnung DESC').all();
+    const klassen = db.prepare(`
+      SELECT DISTINCT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k
+      JOIN schuljahre s ON s.id = k.schuljahr_id
+      LEFT JOIN faecher f ON f.klasse_id = k.id
+      LEFT JOIN fach_zuweisungen fz ON fz.fach_id = f.id AND fz.user_id = ?
+      LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
+      WHERE k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL
+      ORDER BY s.bezeichnung DESC, k.name
+    `).all(request.user.id, request.user.id, request.user.id);
+    return reply.viewEjs('teacher/klassen_liste.ejs', { user: request.user, schuljahre, klassen });
+  });
+
+  fastify.post('/klassen/neu', async (request, reply) => {
+    const schuljahrId = parseInt(request.body?.schuljahr_id, 10);
+    const name = String(request.body?.name || '').trim();
+    let ns = String(request.body?.notenschluessel || 'IHK');
+    if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
+    if (!schuljahrId || !name) {
+      request.flash?.('error', 'Schuljahr und Name sind erforderlich.');
+      return reply.redirect('/teacher/klassen');
+    }
+    try {
+      const info = getDb().prepare(`
+        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns], request.user.id);
+      return reply.redirect(`/teacher/klassen/${info.lastInsertRowid}`);
+    } catch (e) {
+      request.flash?.('error', 'Klasse existiert in diesem Schuljahr bereits.');
+      return reply.redirect('/teacher/klassen');
+    }
+  });
+
+  fastify.get('/klassen/:id', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userHatKlassenZugriff(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const schueler = getDb().prepare(
+      'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
+    ).all(klasse.id);
+    const faecher = getDb().prepare(`
+      SELECT f.*,
+        (SELECT GROUP_CONCAT(u.display_name || COALESCE(NULLIF(' / ' || u.username, ' / '), ''), ', ')
+           FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id WHERE fz.fach_id = f.id) AS lehrer_liste
+      FROM faecher f WHERE f.klasse_id = ? ORDER BY f.name
+    `).all(klasse.id);
+    const eigentuemer = klasse.created_by_id === request.user.id || request.user.isAdmin;
+    return reply.viewEjs('teacher/klasse_detail.ejs', {
+      user: request.user, klasse, schueler, faecher, eigentuemer,
+    });
+  });
+
+  fastify.post('/klassen/:id/loeschen', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT created_by_id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.redirect('/teacher/klassen');
+    if (klasse.created_by_id !== request.user.id && !request.user.isAdmin) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die erstellende Lehrkraft oder der Admin kann diese Klasse löschen.' });
+    }
+    getDb().prepare('DELETE FROM klassen WHERE id = ?').run(request.params.id);
+    return reply.redirect('/teacher/klassen');
+  });
+
+  fastify.post('/klassen/:id/schueler/neu', async (request, reply) => {
+    if (!userHatKlassenZugriff(request.user, request.params.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const nn = String(request.body?.nachname || '').trim();
+    const vn = String(request.body?.vorname || '').trim();
+    if (nn && vn) {
+      getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)')
+        .run(request.params.id, nn, vn);
+    }
+    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  fastify.post('/klassen/:id/schueler/bulk', async (request, reply) => {
+    if (!userHatKlassenZugriff(request.user, request.params.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const text = String(request.body?.text || '');
+    const ins = getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
+    const tx = getDb().transaction((lines) => {
+      for (const line of lines) {
+        const [nn, vn] = line.split(',', 2).map((s) => s.trim());
+        if (!nn) continue;
+        ins.run(request.params.id, nn, vn || '');
+      }
+    });
+    tx(text.split(/\r?\n/));
+    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  fastify.post('/schueler/:id/loeschen', async (request, reply) => {
+    const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
+    if (!s) return reply.redirect('/teacher/klassen');
+    if (!userHatKlassenZugriff(request.user, s.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    getDb().prepare('DELETE FROM schueler WHERE id = ?').run(request.params.id);
+    return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
+  });
+
+  fastify.post('/klassen/:id/faecher/neu', async (request, reply) => {
+    if (!userHatKlassenZugriff(request.user, request.params.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const name = String(request.body?.name || '').trim();
+    if (name) {
+      try {
+        const info = getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)')
+          .run(request.params.id, name);
+        // Ersteller/in wird automatisch dem eigenen Fach zugewiesen — eine
+        // spätere Zuweisung weiterer Lehrkräfte (Admin → Zuweisungen) bleibt
+        // zusätzlich möglich, ist aber nicht Voraussetzung.
+        getDb().prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
+          .run(request.user.id, info.lastInsertRowid);
+      } catch (e) {
+        request.flash?.('error', 'Fach existiert bereits in dieser Klasse.');
+      }
+    }
+    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  fastify.post('/faecher/:id/loeschen', async (request, reply) => {
+    const f = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(request.params.id);
+    if (!f) return reply.redirect('/teacher/klassen');
+    if (!userHatKlassenZugriff(request.user, f.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    getDb().prepare('DELETE FROM faecher WHERE id = ?').run(request.params.id);
+    return reply.redirect(`/teacher/klassen/${f.klasse_id}`);
   });
 }
 

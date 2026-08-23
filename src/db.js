@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -65,6 +65,9 @@ CREATE TABLE IF NOT EXISTS klassen (
     name TEXT NOT NULL,
     notenschluessel TEXT NOT NULL DEFAULT 'IHK',
     notenschluessel_csv TEXT NOT NULL DEFAULT '',
+    -- Lehrkraft, die die Klasse selbst angelegt hat (Selbstbedienung ohne
+    -- vorherige Admin-Zuweisung). NULL bei admin-angelegten Klassen.
+    created_by_id INTEGER REFERENCES users(id),
     UNIQUE (schuljahr_id, name)
 );
 
@@ -157,6 +160,29 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- Eine feste Zeile (id=1) mit der LDAP-Konfiguration aus der Admin-Oberfläche.
+-- bind_pw_encrypted ist AES-256-GCM-verschlüsselt (Schlüssel aus ENV SECRET
+-- abgeleitet, siehe src/auth/secret-crypto.js) — niemals im Klartext abgelegt
+-- und über die Oberfläche auch nicht wieder auslesbar.
+CREATE TABLE IF NOT EXISTS ldap_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    url TEXT,
+    base_dn TEXT,
+    user_filter TEXT,
+    bind_user_template TEXT,
+    bind_dn TEXT,
+    bind_pw_encrypted TEXT,
+    login_attr TEXT,
+    name_attr TEXT,
+    teacher_search_filter TEXT,
+    tls_ca_pem TEXT,
+    tls_reject_unauthorized INTEGER NOT NULL DEFAULT 1,
+    -- Legt bei jeder erfolgreichen LDAP-Anmeldung automatisch ein Konto an,
+    -- falls noch keins existiert (statt Pflicht-Import durch den Admin).
+    auto_provision INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 // Fügt einer bereits existierenden Tabelle (aus einer älteren SCHEMA_VERSION)
@@ -174,6 +200,7 @@ function migrate(db) {
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
   // Partial-Index: login_sub muss nur unter LDAP-Konten eindeutig sein.
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_sub ON users(login_sub) WHERE login_sub IS NOT NULL');
+  ensureColumn(db, 'klassen', 'created_by_id', 'created_by_id INTEGER REFERENCES users(id)');
 }
 
 let _db = null;

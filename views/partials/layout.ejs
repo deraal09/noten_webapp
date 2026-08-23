@@ -16,9 +16,12 @@
         <% if (user.isAdmin) { %>
           <a href="/admin">Dashboard</a>
           <a href="/admin/users">Lehrkräfte</a>
+          <a href="/admin/ldap/einstellungen">LDAP-Einstellungen</a>
           <a href="/admin/ldap">LDAP-Import</a>
           <a href="/admin/einladungen">Einladungen</a>
           <a href="/admin/zuweisungen">Zuweisungen</a>
+        <% } else { %>
+          <a href="/teacher/klassen">Meine Klassen</a>
         <% } %>
         <a href="/teacher">Fächer</a>
         <a href="/klassenlehrer">Klassenleitung</a>

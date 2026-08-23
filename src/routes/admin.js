@@ -6,7 +6,10 @@
 import { getDb } from '../db.js';
 import { requireAdmin, makeToken, hashPassword, isLdapConfigured } from '../auth.js';
 import { DEFAULT_NS_CSV, DEFAULT_GEWICHTUNG } from '../grade-calc.js';
-import { ldapConfigAusEnv, searchLehrkraefte } from '../auth/ldap.js';
+import { searchLehrkraefte } from '../auth/ldap.js';
+import {
+  getLdapSettingsRow, saveLdapSettings, clearLdapBindPassword, resolveLdapConfig,
+} from '../auth/ldap-settings.js';
 
 export default async function adminRoutes(fastify) {
   fastify.addHook('preHandler', requireAdmin);
@@ -214,6 +217,46 @@ export default async function adminRoutes(fastify) {
     return reply.redirect('/admin/users');
   });
 
+  // ---------- LDAP: Einstellungen ----------
+  fastify.get('/ldap/einstellungen', async (request, reply) => {
+    const settings = getLdapSettingsRow();
+    return reply.viewEjs('admin/ldap_einstellungen.ejs', {
+      user: request.user,
+      settings,
+      envGesetzt: Boolean(process.env.LDAP_URL),
+    });
+  });
+
+  fastify.post('/ldap/einstellungen', async (request, reply) => {
+    const b = request.body || {};
+    try {
+      saveLdapSettings({
+        url: String(b.url || '').trim(),
+        base_dn: String(b.base_dn || '').trim(),
+        user_filter: String(b.user_filter || '').trim(),
+        bind_user_template: String(b.bind_user_template || '').trim(),
+        bind_dn: String(b.bind_dn || '').trim(),
+        bind_pw: String(b.bind_pw || ''), // leer = bestehendes Passwort unverändert lassen
+        login_attr: String(b.login_attr || '').trim(),
+        name_attr: String(b.name_attr || '').trim(),
+        teacher_search_filter: String(b.teacher_search_filter || '').trim(),
+        tls_ca_pem: String(b.tls_ca_pem || '').trim(),
+        tls_reject_unauthorized: !b.tls_insecure,
+        auto_provision: Boolean(b.auto_provision),
+      });
+      request.flash?.('success', 'LDAP-Einstellungen gespeichert.');
+    } catch (e) {
+      request.flash?.('error', 'Speichern fehlgeschlagen: ' + e.message);
+    }
+    return reply.redirect('/admin/ldap/einstellungen');
+  });
+
+  fastify.post('/ldap/einstellungen/passwort-loeschen', async (request, reply) => {
+    clearLdapBindPassword();
+    request.flash?.('success', 'Service-Account-Passwort entfernt.');
+    return reply.redirect('/admin/ldap/einstellungen');
+  });
+
   // ---------- LDAP: Lehrkräfte-Import ----------
   fastify.get('/ldap', async (request, reply) => {
     const konfiguriert = isLdapConfigured();
@@ -222,12 +265,12 @@ export default async function adminRoutes(fastify) {
     let error = null;
     if (konfiguriert && q) {
       try {
-        ergebnisse = await searchLehrkraefte(ldapConfigAusEnv(), { query: q });
+        ergebnisse = await searchLehrkraefte(resolveLdapConfig(), { query: q });
       } catch (e) {
         error = e.message;
       }
     } else if (!konfiguriert) {
-      error = 'LDAP ist nicht konfiguriert (ENV-Variable LDAP_URL fehlt).';
+      error = 'LDAP ist nicht konfiguriert. Unter „LDAP-Einstellungen" konfigurieren.';
     }
     const bekannt = new Set(
       getDb().prepare("SELECT login_sub FROM users WHERE auth_source = 'ldap'").all()

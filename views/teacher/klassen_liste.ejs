@@ -1,0 +1,48 @@
+<h1>Meine Klassen</h1>
+<p><small>
+  Klassen können von jeder Lehrkraft selbst angelegt werden — eine Zuweisung durch den Admin
+  ist nicht nötig, kann aber jederzeit zusätzlich erfolgen (Admin → Zuweisungen).
+</small></p>
+
+<h2>Neue Klasse anlegen</h2>
+<% if (!schuljahre.length) { %>
+  <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
+<% } else { %>
+  <form method="post" action="/teacher/klassen/neu" class="card">
+    <label>Schuljahr
+      <select name="schuljahr_id">
+        <% schuljahre.forEach(function(s) { %>
+          <option value="<%= s.id %>"><%= s.bezeichnung %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label>Klassenname
+      <input type="text" name="name" placeholder="z. B. 12BFI1" required>
+    </label>
+    <label>Notenschlüssel
+      <select name="notenschluessel">
+        <option value="IHK">IHK (1–6)</option>
+        <option value="BG">BG (0–15)</option>
+      </select>
+    </label>
+    <button type="submit">+ Klasse anlegen</button>
+  </form>
+<% } %>
+
+<h2>Vorhandene Klassen</h2>
+<% if (!klassen.length) { %>
+  <p>Noch keine Klassen — leg oben eine an oder warte auf eine Zuweisung.</p>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Name</th><th>Schuljahr</th><th>Notenschlüssel</th></tr></thead>
+    <tbody>
+      <% klassen.forEach(function(k) { %>
+        <tr>
+          <td><a href="/teacher/klassen/<%= k.id %>"><%= k.name %></a></td>
+          <td><%= k.schuljahr_bezeichnung %></td>
+          <td><%= k.notenschluessel %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>

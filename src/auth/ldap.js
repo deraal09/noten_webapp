@@ -55,6 +55,41 @@ export function ldapConfigAusEnv(env = process.env) {
   };
 }
 
+/**
+ * Baut eine LdapConfig aus einer Zeile der DB-Tabelle `ldap_settings`
+ * (Admin-Oberfläche) statt aus ENV-Variablen. `decrypt` entschlüsselt das
+ * gespeicherte Service-Account-Passwort (siehe secret-crypto.js) — wird hier
+ * als Parameter injiziert, damit ldap.js selbst keine Abhängigkeit auf die
+ * Verschlüsselung/DB braucht und einfach testbar bleibt.
+ */
+export function ldapConfigAusSettings(row, decrypt) {
+  const pflicht = (v, name) => {
+    if (!v) throw new Error(`${name} fehlt (LDAP-Einstellungen unvollständig)`);
+    return v;
+  };
+  const direkt = Boolean(row.bind_user_template);
+  const tlsOptions = {};
+  if (row.tls_ca_pem) tlsOptions.ca = row.tls_ca_pem;
+  if (row.tls_reject_unauthorized === 0) tlsOptions.rejectUnauthorized = false;
+
+  const bindPasswortKlartext = row.bind_pw_encrypted ? decrypt(row.bind_pw_encrypted) : '';
+
+  return {
+    url: pflicht(row.url, 'LDAP-URL'),
+    bindDn: direkt ? (row.bind_dn || '') : pflicht(row.bind_dn, 'Service-Account-DN'),
+    bindPasswort: direkt ? bindPasswortKlartext : pflicht(bindPasswortKlartext, 'Service-Account-Passwort'),
+    baseDn: pflicht(row.base_dn, 'Base-DN'),
+    userFilter: row.user_filter || '(sAMAccountName={{username}})',
+    loginAttr: row.login_attr || 'sAMAccountName',
+    nameAttr: row.name_attr || 'displayName',
+    teacherSearchFilter:
+      row.teacher_search_filter ||
+      '(&(objectClass=person)(|(cn=*{{query}}*)(sAMAccountName=*{{query}}*)(displayName=*{{query}}*)))',
+    ...(Object.keys(tlsOptions).length ? { tlsOptions } : {}),
+    ...(direkt ? { userBindTemplate: row.bind_user_template } : {}),
+  };
+}
+
 function escapeFilter(wert) {
   // RFC 4515: Sonderzeichen im Suchfilter maskieren (Injection vermeiden).
   return wert.replace(/[\\*() ]/g, (c) => '\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));

@@ -1,0 +1,66 @@
+<h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p>
+  <a href="/teacher/klassen">← Meine Klassen</a> ·
+  <a href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
+  <% if (eigentuemer) { %>
+    · <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
+        <button type="submit" class="danger">🗑 Klasse löschen</button>
+      </form>
+  <% } %>
+</p>
+
+<h2>Schüler/innen (<%= schueler.length %>)</h2>
+<form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/neu" class="inline">
+  <input type="text" name="nachname" placeholder="Nachname" required>
+  <input type="text" name="vorname" placeholder="Vorname" required>
+  <button type="submit">+ Hinzufügen</button>
+</form>
+<details>
+  <summary>Mehrere Schüler/innen auf einmal (eine Zeile je Person, Format: <code>Nachname, Vorname</code>)</summary>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/bulk" class="card">
+    <textarea name="text" rows="6" placeholder="Müller, Anna
+Schmidt, Bernd
+Meier, Carla"></textarea>
+    <button type="submit">Alle anlegen</button>
+  </form>
+</details>
+<table class="data">
+  <thead><tr><th>Nachname</th><th>Vorname</th><th>Aktion</th></tr></thead>
+  <tbody>
+    <% schueler.forEach(function(s) { %>
+      <tr>
+        <td><%= s.nachname %></td>
+        <td><%= s.vorname %></td>
+        <td>
+          <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in löschen?')">
+            <button type="submit" class="danger">🗑</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<h2>Fächer</h2>
+<p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen — weitere Lehrkräfte kann der Admin
+  jederzeit zusätzlich zuweisen (Admin → Zuweisungen).</small></p>
+<form method="post" action="/teacher/klassen/<%= klasse.id %>/faecher/neu" class="inline">
+  <input type="text" name="name" placeholder="z. B. Mathematik" required>
+  <button type="submit">+ Fach anlegen</button>
+</form>
+<table class="data">
+  <thead><tr><th>Name</th><th>Lehrkräfte</th><th>Aktion</th></tr></thead>
+  <tbody>
+    <% faecher.forEach(function(f) { %>
+      <tr>
+        <td><a href="/teacher/fach/<%= f.id %>"><%= f.name %></a></td>
+        <td><%= f.lehrer_liste || '—' %></td>
+        <td>
+          <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen?')">
+            <button type="submit" class="danger">🗑</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
