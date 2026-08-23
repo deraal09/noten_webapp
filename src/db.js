@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -99,6 +99,41 @@ CREATE TABLE IF NOT EXISTS klassen_lehrkraefte (
     klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
     fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
     UNIQUE (user_id, klasse_id, fach_id)
+);
+
+-- Klassen-weite Klassenleitung (im Unterschied zu klassen_lehrkraefte oben,
+-- das historisch je Fach eine Zeile braucht). Wer hier steht, sieht alle
+-- Noten der Klasse und kann Fächer anlegen/Lehrkräfte zuordnen.
+CREATE TABLE IF NOT EXISTS klassenleitung (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (klasse_id, user_id)
+);
+
+-- Verknüpfungsanfrage: Jemand möchte einer bereits bestehenden Klasse
+-- beitreten (Namenskollision beim Selbst-Anlegen), statt eine zweite,
+-- doppelte Klasse zu erzeugen. Alle bereits mit der Klasse verbundenen
+-- Personen (Ersteller/in, Klassenleitung, zugewiesene Lehrkräfte) müssen
+-- zustimmen, siehe klassen_verknuepfungsantworten.
+CREATE TABLE IF NOT EXISTS klassen_verknuepfungsanfragen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ziel_klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
+    angefragt_von_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    vorgeschlagenes_fach TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'offen', -- 'offen' | 'angenommen' | 'abgelehnt'
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    entschieden_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS klassen_verknuepfungsantworten (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    anfrage_id INTEGER NOT NULL REFERENCES klassen_verknuepfungsanfragen(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    zustimmung INTEGER, -- NULL = noch offen, 1 = zugestimmt, 0 = abgelehnt
+    entschieden_at TEXT,
+    UNIQUE (anfrage_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS klausuren (

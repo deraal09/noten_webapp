@@ -136,11 +136,39 @@ Jede angemeldete Lehrkraft kann unter **„Meine Klassen"** eigene Klassen in
 einem bestehenden Schuljahr anlegen — eine vorherige Zuweisung durch den
 Admin ist nicht nötig. Beim Anlegen eines Fachs wird die erstellende
 Lehrkraft automatisch diesem Fach zugewiesen (sieht es sofort in der eigenen
-Notentafel). Eine Zuweisung weiterer Lehrkräfte über Admin → Zuweisungen
-bleibt jederzeit zusätzlich möglich — das ist der Weg, wie später eine
-Klassenleitung/Teamleitung Fächer mit bestehenden Klassen verknüpfen kann.
+Notentafel).
 
 Schuljahre selbst legt weiterhin nur der Admin an (Admin → Dashboard).
+
+### Klassenleitung (selbst eintragen, nicht nur Admin)
+
+Die Person, die eine Klasse angelegt hat, kann sich auf der Klassenseite
+selbst als **Klassenleitung** eintragen (Admin kann das für jede Klasse
+ebenfalls). Als Klassenleitung:
+
+- sieht sie **alle** Fächer/Noten der Klasse, nicht nur die eigenen,
+- kann sie weitere Fächer anlegen,
+- kann sie **andere Lehrkräfte** Fächern dieser Klasse zuordnen — bisher
+  ging das nur über Admin → Zuweisungen, jetzt zusätzlich direkt auf der
+  Klassenseite.
+
+Alle anderen Lehrkräfte sehen weiterhin nur die Fächer, die sie selbst
+angelegt haben oder denen sie zugewiesen wurden.
+
+### Verknüpfungsanfrage bei Namenskollisionen
+
+Legt jemand eine Klasse mit einem Namen an, der in diesem Schuljahr schon
+vergeben ist, entsteht **keine zweite, doppelte Klasse**. Stattdessen:
+
+- Ist die bestehende Klasse noch mit niemandem verbunden (z. B. eine leere,
+  vom Admin angelegte Hülle), bekommt die anfragende Person sofort Zugriff
+  mit dem von ihr genannten Fach.
+- Ist die Klasse bereits mit Personen verbunden (Ersteller/in,
+  Klassenleitung, zugewiesene Lehrkräfte), wird eine **Verknüpfungsanfrage**
+  gestellt: Alle diese Personen sehen sie unter „Meine Klassen" und müssen
+  zustimmen. Lehnt auch nur eine Person ab, ist die Anfrage beendet. Stimmen
+  alle zu, wird das von der anfragenden Person genannte Fach angelegt
+  (falls es das noch nicht gibt) und sie diesem Fach zugewiesen.
 
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 

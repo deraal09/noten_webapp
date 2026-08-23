@@ -146,22 +146,35 @@ export async function requireAdmin(request, reply) {
 
 /**
  * Berechtigungs-Check: Hat der User Zugriff auf das Fach?
- * Admins dürfen alles; Lehrkräfte nur per FachZuweisung.
+ * Admins dürfen alles; die Klassenleitung sieht alle Fächer/Noten ihrer
+ * Klasse; sonstige Lehrkräfte nur per FachZuweisung (eigenes oder
+ * zugewiesenes Fach).
  */
 export function userHatFachZgriff(user, fachId) {
   if (user.isAdmin) return true;
-  const row = getDb()
-    .prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
+  const db = getDb();
+  const direkt = db.prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
     .get(user.id, fachId);
-  return Boolean(row);
+  if (direkt) return true;
+  const fach = db.prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
+  return fach ? userIstKlassenlehrer(user, fach.klasse_id) : false;
 }
 
+/**
+ * Klassenleitung: entweder in `klassenleitung` (klassenweit, siehe
+ * routes/teacher.js Selbstregistrierung) oder in `klassen_lehrkraefte`
+ * (Admin-Zuweisung, historisch je Fach eine Zeile, aber als klassenweite
+ * Rolle geprüft — der fach_id-Wert dort spielt für diesen Check keine Rolle).
+ */
 export function userIstKlassenlehrer(user, klasseId) {
   if (user.isAdmin) return true;
-  const row = getDb()
-    .prepare('SELECT 1 FROM klassen_lehrkraefte WHERE user_id = ? AND klasse_id = ?')
+  const db = getDb();
+  const neu = db.prepare('SELECT 1 FROM klassenleitung WHERE user_id = ? AND klasse_id = ?')
     .get(user.id, klasseId);
-  return Boolean(row);
+  if (neu) return true;
+  const alt = db.prepare('SELECT 1 FROM klassen_lehrkraefte WHERE user_id = ? AND klasse_id = ?')
+    .get(user.id, klasseId);
+  return Boolean(alt);
 }
 
 /**

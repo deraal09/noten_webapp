@@ -4,6 +4,54 @@
   ist nicht nötig, kann aber jederzeit zusätzlich erfolgen (Admin → Zuweisungen).
 </small></p>
 
+<% if (wartetAufMich.length) { %>
+  <h2>Verknüpfungsanfragen, die auf dich warten</h2>
+  <table class="data">
+    <thead><tr><th>Klasse</th><th>Schuljahr</th><th>Vorgeschlagenes Fach</th><th>Von</th><th>Aktion</th></tr></thead>
+    <tbody>
+      <% wartetAufMich.forEach(function(a) { %>
+        <tr>
+          <td><%= a.klasse_name %></td>
+          <td><%= a.schuljahr_bezeichnung %></td>
+          <td><%= a.vorgeschlagenes_fach %></td>
+          <td><%= a.angefragt_von_name || a.angefragt_von_username %></td>
+          <td>
+            <form method="post" action="/teacher/verknuepfungen/<%= a.id %>/antwort" class="inline">
+              <input type="hidden" name="zustimmung" value="1">
+              <button type="submit">✅ Zustimmen</button>
+            </form>
+            <form method="post" action="/teacher/verknuepfungen/<%= a.id %>/antwort" class="inline">
+              <input type="hidden" name="zustimmung" value="0">
+              <button type="submit" class="danger">❌ Ablehnen</button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+
+<% if (meineAnfragen.length) { %>
+  <h2>Meine Verknüpfungsanfragen</h2>
+  <table class="data">
+    <thead><tr><th>Klasse</th><th>Schuljahr</th><th>Fach</th><th>Status</th></tr></thead>
+    <tbody>
+      <% meineAnfragen.forEach(function(a) { %>
+        <tr>
+          <td><%= a.klasse_name %></td>
+          <td><%= a.schuljahr_bezeichnung %></td>
+          <td><%= a.vorgeschlagenes_fach %></td>
+          <td>
+            <% if (a.status === 'offen') { %>⏳ offen
+            <% } else if (a.status === 'angenommen') { %>✅ angenommen
+            <% } else { %>❌ abgelehnt<% } %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+
 <h2>Neue Klasse anlegen</h2>
 <% if (!schuljahre.length) { %>
   <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>

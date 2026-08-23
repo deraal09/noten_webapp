@@ -1,0 +1,18 @@
+<h1>Klasse „<%= klasse.name %>" gibt es schon</h1>
+<p>
+  In <%= klasse.schuljahr_bezeichnung %> ist der Name „<%= klasse.name %>" bereits vergeben.
+  Statt eine zweite, doppelte Klasse anzulegen, kannst du eine Verknüpfungsanfrage stellen:
+  alle bereits mit dieser Klasse verbundenen Personen (Klassenleitung, zugewiesene Lehrkräfte)
+  müssen zustimmen. Stimmen alle zu, wird dein Fach angelegt (falls noch nicht vorhanden) und
+  du bekommst Zugriff auf die Klasse. Ist noch niemand mit der Klasse verbunden, erhältst du
+  sofort Zugriff ohne Zustimmung.
+</p>
+
+<form method="post" action="/teacher/klassen/<%= klasse.id %>/verknuepfen" class="card">
+  <label>Welches Fach möchtest du in dieser Klasse unterrichten?
+    <input type="text" name="fach" placeholder="z. B. Mathematik" required autofocus>
+  </label>
+  <button type="submit">Verknüpfungsanfrage stellen</button>
+</form>
+
+<p><a href="/teacher/klassen">← Zurück zu Meine Klassen</a></p>

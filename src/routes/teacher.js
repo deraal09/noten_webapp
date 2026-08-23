@@ -4,11 +4,12 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth, userHatFachZgriff, userHatKlassenZugriff } from '../auth.js';
+import { requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer } from '../auth.js';
 import {
   HALBJAHRE, NOTE_TYPEN, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr,
   autoDistribute, nichtBestanden, formatNote, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from '../grade-calc.js';
+import { starteVerknuepfung, beantworteVerknuepfung } from '../klassen-verknuepfung.js';
 
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -406,10 +407,40 @@ export default async function teacherRoutes(fastify) {
       LEFT JOIN faecher f ON f.klasse_id = k.id
       LEFT JOIN fach_zuweisungen fz ON fz.fach_id = f.id AND fz.user_id = ?
       LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
-      WHERE k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL
+      LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
+      WHERE k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL
       ORDER BY s.bezeichnung DESC, k.name
-    `).all(request.user.id, request.user.id, request.user.id);
-    return reply.viewEjs('teacher/klassen_liste.ejs', { user: request.user, schuljahre, klassen });
+    `).all(request.user.id, request.user.id, request.user.id, request.user.id);
+
+    // Verknüpfungsanfragen, auf deren Zustimmung ich noch warte
+    const wartetAufMich = db.prepare(`
+      SELECT a.id, a.vorgeschlagenes_fach, a.created_at,
+             k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung,
+             u.display_name AS angefragt_von_name, u.username AS angefragt_von_username
+      FROM klassen_verknuepfungsantworten ant
+      JOIN klassen_verknuepfungsanfragen a ON a.id = ant.anfrage_id
+      JOIN klassen k ON k.id = a.ziel_klasse_id
+      JOIN schuljahre s ON s.id = k.schuljahr_id
+      JOIN users u ON u.id = a.angefragt_von_id
+      WHERE ant.user_id = ? AND ant.zustimmung IS NULL AND a.status = 'offen'
+      ORDER BY a.created_at
+    `).all(request.user.id);
+
+    // Meine eigenen gestellten Anfragen (offen/entschieden)
+    const meineAnfragen = db.prepare(`
+      SELECT a.id, a.vorgeschlagenes_fach, a.status, a.created_at,
+             k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen_verknuepfungsanfragen a
+      JOIN klassen k ON k.id = a.ziel_klasse_id
+      JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE a.angefragt_von_id = ?
+      ORDER BY a.created_at DESC
+      LIMIT 20
+    `).all(request.user.id);
+
+    return reply.viewEjs('teacher/klassen_liste.ejs', {
+      user: request.user, schuljahre, klassen, wartetAufMich, meineAnfragen,
+    });
   });
 
   fastify.post('/klassen/neu', async (request, reply) => {
@@ -428,9 +459,61 @@ export default async function teacherRoutes(fastify) {
       `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns], request.user.id);
       return reply.redirect(`/teacher/klassen/${info.lastInsertRowid}`);
     } catch (e) {
+      // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zur
+      // Verknüpfungsanfrage weiterleiten, damit die Klasse nicht doppelt entsteht.
+      const bestehend = getDb().prepare('SELECT id FROM klassen WHERE schuljahr_id = ? AND name = ?')
+        .get(schuljahrId, name);
+      if (bestehend) return reply.redirect(`/teacher/klassen/${bestehend.id}/verknuepfen`);
       request.flash?.('error', 'Klasse existiert in diesem Schuljahr bereits.');
       return reply.redirect('/teacher/klassen');
     }
+  });
+
+  // ---------- Verknüpfungsanfrage für eine bereits bestehende Klasse ----------
+  fastify.get('/klassen/:id/verknuepfen', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (userHatKlassenZugriff(request.user, klasse.id)) return reply.redirect(`/teacher/klassen/${klasse.id}`);
+    return reply.viewEjs('teacher/klasse_verknuepfen.ejs', { user: request.user, klasse });
+  });
+
+  fastify.post('/klassen/:id/verknuepfen', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    const fach = String(request.body?.fach || '').trim();
+    if (!fach) {
+      request.flash?.('error', 'Bitte ein Fach angeben.');
+      return reply.redirect(`/teacher/klassen/${klasse.id}/verknuepfen`);
+    }
+    const ergebnis = starteVerknuepfung({
+      klasseId: klasse.id, angefragtVonId: request.user.id, vorgeschlagenesFach: fach,
+    });
+    if (ergebnis.direkterBeitritt) {
+      request.flash?.('success', `Klasse war noch niemandem zugeordnet — du hast direkten Zugriff mit dem Fach „${fach}" erhalten.`);
+      return reply.redirect(`/teacher/klassen/${klasse.id}`);
+    }
+    request.flash?.('success', 'Verknüpfungsanfrage gestellt. Sobald alle bereits zugeordneten Personen zustimmen, erhältst du Zugriff.');
+    return reply.redirect('/teacher/klassen');
+  });
+
+  fastify.post('/verknuepfungen/:id/antwort', async (request, reply) => {
+    const zustimmung = request.body?.zustimmung === '1';
+    const ergebnis = beantworteVerknuepfung({
+      anfrageId: request.params.id, userId: request.user.id, zustimmung,
+    });
+    if (!ergebnis) {
+      request.flash?.('error', 'Diese Anfrage betrifft dich nicht (mehr).');
+    } else if (ergebnis.status === 'abgelehnt') {
+      request.flash?.('success', 'Anfrage abgelehnt.');
+    } else if (ergebnis.status === 'angenommen') {
+      request.flash?.('success', 'Anfrage angenommen — die Klasse ist jetzt verknüpft.');
+    } else {
+      request.flash?.('success', 'Deine Zustimmung wurde gespeichert — es fehlen noch andere.');
+    }
+    return reply.redirect('/teacher/klassen');
   });
 
   fastify.get('/klassen/:id', async (request, reply) => {
@@ -453,9 +536,73 @@ export default async function teacherRoutes(fastify) {
       FROM faecher f WHERE f.klasse_id = ? ORDER BY f.name
     `).all(klasse.id);
     const eigentuemer = klasse.created_by_id === request.user.id || request.user.isAdmin;
+    const istKlassenlehrer = userIstKlassenlehrer(request.user, klasse.id);
+    const kannSelbstAlsKlassenlehrerEintragen = !istKlassenlehrer
+      && (klasse.created_by_id === request.user.id || request.user.isAdmin);
+
+    let zuweisbareLehrkraefte = [];
+    let zuweisungen = [];
+    if (istKlassenlehrer) {
+      zuweisbareLehrkraefte = getDb().prepare(
+        "SELECT id, username, display_name FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
+      ).all();
+      zuweisungen = getDb().prepare(`
+        SELECT fz.id, fz.fach_id, f.name AS fach_name, u.display_name, u.username
+        FROM fach_zuweisungen fz
+        JOIN faecher f ON f.id = fz.fach_id
+        JOIN users u ON u.id = fz.user_id
+        WHERE f.klasse_id = ?
+        ORDER BY f.name, u.username
+      `).all(klasse.id);
+    }
+
     return reply.viewEjs('teacher/klasse_detail.ejs', {
       user: request.user, klasse, schueler, faecher, eigentuemer,
+      istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
     });
+  });
+
+  fastify.post('/klassen/:id/klassenlehrer/eintragen', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT created_by_id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.redirect('/teacher/klassen');
+    if (klasse.created_by_id !== request.user.id && !request.user.isAdmin) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die erstellende Lehrkraft oder der Admin kann sich hier als Klassenleitung eintragen.' });
+    }
+    getDb().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)')
+      .run(request.params.id, request.user.id);
+    request.flash?.('success', 'Du bist jetzt als Klassenleitung eingetragen und siehst alle Noten dieser Klasse.');
+    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  fastify.post('/klassen/:id/zuweisungen/neu', async (request, reply) => {
+    if (!userIstKlassenlehrer(request.user, request.params.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Lehrkräfte zuweisen.' });
+    }
+    const userId = parseInt(request.body?.user_id, 10);
+    const fachId = parseInt(request.body?.fach_id, 10);
+    const fach = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
+    if (!userId || !fach || fach.klasse_id !== Number(request.params.id)) {
+      request.flash?.('error', 'Ungültige Auswahl.');
+      return reply.redirect(`/teacher/klassen/${request.params.id}`);
+    }
+    try {
+      getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(userId, fachId);
+    } catch (e) {
+      request.flash?.('error', 'Diese Zuweisung besteht bereits.');
+    }
+    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  fastify.post('/zuweisungen/:id/loeschen', async (request, reply) => {
+    const z = getDb().prepare(`
+      SELECT fz.id, f.klasse_id FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id WHERE fz.id = ?
+    `).get(request.params.id);
+    if (!z) return reply.redirect('/teacher/klassen');
+    if (!userIstKlassenlehrer(request.user, z.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Zuweisungen entfernen.' });
+    }
+    getDb().prepare('DELETE FROM fach_zuweisungen WHERE id = ?').run(request.params.id);
+    return reply.redirect(`/teacher/klassen/${z.klasse_id}`);
   });
 
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {

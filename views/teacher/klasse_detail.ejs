@@ -9,6 +9,14 @@
   <% } %>
 </p>
 
+<% if (istKlassenlehrer) { %>
+  <p class="flash flash-info">Du bist Klassenleitung dieser Klasse und siehst alle Fächer/Noten.</p>
+<% } else if (kannSelbstAlsKlassenlehrerEintragen) { %>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenlehrer/eintragen" class="inline">
+    <button type="submit">Als Klassenleitung eintragen (alle Noten der Klasse sehen, Fächer zuordnen)</button>
+  </form>
+<% } %>
+
 <h2>Schüler/innen (<%= schueler.length %>)</h2>
 <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/neu" class="inline">
   <input type="text" name="nachname" placeholder="Nachname" required>
@@ -42,8 +50,9 @@ Meier, Carla"></textarea>
 </table>
 
 <h2>Fächer</h2>
-<p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen — weitere Lehrkräfte kann der Admin
-  jederzeit zusätzlich zuweisen (Admin → Zuweisungen).</small></p>
+<p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen.
+  <% if (istKlassenlehrer) { %>Als Klassenleitung kannst du unten weitere Lehrkräfte den Fächern zuordnen.
+  <% } else { %>Weitere Lehrkräfte kann die Klassenleitung oder der Admin zuordnen.<% } %></small></p>
 <form method="post" action="/teacher/klassen/<%= klasse.id %>/faecher/neu" class="inline">
   <input type="text" name="name" placeholder="z. B. Mathematik" required>
   <button type="submit">+ Fach anlegen</button>
@@ -64,3 +73,42 @@ Meier, Carla"></textarea>
     <% }); %>
   </tbody>
 </table>
+
+<% if (istKlassenlehrer) { %>
+  <h2>Lehrkräfte zuordnen</h2>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/zuweisungen/neu" class="card">
+    <label>Lehrkraft
+      <select name="user_id" required>
+        <option value="">— wählen —</option>
+        <% zuweisbareLehrkraefte.forEach(function(u) { %>
+          <option value="<%= u.id %>"><%= u.display_name || u.username %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label>Fach
+      <select name="fach_id" required>
+        <option value="">— wählen —</option>
+        <% faecher.forEach(function(f) { %>
+          <option value="<%= f.id %>"><%= f.name %></option>
+        <% }); %>
+      </select>
+    </label>
+    <button type="submit">+ Zuweisen</button>
+  </form>
+  <table class="data">
+    <thead><tr><th>Lehrkraft</th><th>Fach</th><th>Aktion</th></tr></thead>
+    <tbody>
+      <% zuweisungen.forEach(function(z) { %>
+        <tr>
+          <td><%= z.display_name || z.username %></td>
+          <td><%= z.fach_name %></td>
+          <td>
+            <form method="post" action="/teacher/zuweisungen/<%= z.id %>/loeschen" class="inline" onsubmit="return confirm('Zuweisung entfernen?')">
+              <button type="submit" class="danger">🗑</button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
