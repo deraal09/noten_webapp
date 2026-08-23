@@ -8,13 +8,33 @@
   </p>
 <% } %>
 
+<h2>Manuell anlegen (kein Service-Account nötig)</h2>
+<p><small>
+  Trage die LDAP-Kennung (z. B. den AD-Anmeldenamen) direkt ein — funktioniert auch ohne
+  <code>LDAP_BIND_DN</code>/<code>LDAP_BIND_PW</code>, solange der Login selbst per Direkt-Bind
+  (<code>LDAP_BIND_USER_TEMPLATE</code>) läuft.
+</small></p>
+<form method="post" action="/admin/ldap/import" class="card">
+  <label>LDAP-Kennung (login_sub)
+    <input type="text" name="login_sub" placeholder="z. B. mmustermann" required <%= konfiguriert ? '' : 'disabled' %>>
+  </label>
+  <label>Anzeigename
+    <input type="text" name="display_name" placeholder="z. B. M. Mustermann">
+  </label>
+  <label>Lokaler Benutzername (optional, sonst = LDAP-Kennung)
+    <input type="text" name="username" placeholder="optional">
+  </label>
+  <button type="submit" <%= konfiguriert ? '' : 'disabled' %>>+ Anlegen</button>
+</form>
+
+<h2>Verzeichnis durchsuchen (Service-Account nötig)</h2>
 <% if (error && konfiguriert) { %>
   <p class="err"><%= error %></p>
 <% } %>
 
 <form method="get" action="/admin/ldap" class="card">
   <label>Suche (Name oder Benutzerkürzel)
-    <input type="text" name="q" value="<%= q %>" placeholder="z. B. Müller" autofocus <%= konfiguriert ? '' : 'disabled' %>>
+    <input type="text" name="q" value="<%= q %>" placeholder="z. B. Müller" <%= konfiguriert ? '' : 'disabled' %>>
   </label>
   <button type="submit" <%= konfiguriert ? '' : 'disabled' %>>🔍 Suchen</button>
 </form>
