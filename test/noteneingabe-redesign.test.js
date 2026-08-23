@@ -110,6 +110,33 @@ test('Vorbereitung: Admin, Klasse, Fach, zwei Schüler/innen, zwei Klausuren', a
   });
 });
 
+test('Regression: neu angelegte Klausur/UL bekommt automatisch eine Gewichtung > 0', async () => {
+  // Eigenes, frisches Fach — die K1/UL1 aus der Vorbereitung haben ihre
+  // Gewichtung bereits manuell überschrieben und würden den Bug verdecken.
+  await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Chemie' });
+  const chemieId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Chemie'").get(klasseId).id;
+
+  await form(lehrerA, `/teacher/fach/${chemieId}/klausuren/neu`, { name: 'K1', aufgaben: '1', halbjahr: HJ });
+  const klausur = getDb().prepare('SELECT * FROM klausuren WHERE fach_id = ?').get(chemieId);
+  assert.notEqual(klausur.gewichtung, 0, 'Gewichtung sollte automatisch verteilt werden, nicht bei 0 bleiben');
+
+  await form(lehrerA, `/teacher/fach/${chemieId}/uls/neu`, { name: 'UL1', aufgaben: '1', halbjahr: HJ });
+  const ul = getDb().prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ?').get(chemieId);
+  assert.notEqual(ul.gewichtung, 0, 'Gewichtung sollte automatisch verteilt werden, nicht bei 0 bleiben');
+
+  // Mit einer Gewichtung > 0 muss ein eingetragener Punktwert auch in der
+  // Notenübersicht (schriftliche/mündliche Note, Gesamtnote) ankommen.
+  await lehrerA(`/teacher/klausuren/${klausur.id}/punkte`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ schueler_id: String(s1), aufgabe_idx: '0', wert: '1' }),
+  });
+  const r = await lehrerA(`/teacher/fach/${chemieId}/noten?hj=${encodeURIComponent(HJ)}`);
+  const data = await r.json();
+  const zeile = data.schueler.find((s) => s.schueler_id === s1);
+  assert.notEqual(zeile.schriftlicheNote, null);
+  assert.notEqual(zeile.gesamt, null);
+});
+
 test('Notenübersicht (JSON-API): schriftliche/mündliche Note getrennt berechnet', async () => {
   const r = await lehrerA(`/teacher/fach/${fachId}/noten?hj=${encodeURIComponent(HJ)}`);
   assert.equal(r.status, 200);

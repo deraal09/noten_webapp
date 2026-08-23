@@ -120,11 +120,11 @@
   <% if (!klausuren.length) { %><p class="hint">Noch keine Klausuren.</p><% } %>
   <% klausuren.forEach(function(k) { %>
     <% var maxArr = JSON.parse(k.max_punkte_pro_aufgabe); %>
-    <div class="card">
+    <details class="card" open>
+      <summary><%= k.name %> <small>(<%= k.gewichtung %>%)</small></summary>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
-      <h3><%= k.name %></h3>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/gewichtung" class="inline">
         Gewichtung: <input type="number" name="gewichtung" value="<%= k.gewichtung %>" min="0" max="100" step="0.1" size="5">%
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
@@ -160,7 +160,7 @@
           <% }); %>
         </tbody>
       </table>
-    </div>
+    </details>
   <% }); %>
 </div>
 
@@ -178,11 +178,11 @@
   <% if (!uls.length) { %><p class="hint">Noch keine ULs.</p><% } %>
   <% uls.forEach(function(u) { %>
     <% var maxArr = JSON.parse(u.max_punkte_pro_aufgabe); %>
-    <div class="card">
+    <details class="card" open>
+      <summary><%= u.name %> <small>(<%= u.gewichtung %>%)</small></summary>
       <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('UL löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
-      <h3><%= u.name %></h3>
       <form method="post" action="/teacher/uls/<%= u.id %>/gewichtung" class="inline">
         Gewichtung: <input type="number" name="gewichtung" value="<%= u.gewichtung %>" min="0" max="100" step="0.1" size="5">%
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
@@ -218,7 +218,7 @@
           <% }); %>
         </tbody>
       </table>
-    </div>
+    </details>
   <% }); %>
 </div>
 

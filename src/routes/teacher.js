@@ -722,7 +722,7 @@ export default async function teacherRoutes(fastify) {
 
 function autoVerteileKlausuren(fachId, halbjahr) {
   const klausuren = getDb().prepare(
-    'SELECT id FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
+    'SELECT id, gewichtung FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
   ).all(fachId, halbjahr);
   if (!klausuren.length) return;
   if (klausuren.some((k) => k.gewichtung !== 0)) return;
@@ -738,7 +738,7 @@ function autoVerteileKlausuren(fachId, halbjahr) {
 
 function autoVerteileUls(fachId, halbjahr) {
   const uls = getDb().prepare(
-    'SELECT id FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
+    'SELECT id, gewichtung FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
   ).all(fachId, halbjahr);
   if (!uls.length) return;
   if (uls.some((u) => u.gewichtung !== 0)) return;

@@ -67,6 +67,8 @@ form.card select, form.card textarea, .card input, .card select, .card textarea 
 }
 form.card input[type=checkbox], .card input[type=checkbox] { width: auto; }
 form.card textarea, .card textarea { min-height: 100px; font-family: monospace; }
+details.card > summary { cursor: pointer; font-size: 1.1rem; font-weight: 600; margin: -1rem -1rem 0.75rem; padding: 1rem; }
+details.card[open] > summary { margin-bottom: 0.75rem; border-bottom: 1px solid #eee; }
 
 button, .btn {
   display: inline-block; padding: 0.5rem 1rem; background: #1d3557; color: white;
