@@ -2,7 +2,7 @@
 
 <table class="data">
   <thead>
-    <tr><th>Benutzername</th><th>Anzeigename</th><th>Rolle</th><th>Status</th><th>Aktion</th></tr>
+    <tr><th>Benutzername</th><th>Anzeigename</th><th>Rolle</th><th>Quelle</th><th>Status</th><th>Aktion</th></tr>
   </thead>
   <tbody>
     <% users.forEach(function(u) { %>
@@ -10,6 +10,13 @@
         <td><%= u.username %></td>
         <td><%= u.display_name || '—' %></td>
         <td><%= u.role %></td>
+        <td>
+          <% if (u.auth_source === 'ldap') { %>
+            <span class="role" style="background:#0d6efd">LDAP</span>
+          <% } else { %>
+            <span class="role" style="background:#6c757d">Lokal / Extern</span>
+          <% } %>
+        </td>
         <td><%= u.active ? '✅ aktiv' : '🚫 inaktiv' %></td>
         <td>
           <details>
@@ -17,10 +24,14 @@
             <form method="post" action="/admin/users/<%= u.id %>/toggle" class="inline">
               <button type="submit"><%= u.active ? 'Deaktivieren' : 'Aktivieren' %></button>
             </form>
-            <form method="post" action="/admin/users/<%= u.id %>/reset" class="inline">
-              <input type="password" name="password" placeholder="neues Passwort" minlength="8" required>
-              <button type="submit">Passwort zurücksetzen</button>
-            </form>
+            <% if (u.auth_source !== 'ldap') { %>
+              <form method="post" action="/admin/users/<%= u.id %>/reset" class="inline">
+                <input type="password" name="password" placeholder="neues Passwort" minlength="8" required>
+                <button type="submit">Passwort zurücksetzen</button>
+              </form>
+            <% } else { %>
+              <p><small>Passwort wird über LDAP verwaltet.</small></p>
+            <% } %>
           </details>
         </td>
       </tr>
@@ -28,4 +39,5 @@
   </tbody>
 </table>
 
-<p><a href="/admin/einladungen">→ Neue Lehrkraft per Einladungslink anlegen</a></p>
+<p><a href="/admin/einladungen">→ Neue externe Lehrkraft (ohne LDAP) per Einladungslink anlegen</a></p>
+<p><a href="/admin/ldap">→ Lehrkräfte aus LDAP importieren</a></p>

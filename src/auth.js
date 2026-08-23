@@ -6,8 +6,36 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { getDb } from './db.js';
+import { ldapConfigAusEnv, LdapAuthenticator } from './auth/ldap.js';
 
 export const SESSION_COOKIE = 'noten_session';
+
+export function isLdapConfigured() {
+  return Boolean(process.env.LDAP_URL);
+}
+
+let _ldapAuthenticator;
+let _ldapConfigOverride;
+
+/**
+ * Liefert den (gecachten) LDAP-Authenticator, gebaut aus ENV-Variablen.
+ * Gibt `null` zurück, wenn LDAP nicht konfiguriert ist oder die Konfiguration
+ * fehlerhaft ist (z. B. Pflicht-ENV-Variable fehlt) — der Aufrufer entscheidet,
+ * wie er das dem Nutzer meldet.
+ */
+export function getLdapAuthenticator() {
+  if (_ldapConfigOverride !== undefined) return _ldapConfigOverride;
+  if (!isLdapConfigured()) return null;
+  if (_ldapAuthenticator) return _ldapAuthenticator;
+  _ldapAuthenticator = new LdapAuthenticator(ldapConfigAusEnv());
+  return _ldapAuthenticator;
+}
+
+/** Nur für Tests: injiziert einen Fake-Authenticator (oder setzt zurück mit `undefined`). */
+export function setLdapAuthenticatorForTests(authenticator) {
+  _ldapConfigOverride = authenticator;
+  _ldapAuthenticator = undefined;
+}
 
 export function hashPassword(plain) {
   return bcrypt.hashSync(plain, 12);

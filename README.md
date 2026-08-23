@@ -23,8 +23,10 @@ die App direkt und routet die Subdomain darauf.
 
 - **Rollen:** Admin / Lehrkraft / Klassenleitung
 - **Setup:** Beim ersten Start wird der erste Admin via `/setup` angelegt
-- **Einladungssystem:** Admin erzeugt Einladungslinks, Lehrkräfte wählen
-  selbst Benutzername + Passwort
+- **LDAP/Active-Directory-Login:** optional, siehe Abschnitt „LDAP-Konfiguration"
+  unten. Ist LDAP nicht konfiguriert, ändert sich am Verhalten nichts.
+- **Externe Lehrkräfte ohne LDAP-Zugang:** Admin erzeugt Einladungslinks,
+  Lehrkräfte wählen selbst Benutzername + Passwort (lokales Konto)
 - **Notenverwaltung:** Klausuren, Unterrichtsleistungen (ULs), mündlich/schriftlich,
   mit automatischer Gewichtung
 - **Notentafel:** Live-Gesamtnoten via AJAX
@@ -57,6 +59,50 @@ Deckt:
 ```bash
 node src/cli/seed-admin.js --username admin --display "T. Lehrer" --password geheim123
 ```
+
+## LDAP-Konfiguration
+
+Lehrkräfte können sich statt mit einem lokalen Passwort mit ihrer
+LDAP/Active-Directory-Kennung anmelden. Das Vorgehen (Konfiguration,
+Direkt-Bind vs. Service-Account, TLS) ist 1:1 aus `notentabellen-spa`
+übernommen (`src/auth/ldap.js`).
+
+**Wichtig:** Rollen und Berechtigungen kommen weiterhin ausschließlich aus
+der lokalen DB, nicht aus dem Verzeichnis. Eine LDAP-Anmeldung funktioniert
+nur für Konten, die der Admin vorher unter **Admin → LDAP-Import** angelegt
+hat (Verzeichnis durchsuchen → „Als Lehrkraft anlegen"). Ein beliebiger
+AD-Nutzer kann sich also NICHT einfach so einloggen, nur weil er im
+Verzeichnis existiert.
+
+### Env-Variablen (Plesk-Node.js-UI → Umgebungsvariablen)
+
+| Variable | Pflicht | Bedeutung |
+|---|---|---|
+| `LDAP_URL` | für LDAP-Login | z. B. `ldaps://dc01.schule.local:636`. Fehlt sie, ist LDAP komplett deaktiviert. |
+| `LDAP_BASE_DN` | für LDAP-Login | Such-Basis, z. B. `DC=schule,DC=local` |
+| `LDAP_USER_FILTER` | optional | Default `(sAMAccountName={{username}})` |
+| `LDAP_BIND_USER_TEMPLATE` | Variante A | Direkt-Bind, z. B. `SCHULE\{{username}}` oder `{{username}}@schule.local` — kein Service-Account fürs Login nötig |
+| `LDAP_BIND_DN` / `LDAP_BIND_PW` | Variante B, **immer** für den LDAP-Import | Service-Account. Wird für die Admin-Verzeichnissuche gebraucht, selbst wenn Login per Direkt-Bind läuft |
+| `LDAP_LOGIN_ATTR` | optional | Default `sAMAccountName` |
+| `LDAP_NAME_ATTR` | optional | Default `displayName` |
+| `LDAP_TEACHER_SEARCH_FILTER` | optional | Filter für die Admin-Suche, `{{query}}` wird ersetzt |
+| `LDAP_TLS_CA_PFAD` | optional | Pfad zur PEM-Datei der internen CA |
+| `LDAP_TLS_REJECT_UNAUTHORIZED` | optional | `false` schaltet die Zertifikatsprüfung ab (nur Notlösung) |
+
+Siehe `.env.example` für ein vollständiges Beispiel.
+
+### Ablauf
+
+1. ENV-Variablen in Plesk setzen, App neu starten.
+2. Admin → **LDAP-Import** → Lehrkraft suchen → **„Als Lehrkraft anlegen"**.
+3. Die Lehrkraft meldet sich künftig mit ihrer gewohnten LDAP-Kennung + AD-Passwort an.
+4. Diagnose bei Problemen: `npm run ldap-test -- <benutzername> <passwort>` auf
+   dem Server (zeigt die aufgelöste Konfiguration und den genauen Fehler).
+
+Externe Lehrkräfte ohne LDAP-Konto laufen unverändert über den
+Einladungslink (Admin → Einladungen) — beide Kontotypen (LDAP / lokal)
+funktionieren parallel und sind in **Admin → Lehrkräfte** an der Spalte
+„Quelle" zu erkennen.
 
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 
@@ -133,6 +179,18 @@ Die App wird **nicht** per Hand auf der Shell gestartet. Plesk übernimmt das:
 
 Nach jedem `git push` oder wenn sich `package.json`/`package-lock.json`
 geändert hat: **„npm-Installation"** → **„Anwendung neu starten"**.
+
+**Automatischer Neustart über Plesk-Bereitstellungsaktionen:** Eine
+Bereitstellungsaktion mit
+`export PATH=/opt/plesk/node/22/bin:$PATH && npm install && touch tmp/restart.txt`
+übernimmt beides automatisch nach jedem Git-Pull — `touch tmp/restart.txt`
+ist Passengers Standard-Mechanismus, um die App beim nächsten Request neu zu
+starten. Ein manueller Klick auf „Anwendung neu starten" ist damit i. d. R.
+NICHT nötig. Einzige Voraussetzung: das Verzeichnis `tmp/` muss existieren
+(es ist in `.gitignore`, wird also nicht mitgeklont) — sicherheitshalber die
+Aktion auf `mkdir -p tmp && touch tmp/restart.txt` erweitern, damit der
+Befehl auch beim allerersten Deploy nicht mit „No such file or directory"
+fehlschlägt.
 
 ### 6. Ersten Admin anlegen
 

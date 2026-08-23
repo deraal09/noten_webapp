@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -32,7 +32,12 @@ CREATE TABLE IF NOT EXISTS users (
     display_name TEXT,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    invited_by_id INTEGER REFERENCES users(id)
+    invited_by_id INTEGER REFERENCES users(id),
+    -- 'lokal': Login per Passwort (Einladungslink). 'ldap': Login per LDAP-Bind,
+    -- password_hash ist dann nur ein nie verwendeter Platzhalter.
+    auth_source TEXT NOT NULL DEFAULT 'lokal',
+    -- Stabile Kennung aus dem Verzeichnis (z. B. sAMAccountName), nur bei auth_source='ldap'.
+    login_sub TEXT
 );
 
 CREATE TABLE IF NOT EXISTS invitations (
@@ -154,6 +159,23 @@ CREATE TABLE IF NOT EXISTS schema_meta (
 );
 `;
 
+// Fügt einer bereits existierenden Tabelle (aus einer älteren SCHEMA_VERSION)
+// eine Spalte hinzu, falls sie fehlt. CREATE TABLE IF NOT EXISTS deckt nur
+// neue DBs ab — Bestandsinstallationen brauchen ALTER TABLE.
+function ensureColumn(db, table, column, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+
+function migrate(db) {
+  ensureColumn(db, 'users', 'auth_source', "auth_source TEXT NOT NULL DEFAULT 'lokal'");
+  ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
+  // Partial-Index: login_sub muss nur unter LDAP-Konten eindeutig sein.
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_sub ON users(login_sub) WHERE login_sub IS NOT NULL');
+}
+
 let _db = null;
 
 export function getDb() {
@@ -163,9 +185,12 @@ export function getDb() {
   _db.pragma('journal_mode = WAL');
   _db.pragma('foreign_keys = ON');
   _db.exec(SCHEMA);
+  migrate(_db);
   const v = _db.prepare("SELECT value FROM schema_meta WHERE key='version'").get();
   if (!v) {
     _db.prepare("INSERT INTO schema_meta (key, value) VALUES ('version', ?)").run(String(SCHEMA_VERSION));
+  } else if (Number(v.value) < SCHEMA_VERSION) {
+    _db.prepare("UPDATE schema_meta SET value = ? WHERE key='version'").run(String(SCHEMA_VERSION));
   }
   return _db;
 }

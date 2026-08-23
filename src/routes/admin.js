@@ -4,8 +4,9 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAdmin, makeToken, hashPassword } from '../auth.js';
+import { requireAdmin, makeToken, hashPassword, isLdapConfigured } from '../auth.js';
 import { DEFAULT_NS_CSV, DEFAULT_GEWICHTUNG } from '../grade-calc.js';
+import { ldapConfigAusEnv, searchLehrkraefte } from '../auth/ldap.js';
 
 export default async function adminRoutes(fastify) {
   fastify.addHook('preHandler', requireAdmin);
@@ -198,6 +199,11 @@ export default async function adminRoutes(fastify) {
   });
 
   fastify.post('/users/:id/reset', async (request, reply) => {
+    const ziel = getDb().prepare('SELECT auth_source FROM users WHERE id = ?').get(request.params.id);
+    if (ziel?.auth_source === 'ldap') {
+      request.flash?.('error', 'LDAP-Konten haben kein lokales Passwort — das Passwort wird im Verzeichnis verwaltet.');
+      return reply.redirect('/admin/users');
+    }
     const pw = String(request.body?.password || '');
     if (pw.length < 8) {
       request.flash?.('error', 'Passwort muss mindestens 8 Zeichen haben.');
@@ -206,6 +212,51 @@ export default async function adminRoutes(fastify) {
         .run(hashPassword(pw), request.params.id);
     }
     return reply.redirect('/admin/users');
+  });
+
+  // ---------- LDAP: Lehrkräfte-Import ----------
+  fastify.get('/ldap', async (request, reply) => {
+    const konfiguriert = isLdapConfigured();
+    const q = String(request.query?.q || '').trim();
+    let ergebnisse = [];
+    let error = null;
+    if (konfiguriert && q) {
+      try {
+        ergebnisse = await searchLehrkraefte(ldapConfigAusEnv(), { query: q });
+      } catch (e) {
+        error = e.message;
+      }
+    } else if (!konfiguriert) {
+      error = 'LDAP ist nicht konfiguriert (ENV-Variable LDAP_URL fehlt).';
+    }
+    const bekannt = new Set(
+      getDb().prepare("SELECT login_sub FROM users WHERE auth_source = 'ldap'").all()
+        .map((r) => r.login_sub),
+    );
+    return reply.viewEjs('admin/ldap.ejs', {
+      user: request.user, konfiguriert, q, ergebnisse, error, bekannt,
+    });
+  });
+
+  fastify.post('/ldap/import', async (request, reply) => {
+    const loginSub = String(request.body?.login_sub || '').trim();
+    const displayName = String(request.body?.display_name || '').trim();
+    const username = String(request.body?.username || '').trim() || loginSub;
+    const q = String(request.body?.q || '');
+    if (!loginSub || !username) {
+      request.flash?.('error', 'Kein LDAP-Kennzeichen übergeben.');
+      return reply.redirect('/admin/ldap?q=' + encodeURIComponent(q));
+    }
+    try {
+      getDb().prepare(`INSERT INTO users
+        (username, display_name, password_hash, role, active, auth_source, login_sub)
+        VALUES (?, ?, ?, 'teacher', 1, 'ldap', ?)`)
+        .run(username, displayName || username, hashPassword(makeToken()), loginSub);
+      request.flash?.('success', `Lehrkraft „${displayName || username}" wurde aus LDAP importiert und kann sich jetzt anmelden.`);
+    } catch (e) {
+      request.flash?.('error', 'Import fehlgeschlagen: Benutzername oder LDAP-Kennzeichen ist bereits vergeben.');
+    }
+    return reply.redirect('/admin/ldap?q=' + encodeURIComponent(q));
   });
 
   // ---------- Einladungen ----------

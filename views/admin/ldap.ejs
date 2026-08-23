@@ -1,0 +1,65 @@
+<h1>Lehrkräfte aus LDAP importieren</h1>
+
+<% if (!konfiguriert) { %>
+  <p class="err">
+    LDAP ist auf diesem Server nicht konfiguriert (ENV-Variable <code>LDAP_URL</code> fehlt).
+    Trage die <code>LDAP_*</code>-Variablen in der Plesk-Node.js-Oberfläche ein und starte die
+    App neu — siehe README, Abschnitt „LDAP-Konfiguration".
+  </p>
+<% } %>
+
+<% if (error && konfiguriert) { %>
+  <p class="err"><%= error %></p>
+<% } %>
+
+<form method="get" action="/admin/ldap" class="card">
+  <label>Suche (Name oder Benutzerkürzel)
+    <input type="text" name="q" value="<%= q %>" placeholder="z. B. Müller" autofocus <%= konfiguriert ? '' : 'disabled' %>>
+  </label>
+  <button type="submit" <%= konfiguriert ? '' : 'disabled' %>>🔍 Suchen</button>
+</form>
+
+<% if (q && konfiguriert && !error) { %>
+  <% if (!ergebnisse.length) { %>
+    <p>Keine Treffer im Verzeichnis für „<%= q %>".</p>
+  <% } else { %>
+    <table class="data">
+      <thead>
+        <tr><th>Name</th><th>LDAP-Kennzeichen</th><th>Status</th><th>Aktion</th></tr>
+      </thead>
+      <tbody>
+        <% ergebnisse.forEach(function(e) { %>
+          <tr>
+            <td><%= e.name || '—' %></td>
+            <td><code><%= e.loginSub %></code></td>
+            <td>
+              <% if (bekannt.has(e.loginSub)) { %>
+                ✅ bereits angelegt
+              <% } else { %>
+                — noch nicht angelegt
+              <% } %>
+            </td>
+            <td>
+              <% if (!bekannt.has(e.loginSub)) { %>
+                <form method="post" action="/admin/ldap/import" class="inline">
+                  <input type="hidden" name="login_sub" value="<%= e.loginSub %>">
+                  <input type="hidden" name="display_name" value="<%= e.name || e.loginSub %>">
+                  <input type="hidden" name="q" value="<%= q %>">
+                  <input type="text" name="username" value="<%= e.loginSub %>" style="width:9rem" title="Lokaler Benutzername (frei wählbar)">
+                  <button type="submit">+ Als Lehrkraft anlegen</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+<% } %>
+
+<p><small>
+  Importierte Lehrkräfte melden sich künftig mit ihrem gewohnten LDAP-Benutzernamen
+  und -Passwort an (nicht mit einem hier vergebenen Passwort). Für die Suche wird ein
+  Service-Account benötigt (<code>LDAP_BIND_DN</code>/<code>LDAP_BIND_PW</code>), auch wenn
+  der Login selbst per Direkt-Bind läuft.
+</small></p>

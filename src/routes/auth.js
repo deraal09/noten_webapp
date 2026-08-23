@@ -5,6 +5,7 @@
 import { getDb } from '../db.js';
 import {
   hashPassword, checkPassword, makeToken, SESSION_COOKIE, requireAuth, destroySession,
+  getLdapAuthenticator,
 } from '../auth.js';
 
 const MIN_PW_LEN = 8;
@@ -63,12 +64,13 @@ export default async function authRoutes(fastify) {
 
   fastify.post('/login', async (request, reply) => {
     const { username = '', password = '' } = request.body || {};
+    const next = request.body?.next || '';
     const row = getDb()
-      .prepare('SELECT id, username, password_hash, active FROM users WHERE username = ?')
+      .prepare('SELECT id, username, password_hash, active, auth_source, login_sub FROM users WHERE username = ?')
       .get(String(username).trim());
-    if (!row || !checkPassword(password, row.password_hash)) {
+    if (!row) {
       return reply.viewEjs('auth/login.ejs', {
-        user: null, error: 'Benutzername oder Passwort ist falsch.', next: request.body?.next || '',
+        user: null, error: 'Benutzername oder Passwort ist falsch.', next,
       });
     }
     if (!row.active) {
@@ -76,10 +78,35 @@ export default async function authRoutes(fastify) {
         user: null, error: 'Konto ist deaktiviert. Bitte an den Admin wenden.', next: '',
       });
     }
+
+    if (row.auth_source === 'ldap') {
+      let ergebnis;
+      try {
+        const ldap = getLdapAuthenticator();
+        if (!ldap) throw new Error('LDAP_URL fehlt');
+        ergebnis = await ldap.authenticate(row.login_sub || row.username, password);
+      } catch (e) {
+        request.log.error({ err: e }, 'LDAP-Login fehlgeschlagen (technischer Fehler)');
+        return reply.viewEjs('auth/login.ejs', {
+          user: null,
+          error: 'LDAP-Anmeldung ist gerade nicht verfügbar. Bitte später erneut versuchen oder an den Admin wenden.',
+          next: '',
+        });
+      }
+      if (!ergebnis) {
+        return reply.viewEjs('auth/login.ejs', {
+          user: null, error: 'Benutzername oder Passwort ist falsch.', next,
+        });
+      }
+    } else if (!checkPassword(password, row.password_hash)) {
+      return reply.viewEjs('auth/login.ejs', {
+        user: null, error: 'Benutzername oder Passwort ist falsch.', next,
+      });
+    }
+
     request.session.userId = row.id;
-    const next = String(request.body?.next || '/');
     // Nur relative Pfade ohne Host erlauben (Open-Redirect-Schutz).
-    const safeNext = /^\/(?!\/)/.test(next) ? next : '/';
+    const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';
     return reply.redirect(safeNext);
   });
 
