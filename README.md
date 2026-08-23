@@ -30,7 +30,8 @@ die App direkt und routet die Subdomain darauf.
 - **Notenverwaltung:** Klausuren, Unterrichtsleistungen (ULs), mündlich/schriftlich,
   mit automatischer Gewichtung
 - **Notentafel:** Live-Gesamtnoten via AJAX
-- **Fehlzeiten:** Pro Halbjahr, drei Typen (entschuldigt/unentschuldigt/betrieblich)
+- **Fehlzeiten:** Pro Halbjahr, drei Typen (entschuldigt/unentschuldigt/betrieblich),
+  optional mit zweiter Schule (siehe unten)
 - **CSV-Export:** Pro Klasse oder komplettes Schuljahr (UTF-8 BOM, Excel-freundlich)
 - **Notenschlüssel:** IHK (1–6) und BG (0–15), pro Klasse mit eigenem CSV
 
@@ -130,6 +131,17 @@ Einladungslink (Admin → Einladungen) — beide Kontotypen (LDAP / lokal)
 funktionieren parallel und sind in **Admin → Lehrkräfte** an der Spalte
 „Quelle" zu erkennen.
 
+## Fehlzeiten: optionale zweite Schule
+
+Manche Schüler/innen werden an zwei Schulen unterrichtet (z. B. duales
+Modell) — dann müssen Fehlzeiten an beiden Schulen erfasst werden. Auf der
+Fehlzeiten-Seite einer Klasse kann die Klassenleitung/der Admin den Haken
+„Schüler/innen werden an zwei Schulen unterrichtet" setzen. Danach bekommt
+jede Fehlzeitenart (entschuldigt/unentschuldigt/betrieblich) zwei
+Stunden-Spalten (Schule 1 / Schule 2) plus eine live berechnete Summe. Ohne
+den Haken bleibt die Ansicht wie bisher (eine Spalte je Typ) — das ist rein
+optional pro Klasse.
+
 ## Klassen selbst anlegen (ohne Admin-Zuweisung)
 
 Jede angemeldete Lehrkraft kann unter **„Meine Klassen"** eigene Klassen in
@@ -198,8 +210,38 @@ ist bewusst nicht möglich.
 Unter **Klasse → Halbjahresübersicht** sieht die Klassenleitung für das
 gewählte Halbjahr eine Tabelle Schüler/in × Fach mit dem jeweils zuletzt
 synchronisierten Stand, dem Zeitpunkt der letzten Synchronisierung je Fach,
-und einem Notenschnitt je Schüler/in (Durchschnitt über alle synchronisierten
-Fächer) — als Vorbereitung für Halbjahresgespräche.
+einem Notenschnitt je Schüler/in (Durchschnitt über alle synchronisierten
+Fächer), und — per Knopfdruck aufklappbar — allen Notizen aus
+Notenbesprechungen/Notenkonferenzen (siehe unten) als Vorbereitung für
+Halbjahresgespräche.
+
+## Noteneingabe (vormals „Fächer")
+
+Die Notentafel eines Fachs (jetzt „Noteneingabe" genannt) ist neu
+strukturiert:
+
+- **Notenübersicht** oben, direkt unter den Halbjahr-Reitern: eine Tabelle
+  mit allen Schüler/innen, ihren manuellen mündlichen/schriftlichen Noten,
+  sowie den berechneten Werten **Mündliche Note** (aus den
+  Unterrichtsleistungen), **Schriftliche Note** (aus den Klausuren) und
+  **Gesamtnote**.
+- Darunter zwei **Reiter** (nebeneinander liegende Buttons) „Klausuren" und
+  „Unterrichtsleistungen". In jedem Reiter können Klausuren/ULs angelegt
+  werden; jede bekommt eine eigene Tabelle mit allen Schüler/innen zur
+  Punkteeingabe. Die daraus berechnete Note fließt live (ohne Neuladen) in
+  die Notenübersicht oben.
+
+### Notenbesprechungsmodus
+
+Über „🗣 Notenbesprechung starten" auf der Noteneingabe-Seite gelangt man in
+einen Modus, der immer nur **eine** Schüler/in mit ihren/seinen Noten,
+Punkten und Klausuren/ULs zeigt. Mit „← Zurück" / „Weiter →" wechselt man
+zur vorherigen/nächsten Schüler/in (alphabetisch). Jede Schüler/in bekommt
+ein Notizfeld — Einträge werden als Verlauf gespeichert (nicht
+überschrieben), wahlweise als **Notenbesprechung** (an das aktuelle Fach
+gebunden) oder als **Notenkonferenz-Entscheidung** (klassenweit, fachübergreifend
+sichtbar). Alle Notizen einer Schüler/in erscheinen in der
+Halbjahresübersicht der Klassenleitung.
 
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 

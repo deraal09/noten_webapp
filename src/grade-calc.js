@@ -108,6 +108,26 @@ export function gesamtnoteHj(schriftlichPct, ulPct, klausuren, uls, csvStr) {
   return hasAny ? Math.round(total * 100) / 100 : null;
 }
 
+/**
+ * Gewichteter Durchschnitt einer einzelnen Gruppe (nur Klausuren ODER nur
+ * ULs) — die "schriftliche Note" bzw. "mündliche Note" der Notenübersicht,
+ * unabhängig vom schriftlich/mündlich-Gesamtsplit des Schuljahres.
+ *
+ * @param {Array<{note: number|null, gewichtung: number}>} items
+ * @returns {number|null}
+ */
+export function teilNote(items) {
+  let totalGew = 0;
+  let totalWeighted = 0;
+  for (const it of items) {
+    if (it.note !== null && it.note !== undefined && it.gewichtung > 0) {
+      totalWeighted += it.note * it.gewichtung;
+      totalGew += it.gewichtung;
+    }
+  }
+  return totalGew > 0 ? Math.round((totalWeighted / totalGew) * 100) / 100 : null;
+}
+
 export function gesamtnoteJahr(hjNoten) {
   const notes = hjNoten.filter((n) => n !== null && n !== undefined);
   if (!notes.length) return null;

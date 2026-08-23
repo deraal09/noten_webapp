@@ -88,6 +88,15 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .hj-tab { padding: 0.4rem 1rem; background: white; border: 1px solid #ccc; border-radius: 4px 4px 0 0; }
 .hj-tab.active { background: #1d3557; color: white; border-color: #1d3557; }
 
+.reiter { display: flex; gap: 0.5rem; margin: 1rem 0 0; }
+.reiter button { background: white; color: #1d3557; border: 1px solid #1d3557; }
+.reiter button.active { background: #1d3557; color: white; }
+.reiter-panel { display: none; }
+.reiter-panel.active { display: block; }
+
+.btn.disabled { background: #ccc; color: #888; cursor: default; pointer-events: none; }
+.besprechung-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+
 .klasse-liste { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
 .klasse-liste li { background: white; padding: 1rem; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 

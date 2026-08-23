@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  nsCsvParse, nsCsvLookup, noteAusPunkten, gesamtnoteHj,
+  nsCsvParse, nsCsvLookup, noteAusPunkten, gesamtnoteHj, teilNote,
   gesamtnoteJahr, autoDistribute, nichtBestanden, formatNote, DEFAULT_NS_CSV,
 } from '../src/grade-calc.js';
 
@@ -122,4 +122,16 @@ test('formatNote: mit Komma statt Punkt', () => {
   assert.equal(formatNote(2.5), '2,5');
   assert.equal(formatNote(null), '—');
   assert.equal(formatNote(1), '1,0');
+});
+
+test('teilNote: gewichteter Durchschnitt einer einzelnen Gruppe (z. B. nur Klausuren)', () => {
+  assert.equal(teilNote([{ note: 2, gewichtung: 50 }, { note: 4, gewichtung: 50 }]), 3);
+  // Ungleiche Gewichtung normalisiert sich innerhalb der Gruppe (nicht auf 100 der Gesamtnote).
+  assert.equal(teilNote([{ note: 1, gewichtung: 75 }, { note: 5, gewichtung: 25 }]), 2);
+});
+
+test('teilNote: fehlende/ungewichtete Einträge werden ignoriert, leer → null', () => {
+  assert.equal(teilNote([{ note: null, gewichtung: 50 }, { note: 3, gewichtung: 50 }]), 3);
+  assert.equal(teilNote([{ note: 2, gewichtung: 0 }]), null);
+  assert.equal(teilNote([]), null);
 });

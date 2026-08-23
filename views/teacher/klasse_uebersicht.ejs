@@ -31,6 +31,7 @@
           </th>
         <% }); %>
         <th>Ø Notenschnitt</th>
+        <th>Notizen</th>
       </tr>
     </thead>
     <tbody>
@@ -41,6 +42,27 @@
             <td><%= n === null ? '–' : formatNote(n) %></td>
           <% }); %>
           <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+          <td>
+            <% if (!z.notizen.length) { %>
+              —
+            <% } else { %>
+              <details>
+                <summary>📝 <%= z.notizen.length %></summary>
+                <ul>
+                  <% z.notizen.forEach(function(n) { %>
+                    <li>
+                      <small>
+                        <%= n.created_at %> ·
+                        <%= n.typ === 'konferenz' ? 'Notenkonferenz' : ('Besprechung' + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %> ·
+                        <%= n.display_name || n.username || '—' %>
+                      </small><br>
+                      <%= n.text %>
+                    </li>
+                  <% }); %>
+                </ul>
+              </details>
+            <% } %>
+          </td>
         </tr>
       <% }); %>
     </tbody>

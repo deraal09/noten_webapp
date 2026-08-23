@@ -7,29 +7,46 @@
   <% }); %>
 </div>
 
+<form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/zwei-schulen" class="inline">
+  <input type="hidden" name="aktiv" value="<%= klasse.zwei_schulen ? '0' : '1' %>">
+  <button type="submit">
+    <%= klasse.zwei_schulen ? '☑' : '☐' %> Schüler/innen werden an zwei Schulen unterrichtet
+    (zwei Spalten je Fehlzeitenart + Summe)
+  </button>
+</form>
+
 <form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/speichern">
   <input type="hidden" name="hj" value="<%= halbjahr %>">
   <table class="data fz">
     <thead>
       <tr>
         <th rowspan="2">Schüler/in</th>
-        <th colspan="2">entschuldigt</th>
-        <th colspan="2">unentschuldigt</th>
-        <th colspan="2">betrieblich</th>
+        <% FEHLZEIT_TYPEN.forEach(function(typ) { %>
+          <th colspan="<%= klasse.zwei_schulen ? 4 : 2 %>"><%= typ %></th>
+        <% }); %>
       </tr>
       <tr>
-        <th>h</th><th>Notiz</th>
-        <th>h</th><th>Notiz</th>
-        <th>h</th><th>Notiz</th>
+        <% FEHLZEIT_TYPEN.forEach(function() { %>
+          <% if (klasse.zwei_schulen) { %>
+            <th>Schule 1 (h)</th><th>Schule 2 (h)</th><th>Summe</th><th>Notiz</th>
+          <% } else { %>
+            <th>h</th><th>Notiz</th>
+          <% } %>
+        <% }); %>
       </tr>
     </thead>
     <tbody>
       <% schueler.forEach(function(s) { %>
         <tr>
           <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
-          <% ['entschuldigt', 'unentschuldigt', 'betrieblich'].forEach(function(typ) {
-               var fz = fehlMap[s.id][typ]; %>
-            <td><input type="number" name="stunden_<%= s.id %>_<%= typ %>" value="<%= fz.stunden || 0 %>" min="0" step="0.5" size="5"></td>
+          <% FEHLZEIT_TYPEN.forEach(function(typ) {
+               var fz = fehlMap[s.id][typ];
+               var fz2 = fehlMap2[s.id][typ]; %>
+            <td><input type="number" name="stunden_<%= s.id %>_<%= typ %>" value="<%= fz.stunden || 0 %>" min="0" step="0.5" size="5" class="fz-s1" data-sid="<%= s.id %>" data-typ="<%= typ %>"></td>
+            <% if (klasse.zwei_schulen) { %>
+              <td><input type="number" name="stunden2_<%= s.id %>_<%= typ %>" value="<%= fz2.stunden || 0 %>" min="0" step="0.5" size="5" class="fz-s2" data-sid="<%= s.id %>" data-typ="<%= typ %>"></td>
+              <td><output class="fz-summe" data-sid="<%= s.id %>" data-typ="<%= typ %>"><%= (Number(fz.stunden)||0) + (Number(fz2.stunden)||0) %></output></td>
+            <% } %>
             <td><input type="text" name="notiz_<%= s.id %>_<%= typ %>" value="<%= fz.notiz || '' %>" placeholder="optional"></td>
           <% }); %>
         </tr>
@@ -38,3 +55,20 @@
   </table>
   <p><button type="submit">💾 Fehlzeiten speichern</button></p>
 </form>
+
+<% if (klasse.zwei_schulen) { %>
+<script>
+  function aktualisiereSummen() {
+    document.querySelectorAll('.fz-summe').forEach(function(out) {
+      var sid = out.dataset.sid, typ = out.dataset.typ;
+      var s1 = document.querySelector('.fz-s1[data-sid="' + sid + '"][data-typ="' + typ + '"]');
+      var s2 = document.querySelector('.fz-s2[data-sid="' + sid + '"][data-typ="' + typ + '"]');
+      var summe = (parseFloat(s1.value) || 0) + (parseFloat(s2.value) || 0);
+      out.textContent = summe;
+    });
+  }
+  document.querySelectorAll('.fz-s1, .fz-s2').forEach(function(inp) {
+    inp.addEventListener('input', aktualisiereSummen);
+  });
+</script>
+<% } %>

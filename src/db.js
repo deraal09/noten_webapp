@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS klassen (
     -- Lehrkraft, die die Klasse selbst angelegt hat (Selbstbedienung ohne
     -- vorherige Admin-Zuweisung). NULL bei admin-angelegten Klassen.
     created_by_id INTEGER REFERENCES users(id),
+    -- Optional: Schüler/innen dieser Klasse werden an zwei Schulen
+    -- unterrichtet (z. B. duales Modell) — Fehlzeiten-Erfassung bekommt
+    -- dann zwei Spalten je Typ + Summe, siehe fehlzeiten_schule2.
+    zwei_schulen INTEGER NOT NULL DEFAULT 0,
     UNIQUE (schuljahr_id, name)
 );
 
@@ -220,6 +224,36 @@ CREATE TABLE IF NOT EXISTS fehlzeiten (
     UNIQUE (schueler_id, halbjahr, typ)
 );
 
+-- Fehlzeiten an der zweiten Schule, für Klassen mit klassen.zwei_schulen=1
+-- (z. B. Schüler/innen im dualen Modell, die an zwei Schulen unterrichtet
+-- werden). Bewusst eine separate Tabelle statt einer weiteren Spalte in
+-- fehlzeiten, damit die bestehende UNIQUE-Zeile pro Schüler/Halbjahr/Typ
+-- unangetastet bleibt — die Summe beider Tabellen ergibt den Gesamtwert.
+CREATE TABLE IF NOT EXISTS fehlzeiten_schule2 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    typ TEXT NOT NULL,
+    stunden REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (schueler_id, halbjahr, typ)
+);
+
+-- Notizen aus Notenbesprechungen (typ='besprechung', an ein Fach gebunden)
+-- oder Notenkonferenz-Entscheidungen (typ='konferenz', fach_id NULL,
+-- klassenweit). Mehrere Einträge pro Schüler/Halbjahr möglich (Verlauf statt
+-- ein überschreibbares Feld).
+CREATE TABLE IF NOT EXISTS notenbesprechung_notizen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    fach_id INTEGER REFERENCES faecher(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    typ TEXT NOT NULL DEFAULT 'besprechung', -- 'besprechung' | 'konferenz'
+    text TEXT NOT NULL,
+    created_by_id INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS schema_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -266,6 +300,7 @@ function migrate(db) {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_sub ON users(login_sub) WHERE login_sub IS NOT NULL');
   ensureColumn(db, 'klassen', 'created_by_id', 'created_by_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'fach_zuweisungen', 'auto_sync', 'auto_sync INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'klassen', 'zwei_schulen', 'zwei_schulen INTEGER NOT NULL DEFAULT 0');
 }
 
 let _db = null;

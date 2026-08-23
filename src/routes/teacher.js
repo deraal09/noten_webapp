@@ -5,12 +5,9 @@
 
 import { getDb } from '../db.js';
 import { requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer } from '../auth.js';
-import {
-  HALBJAHRE, NOTE_TYPEN, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr,
-  autoDistribute, nichtBestanden, formatNote, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
-} from '../grade-calc.js';
+import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
 import { starteVerknuepfung, beantworteVerknuepfung } from '../klassen-verknuepfung.js';
-import { ladeFachMitUmfeld, getNotenschluesselCsv, berechneGesamtnoten } from '../noten-service.js';
+import { ladeFachMitUmfeld, ladeNotenuebersicht } from '../noten-service.js';
 import { syncFach, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
 
 export default async function teacherRoutes(fastify) {
@@ -52,7 +49,7 @@ export default async function teacherRoutes(fastify) {
     });
   });
 
-  // ---------- Fach-Detail (Notentafel) ----------
+  // ---------- Fach-Detail (Noteneingabe) ----------
   fastify.get('/fach/:id', async (request, reply) => {
     const fach = ladeFachMitUmfeld(request.params.id);
     if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
@@ -60,53 +57,14 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
-    const schueler = getDb().prepare(
-      'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
-    ).all(fach.klasse_id);
-    const klausuren = getDb().prepare(
-      'SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
-    ).all(fach.id, halbjahr);
-    const uls = getDb().prepare(
-      'SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
-    ).all(fach.id, halbjahr);
-    // Ergebnisse / Noten
-    const ergebnisseMap = {};
-    const notenMap = {};
-    for (const s of schueler) {
-      ergebnisseMap[s.id] = {};
-      notenMap[s.id] = { muendlich: [], schriftlich: [] };
-    }
-    for (const k of klausuren) {
-      const rows = getDb().prepare(
-        'SELECT schueler_id, punkte FROM klausur_ergebnisse WHERE klausur_id = ?'
-      ).all(k.id);
-      for (const r of rows) {
-        if (ergebnisseMap[r.schueler_id]) ergebnisseMap[r.schueler_id]['k' + k.id] = JSON.parse(r.punkte);
-      }
-    }
-    for (const u of uls) {
-      const rows = getDb().prepare(
-        'SELECT schueler_id, punkte FROM ul_ergebnisse WHERE ul_id = ?'
-      ).all(u.id);
-      for (const r of rows) {
-        if (ergebnisseMap[r.schueler_id]) ergebnisseMap[r.schueler_id]['u' + u.id] = JSON.parse(r.punkte);
-      }
-    }
-    const notenRows = getDb().prepare(
-      'SELECT schueler_id, typ, wert FROM noten WHERE fach_id = ? AND halbjahr = ? ORDER BY position, id'
-    ).all(fach.id, halbjahr);
-    for (const n of notenRows) {
-      if (notenMap[n.schueler_id]) notenMap[n.schueler_id][n.typ].push(n.wert);
-    }
-    const schuljahr = getDb().prepare('SELECT gewichtung_muendlich FROM schuljahre WHERE id = ?').get(fach.schuljahr_id);
-    const schriftlichPct = 100 - (schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG);
-    const ulPct = schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG;
+    const uebersicht = ladeNotenuebersicht(fach, halbjahr);
     const zuweisung = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?')
       .get(fach.id, request.user.id);
     const syncMeta = holeSyncMeta(fach.id, halbjahr);
     return reply.viewEjs('teacher/fach_detail.ejs', {
-      user: request.user, fach, halbjahr, schueler, klausuren, uls,
-      ergebnisseMap, notenMap, schriftlichPct, ulPct,
+      user: request.user, fach, halbjahr,
+      schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
+      rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
     });
   });
@@ -130,69 +88,57 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
   });
 
-  // ---------- Noten-API (JSON für Live-Tafel) ----------
+  // ---------- Noten-API (JSON für Live-Aktualisierung) ----------
   fastify.get('/fach/:id/noten', async (request, reply) => {
     const fach = ladeFachMitUmfeld(request.params.id);
     if (!fach) return reply.code(404).send({ error: 'not found' });
     if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
-    const schueler = getDb().prepare(
-      'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
-    ).all(fach.klasse_id);
-    const klausuren = getDb().prepare(
-      'SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
-    ).all(fach.id, halbjahr);
-    const uls = getDb().prepare(
-      'SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
-    ).all(fach.id, halbjahr);
-    const csvStr = getNotenschluesselCsv(fach);
-    const schuljahr = getDb().prepare('SELECT gewichtung_muendlich FROM schuljahre WHERE id = ?').get(fach.schuljahr_id);
-    const schriftlichPct = 100 - (schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG);
-    const ulPct = schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG;
-    // Ergebnisse
-    const klausurErgs = new Map();
-    for (const k of klausuren) {
-      const rows = getDb().prepare('SELECT schueler_id, punkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(k.id);
-      klausurErgs.set(k.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
-    }
-    const ulErgs = new Map();
-    for (const u of uls) {
-      const rows = getDb().prepare('SELECT schueler_id, punkte FROM ul_ergebnisse WHERE ul_id = ?').all(u.id);
-      ulErgs.set(u.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
-    }
-    const notenRows = getDb().prepare(
-      'SELECT schueler_id, typ, wert FROM noten WHERE fach_id = ? AND halbjahr = ? ORDER BY position, id'
-    ).all(fach.id, halbjahr);
-    const noten = new Map();
-    for (const n of notenRows) {
-      if (!noten.has(n.schueler_id)) noten.set(n.schueler_id, { muendlich: [], schriftlich: [] });
-      noten.get(n.schueler_id)[n.typ].push(n.wert);
-    }
-    const rows = schueler.map((s) => {
-      const klausurData = klausuren.map((k) => {
-        const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
-        const note = punkte ? noteAusPunkten(punkte, JSON.parse(k.max_punkte_pro_aufgabe), csvStr) : null;
-        return { id: k.id, name: k.name, gewichtung: k.gewichtung, punkte, note };
-      });
-      const ulData = uls.map((u) => {
-        const punkte = ulErgs.get(u.id)?.get(s.id) || null;
-        const note = punkte ? noteAusPunkten(punkte, JSON.parse(u.max_punkte_pro_aufgabe), csvStr) : null;
-        return { id: u.id, name: u.name, gewichtung: u.gewichtung, punkte, note };
-      });
-      const manuelle = noten.get(s.id) || { muendlich: [], schriftlich: [] };
-      const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, ulData, csvStr);
-      return {
-        schueler_id: s.id, nachname: s.nachname, vorname: s.vorname,
-        klausuren: klausurData, uls: ulData,
-        muendlich: manuelle.muendlich, schriftlich: manuelle.schriftlich,
-        gesamt: gn,
-        nicht_bestanden: gn !== null ? nichtBestanden(gn, fach.notenschluessel) : false,
-      };
-    });
+    const uebersicht = ladeNotenuebersicht(fach, halbjahr);
     return reply.send({
-      schueler: rows, halbjahr, csv_typ: fach.notenschluessel,
-      schriftlich_pct: schriftlichPct, ul_pct: ulPct,
+      schueler: uebersicht.rows, halbjahr, csv_typ: fach.notenschluessel,
+      schriftlich_pct: uebersicht.schriftlichPct, ul_pct: uebersicht.ulPct,
     });
+  });
+
+  // ---------- Notenbesprechungsmodus (eine Schüler:in nach der anderen) ----------
+  fastify.get('/fach/:id/besprechung/:schuelerId', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userHatFachZgriff(request.user, fach.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
+    const uebersicht = ladeNotenuebersicht(fach, halbjahr);
+    const idx = uebersicht.rows.findIndex((r) => r.schueler_id === Number(request.params.schuelerId));
+    if (idx === -1) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in diesem Fach.' });
+    const zeile = uebersicht.rows[idx];
+    const notizen = getDb().prepare(`
+      SELECT n.*, u.display_name, u.username FROM notenbesprechung_notizen n
+      LEFT JOIN users u ON u.id = n.created_by_id
+      WHERE n.schueler_id = ? AND n.halbjahr = ? AND (n.fach_id = ? OR n.fach_id IS NULL)
+      ORDER BY n.created_at DESC
+    `).all(zeile.schueler_id, halbjahr, fach.id);
+    return reply.viewEjs('teacher/notenbesprechung.ejs', {
+      user: request.user, fach, halbjahr, zeile, notizen,
+      vorherige: idx > 0 ? uebersicht.rows[idx - 1] : null,
+      naechste: idx < uebersicht.rows.length - 1 ? uebersicht.rows[idx + 1] : null,
+      position: idx + 1, anzahl: uebersicht.rows.length,
+    });
+  });
+
+  fastify.post('/fach/:id/besprechung/:schuelerId/notiz', async (request, reply) => {
+    if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const typ = request.body?.typ === 'konferenz' ? 'konferenz' : 'besprechung';
+    const text = String(request.body?.text || '').trim();
+    if (text) {
+      getDb().prepare(`
+        INSERT INTO notenbesprechung_notizen (schueler_id, fach_id, halbjahr, typ, text, created_by_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(request.params.schuelerId, typ === 'konferenz' ? null : request.params.id, halbjahr, typ, text, request.user.id);
+    }
+    return reply.redirect(`/teacher/fach/${request.params.id}/besprechung/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
   });
 
   // ---------- Klausuren ----------
@@ -578,11 +524,24 @@ export default async function teacherRoutes(fastify) {
     for (const s of schueler) stand.set(s.id, new Map());
     for (const r of standRows) stand.get(r.schueler_id)?.set(r.fach_id, r.note);
 
+    const notizRows = schueler.length ? db.prepare(`
+      SELECT n.*, u.display_name, u.username, f.name AS fach_name FROM notenbesprechung_notizen n
+      LEFT JOIN users u ON u.id = n.created_by_id
+      LEFT JOIN faecher f ON f.id = n.fach_id
+      WHERE n.halbjahr = ? AND n.schueler_id IN (${schueler.map(() => '?').join(',')})
+      ORDER BY n.created_at DESC
+    `).all(halbjahr, ...schueler.map((s) => s.id)) : [];
+    const notizenNachSchueler = new Map();
+    for (const n of notizRows) {
+      if (!notizenNachSchueler.has(n.schueler_id)) notizenNachSchueler.set(n.schueler_id, []);
+      notizenNachSchueler.get(n.schueler_id).push(n);
+    }
+
     const zeilen = schueler.map((s) => {
       const noten = faecher.map((f) => stand.get(s.id)?.get(f.id) ?? null);
       const vorhanden = noten.filter((n) => n !== null && n !== undefined);
       const schnitt = vorhanden.length ? vorhanden.reduce((a, b) => a + b, 0) / vorhanden.length : null;
-      return { schueler: s, noten, schnitt };
+      return { schueler: s, noten, schnitt, notizen: notizenNachSchueler.get(s.id) || [] };
     });
 
     return reply.viewEjs('teacher/klasse_uebersicht.ejs', {

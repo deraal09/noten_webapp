@@ -1,6 +1,10 @@
 /**
  * Klassenlehrer-Routen: Fehlzeiten pro Halbjahr
  * (entschuldigt / unentschuldigt / betrieblich).
+ *
+ * Optional (klassen.zwei_schulen): Schüler/innen werden an zwei Schulen
+ * unterrichtet — dann gibt es je Typ zwei Stunden-Spalten (Schule 1/2,
+ * separate Tabelle fehlzeiten_schule2) plus eine berechnete Summe.
  */
 
 import { getDb } from '../db.js';
@@ -48,21 +52,35 @@ export default async function klassenlehrerRoutes(fastify) {
       'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
     ).all(klasse.id);
     const fehlMap = {};
+    const fehlMap2 = {};
     for (const s of schueler) {
       fehlMap[s.id] = {};
-      for (const t of FEHLZEIT_TYPEN) fehlMap[s.id][t] = { stunden: 0, notiz: '' };
+      fehlMap2[s.id] = {};
+      for (const t of FEHLZEIT_TYPEN) {
+        fehlMap[s.id][t] = { stunden: 0, notiz: '' };
+        fehlMap2[s.id][t] = { stunden: 0 };
+      }
     }
-    const rows = schueler.length ? getDb().prepare(
-      'SELECT schueler_id, typ, stunden, notiz FROM fehlzeiten WHERE halbjahr = ? AND schueler_id IN (' +
-      schueler.map(() => '?').join(',') + ')'
-    ).all(halbjahr, ...schueler.map((s) => s.id)) : [];
-    for (const r of rows) {
-      if (fehlMap[r.schueler_id] && fehlMap[r.schueler_id][r.typ]) {
-        fehlMap[r.schueler_id][r.typ] = { stunden: r.stunden, notiz: r.notiz || '' };
+    if (schueler.length) {
+      const ids = schueler.map((s) => s.id);
+      const placeholders = ids.map(() => '?').join(',');
+      const rows = getDb().prepare(
+        `SELECT schueler_id, typ, stunden, notiz FROM fehlzeiten WHERE halbjahr = ? AND schueler_id IN (${placeholders})`
+      ).all(halbjahr, ...ids);
+      for (const r of rows) {
+        if (fehlMap[r.schueler_id]?.[r.typ]) fehlMap[r.schueler_id][r.typ] = { stunden: r.stunden, notiz: r.notiz || '' };
+      }
+      if (klasse.zwei_schulen) {
+        const rows2 = getDb().prepare(
+          `SELECT schueler_id, typ, stunden FROM fehlzeiten_schule2 WHERE halbjahr = ? AND schueler_id IN (${placeholders})`
+        ).all(halbjahr, ...ids);
+        for (const r of rows2) {
+          if (fehlMap2[r.schueler_id]?.[r.typ]) fehlMap2[r.schueler_id][r.typ] = { stunden: r.stunden };
+        }
       }
     }
     return reply.viewEjs('klassenlehrer/klasse_detail.ejs', {
-      user: request.user, klasse, halbjahr, schueler, fehlMap,
+      user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2,
     });
   });
 
@@ -84,16 +102,32 @@ export default async function klassenlehrerRoutes(fastify) {
         notiz = excluded.notiz,
         updated_at = datetime('now')
     `);
+    const upsert2 = getDb().prepare(`
+      INSERT INTO fehlzeiten_schule2 (schueler_id, halbjahr, typ, stunden, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+      ON CONFLICT (schueler_id, halbjahr, typ) DO UPDATE SET
+        stunden = excluded.stunden,
+        updated_at = datetime('now')
+    `);
     const tx = getDb().transaction(() => {
       let count = 0;
       for (const s of schueler) {
         for (const t of FEHLZEIT_TYPEN) {
           const stundenRaw = request.body?.['stunden_' + s.id + '_' + t];
-          if (stundenRaw === undefined || stundenRaw === '') continue;
-          const stunden = Math.max(0, Number(stundenRaw) || 0);
-          const notiz = String(request.body?.['notiz_' + s.id + '_' + t] || '').trim();
-          upsert.run(s.id, halbjahr, t, stunden, notiz);
-          count++;
+          if (stundenRaw !== undefined && stundenRaw !== '') {
+            const stunden = Math.max(0, Number(stundenRaw) || 0);
+            const notiz = String(request.body?.['notiz_' + s.id + '_' + t] || '').trim();
+            upsert.run(s.id, halbjahr, t, stunden, notiz);
+            count++;
+          }
+          if (klasse.zwei_schulen) {
+            const stunden2Raw = request.body?.['stunden2_' + s.id + '_' + t];
+            if (stunden2Raw !== undefined && stunden2Raw !== '') {
+              const stunden2 = Math.max(0, Number(stunden2Raw) || 0);
+              upsert2.run(s.id, halbjahr, t, stunden2);
+              count++;
+            }
+          }
         }
       }
       return count;
@@ -101,5 +135,16 @@ export default async function klassenlehrerRoutes(fastify) {
     const count = tx();
     request.flash?.('success', `Fehlzeiten gespeichert (${count} Einträge).`);
     return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?hj=${encodeURIComponent(halbjahr)}`);
+  });
+
+  fastify.post('/klasse/:id/zwei-schulen', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.redirect('/klassenlehrer');
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const aktiv = request.body?.aktiv === '1';
+    getDb().prepare('UPDATE klassen SET zwei_schulen = ? WHERE id = ?').run(aktiv ? 1 : 0, klasse.id);
+    return reply.redirect(`/klassenlehrer/klasse/${klasse.id}`);
   });
 }

@@ -1,7 +1,7 @@
-<h1>Meine Fächer</h1>
+<h1>Noteneingabe</h1>
 
 <% if (!byKlasse.length) { %>
-  <p>Du bist noch keinen Fächern zugewiesen. Bitte wende dich an den Admin.</p>
+  <p>Du bist noch keinen Fächern zugewiesen. Bitte wende dich an den Admin oder lege selbst eine <a href="/teacher/klassen">Klasse</a> an.</p>
 <% } %>
 
 <% byKlasse.forEach(function(k) { %>
@@ -14,7 +14,7 @@
           <td><%= f.name %></td>
           <td><%= f.anzahl_klausuren %></td>
           <td><%= f.anzahl_uls %></td>
-          <td><a class="btn" href="/teacher/fach/<%= f.id %>">📝 Notentafel</a></td>
+          <td><a class="btn" href="/teacher/fach/<%= f.id %>">📝 Noteneingabe</a></td>
         </tr>
       <% }); %>
     </tbody>

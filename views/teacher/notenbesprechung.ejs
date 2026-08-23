@@ -1,0 +1,112 @@
+<h1>Notenbesprechung: <%= fach.name %> – <%= fach.klasse_name %></h1>
+<p><a href="/teacher/fach/<%= fach.id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück zur Noteneingabe</a></p>
+
+<div class="hj-tabs">
+  <% HALBJAHRE.forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>"
+       href="/teacher/fach/<%= fach.id %>/besprechung/<%= zeile.schueler_id %>?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
+  <% }); %>
+</div>
+
+<div class="card besprechung-nav">
+  <% if (vorherige) { %>
+    <a class="btn" href="/teacher/fach/<%= fach.id %>/besprechung/<%= vorherige.schueler_id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück</a>
+  <% } else { %>
+    <span class="btn disabled">← Zurück</span>
+  <% } %>
+  <strong><%= position %> / <%= anzahl %>: <%= zeile.nachname %>, <%= zeile.vorname %></strong>
+  <% if (naechste) { %>
+    <a class="btn" href="/teacher/fach/<%= fach.id %>/besprechung/<%= naechste.schueler_id %>?hj=<%= encodeURIComponent(halbjahr) %>">Weiter →</a>
+  <% } else { %>
+    <span class="btn disabled">Weiter →</span>
+  <% } %>
+</div>
+
+<h2>Noten <%= halbjahr %></h2>
+<table class="data">
+  <thead><tr><th>Gesamtnote</th><th>Schriftliche Note</th><th>Mündliche Note</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong><%= zeile.gesamt === null ? '–' : formatNote(zeile.gesamt) %></strong></td>
+      <td><%= zeile.schriftlicheNote === null ? '–' : formatNote(zeile.schriftlicheNote) %></td>
+      <td><%= zeile.muendlicheNote === null ? '–' : formatNote(zeile.muendlicheNote) %></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Klausuren</h3>
+<% if (!zeile.klausuren.length) { %><p class="hint">Keine Klausuren in diesem Halbjahr.</p><% } %>
+<table class="data">
+  <thead><tr><th>Name</th><th>Gewichtung</th><th>Punkte</th><th>Note</th></tr></thead>
+  <tbody>
+    <% zeile.klausuren.forEach(function(k) { %>
+      <tr>
+        <td><%= k.name %></td>
+        <td><%= k.gewichtung %>%</td>
+        <td><%= k.punkte ? k.punkte.map(function(p){ return p === null ? '–' : p; }).join(', ') : '–' %></td>
+        <td><%= k.note === null ? '–' : formatNote(k.note) %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<h3>Unterrichtsleistungen</h3>
+<% if (!zeile.uls.length) { %><p class="hint">Keine Unterrichtsleistungen in diesem Halbjahr.</p><% } %>
+<table class="data">
+  <thead><tr><th>Name</th><th>Gewichtung</th><th>Punkte</th><th>Note</th></tr></thead>
+  <tbody>
+    <% zeile.uls.forEach(function(u) { %>
+      <tr>
+        <td><%= u.name %></td>
+        <td><%= u.gewichtung %>%</td>
+        <td><%= u.punkte ? u.punkte.map(function(p){ return p === null ? '–' : p; }).join(', ') : '–' %></td>
+        <td><%= u.note === null ? '–' : formatNote(u.note) %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<h3>Manuelle Noten</h3>
+<p>
+  Mündlich:
+  <% if (!zeile.muendlich.length) { %>–<% } %>
+  <% zeile.muendlich.forEach(function(v) { %><span class="tag"><%= Number(v).toString().replace('.', ',') %></span> <% }); %>
+</p>
+<p>
+  Schriftlich:
+  <% if (!zeile.schriftlich.length) { %>–<% } %>
+  <% zeile.schriftlich.forEach(function(v) { %><span class="tag"><%= Number(v).toString().replace('.', ',') %></span> <% }); %>
+</p>
+
+<h2>Notizen</h2>
+<form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/<%= zeile.schueler_id %>/notiz" class="card">
+  <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+  <label>Art
+    <select name="typ">
+      <option value="besprechung">Notenbesprechung (dieses Fach)</option>
+      <option value="konferenz">Notenkonferenz-Entscheidung (klassenweit)</option>
+    </select>
+  </label>
+  <label>Notiz
+    <textarea name="text" rows="3" required></textarea>
+  </label>
+  <button type="submit">+ Notiz speichern</button>
+</form>
+
+<% if (!notizen.length) { %>
+  <p class="hint">Noch keine Notizen für dieses Halbjahr.</p>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Datum</th><th>Art</th><th>Von</th><th>Notiz</th></tr></thead>
+    <tbody>
+      <% notizen.forEach(function(n) { %>
+        <tr>
+          <td><%= n.created_at %></td>
+          <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : 'Besprechung' %></td>
+          <td><%= n.display_name || n.username || '—' %></td>
+          <td><%= n.text %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
