@@ -10,7 +10,10 @@
 </p>
 
 <% if (istKlassenlehrer) { %>
-  <p class="flash flash-info">Du bist Klassenleitung dieser Klasse und siehst alle Fächer/Noten.</p>
+  <p class="flash flash-info">
+    Du bist Klassenleitung dieser Klasse.
+    <a href="/teacher/klassen/<%= klasse.id %>/uebersicht">→ Halbjahresübersicht (synchronisierte Noten, Notenschnitt)</a>
+  </p>
 <% } else if (kannSelbstAlsKlassenlehrerEintragen) { %>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenlehrer/eintragen" class="inline">
     <button type="submit">Als Klassenleitung eintragen (alle Noten der Klasse sehen, Fächer zuordnen)</button>

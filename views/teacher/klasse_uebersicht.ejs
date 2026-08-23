@@ -1,0 +1,48 @@
+<h1>Halbjahresübersicht: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p><a href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a></p>
+
+<div class="hj-tabs">
+  <% HALBJAHRE.forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
+  <% }); %>
+</div>
+
+<p><small>
+  Zeigt den zuletzt <strong>synchronisierten</strong> Stand je Fach — nicht die Live-Notentafel der
+  Fachlehrkräfte. Eine Lehrkraft synchronisiert selbst per Knopfdruck oder automatisch (siehe
+  Fachseite). Fehlt eine Spalte „zuletzt synchronisiert", wurde für dieses Fach/Halbjahr noch nie
+  synchronisiert.
+</small></p>
+
+<% if (!faecher.length) { %>
+  <p>Diese Klasse hat noch keine Fächer.</p>
+<% } else { %>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Schüler/in</th>
+        <% faecher.forEach(function(f) { %>
+          <th>
+            <%= f.name %><br>
+            <small>
+              <% var m = syncMeta.get(f.id); %>
+              <% if (m) { %>zuletzt sync.: <%= m.synced_at %><% } else { %>noch nie synchronisiert<% } %>
+            </small>
+          </th>
+        <% }); %>
+        <th>Ø Notenschnitt</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% zeilen.forEach(function(z) { %>
+        <tr>
+          <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
+          <% z.noten.forEach(function(n) { %>
+            <td><%= n === null ? '–' : formatNote(n) %></td>
+          <% }); %>
+          <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>

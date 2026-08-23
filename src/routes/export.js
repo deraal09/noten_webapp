@@ -4,7 +4,7 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth, userHatFachZgriff, userIstKlassenlehrer } from '../auth.js';
+import { requireAuth, userHatFachZgriff } from '../auth.js';
 import { HALBJAHRE, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr, formatNote } from '../grade-calc.js';
 
 export default async function exportRoutes(fastify) {
@@ -72,10 +72,13 @@ function ladeKlasse(id) {
   `).get(id);
 }
 
+// Bewusst KEIN Blanket-Export für die Klassenleitung (userIstKlassenlehrer):
+// CSV-Export enthält Live-Werte — die Klassenleitung soll nur über den
+// Sync-Stand Einblick bekommen (siehe src/noten-sync.js), nicht per Export
+// live auf fremde Notentafeln zugreifen können.
 function darfExportieren(user, klasse) {
   if (user.isAdmin) return true;
   if (klasse.created_by_id === user.id) return true;
-  if (userIstKlassenlehrer(user, klasse.id)) return true;
   const row = getDb().prepare(`
     SELECT 1 FROM fach_zuweisungen fz
     JOIN faecher f ON f.id = fz.fach_id

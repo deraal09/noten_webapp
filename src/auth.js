@@ -145,19 +145,19 @@ export async function requireAdmin(request, reply) {
 }
 
 /**
- * Berechtigungs-Check: Hat der User Zugriff auf das Fach?
- * Admins dürfen alles; die Klassenleitung sieht alle Fächer/Noten ihrer
- * Klasse; sonstige Lehrkräfte nur per FachZuweisung (eigenes oder
- * zugewiesenes Fach).
+ * Berechtigungs-Check: Hat der User Zugriff auf die LIVE-Notentafel des
+ * Fachs? Admins dürfen alles; sonst nur per FachZuweisung (eigenes oder
+ * zugewiesenes Fach) — bewusst KEIN Blanket-Zugriff für die Klassenleitung:
+ * Die soll nicht permanent live in fremde Notentafeln schauen können,
+ * sondern nur über den Sync-Stand (siehe noten-sync.js, Halbjahresübersicht
+ * unter /teacher/klassen/:id/uebersicht).
  */
 export function userHatFachZgriff(user, fachId) {
   if (user.isAdmin) return true;
-  const db = getDb();
-  const direkt = db.prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
+  const row = getDb()
+    .prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
     .get(user.id, fachId);
-  if (direkt) return true;
-  const fach = db.prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
-  return fach ? userIstKlassenlehrer(user, fach.klasse_id) : false;
+  return Boolean(row);
 }
 
 /**

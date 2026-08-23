@@ -90,7 +90,7 @@ test('Vorbereitung: Admin, Schuljahr, drei Lehrkräfte', async () => {
   assert.equal(r.status, 302);
 });
 
-test('Klassenleitung: Selbstregistrierung nur für Ersteller/in, dann blanket Fach-Zugriff', async () => {
+test('Klassenleitung: Selbstregistrierung nur für Ersteller/in, KEIN Live-Zugriff auf fremde Fächer', async () => {
   let r = await form(lehrerA, '/teacher/klassen/neu', {
     schuljahr_id: String(sjId), name: '12BFI1', notenschluessel: 'IHK',
   });
@@ -108,8 +108,9 @@ test('Klassenleitung: Selbstregistrierung nur für Ersteller/in, dann blanket Fa
     .get(klasseId, userId('lehrera'));
   assert.ok(eintrag);
 
-  // Lehrer A (jetzt Klassenleitung) weist Lehrer B ein neues Fach zu, ohne es selbst angelegt zu haben
-  r = await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Englisch' });
+  // Fach wird vom Admin angelegt (kein Auto-Zuweisen wie bei der Selbstbedienung),
+  // damit Lehrer A trotz Klassenleitung NICHT automatisch zugewiesen ist.
+  r = await form(admin, `/admin/klassen/${klasseId}/faecher/neu`, { name: 'Englisch' });
   assert.equal(r.status, 302);
   const englisch = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Englisch'").get(klasseId);
 
@@ -128,11 +129,16 @@ test('Klassenleitung: Selbstregistrierung nur für Ersteller/in, dann blanket Fa
     .get(userId('lehrerb'), englisch.id);
   assert.ok(zuweisung);
 
-  // Lehrer A sieht als Klassenleitung auch das Fach Englisch, obwohl nicht direkt zugewiesen
+  // Lehrer A (Klassenleitung, aber NICHT dem Fach zugewiesen) sieht die
+  // Live-Notentafel NICHT — genau das soll der Sync-Mechanismus verhindern.
   r = await lehrerA(`/teacher/fach/${englisch.id}`);
+  assert.equal(r.status, 403);
+
+  // Lehrer B (zugewiesen) sieht sie
+  r = await lehrerB(`/teacher/fach/${englisch.id}`);
   assert.equal(r.status, 200);
 
-  // Lehrer C (unbeteiligt) sieht es nicht
+  // Lehrer C (unbeteiligt) sieht sie erst recht nicht
   r = await lehrerC(`/teacher/fach/${englisch.id}`);
   assert.equal(r.status, 403);
 });

@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -90,6 +90,10 @@ CREATE TABLE IF NOT EXISTS fach_zuweisungen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    -- "automatisch mit Klassenleitung synchronisieren": bei 1 löst jede
+    -- Notenänderung dieser Lehrkraft in diesem Fach sofort einen Sync aus
+    -- (siehe src/noten-sync.js), statt nur auf Knopfdruck.
+    auto_sync INTEGER NOT NULL DEFAULT 0,
     UNIQUE (user_id, fach_id)
 );
 
@@ -134,6 +138,31 @@ CREATE TABLE IF NOT EXISTS klassen_verknuepfungsantworten (
     zustimmung INTEGER, -- NULL = noch offen, 1 = zugestimmt, 0 = abgelehnt
     entschieden_at TEXT,
     UNIQUE (anfrage_id, user_id)
+);
+
+-- Zuletzt synchronisierte Gesamtnote je Fach/Halbjahr/Schüler ("Sync-Stand").
+-- Wird NICHT live berechnet, sondern nur beim Sync (Knopfdruck oder
+-- Auto-Sync) aktualisiert — genau das gibt der Klassenleitung Einblick,
+-- ohne live in fremde Notentafeln schauen zu können (src/noten-sync.js).
+CREATE TABLE IF NOT EXISTS fach_sync_stand (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    note REAL,
+    synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+    synced_by_id INTEGER REFERENCES users(id),
+    UNIQUE (fach_id, halbjahr, schueler_id)
+);
+
+-- Zeitpunkt des letzten Syncs je Fach/Halbjahr (für die Anzeige "zuletzt
+-- synchronisiert am ..." unabhängig von einzelnen Schüler-Zeilen).
+CREATE TABLE IF NOT EXISTS fach_sync_meta (
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+    synced_by_id INTEGER REFERENCES users(id),
+    PRIMARY KEY (fach_id, halbjahr)
 );
 
 CREATE TABLE IF NOT EXISTS klausuren (
@@ -236,6 +265,7 @@ function migrate(db) {
   // Partial-Index: login_sub muss nur unter LDAP-Konten eindeutig sein.
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_sub ON users(login_sub) WHERE login_sub IS NOT NULL');
   ensureColumn(db, 'klassen', 'created_by_id', 'created_by_id INTEGER REFERENCES users(id)');
+  ensureColumn(db, 'fach_zuweisungen', 'auto_sync', 'auto_sync INTEGER NOT NULL DEFAULT 0');
 }
 
 let _db = null;

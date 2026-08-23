@@ -1,6 +1,41 @@
 <h1><%= fach.name %> – <%= fach.klasse_name %> <small>(<%= fach.schuljahr_bezeichnung %>, <%= fach.notenschluessel %>)</small></h1>
 <p><a href="/teacher">← Meine Fächer</a></p>
 
+<div class="card">
+  <p>
+    <% if (syncMeta) { %>
+      Zuletzt mit der Klassenleitung synchronisiert:
+      <strong><%= syncMeta.synced_at %></strong>
+      (<%= syncMeta.display_name || syncMeta.username || 'unbekannt' %>)
+    <% } else { %>
+      <strong>Noch nicht synchronisiert</strong> — die Klassenleitung sieht für dieses Halbjahr noch keine Noten dieses Fachs.
+    <% } %>
+  </p>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/sync" class="inline">
+    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+    <button type="submit">🔄 Jetzt synchronisieren</button>
+  </form>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/auto-sync" class="inline" id="auto-sync-form">
+    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+    <input type="hidden" name="aktiv" id="auto-sync-aktiv" value="<%= autoSync ? '1' : '0' %>">
+    <label>
+      <input type="checkbox" id="auto-sync-checkbox" <%= autoSync ? 'checked' : '' %>>
+      automatisch mit Klassenleitung synchronisieren (bei jeder Notenänderung)
+    </label>
+  </form>
+  <script>
+    (function() {
+      var cb = document.getElementById('auto-sync-checkbox');
+      var hidden = document.getElementById('auto-sync-aktiv');
+      var form = document.getElementById('auto-sync-form');
+      cb.addEventListener('change', function() {
+        hidden.value = cb.checked ? '1' : '0';
+        form.submit();
+      });
+    })();
+  </script>
+</div>
+
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
     <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>

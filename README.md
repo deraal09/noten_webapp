@@ -146,14 +146,18 @@ Die Person, die eine Klasse angelegt hat, kann sich auf der Klassenseite
 selbst als **Klassenleitung** eintragen (Admin kann das für jede Klasse
 ebenfalls). Als Klassenleitung:
 
-- sieht sie **alle** Fächer/Noten der Klasse, nicht nur die eigenen,
 - kann sie weitere Fächer anlegen,
 - kann sie **andere Lehrkräfte** Fächern dieser Klasse zuordnen — bisher
   ging das nur über Admin → Zuweisungen, jetzt zusätzlich direkt auf der
-  Klassenseite.
+  Klassenseite,
+- sieht sie in der **Halbjahresübersicht** die zuletzt synchronisierten
+  Noten aller Fächer der Klasse (siehe unten) — **nicht** live die
+  Notentafeln der einzelnen Fachlehrkräfte, das bleibt bewusst diesen
+  vorbehalten.
 
-Alle anderen Lehrkräfte sehen weiterhin nur die Fächer, die sie selbst
-angelegt haben oder denen sie zugewiesen wurden.
+Jede Lehrkraft sieht die Live-Notentafel weiterhin nur für Fächer, die sie
+selbst angelegt hat oder denen sie zugewiesen wurde — auch die
+Klassenleitung nicht ausgenommen.
 
 ### Verknüpfungsanfrage bei Namenskollisionen
 
@@ -169,6 +173,33 @@ vergeben ist, entsteht **keine zweite, doppelte Klasse**. Stattdessen:
   zustimmen. Lehnt auch nur eine Person ab, ist die Anfrage beendet. Stimmen
   alle zu, wird das von der anfragenden Person genannte Fach angelegt
   (falls es das noch nicht gibt) und sie diesem Fach zugewiesen.
+
+### Noten-Sync statt Live-Zugriff für die Klassenleitung
+
+Die Klassenleitung sieht **nie** die Live-Notentafel fremder Fächer — nur
+die Lehrkraft, die einem Fach zugewiesen ist, kann dort Noten eintragen und
+sehen. Damit die Klassenleitung trotzdem zum Halbjahresende einen Überblick
+bekommt, synchronisiert jede Lehrkraft ihr Fach selbst:
+
+- **„Jetzt synchronisieren"**-Button auf der Fachseite: überträgt den
+  aktuellen Notenstand (Gesamtnote je Schüler/in, aktuelles Halbjahr) in
+  einen für die Klassenleitung sichtbaren Sync-Stand.
+- **Haken „automatisch mit Klassenleitung synchronisieren"**: ist er
+  gesetzt, löst jede Notenänderung in diesem Fach sofort einen Sync aus,
+  statt dass die Lehrkraft manuell auf den Button klicken muss.
+
+Ohne einen der beiden Wege bleibt eine Lehrkraft für dieses Fach für die
+Klassenleitung auf dem letzten synchronisierten Stand (oder „noch nie
+synchronisiert") — eine permanente Live-Kontrolle durch die Klassenleitung
+ist bewusst nicht möglich.
+
+### Halbjahresübersicht (Klassenleitung/Admin)
+
+Unter **Klasse → Halbjahresübersicht** sieht die Klassenleitung für das
+gewählte Halbjahr eine Tabelle Schüler/in × Fach mit dem jeweils zuletzt
+synchronisierten Stand, dem Zeitpunkt der letzten Synchronisierung je Fach,
+und einem Notenschnitt je Schüler/in (Durchschnitt über alle synchronisierten
+Fächer) — als Vorbereitung für Halbjahresgespräche.
 
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 
