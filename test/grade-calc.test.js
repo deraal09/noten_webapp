@@ -83,6 +83,30 @@ test('gesamtnoteHj: alle null → null', () => {
   assert.equal(gesamtnoteHj(40, 60, klausuren, uls, IHK_CSV), null);
 });
 
+test('gesamtnoteHj: keine Klausurnoten vorhanden → Unterrichtsleistung zählt 100 %', () => {
+  // Noch keine Klausur benotet (oder gar keine angelegt): der nominale
+  // schriftliche Anteil (40 %) darf die Gesamtnote nicht verwässern —
+  // sie muss der vollen, gewichteten UL-Note entsprechen.
+  const klausuren = [];
+  const uls = [{ note: 2, gewichtung: 30 }, { note: 3, gewichtung: 30 }];
+  assert.equal(gesamtnoteHj(40, 60, klausuren, uls, IHK_CSV), teilNote(uls));
+});
+
+test('gesamtnoteHj: nur eine Klausurnote, keine UL-Note → Klausurnote zählt 100 %', () => {
+  const klausuren = [{ note: 3, gewichtung: 40 }];
+  const uls = [{ note: null, gewichtung: 60 }]; // UL angelegt, aber noch nicht benotet
+  assert.equal(gesamtnoteHj(40, 60, klausuren, uls, IHK_CSV), 3);
+});
+
+test('gesamtnoteHj: von zwei Klausuren nur eine benotet → zählt allein für den schriftlichen Anteil', () => {
+  const klausuren = [{ note: 2, gewichtung: 20 }, { note: null, gewichtung: 20 }];
+  const uls = [{ note: 4, gewichtung: 60 }];
+  // Schriftlicher Anteil: nur K1 vorhanden → zählt zu 100 % des
+  // schriftlichen Anteils (nicht nur zu ihrem nominalen 20-%-Teilgewicht).
+  // Gesamt: 2*0,4 + 4*0,6 = 0,8 + 2,4 = 3,2
+  assert.equal(gesamtnoteHj(40, 60, klausuren, uls, IHK_CSV), 3.2);
+});
+
 test('gesamtnoteJahr: Mittelwert beider Halbjahre', () => {
   assert.equal(gesamtnoteJahr([2, 3]), 2.5);
   assert.equal(gesamtnoteJahr([1, 1]), 1);

@@ -79,7 +79,18 @@ export function noteAusPunkten(punkte, maxPunkte, csvStr) {
 }
 
 /**
- * Berechnet die Gesamtnote für ein Halbjahr.
+ * Berechnet die Gesamtnote für ein Halbjahr aus der schriftlichen Note
+ * (gewichteter Durchschnitt der Klausuren) und der mündlichen Note
+ * (gewichteter Durchschnitt der ULs), kombiniert im Verhältnis
+ * schriftlichPct/ulPct.
+ *
+ * Nur tatsächlich eingetragene Noten fließen ein: Fehlt eine ganze Seite
+ * komplett (z. B. noch keine Klausur benotet), zählt die andere Seite zu
+ * 100 % statt auf ihren nominalen Anteil verwässert zu werden — die
+ * Gesamtnote soll nicht künstlich Richtung "ungenügend" gezogen werden, nur
+ * weil ein Teilbereich noch nicht bewertet wurde. Innerhalb einer Seite
+ * übernimmt teilNote() dieselbe Logik (nur benotete Items zählen, normiert
+ * auf deren Gewichtungssumme).
  *
  * @param {number} schriftlichPct - Prozentanteil Schriftlich (z. B. 40)
  * @param {number} ulPct - Prozentanteil Mündlich/UL (z. B. 60)
@@ -89,23 +100,15 @@ export function noteAusPunkten(punkte, maxPunkte, csvStr) {
  * @returns {number|null}
  */
 export function gesamtnoteHj(schriftlichPct, ulPct, klausuren, uls, csvStr) {
-  let total = 0;
-  let hasAny = false;
+  const schriftlicheNote = teilNote(klausuren);
+  const muendlicheNote = teilNote(uls);
 
-  for (const ul of uls) {
-    if (ul.note !== null && ul.note !== undefined && ul.gewichtung > 0) {
-      total += ul.note * (ul.gewichtung / 100);
-      hasAny = true;
-    }
-  }
-  for (const k of klausuren) {
-    if (k.note !== null && k.note !== undefined && k.gewichtung > 0) {
-      total += k.note * (k.gewichtung / 100);
-      hasAny = true;
-    }
-  }
+  if (schriftlicheNote === null && muendlicheNote === null) return null;
+  if (schriftlicheNote === null) return muendlicheNote;
+  if (muendlicheNote === null) return schriftlicheNote;
 
-  return hasAny ? Math.round(total * 100) / 100 : null;
+  const total = schriftlicheNote * (schriftlichPct / 100) + muendlicheNote * (ulPct / 100);
+  return Math.round(total * 100) / 100;
 }
 
 /**
