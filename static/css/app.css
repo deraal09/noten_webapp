@@ -188,6 +188,10 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .reiter-panel.active { display: block; }
 
 .btn.disabled { background: var(--border-strong); color: var(--text-muted); cursor: default; pointer-events: none; }
+
+.aufgabe-liste { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; vertical-align: middle; margin: 0.3rem 0; }
+.aufgabe-feld { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; margin: 0; font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+form.inline .aufgabe-feld input[type=number] { width: 3rem; text-align: center; padding: 0.2rem; }
 .besprechung-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 
 .klasse-liste { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }

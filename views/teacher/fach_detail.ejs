@@ -136,10 +136,14 @@
       </form>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="inline">
         Anzahl Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
-        Maximal erreichbare Punkte je Aufgabe:
-        <% maxArr.forEach(function(mp, i) { %>
-          A<%= i+1 %>: <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3" title="Max. Punkte Aufgabe <%= i+1 %>">
-        <% }); %>
+        <span class="hint">Maximal erreichbare Punkte je Aufgabe:</span>
+        <span class="aufgabe-liste">
+          <% maxArr.forEach(function(mp, i) { %>
+            <label class="aufgabe-feld">A<%= i+1 %>
+              <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>">
+            </label>
+          <% }); %>
+        </span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
         <button type="submit">💾 Max-Punkte speichern</button>
       </form>
@@ -203,10 +207,14 @@
       </form>
       <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" class="inline">
         Anzahl Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
-        Maximal erreichbare Punkte je Aufgabe:
-        <% maxArr.forEach(function(mp, i) { %>
-          A<%= i+1 %>: <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3" title="Max. Punkte Aufgabe <%= i+1 %>">
-        <% }); %>
+        <span class="hint">Maximal erreichbare Punkte je Aufgabe:</span>
+        <span class="aufgabe-liste">
+          <% maxArr.forEach(function(mp, i) { %>
+            <label class="aufgabe-feld">A<%= i+1 %>
+              <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>">
+            </label>
+          <% }); %>
+        </span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
         <button type="submit">💾 Max-Punkte speichern</button>
       </form>
