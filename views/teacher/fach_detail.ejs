@@ -109,11 +109,15 @@
 <div id="panel-klausuren" class="reiter-panel active">
   <details class="card">
     <summary>+ Klausur anlegen</summary>
-    <form method="post" action="/teacher/fach/<%= fach.id %>/klausuren/neu" class="inline">
-      <input type="text" name="name" placeholder="Name (z. B. K1)" required>
-      <input type="number" name="aufgaben" min="1" value="1" size="3">
+    <form method="post" action="/teacher/fach/<%= fach.id %>/klausuren/neu">
+      <label>Name der Klausur
+        <input type="text" name="name" placeholder="z. B. Klausur 1" required>
+      </label>
+      <label>Anzahl der Aufgaben (Teilpunktzahlen), z. B. 3 bei drei Teilaufgaben
+        <input type="number" name="aufgaben" min="1" value="1" size="3">
+      </label>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-      <button type="submit">+ Klausur</button>
+      <button type="submit">+ Klausur anlegen</button>
     </form>
   </details>
 
@@ -131,12 +135,13 @@
         <button type="submit">💾</button>
       </form>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="inline">
-        Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
+        Anzahl Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
+        Maximal erreichbare Punkte je Aufgabe:
         <% maxArr.forEach(function(mp, i) { %>
-          <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3" title="Max. Punkte Aufgabe <%= i+1 %>">
+          A<%= i+1 %>: <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3" title="Max. Punkte Aufgabe <%= i+1 %>">
         <% }); %>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-        <button type="submit">💾 Max-Punkte</button>
+        <button type="submit">💾 Max-Punkte speichern</button>
       </form>
       <table class="tafel">
         <thead>
@@ -167,11 +172,15 @@
 <div id="panel-uls" class="reiter-panel">
   <details class="card">
     <summary>+ Unterrichtsleistung anlegen</summary>
-    <form method="post" action="/teacher/fach/<%= fach.id %>/uls/neu" class="inline">
-      <input type="text" name="name" placeholder="Name (z. B. UL 1)" required>
-      <input type="number" name="aufgaben" min="1" value="1" size="3">
+    <form method="post" action="/teacher/fach/<%= fach.id %>/uls/neu">
+      <label>Name der Unterrichtsleistung (mündliche Leistung)
+        <input type="text" name="name" placeholder="z. B. UL 1 oder Mitarbeit 1. Halbjahr" required>
+      </label>
+      <label>Anzahl der Aufgaben (Teilpunktzahlen)
+        <input type="number" name="aufgaben" min="1" value="1" size="3">
+      </label>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-      <button type="submit">+ UL</button>
+      <button type="submit">+ Unterrichtsleistung anlegen</button>
     </form>
   </details>
 
@@ -189,12 +198,13 @@
         <button type="submit">💾</button>
       </form>
       <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" class="inline">
-        Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
+        Anzahl Aufgaben: <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20" size="3">
+        Maximal erreichbare Punkte je Aufgabe:
         <% maxArr.forEach(function(mp, i) { %>
-          <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3">
+          A<%= i+1 %>: <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" size="3" title="Max. Punkte Aufgabe <%= i+1 %>">
         <% }); %>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-        <button type="submit">💾 Max-Punkte</button>
+        <button type="submit">💾 Max-Punkte speichern</button>
       </form>
       <table class="tafel">
         <thead>
@@ -261,14 +271,20 @@
   function debounce(fn, ms) { let t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
   document.querySelectorAll('input.punkt').forEach(function(inp) {
     inp.addEventListener('input', debounce(async function() {
-      const fd = new FormData();
-      fd.append('schueler_id', inp.dataset.sid);
-      fd.append('aufgabe_idx', inp.dataset.idx);
-      fd.append('wert', inp.value);
+      // URLSearchParams statt FormData: fetch setzt dafür automatisch
+      // Content-Type: application/x-www-form-urlencoded, das Einzige, was
+      // der Server (@fastify/formbody) versteht. Mit FormData (→
+      // multipart/form-data) antwortet der Server mit 415 und die Punkte
+      // werden nie gespeichert — genau das führte dazu, dass live weder
+      // Note noch Gesamtnote berechnet wurden.
+      const body = new URLSearchParams();
+      body.append('schueler_id', inp.dataset.sid);
+      body.append('aufgabe_idx', inp.dataset.idx);
+      body.append('wert', inp.value);
       const url = inp.dataset.kind === 'k'
         ? '/teacher/klausuren/' + inp.dataset.kid + '/punkte'
         : '/teacher/uls/' + inp.dataset.kid + '/punkte';
-      await fetch(url, { method: 'POST', body: fd });
+      await fetch(url, { method: 'POST', body });
       refresh();
     }, 400));
   });

@@ -110,6 +110,37 @@ test('Vorbereitung: Admin, Klasse, Fach, zwei Schüler/innen, zwei Klausuren', a
   });
 });
 
+test('Regression: Punkte-Eingabe funktioniert mit der Kodierung, die der Browser tatsächlich sendet', async () => {
+  // fetch() mit einem FormData-Body setzt automatisch
+  // Content-Type: multipart/form-data — das versteht der Server
+  // (@fastify/formbody) nicht und lehnt die Anfrage mit 415 ab, OHNE dass
+  // die Punkte gespeichert werden. Das war der eigentliche Grund, warum
+  // live weder Note noch Gesamtnote berechnet wurden: die vorherige
+  // fach_detail.ejs schickte ihre AJAX-Punkteingabe genau so. Dieser Test
+  // bildet exakt nach, was ein echter Browser sendet (nicht den
+  // vereinfachten, direkt url-kodierten POST der übrigen Tests).
+  const klausurId = getDb().prepare('SELECT id FROM klausuren WHERE fach_id = ?').get(fachId).id;
+
+  const multipartBody = new FormData();
+  multipartBody.append('schueler_id', String(s2));
+  multipartBody.append('aufgabe_idx', '0');
+  multipartBody.append('wert', '7');
+  const multipartRes = await lehrerA(`/teacher/klausuren/${klausurId}/punkte`, {
+    method: 'POST', body: multipartBody,
+  });
+  assert.equal(multipartRes.status, 415, 'multipart/form-data wird vom Server nicht akzeptiert (erwartetes Verhalten)');
+
+  // Sicherstellen, dass fach_detail.ejs NICHT mehr FormData für die
+  // Punkt-Inputs verwendet (das genaue Muster, das den Bug verursacht hat).
+  const template = fs.readFileSync(
+    path.join(process.cwd(), 'views/teacher/fach_detail.ejs'), 'utf8',
+  );
+  const punktListenerBlock = template.slice(template.indexOf("querySelectorAll('input.punkt')"));
+  assert.doesNotMatch(punktListenerBlock, /new FormData\(\)/,
+    'Die Punkt-Eingabe darf keine FormData mehr verwenden (führt zu 415 statt gespeicherten Punkten)');
+  assert.match(punktListenerBlock, /new URLSearchParams\(\)/);
+});
+
 test('Regression: neu angelegte Klausur/UL bekommt automatisch eine Gewichtung > 0', async () => {
   // Eigenes, frisches Fach — die K1/UL1 aus der Vorbereitung haben ihre
   // Gewichtung bereits manuell überschrieben und würden den Bug verdecken.
