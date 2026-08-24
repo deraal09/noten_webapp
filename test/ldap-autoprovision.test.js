@@ -56,9 +56,10 @@ function client() {
   };
 }
 
-test('Auto-Provisioning: unbekannter Nutzername + gültige LDAP-Zugangsdaten legt Konto an', async (t) => {
-  const req = client();
-  let r = await req('/setup', {
+const admin = client();
+
+test('Vorbereitung: ersten Admin anlegen', async () => {
+  const r = await admin('/setup', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -66,7 +67,19 @@ test('Auto-Provisioning: unbekannter Nutzername + gültige LDAP-Zugangsdaten leg
     }),
   });
   assert.equal(r.status, 302);
+});
 
+test('Regression: Auto-Provisioning-Haken ist bei noch nicht gespeicherter LDAP-Konfiguration NICHT vorausgewählt', async () => {
+  const r = await admin('/admin/ldap/einstellungen');
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  const checkboxMatch = html.match(/name="auto_provision"[^>]*>/);
+  assert.ok(checkboxMatch, 'Checkbox auto_provision nicht gefunden');
+  assert.doesNotMatch(checkboxMatch[0], /checked/,
+    'Auto-Provisioning darf bei einer frischen, noch nicht gespeicherten Konfiguration nicht automatisch aktiviert sein');
+});
+
+test('Auto-Provisioning: unbekannter Nutzername + gültige LDAP-Zugangsdaten legt Konto an', async (t) => {
   saveLdapSettings({
     url: 'ldaps://dc01.schule.local:636',
     base_dn: 'DC=schule,DC=local',
@@ -78,7 +91,7 @@ test('Auto-Provisioning: unbekannter Nutzername + gültige LDAP-Zugangsdaten leg
   assert.equal(vorher, 0);
 
   const req2 = client();
-  r = await req2('/login', {
+  let r = await req2('/login', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ username: 'neu123', password: 'geheim123' }),
@@ -107,6 +120,33 @@ test('Auto-Provisioning: falsches Passwort legt kein Konto an', async () => {
   assert.match(await r.text(), /Benutzername oder Passwort ist falsch/);
   const row = getDb().prepare("SELECT COUNT(*) AS c FROM users WHERE username = 'unbekannt'").get().c;
   assert.equal(row, 0);
+});
+
+test('Regression: technischer LDAP-Fehler beim Auto-Provisioning zeigt "nicht verfügbar", nicht "falsches Passwort"', async () => {
+  const kaputterAuthenticator = {
+    authenticate: async () => {
+      throw new Error('Service-Account-Bind fehlgeschlagen (simuliert)');
+    },
+  };
+  setLdapAuthenticatorForTests(kaputterAuthenticator);
+  try {
+    const req = client();
+    const r = await req('/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username: 'nochNieGesehen', password: 'irgendwas' }),
+    });
+    assert.equal(r.status, 200);
+    const html = await r.text();
+    assert.match(html, /LDAP-Anmeldung ist gerade nicht verfügbar/);
+    assert.doesNotMatch(html, /Benutzername oder Passwort ist falsch/);
+    const row = getDb().prepare("SELECT COUNT(*) AS c FROM users WHERE username = 'nochNieGesehen'").get().c;
+    assert.equal(row, 0);
+  } finally {
+    setLdapAuthenticatorForTests(new FakeAuthenticator({
+      neu123: { passwort: 'geheim123', name: 'Neue Lehrkraft' },
+    }));
+  }
 });
 
 test.after(async () => {

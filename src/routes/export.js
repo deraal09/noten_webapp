@@ -4,7 +4,7 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth, userHatFachZgriff } from '../auth.js';
+import { requireAuth, userHatFachZgriff, userDarfKlasseExportieren } from '../auth.js';
 import { HALBJAHRE, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr, formatNote } from '../grade-calc.js';
 
 export default async function exportRoutes(fastify) {
@@ -13,7 +13,7 @@ export default async function exportRoutes(fastify) {
   fastify.get('/klasse/:id.csv', async (request, reply) => {
     const klasse = ladeKlasse(request.params.id);
     if (!klasse) return reply.code(404).send('Klasse nicht gefunden');
-    if (!darfExportieren(request.user, klasse)) return reply.code(403).send('Keine Berechtigung');
+    if (!userDarfKlasseExportieren(request.user, klasse.id)) return reply.code(403).send('Keine Berechtigung');
 
     const csv = '\ufeff' + [HEADER.join(';'), ...baueKlasseCsv(klasse)].join('\n');
     const filename = `Noten_${klasse.schuljahr_bezeichnung}_${klasse.name}.csv`.replace(/[^\w.-]/g, '_');
@@ -70,21 +70,6 @@ function ladeKlasse(id) {
     FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
     WHERE k.id = ?
   `).get(id);
-}
-
-// Bewusst KEIN Blanket-Export für die Klassenleitung (userIstKlassenlehrer):
-// CSV-Export enthält Live-Werte — die Klassenleitung soll nur über den
-// Sync-Stand Einblick bekommen (siehe src/noten-sync.js), nicht per Export
-// live auf fremde Notentafeln zugreifen können.
-function darfExportieren(user, klasse) {
-  if (user.isAdmin) return true;
-  if (klasse.created_by_id === user.id) return true;
-  const row = getDb().prepare(`
-    SELECT 1 FROM fach_zuweisungen fz
-    JOIN faecher f ON f.id = fz.fach_id
-    WHERE fz.user_id = ? AND f.klasse_id = ? LIMIT 1
-  `).get(user.id, klasse.id);
-  return Boolean(row);
 }
 
 function escapeCell(v) {

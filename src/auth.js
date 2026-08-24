@@ -197,3 +197,27 @@ export function userHatKlassenZugriff(user, klasseId) {
   if (fach) return true;
   return userIstKlassenlehrer(user, klasseId);
 }
+
+/**
+ * Darf der User die Klasse per CSV exportieren? CSV enthält Live-Werte —
+ * bewusst KEIN Blanket-Export für die Klassenleitung (userIstKlassenlehrer):
+ * die soll nur über den Sync-Stand Einblick bekommen (siehe noten-sync.js),
+ * nicht per Export live auf fremde Notentafeln zugreifen können. Ersteller/in
+ * der Klasse oder eine Fach-Zuweisung in dieser Klasse reichen aus.
+ *
+ * Einzige Quelle dieser Regel — wird sowohl von routes/export.js (harte
+ * Durchsetzung) als auch von views/teacher/klasse_detail.ejs (Link nur
+ * anzeigen, wenn er auch funktioniert) verwendet.
+ */
+export function userDarfKlasseExportieren(user, klasseId) {
+  if (user.isAdmin) return true;
+  const db = getDb();
+  const erstellt = db.prepare('SELECT 1 FROM klassen WHERE id = ? AND created_by_id = ?')
+    .get(klasseId, user.id);
+  if (erstellt) return true;
+  const fach = db.prepare(`
+    SELECT 1 FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id
+    WHERE f.klasse_id = ? AND fz.user_id = ?
+  `).get(klasseId, user.id);
+  return Boolean(fach);
+}

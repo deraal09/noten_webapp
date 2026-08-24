@@ -75,11 +75,20 @@ export default async function authRoutes(fastify) {
     // den Login abzulehnen (siehe Admin → LDAP-Einstellungen).
     if (!row && isLdapConfigured() && isAutoProvisionEnabled() && uname && password) {
       let ergebnis;
+      let technischerFehler = false;
       try {
         const ldap = getLdapAuthenticator();
         ergebnis = ldap ? await ldap.authenticate(uname, password) : null;
       } catch (e) {
+        technischerFehler = true;
         request.log.error({ err: e }, 'Auto-Provisioning: LDAP-Anmeldung fehlgeschlagen (technischer Fehler)');
+      }
+      if (technischerFehler) {
+        return reply.viewEjs('auth/login.ejs', {
+          user: null,
+          error: 'LDAP-Anmeldung ist gerade nicht verfügbar. Bitte später erneut versuchen oder an den Admin wenden.',
+          next: '',
+        });
       }
       if (ergebnis) {
         try {

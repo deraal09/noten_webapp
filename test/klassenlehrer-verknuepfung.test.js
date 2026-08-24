@@ -195,6 +195,33 @@ test('Verknüpfung: leere/unverbundene Klasse gewährt direkten Zugriff ohne Zus
   assert.ok(zuweisung);
 });
 
+test('Regression: CSV-Export-Link nur sichtbar, wenn der Export auch erlaubt ist', async () => {
+  // Eigene, frische Klasse — Lehrer C ist an diesem Punkt in früheren Tests
+  // bereits anderweitig mit klasseId verknüpft, das würde diesen Test verfälschen.
+  await form(admin, '/admin/schuljahre/neu', { bezeichnung: '2099/00' });
+  const sjId2 = getDb().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2099/00'").get().id;
+  await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId2), name: 'ExportTest', notenschluessel: 'IHK' });
+  const klasse2 = getDb().prepare("SELECT id FROM klassen WHERE name = 'ExportTest'").get().id;
+  await form(admin, `/admin/klassen/${klasse2}/faecher/neu`, { name: 'Bio' });
+  const bio = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Bio'").get(klasse2);
+
+  // Lehrer C als klassenweite Klassenleitung nach altem Admin-Modell
+  // eintragen (klassen_lehrkraefte) — weder Ersteller/in noch einem Fach
+  // zugewiesen, damit userDarfKlasseExportieren() für ihn false liefert,
+  // obwohl userIstKlassenlehrer() (und damit der Seitenzugriff) true ist.
+  await form(admin, '/admin/klassenlehrer/neu', {
+    user_id: String(userId('lehrerc')), klasse_id: String(klasse2), fach_id: String(bio.id),
+  });
+
+  let r = await lehrerC(`/teacher/klassen/${klasse2}`);
+  assert.equal(r.status, 200, 'Klassenleitung sollte die Klassenseite trotzdem sehen können');
+  const html = await r.text();
+  assert.doesNotMatch(html, /CSV-Export/, 'Export-Link darf nicht angezeigt werden, wenn der Export 403 liefern würde');
+
+  r = await lehrerC(`/export/klasse/${klasse2}.csv`);
+  assert.equal(r.status, 403);
+});
+
 test.after(async () => {
   await fastify.close();
 });

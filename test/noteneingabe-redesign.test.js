@@ -135,6 +135,15 @@ test('Regression: neu angelegte Klausur/UL bekommt automatisch eine Gewichtung >
   const zeile = data.schueler.find((s) => s.schueler_id === s1);
   assert.notEqual(zeile.schriftlicheNote, null);
   assert.notEqual(zeile.gesamt, null);
+
+  // Regression: eine ZWEITE Klausur, angelegt nachdem K1 schon eine
+  // Gewichtung > 0 hat, muss ebenfalls eine Gewichtung > 0 bekommen (nicht
+  // komplett übersprungen werden, nur weil K1 nicht mehr bei 0 steht).
+  await form(lehrerA, `/teacher/fach/${chemieId}/klausuren/neu`, { name: 'K2', aufgaben: '1', halbjahr: HJ });
+  const klausuren = getDb().prepare('SELECT * FROM klausuren WHERE fach_id = ? ORDER BY id').all(chemieId);
+  assert.equal(klausuren.length, 2);
+  assert.notEqual(klausuren[0].gewichtung, 0);
+  assert.notEqual(klausuren[1].gewichtung, 0, 'Zweite Klausur darf nicht bei Gewichtung 0 hängen bleiben');
 });
 
 test('Notenübersicht (JSON-API): schriftliche/mündliche Note getrennt berechnet', async () => {

@@ -4,7 +4,9 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer } from '../auth.js';
+import {
+  requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
+} from '../auth.js';
 import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
 import { starteVerknuepfung, beantworteVerknuepfung } from '../klassen-verknuepfung.js';
 import { ladeFachMitUmfeld, ladeNotenuebersicht } from '../noten-service.js';
@@ -151,7 +153,7 @@ export default async function teacherRoutes(fastify) {
     getDb().prepare(`INSERT INTO klausuren (fach_id, halbjahr, name, max_punkte_pro_aufgabe, gewichtung)
                      VALUES (?, ?, ?, ?, 0)`)
       .run(request.params.id, halbjahr, name, JSON.stringify(Array(aufgaben).fill(1)));
-    autoVerteileKlausuren(request.params.id, halbjahr);
+    autoVerteileKlausuren(request.params.id, halbjahr, { erzwingen: true });
     syncFallsAutoAktiv(request.params.id, halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
   });
@@ -252,7 +254,7 @@ export default async function teacherRoutes(fastify) {
     getDb().prepare(`INSERT INTO unterrichtsleistungen (fach_id, halbjahr, name, max_punkte_pro_aufgabe, gewichtung)
                      VALUES (?, ?, ?, ?, 0)`)
       .run(request.params.id, halbjahr, name, JSON.stringify(Array(aufgaben).fill(1)));
-    autoVerteileUls(request.params.id, halbjahr);
+    autoVerteileUls(request.params.id, halbjahr, { erzwingen: true });
     syncFallsAutoAktiv(request.params.id, halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
   });
@@ -570,6 +572,7 @@ export default async function teacherRoutes(fastify) {
     `).all(klasse.id);
     const eigentuemer = klasse.created_by_id === request.user.id || request.user.isAdmin;
     const istKlassenlehrer = userIstKlassenlehrer(request.user, klasse.id);
+    const kannExportieren = userDarfKlasseExportieren(request.user, klasse.id);
     const kannSelbstAlsKlassenlehrerEintragen = !istKlassenlehrer
       && (klasse.created_by_id === request.user.id || request.user.isAdmin);
 
@@ -590,7 +593,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      user: request.user, klasse, schueler, faecher, eigentuemer,
+      user: request.user, klasse, schueler, faecher, eigentuemer, kannExportieren,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
     });
   });
@@ -720,34 +723,69 @@ export default async function teacherRoutes(fastify) {
   });
 }
 
-function autoVerteileKlausuren(fachId, halbjahr) {
+// Verteilt die Gewichtung der Klausuren eines Fachs/Halbjahrs neu.
+//
+// erzwingen=false (Default, z. B. nach dem Löschen einer Klausur): füllt nur
+// Klausuren, die noch bei 0 stehen, aus dem verbleibenden Budget auf —
+// bereits gesetzte Gewichtungen bleiben unangetastet.
+//
+// erzwingen=true (beim Anlegen einer neuen Klausur): verteilt IMMER alle
+// Klausuren gleichmäßig neu. Nötig, weil eine bereits vorhandene Klausur das
+// komplette Budget beanspruchen kann (z. B. die einzige Klausur mit 100%) —
+// dann bliebe für eine neu angelegte Klausur beim reinen Auffüllen nichts
+// mehr übrig und sie hinge dauerhaft bei Gewichtung 0 (und damit ohne
+// Einfluss auf Schriftliche Note/Gesamtnote, siehe grade-calc.js
+// teilNote()/gesamtnoteHj()). Das Neuverteilen kann eine zuvor manuell
+// gesetzte Gewichtung überschreiben — das ist der bewusste Kompromiss:
+// sichtbar falsch verteilte Prozente lassen sich sofort im Formular
+// korrigieren, eine unsichtbar bei 0 hängende Klausur (fehlende Note in der
+// Übersicht) nicht.
+function autoVerteileKlausuren(fachId, halbjahr, { erzwingen = false } = {}) {
   const klausuren = getDb().prepare(
     'SELECT id, gewichtung FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
   ).all(fachId, halbjahr);
   if (!klausuren.length) return;
-  if (klausuren.some((k) => k.gewichtung !== 0)) return;
   const fach = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
   const sj = getDb().prepare(`
     SELECT s.gewichtung_muendlich FROM schuljahre s JOIN klassen k ON k.schuljahr_id = s.id WHERE k.id = ?
   `).get(fach.klasse_id);
   const schriftlichPct = 100 - (sj?.gewichtung_muendlich || DEFAULT_GEWICHTUNG);
-  const weights = autoDistribute(klausuren.length, schriftlichPct);
   const upd = getDb().prepare('UPDATE klausuren SET gewichtung = ? WHERE id = ?');
-  for (let i = 0; i < klausuren.length; i++) upd.run(weights[i], klausuren[i].id);
+
+  if (erzwingen) {
+    const weights = autoDistribute(klausuren.length, schriftlichPct);
+    for (let i = 0; i < klausuren.length; i++) upd.run(weights[i], klausuren[i].id);
+    return;
+  }
+  const offene = klausuren.filter((k) => k.gewichtung === 0);
+  if (!offene.length) return;
+  const belegt = klausuren.reduce((sum, k) => sum + k.gewichtung, 0);
+  const rest = Math.max(0, schriftlichPct - belegt);
+  const weights = autoDistribute(offene.length, rest);
+  for (let i = 0; i < offene.length; i++) upd.run(weights[i], offene[i].id);
 }
 
-function autoVerteileUls(fachId, halbjahr) {
+function autoVerteileUls(fachId, halbjahr, { erzwingen = false } = {}) {
   const uls = getDb().prepare(
     'SELECT id, gewichtung FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
   ).all(fachId, halbjahr);
   if (!uls.length) return;
-  if (uls.some((u) => u.gewichtung !== 0)) return;
   const fach = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
   const sj = getDb().prepare(`
     SELECT s.gewichtung_muendlich FROM schuljahre s JOIN klassen k ON k.schuljahr_id = s.id WHERE k.id = ?
   `).get(fach.klasse_id);
   const ulPct = sj?.gewichtung_muendlich || DEFAULT_GEWICHTUNG;
-  const weights = autoDistribute(uls.length, ulPct);
   const upd = getDb().prepare('UPDATE unterrichtsleistungen SET gewichtung = ? WHERE id = ?');
-  for (let i = 0; i < uls.length; i++) upd.run(weights[i], uls[i].id);
+
+  if (erzwingen) {
+    const weights = autoDistribute(uls.length, ulPct);
+    for (let i = 0; i < uls.length; i++) upd.run(weights[i], uls[i].id);
+    return;
+  }
+  const offene = uls.filter((u) => u.gewichtung === 0);
+  if (!offene.length) return;
+  const belegt = uls.reduce((sum, u) => sum + u.gewichtung, 0);
+  const rest = Math.max(0, ulPct - belegt);
+  const weights = autoDistribute(offene.length, rest);
+  for (let i = 0; i < offene.length; i++) upd.run(weights[i], offene[i].id);
 }

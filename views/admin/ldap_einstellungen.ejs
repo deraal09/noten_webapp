@@ -70,7 +70,7 @@
 
   <h2>Anmeldung ohne Vorab-Import</h2>
   <label>
-    <input type="checkbox" name="auto_provision" value="1" <%= (settings ? Boolean(settings.auto_provision) : true) ? 'checked' : '' %>>
+    <input type="checkbox" name="auto_provision" value="1" <%= Boolean(settings && settings.auto_provision) ? 'checked' : '' %>>
     Jede Person mit gültigem LDAP-Konto darf sich anmelden — das Konto wird beim ersten
     erfolgreichen Login automatisch angelegt (kein manueller Import durch den Admin nötig)
   </label>
