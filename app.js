@@ -29,6 +29,7 @@ import { authPreHandler, SESSION_COOKIE } from './src/auth.js';
 import {
   HALBJAHRE, NOTE_TYPEN, FEHLZEIT_TYPEN, formatNote, formatNoteG,
 } from './src/grade-calc.js';
+import { formatZeitLokal } from './src/format.js';
 import authRoutes from './src/routes/auth.js';
 import adminRoutes from './src/routes/admin.js';
 import teacherRoutes from './src/routes/teacher.js';
@@ -118,6 +119,7 @@ export async function buildApp(opts = {}) {
     reply.locals.FEHLZEIT_TYPEN = FEHLZEIT_TYPEN;
     reply.locals.formatNote = formatNote;
     reply.locals.formatNoteG = formatNoteG;
+    reply.locals.formatZeitLokal = formatZeitLokal;
     const pending = request.session?.flash;
     reply.locals.flash = pending && pending.length ? pending : null;
     if (pending && pending.length) request.session.flash = [];

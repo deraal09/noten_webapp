@@ -26,7 +26,7 @@
             <%= f.name %><br>
             <small>
               <% var m = syncMeta.get(f.id); %>
-              <% if (m) { %>zuletzt sync.: <%= m.synced_at %><% } else { %>noch nie synchronisiert<% } %>
+              <% if (m) { %>zuletzt sync.: <%= formatZeitLokal(m.synced_at) %><% } else { %>noch nie synchronisiert<% } %>
             </small>
           </th>
         <% }); %>

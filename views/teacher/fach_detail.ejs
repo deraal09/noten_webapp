@@ -10,7 +10,7 @@
   <p>
     <% if (syncMeta) { %>
       Zuletzt mit der Klassenleitung synchronisiert:
-      <strong><%= syncMeta.synced_at %></strong>
+      <strong><%= formatZeitLokal(syncMeta.synced_at) %></strong>
       (<%= syncMeta.display_name || syncMeta.username || 'unbekannt' %>)
     <% } else { %>
       <strong>Noch nicht synchronisiert</strong> — die Klassenleitung sieht für dieses Halbjahr noch keine Noten dieses Fachs.
