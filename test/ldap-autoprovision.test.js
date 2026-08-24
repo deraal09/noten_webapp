@@ -109,6 +109,25 @@ test('Auto-Provisioning: unbekannter Nutzername + gültige LDAP-Zugangsdaten leg
   assert.equal(r.status, 200);
 });
 
+test('Regression: LDAP-Login ist nicht case-sensitiv (bereits angelegtes Konto, abweichende Groß-/Kleinschreibung)', async () => {
+  // "neu123" wurde im vorigen Test per Auto-Provisioning angelegt. Ein
+  // erneuter Login mit abweichender Schreibweise darf nicht an unserer
+  // eigenen (bisher case-sensitiven) Benutzernamens-Suche scheitern — das AD
+  // selbst ist bei sAMAccountName ohnehin nicht case-sensitiv.
+  const req = client();
+  const r = await req('/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username: 'NEU123', password: 'geheim123' }),
+  });
+  assert.equal(r.status, 302, 'Login mit abweichender Groß-/Kleinschreibung muss trotzdem erfolgreich sein');
+  assert.equal(r.headers.get('location'), '/');
+
+  // Es darf dabei KEIN zweites Konto entstehen.
+  const anzahl = getDb().prepare("SELECT COUNT(*) AS c FROM users WHERE username = 'neu123' COLLATE NOCASE").get().c;
+  assert.equal(anzahl, 1, 'Case-insensitiver Login darf kein doppeltes Konto anlegen');
+});
+
 test('Auto-Provisioning: falsches Passwort legt kein Konto an', async () => {
   const req = client();
   const r = await req('/login', {

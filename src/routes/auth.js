@@ -66,8 +66,13 @@ export default async function authRoutes(fastify) {
     const { username = '', password = '' } = request.body || {};
     const next = request.body?.next || '';
     const uname = String(username).trim();
+    // COLLATE NOCASE: Benutzername beim Login unabhängig von Groß-/Kleinschreibung
+    // finden. Wichtig vor allem für LDAP-Konten — das AD ist bei sAMAccountName
+    // selbst nicht case-sensitiv, unsere Login-Suche war es aber bisher, sodass
+    // ein Login mit abweichender Schreibweise als "Benutzername oder Passwort
+    // ist falsch" abgelehnt wurde, obwohl das LDAP-Bind selbst geklappt hätte.
     let row = getDb()
-      .prepare('SELECT id, username, password_hash, active, auth_source, login_sub FROM users WHERE username = ?')
+      .prepare('SELECT id, username, password_hash, active, auth_source, login_sub FROM users WHERE username = ? COLLATE NOCASE')
       .get(uname);
 
     // Kein lokales/importiertes Konto bekannt: Ist Auto-Provisioning aktiv,
