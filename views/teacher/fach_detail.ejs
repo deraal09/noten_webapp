@@ -143,23 +143,27 @@
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
         <button type="submit">💾 Max-Punkte speichern</button>
       </form>
+      <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
       <table class="tafel">
         <thead>
           <tr>
             <th>Schüler/in</th>
             <% maxArr.forEach(function(_, i) { %><th class="aufgabe-head">A<%= i+1 %></th><% }); %>
+            <th>Punkte gesamt</th>
             <th class="note-col">Note</th>
           </tr>
         </thead>
         <tbody>
           <% rows.forEach(function(r) {
-               var eintrag = r.klausuren.find(function(x) { return x.id === k.id; }); %>
+               var eintrag = r.klausuren.find(function(x) { return x.id === k.id; });
+               var summe = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0; %>
             <tr>
               <td class="name"><%= r.nachname %>, <%= r.vorname %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
                 <td><input type="number" class="punkt" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–"></td>
               <% }); %>
+              <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe %> / <%= maxSumme %></td>
               <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
             </tr>
           <% }); %>
@@ -206,23 +210,27 @@
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
         <button type="submit">💾 Max-Punkte speichern</button>
       </form>
+      <% var maxSummeUl = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
       <table class="tafel">
         <thead>
           <tr>
             <th>Schüler/in</th>
             <% maxArr.forEach(function(_, i) { %><th class="aufgabe-head">A<%= i+1 %></th><% }); %>
+            <th>Punkte gesamt</th>
             <th class="note-col">Note</th>
           </tr>
         </thead>
         <tbody>
           <% rows.forEach(function(r) {
-               var eintrag = r.uls.find(function(x) { return x.id === u.id; }); %>
+               var eintrag = r.uls.find(function(x) { return x.id === u.id; });
+               var summeUl = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0; %>
             <tr>
               <td class="name"><%= r.nachname %>, <%= r.vorname %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
                 <td><input type="number" class="punkt" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–"></td>
               <% }); %>
+              <td class="note-cell u-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>" data-max="<%= maxSummeUl %>"><%= summeUl %> / <%= maxSummeUl %></td>
               <td class="note-cell u-note" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
             </tr>
           <% }); %>
@@ -258,6 +266,16 @@
         document.querySelectorAll('.u-note[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
           const u = s.uls.find(function(x) { return x.id === Number(cell.dataset.kid); });
           cell.textContent = (u && u.note !== null) ? u.note.toString().replace('.', ',') : '–';
+        });
+        document.querySelectorAll('.k-summe[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
+          const k = s.klausuren.find(function(x) { return x.id === Number(cell.dataset.kid); });
+          const summe = (k && k.punkte) ? k.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
+          cell.textContent = summe + ' / ' + cell.dataset.max;
+        });
+        document.querySelectorAll('.u-summe[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
+          const u = s.uls.find(function(x) { return x.id === Number(cell.dataset.kid); });
+          const summe = (u && u.punkte) ? u.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
+          cell.textContent = summe + ' / ' + cell.dataset.max;
         });
         const tr = document.querySelector('#uebersicht tr[data-schueler="' + s.schueler_id + '"]');
         if (tr) {

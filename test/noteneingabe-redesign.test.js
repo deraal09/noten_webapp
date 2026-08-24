@@ -207,6 +207,61 @@ test('Fach-Detail-Seite (SSR) rendert Notenübersicht mit denselben Werten', asy
   assert.match(html, /Unterrichtsleistungen/);
 });
 
+test('Punkte gesamt: erreichte/maximale Punktsumme wird bei Klausur und UL angezeigt (auch bei unvollständiger Eingabe)', async () => {
+  // Eigenes, frisches Fach mit einer Klausur (2 Aufgaben) und einer UL (2 Aufgaben).
+  await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Biologie' });
+  const bioId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Biologie'").get(klasseId).id;
+
+  await form(lehrerA, `/teacher/fach/${bioId}/klausuren/neu`, { name: 'K1', aufgaben: '2', halbjahr: HJ });
+  const klausur = getDb().prepare('SELECT * FROM klausuren WHERE fach_id = ?').get(bioId);
+  await form(lehrerA, `/teacher/klausuren/${klausur.id}/maxpunkte`, {
+    anzahl_aufgaben: '2', mp_0: '20', mp_1: '30', halbjahr: HJ,
+  });
+
+  await form(lehrerA, `/teacher/fach/${bioId}/uls/neu`, { name: 'UL1', aufgaben: '2', halbjahr: HJ });
+  const ul = getDb().prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ?').get(bioId);
+  await form(lehrerA, `/teacher/uls/${ul.id}/maxpunkte`, {
+    anzahl_aufgaben: '2', mp_0: '10', mp_1: '10', halbjahr: HJ,
+  });
+
+  // s1 bekommt eine vollständige Eingabe (beide Aufgaben), s2 nur eine
+  // Teilaufgabe -> muss trotzdem eine Punktsumme (kein "-") zeigen.
+  await lehrerA(`/teacher/klausuren/${klausur.id}/punkte`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ schueler_id: String(s1), aufgabe_idx: '0', wert: '10' }),
+  });
+  await lehrerA(`/teacher/klausuren/${klausur.id}/punkte`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ schueler_id: String(s1), aufgabe_idx: '1', wert: '20' }),
+  });
+  await lehrerA(`/teacher/klausuren/${klausur.id}/punkte`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ schueler_id: String(s2), aufgabe_idx: '0', wert: '5' }),
+  });
+
+  const r = await lehrerA(`/teacher/fach/${bioId}/noten?hj=${encodeURIComponent(HJ)}`);
+  const data = await r.json();
+  const zeileS1 = data.schueler.find((s) => s.schueler_id === s1);
+  const zeileS2 = data.schueler.find((s) => s.schueler_id === s2);
+  const kS1 = zeileS1.klausuren.find((k) => k.id === klausur.id);
+  const kS2 = zeileS2.klausuren.find((k) => k.id === klausur.id);
+
+  // s1: vollständig (10+20=30/50) -> Note bereits berechnet
+  assert.deepEqual(kS1.punkte, [10, 20]);
+  assert.notEqual(kS1.note, null);
+  // s2: unvollständig (nur 5 von 2 Aufgaben) -> Note noch null, aber die
+  // erreichte Punktsumme muss trotzdem aus den vorhandenen Werten
+  // berechenbar sein (5 + 0, da Aufgabe 2 noch fehlt).
+  assert.equal(kS2.punkte[0], 5);
+  assert.equal(kS2.note, null, 'Note erst vollständig, wenn alle Teilaufgaben ausgefüllt sind');
+
+  const html = await (await lehrerA(`/teacher/fach/${bioId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /Punkte gesamt/);
+  assert.match(html, /30 \/ 50/, 'vollständige Klausur-Punktsumme (10+20 von 20+30) muss angezeigt werden');
+  assert.match(html, /5 \/ 50/, 'unvollständige Klausur-Punktsumme (nur Aufgabe 1) muss trotzdem angezeigt werden');
+  assert.match(html, /0 \/ 20/, 'UL ohne jede Eingabe zeigt Punktsumme 0');
+});
+
 test('Notenbesprechungsmodus: Navigation, Zugriffsschutz, Notizen (Besprechung + Konferenz)', async () => {
   // Nur die zugewiesene Lehrkraft darf besprechen
   let r = await lehrerB(`/teacher/fach/${fachId}/besprechung/${s1}`);
