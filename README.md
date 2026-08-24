@@ -17,7 +17,7 @@ die App direkt und routet die Subdomain darauf.
 | Datenbank   | better-sqlite3 (eine Datei, synchron)      |
 | Auth        | `@fastify/session` + bcryptjs              |
 | Notenlogik  | 1:1 portiert aus `src/grade_calc.py`       |
-| Frontend    | Vanilla CSS (kein CDN, keine Build-Pipeline) |
+| Frontend    | Vanilla CSS (kein CDN, keine Build-Pipeline), unterstützt Dark Mode |
 
 ## Funktionen
 
@@ -455,6 +455,15 @@ beachten — Migrationen sind nicht automatisch rückwärtskompatibel.
 | `build`     | Pre-Deploy-Check                   |
 | `test`      | Tests ausführen                    |
 | `seed:admin`| Admin per CLI anlegen              |
+
+## Dark Mode
+
+Die App folgt automatisch der Betriebssystem-/Browser-Einstellung
+(`prefers-color-scheme`) — kein manueller Umschalter, kein JavaScript nötig.
+Alle Farben in `static/css/app.css` sind als CSS-Variablen in `:root`
+definiert; ein `@media (prefers-color-scheme: dark) { :root { ... } }`-Block
+überschreibt sie für den Dark Mode. Neue Styles sollten `var(--…)` statt
+fester Hex-Farben verwenden, damit sie in beiden Modi funktionieren.
 
 ## Entwicklung
 

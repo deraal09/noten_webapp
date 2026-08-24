@@ -12,9 +12,9 @@
         <td><%= u.role %></td>
         <td>
           <% if (u.auth_source === 'ldap') { %>
-            <span class="role" style="background:#0d6efd">LDAP</span>
+            <span class="badge" style="background:#0d6efd">LDAP</span>
           <% } else { %>
-            <span class="role" style="background:#6c757d">Lokal / Extern</span>
+            <span class="badge" style="background:#6c757d">Lokal / Extern</span>
           <% } %>
         </td>
         <td><%= u.active ? '✅ aktiv' : '🚫 inaktiv' %></td>
