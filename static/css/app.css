@@ -140,6 +140,10 @@ table.data tbody tr:nth-child(even) { background: var(--bg-subtle); }
 table.data .name, table.tafel .name { white-space: nowrap; }
 
 table.tafel input.punkt { width: 50px; padding: 0.2rem; border: 1px solid var(--border-strong); border-radius: 3px; text-align: center; background: var(--bg-input); color: var(--text); }
+/* Punkteingabe: keine Spinner-Pfeile, Punkte werden direkt getippt. */
+table.tafel input.punkt::-webkit-outer-spin-button,
+table.tafel input.punkt::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+table.tafel input.punkt { -moz-appearance: textfield; }
 table.tafel .note-cell, table.tafel .gesamt-cell { text-align: center; font-weight: 600; background: var(--bg-header); min-width: 40px; }
 table.tafel .klausur-col, table.tafel .ul-col { background: var(--bg-tint); text-align: center; }
 table.tafel .aufgabe-head { background: var(--bg-tint-2); font-size: 0.8rem; }
