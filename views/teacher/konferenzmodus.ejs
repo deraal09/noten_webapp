@@ -1,0 +1,86 @@
+<h1>Konferenzmodus: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p><a href="/teacher/klassen/<%= klasse.id %>/uebersicht?hj=<%= encodeURIComponent(halbjahr) %>">← Zur Halbjahresübersicht</a></p>
+
+<div class="hj-tabs">
+  <% HALBJAHRE.forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>"
+       href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= schueler.id %>?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
+  <% }); %>
+</div>
+
+<div class="card besprechung-nav">
+  <% if (vorherige) { %>
+    <a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= vorherige.id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück</a>
+  <% } else { %>
+    <span class="btn disabled">← Zurück</span>
+  <% } %>
+  <strong><%= position %> / <%= anzahl %>: <%= schueler.nachname %>, <%= schueler.vorname %></strong>
+  <% if (naechste) { %>
+    <a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= naechste.id %>?hj=<%= encodeURIComponent(halbjahr) %>">Weiter →</a>
+  <% } else { %>
+    <span class="btn disabled">Weiter →</span>
+  <% } %>
+</div>
+
+<h2>Noten <%= halbjahr %> <small>Ø <%= schnitt === null ? '–' : formatNote(schnitt) %></small></h2>
+<p class="hint">
+  Gezeigt wird der zuletzt synchronisierte Stand je Fach. Eine Konferenznote überschreibt diesen
+  Stand als Entscheidung der Notenkonferenz — die Fachlehrkraft behält ihre eigene (unveränderte)
+  Note, ein späterer erneuter Sync löscht die Konferenznote nicht.
+</p>
+<% if (!fachZeilen.length) { %><p class="hint">Diese Klasse hat noch keine Fächer.</p><% } %>
+<table class="data">
+  <thead><tr><th>Fach</th><th>Sync-Stand</th><th>Konferenznote</th><th></th></tr></thead>
+  <tbody>
+    <% fachZeilen.forEach(function(z) { %>
+      <tr>
+        <td class="name"><%= z.fach.name %></td>
+        <td><%= z.note === null ? '–' : formatNote(z.note) %><%= z.syncedAt === null ? ' (noch nicht synchronisiert)' : '' %></td>
+        <td>
+          <% if (z.ueberschrieben) { %>
+            <strong><%= formatNote(z.konferenzNote) %></strong> <small class="hint">(Konferenzentscheidung)</small>
+          <% } else { %>
+            —
+          <% } %>
+        </td>
+        <td>
+          <form method="post" action="/teacher/klassen/<%= klasse.id %>/konferenz/<%= schueler.id %>/note" class="inline">
+            <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+            <input type="hidden" name="fach_id" value="<%= z.fach.id %>">
+            <input type="number" name="note" step="0.1"
+                   min="<%= klasse.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= klasse.notenschluessel === 'BG' ? 15 : 6 %>"
+                   value="<%= z.konferenzNote === null ? '' : z.konferenzNote %>" placeholder="unverändert">
+            <button type="submit">💾</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<h2>Notizen</h2>
+<form method="post" action="/teacher/klassen/<%= klasse.id %>/konferenz/<%= schueler.id %>/notiz" class="card">
+  <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+  <label>Notiz (Notenkonferenz-Entscheidung, klassenweit)
+    <textarea name="text" rows="3" required></textarea>
+  </label>
+  <button type="submit">+ Notiz speichern</button>
+</form>
+
+<% if (!notizen.length) { %>
+  <p class="hint">Noch keine Notizen für dieses Halbjahr.</p>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Datum</th><th>Art</th><th>Von</th><th>Notiz</th></tr></thead>
+    <tbody>
+      <% notizen.forEach(function(n) { %>
+        <tr>
+          <td><%= formatZeitLokal(n.created_at) %></td>
+          <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : ('Besprechung' + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %></td>
+          <td><%= n.display_name || n.username || '—' %></td>
+          <td><%= n.text %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>

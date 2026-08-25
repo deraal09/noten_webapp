@@ -1,5 +1,10 @@
 <h1>Halbjahresübersicht: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
-<p><a href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a></p>
+<p>
+  <a href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
+  <% if (zeilen.length) { %>
+    · <a href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= zeilen[0].schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">🎓 Konferenzmodus starten</a>
+  <% } %>
+</p>
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
@@ -32,6 +37,7 @@
         <% }); %>
         <th>Ø Notenschnitt</th>
         <th>Notizen</th>
+        <th>Konferenz</th>
       </tr>
     </thead>
     <tbody>
@@ -39,7 +45,10 @@
         <tr>
           <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
           <% z.noten.forEach(function(n) { %>
-            <td><%= n === null ? '–' : formatNote(n) %></td>
+            <td>
+              <%= n.note === null ? '–' : formatNote(n.note) %>
+              <% if (n.ueberschrieben) { %><small class="hint" title="Konferenzentscheidung">🎓</small><% } %>
+            </td>
           <% }); %>
           <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
           <td>
@@ -52,7 +61,7 @@
                   <% z.notizen.forEach(function(n) { %>
                     <li>
                       <small>
-                        <%= n.created_at %> ·
+                        <%= formatZeitLokal(n.created_at) %> ·
                         <%= n.typ === 'konferenz' ? 'Notenkonferenz' : ('Besprechung' + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %> ·
                         <%= n.display_name || n.username || '—' %>
                       </small><br>
@@ -63,6 +72,7 @@
               </details>
             <% } %>
           </td>
+          <td><a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= z.schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">Öffnen</a></td>
         </tr>
       <% }); %>
     </tbody>

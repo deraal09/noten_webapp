@@ -519,12 +519,17 @@ export default async function teacherRoutes(fastify) {
     const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
     const syncMeta = new Map(faecher.map((f) => [f.id, holeSyncMeta(f.id, halbjahr)]));
     const standRows = faecher.length ? db.prepare(`
-      SELECT fach_id, schueler_id, note FROM fach_sync_stand
+      SELECT fach_id, schueler_id, note, konferenz_note FROM fach_sync_stand
       WHERE halbjahr = ? AND fach_id IN (${faecher.map(() => '?').join(',')})
     `).all(halbjahr, ...faecher.map((f) => f.id)) : [];
-    const stand = new Map(); // schueler_id -> Map(fach_id -> note)
+    // Von der Klassenleitung im Konferenzmodus überschriebene Note hat Vorrang
+    // vor dem reinen Sync-Stand der Fachlehrkraft.
+    const stand = new Map(); // schueler_id -> Map(fach_id -> {note, ueberschrieben})
     for (const s of schueler) stand.set(s.id, new Map());
-    for (const r of standRows) stand.get(r.schueler_id)?.set(r.fach_id, r.note);
+    for (const r of standRows) {
+      const ueberschrieben = r.konferenz_note !== null && r.konferenz_note !== undefined;
+      stand.get(r.schueler_id)?.set(r.fach_id, { note: ueberschrieben ? r.konferenz_note : r.note, ueberschrieben });
+    }
 
     const notizRows = schueler.length ? db.prepare(`
       SELECT n.*, u.display_name, u.username, f.name AS fach_name FROM notenbesprechung_notizen n
@@ -540,8 +545,8 @@ export default async function teacherRoutes(fastify) {
     }
 
     const zeilen = schueler.map((s) => {
-      const noten = faecher.map((f) => stand.get(s.id)?.get(f.id) ?? null);
-      const vorhanden = noten.filter((n) => n !== null && n !== undefined);
+      const noten = faecher.map((f) => stand.get(s.id)?.get(f.id) ?? { note: null, ueberschrieben: false });
+      const vorhanden = noten.map((n) => n.note).filter((n) => n !== null && n !== undefined);
       const schnitt = vorhanden.length ? vorhanden.reduce((a, b) => a + b, 0) / vorhanden.length : null;
       return { schueler: s, noten, schnitt, notizen: notizenNachSchueler.get(s.id) || [] };
     });
@@ -549,6 +554,115 @@ export default async function teacherRoutes(fastify) {
     return reply.viewEjs('teacher/klasse_uebersicht.ejs', {
       user: request.user, klasse, halbjahr, faecher, zeilen, syncMeta,
     });
+  });
+
+  // ---------- Konferenzmodus (eine Schüler:in nach der anderen, klassenweit) ----------
+  // Wie die Notenbesprechung (siehe oben), aber für die Klassenleitung: zeigt
+  // alle Fächer im Sync-Stand (nie Live-Werte, siehe Kommentar oben) und
+  // erlaubt, die Note je Fach als Konferenz-Entscheidung zu überschreiben
+  // sowie klassenweite Notizen zu hinterlegen.
+  fastify.get('/klassen/:id/konferenz/:schuelerId', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin haben Zugriff auf den Konferenzmodus.' });
+    }
+    const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
+    const db = getDb();
+    const schuelerListe = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
+    const idx = schuelerListe.findIndex((s) => s.id === Number(request.params.schuelerId));
+    if (idx === -1) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in dieser Klasse.' });
+    const schueler = schuelerListe[idx];
+    const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+    const standRows = faecher.length ? db.prepare(`
+      SELECT * FROM fach_sync_stand
+      WHERE halbjahr = ? AND schueler_id = ? AND fach_id IN (${faecher.map(() => '?').join(',')})
+    `).all(halbjahr, schueler.id, ...faecher.map((f) => f.id)) : [];
+    const standByFach = new Map(standRows.map((r) => [r.fach_id, r]));
+    const fachZeilen = faecher.map((f) => {
+      const s = standByFach.get(f.id) || null;
+      const ueberschrieben = s?.konferenz_note !== null && s?.konferenz_note !== undefined;
+      return {
+        fach: f,
+        note: s?.note ?? null,
+        konferenzNote: s?.konferenz_note ?? null,
+        aktuelleNote: ueberschrieben ? s.konferenz_note : (s?.note ?? null),
+        ueberschrieben,
+        syncedAt: s?.synced_at ?? null,
+      };
+    });
+    const vorhandeneNoten = fachZeilen.map((z) => z.aktuelleNote).filter((n) => n !== null && n !== undefined);
+    const schnitt = vorhandeneNoten.length
+      ? Math.round((vorhandeneNoten.reduce((a, b) => a + b, 0) / vorhandeneNoten.length) * 100) / 100
+      : null;
+
+    const notizen = db.prepare(`
+      SELECT n.*, u.display_name, u.username, f.name AS fach_name FROM notenbesprechung_notizen n
+      LEFT JOIN users u ON u.id = n.created_by_id
+      LEFT JOIN faecher f ON f.id = n.fach_id
+      WHERE n.schueler_id = ? AND n.halbjahr = ?
+      ORDER BY n.created_at DESC
+    `).all(schueler.id, halbjahr);
+
+    return reply.viewEjs('teacher/konferenzmodus.ejs', {
+      user: request.user, klasse, halbjahr, schueler, fachZeilen, schnitt, notizen,
+      vorherige: idx > 0 ? schuelerListe[idx - 1] : null,
+      naechste: idx < schuelerListe.length - 1 ? schuelerListe[idx + 1] : null,
+      position: idx + 1, anzahl: schuelerListe.length,
+    });
+  });
+
+  fastify.post('/klassen/:id/konferenz/:schuelerId/note', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id, notenschluessel FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse || !userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const fachId = parseInt(request.body?.fach_id, 10);
+    const fach = getDb().prepare('SELECT id FROM faecher WHERE id = ? AND klasse_id = ?').get(fachId, klasse.id);
+    if (!Number.isFinite(fachId) || !fach) return reply.code(404).send({ error: 'fach not found' });
+    const wertRaw = String(request.body?.note ?? '').trim().replace(',', '.');
+    const wert = wertRaw === '' ? null : Number(wertRaw);
+    if (wert !== null) {
+      if (!Number.isFinite(wert)) {
+        request.flash?.('error', 'Ungültige Note.');
+        return reply.redirect(`/teacher/klassen/${request.params.id}/konferenz/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
+      }
+      const [min, max] = klasse.notenschluessel === 'BG' ? [0, 15] : [1, 6];
+      if (wert < min || wert > max) {
+        request.flash?.('error', `Note außerhalb des Bereichs ${min}–${max}.`);
+        return reply.redirect(`/teacher/klassen/${request.params.id}/konferenz/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
+      }
+    }
+    getDb().prepare(`
+      INSERT INTO fach_sync_stand (fach_id, halbjahr, schueler_id, konferenz_note, konferenz_note_von_id, konferenz_note_am)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(fach_id, halbjahr, schueler_id) DO UPDATE SET
+        konferenz_note = excluded.konferenz_note,
+        konferenz_note_von_id = excluded.konferenz_note_von_id,
+        konferenz_note_am = excluded.konferenz_note_am
+    `).run(fachId, halbjahr, request.params.schuelerId, wert, request.user.id);
+    request.flash?.('success', wert === null ? 'Konferenznote zurückgesetzt.' : 'Konferenznote gespeichert.');
+    return reply.redirect(`/teacher/klassen/${request.params.id}/konferenz/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
+  });
+
+  fastify.post('/klassen/:id/konferenz/:schuelerId/notiz', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse || !userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const text = String(request.body?.text || '').trim();
+    if (text) {
+      getDb().prepare(`
+        INSERT INTO notenbesprechung_notizen (schueler_id, fach_id, halbjahr, typ, text, created_by_id)
+        VALUES (?, NULL, ?, 'konferenz', ?, ?)
+      `).run(request.params.schuelerId, halbjahr, text, request.user.id);
+    }
+    return reply.redirect(`/teacher/klassen/${request.params.id}/konferenz/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
   });
 
   fastify.get('/klassen/:id', async (request, reply) => {

@@ -178,6 +178,90 @@ test('Auto-Sync: aktivieren synct sofort, danach jede Änderung automatisch', as
   assert.notEqual(standNachher.note, standVorher.note, 'Auto-Sync sollte den neuen Stand übernommen haben');
 });
 
+test('Konferenzmodus: Zugriffsschutz (nur Klassenleitung/Admin), Navigation, Sync-Stand sichtbar', async () => {
+  let r = await lehrerB(`/teacher/klassen/${klasseId}/konferenz/${schuelerId}`);
+  assert.equal(r.status, 403);
+
+  r = await lehrerA(`/teacher/klassen/${klasseId}/konferenz/${schuelerId}?hj=${encodeURIComponent(HJ)}`);
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.match(html, /Mustermann/);
+  assert.match(html, /Deutsch/);
+  assert.match(html, /1 \/ 1/); // einziger Schüler der Klasse
+});
+
+test('Konferenzmodus: Notenkonferenz-Notiz speichern (klassenweit, fach_id NULL)', async () => {
+  let r = await lehrerB(`/teacher/klassen/${klasseId}/konferenz/${schuelerId}/notiz`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ halbjahr: HJ, text: 'darf ich nicht' }),
+  });
+  assert.equal(r.status, 403);
+
+  r = await form(lehrerA, `/teacher/klassen/${klasseId}/konferenz/${schuelerId}/notiz`, {
+    halbjahr: HJ, text: 'Konferenz beschließt: Aufstieg mit Auflagen.',
+  });
+  assert.equal(r.status, 302);
+
+  const notiz = getDb().prepare(
+    "SELECT * FROM notenbesprechung_notizen WHERE schueler_id = ? AND typ = 'konferenz'"
+  ).get(schuelerId);
+  assert.ok(notiz);
+  assert.equal(notiz.fach_id, null);
+  assert.equal(notiz.text, 'Konferenz beschließt: Aufstieg mit Auflagen.');
+
+  const html = await (await lehrerA(`/teacher/klassen/${klasseId}/konferenz/${schuelerId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /Aufstieg mit Auflagen/);
+});
+
+test('Konferenzmodus: Note überschreiben bleibt auch nach erneutem Sync erhalten', async () => {
+  const vorSync = getDb().prepare('SELECT note, konferenz_note FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ?')
+    .get(fachId, HJ, schuelerId);
+  assert.ok(vorSync.note !== null);
+  assert.equal(vorSync.konferenz_note, null);
+
+  // Lehrer B ist nicht Klassenleitung → keine Berechtigung
+  let r = await lehrerB(`/teacher/klassen/${klasseId}/konferenz/${schuelerId}/note`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ halbjahr: HJ, fach_id: String(fachId), note: '2' }),
+  });
+  assert.equal(r.status, 403);
+
+  r = await form(lehrerA, `/teacher/klassen/${klasseId}/konferenz/${schuelerId}/note`, {
+    halbjahr: HJ, fach_id: String(fachId), note: '2,0',
+  });
+  assert.equal(r.status, 302);
+
+  let stand = getDb().prepare('SELECT note, konferenz_note, konferenz_note_von_id FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ?')
+    .get(fachId, HJ, schuelerId);
+  assert.equal(stand.konferenz_note, 2);
+  assert.equal(stand.konferenz_note_von_id, userId('lehrera'));
+  const ursprünglicheNote = stand.note;
+
+  // Übersicht zeigt jetzt die Konferenznote statt des reinen Sync-Stands.
+  let html = await (await lehrerA(`/teacher/klassen/${klasseId}/uebersicht?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /title="Konferenzentscheidung"/);
+
+  // Ein erneuter Sync durch die Fachlehrkraft darf die Konferenznote nicht löschen.
+  r = await form(lehrerA, `/teacher/fach/${fachId}/sync`, { halbjahr: HJ });
+  assert.equal(r.status, 302);
+  stand = getDb().prepare('SELECT note, konferenz_note FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ?')
+    .get(fachId, HJ, schuelerId);
+  assert.equal(stand.note, ursprünglicheNote, 'Der reine Sync-Stand bleibt unverändert');
+  assert.equal(stand.konferenz_note, 2, 'Die Konferenznote überlebt einen erneuten Sync');
+
+  // Zurücksetzen (leerer Wert) entfernt die Überschreibung wieder.
+  r = await form(lehrerA, `/teacher/klassen/${klasseId}/konferenz/${schuelerId}/note`, {
+    halbjahr: HJ, fach_id: String(fachId), note: '',
+  });
+  assert.equal(r.status, 302);
+  stand = getDb().prepare('SELECT konferenz_note FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ?')
+    .get(fachId, HJ, schuelerId);
+  assert.equal(stand.konferenz_note, null);
+
+  html = await (await lehrerA(`/teacher/klassen/${klasseId}/uebersicht?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.doesNotMatch(html, /title="Konferenzentscheidung"/);
+});
+
 test.after(async () => {
   await fastify.close();
 });

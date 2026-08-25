@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -156,6 +156,13 @@ CREATE TABLE IF NOT EXISTS fach_sync_stand (
     note REAL,
     synced_at TEXT NOT NULL DEFAULT (datetime('now')),
     synced_by_id INTEGER REFERENCES users(id),
+    -- Von der Klassenleitung im Konferenzmodus überschriebene Note (z. B.
+    -- Entscheidung der Notenkonferenz) — bleibt bei einem erneuten Sync durch
+    -- die Fachlehrkraft erhalten (das UPSERT in noten-sync.js aktualisiert nur
+    -- note/synced_at/synced_by_id) und wird angezeigt, falls gesetzt.
+    konferenz_note REAL,
+    konferenz_note_von_id INTEGER REFERENCES users(id),
+    konferenz_note_am TEXT,
     UNIQUE (fach_id, halbjahr, schueler_id)
 );
 
@@ -301,6 +308,9 @@ function migrate(db) {
   ensureColumn(db, 'klassen', 'created_by_id', 'created_by_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'fach_zuweisungen', 'auto_sync', 'auto_sync INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'zwei_schulen', 'zwei_schulen INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'fach_sync_stand', 'konferenz_note', 'konferenz_note REAL');
+  ensureColumn(db, 'fach_sync_stand', 'konferenz_note_von_id', 'konferenz_note_von_id INTEGER REFERENCES users(id)');
+  ensureColumn(db, 'fach_sync_stand', 'konferenz_note_am', 'konferenz_note_am TEXT');
 }
 
 let _db = null;
