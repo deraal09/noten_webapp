@@ -204,7 +204,20 @@ test('Fach-Detail-Seite (SSR) rendert Notenübersicht mit denselben Werten', asy
   assert.match(html, /Adler/);
   assert.match(html, /Berger/);
   assert.match(html, /Klausuren/);
-  assert.match(html, /Unterrichtsleistungen/);
+  assert.match(html, /Unterrichtsleistung/);
+});
+
+test('Noteneingabe: drei Reiter (Notenübersicht/Unterrichtsleistung/Klausuren), Notenübersicht standardmäßig aktiv', async () => {
+  const r = await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`);
+  const html = await r.text();
+  assert.match(html, /data-target="panel-uebersicht"/);
+  assert.match(html, /data-target="panel-uls"/);
+  assert.match(html, /data-target="panel-klausuren"/);
+  // Der Notenübersicht-Reiter ist beim ersten Laden aktiv (Notentabelle +
+  // manuelle Noteneingabe direkt sichtbar), Klausuren/ULs erst nach Klick.
+  assert.match(html, /<div id="panel-uebersicht" class="reiter-panel active">/);
+  assert.match(html, /<div id="panel-klausuren" class="reiter-panel">/);
+  assert.match(html, /<div id="panel-uls" class="reiter-panel">/);
 });
 
 test('Punkte gesamt: erreichte/maximale Punktsumme wird bei Klausur und UL angezeigt (auch bei unvollständiger Eingabe)', async () => {

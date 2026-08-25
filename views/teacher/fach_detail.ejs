@@ -47,66 +47,69 @@
   <% }); %>
 </div>
 
-<h2>Notenübersicht</h2>
-<table class="data" id="uebersicht">
-  <thead>
-    <tr>
-      <th>Schüler/in</th>
-      <th>Mündliche Noten</th>
-      <th>Schriftliche Noten</th>
-      <th>Mündliche Note</th>
-      <th>Schriftliche Note</th>
-      <th>Gesamtnote</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% rows.forEach(function(r) { %>
-      <tr data-schueler="<%= r.schueler_id %>">
-        <td class="name"><%= r.nachname %>, <%= r.vorname %></td>
-        <td class="manuell-muendlich">
-          <% r.muendlich.forEach(function(n) { %>
-            <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
-              <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
-            </form>
-          <% }); %>
-        </td>
-        <td class="manuell-schriftlich">
-          <% r.schriftlich.forEach(function(n) { %>
-            <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
-              <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
-            </form>
-          <% }); %>
-        </td>
-        <td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td>
-        <td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td>
-        <td class="gesamt-cell"><%= r.gesamt === null ? '–' : formatNote(r.gesamt) %></td>
-      </tr>
-    <% }); %>
-  </tbody>
-</table>
-
-<details class="card">
-  <summary>+ Manuelle Note hinzufügen</summary>
-  <form method="post" action="/teacher/fach/<%= fach.id %>/noten/hinzufuegen" class="inline">
-    <select name="schueler_id" required>
-      <% schueler.forEach(function(s) { %><option value="<%= s.id %>"><%= s.nachname %>, <%= s.vorname %></option><% }); %>
-    </select>
-    <select name="typ" required>
-      <option value="muendlich">Mündlich</option>
-      <option value="schriftlich">Schriftlich</option>
-    </select>
-    <input type="number" name="wert" step="0.1" min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" required>
-    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-    <button type="submit">+ Note</button>
-  </form>
-</details>
-
 <div class="reiter">
-  <button type="button" data-target="panel-uls">Unterrichtsleistungen</button>
-  <button type="button" class="active" data-target="panel-klausuren">Klausuren</button>
+  <button type="button" class="active" data-target="panel-uebersicht">Notenübersicht</button>
+  <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
+  <button type="button" data-target="panel-klausuren">Klausuren</button>
 </div>
 
-<div id="panel-klausuren" class="reiter-panel active">
+<div id="panel-uebersicht" class="reiter-panel active">
+  <h2>Notenübersicht</h2>
+  <table class="data" id="uebersicht">
+    <thead>
+      <tr>
+        <th>Schüler/in</th>
+        <th>Mündliche Noten</th>
+        <th>Schriftliche Noten</th>
+        <th>Mündliche Note</th>
+        <th>Schriftliche Note</th>
+        <th>Gesamtnote</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(function(r) { %>
+        <tr data-schueler="<%= r.schueler_id %>">
+          <td class="name"><%= r.nachname %>, <%= r.vorname %></td>
+          <td class="manuell-muendlich">
+            <% r.muendlich.forEach(function(n) { %>
+              <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
+                <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
+              </form>
+            <% }); %>
+          </td>
+          <td class="manuell-schriftlich">
+            <% r.schriftlich.forEach(function(n) { %>
+              <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
+                <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
+              </form>
+            <% }); %>
+          </td>
+          <td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td>
+          <td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td>
+          <td class="gesamt-cell"><%= r.gesamt === null ? '–' : formatNote(r.gesamt) %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <details class="card">
+    <summary>+ Manuelle Note hinzufügen</summary>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/noten/hinzufuegen" class="inline">
+      <select name="schueler_id" required>
+        <% schueler.forEach(function(s) { %><option value="<%= s.id %>"><%= s.nachname %>, <%= s.vorname %></option><% }); %>
+      </select>
+      <select name="typ" required>
+        <option value="muendlich">Mündlich</option>
+        <option value="schriftlich">Schriftlich</option>
+      </select>
+      <input type="number" name="wert" step="0.1" min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" required>
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">+ Note</button>
+    </form>
+  </details>
+</div>
+
+<div id="panel-klausuren" class="reiter-panel">
   <details class="card">
     <summary>+ Klausur anlegen</summary>
     <form method="post" action="/teacher/fach/<%= fach.id %>/klausuren/neu">
