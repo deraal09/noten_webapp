@@ -102,8 +102,8 @@
 </details>
 
 <div class="reiter">
-  <button type="button" class="active" data-target="panel-klausuren">Klausuren</button>
   <button type="button" data-target="panel-uls">Unterrichtsleistungen</button>
+  <button type="button" class="active" data-target="panel-klausuren">Klausuren</button>
 </div>
 
 <div id="panel-klausuren" class="reiter-panel active">
@@ -265,15 +265,32 @@
 </div>
 
 <script>
-  // Reiter (Klausuren/ULs) umschalten
+  // Reiter (Klausuren/ULs) umschalten. Der gewählte Reiter wird pro Fach in
+  // localStorage gemerkt, damit er nach einem Seiten-Reload (z. B. nach dem
+  // Anlegen/Löschen einer Klausur oder UL, oder dem Speichern von
+  // Gewichtung/Max-Punkten — alles normale Form-POSTs mit vollem Reload)
+  // erhalten bleibt, statt immer wieder auf "Klausuren" zurückzuspringen.
+  const REITER_KEY = 'noteneingabe-reiter-<%= fach.id %>';
+  function setzeReiter(targetId) {
+    document.querySelectorAll('.reiter button').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.target === targetId);
+    });
+    document.querySelectorAll('.reiter-panel').forEach(function(p) {
+      p.classList.toggle('active', p.id === targetId);
+    });
+  }
   document.querySelectorAll('.reiter button').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      document.querySelectorAll('.reiter button').forEach(function(b) { b.classList.remove('active'); });
-      document.querySelectorAll('.reiter-panel').forEach(function(p) { p.classList.remove('active'); });
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.target).classList.add('active');
+      setzeReiter(btn.dataset.target);
+      try { localStorage.setItem(REITER_KEY, btn.dataset.target); } catch (e) { /* z. B. privater Modus */ }
     });
   });
+  try {
+    const gemerkterReiter = localStorage.getItem(REITER_KEY);
+    if (gemerkterReiter && document.getElementById(gemerkterReiter)) {
+      setzeReiter(gemerkterReiter);
+    }
+  } catch (e) { /* z. B. privater Modus */ }
 
   // Live-Update via JSON-API: aktualisiert Punkt-Noten UND die Notenübersicht oben
   const API_URL = '/teacher/fach/<%= fach.id %>/noten?hj=' + encodeURIComponent('<%= halbjahr %>');
