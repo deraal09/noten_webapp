@@ -196,6 +196,10 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .aufgabe-liste { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; vertical-align: middle; margin: 0.3rem 0; }
 .aufgabe-feld { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; margin: 0; font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
 .card .aufgabe-feld input[type=number] { width: 3rem; text-align: center; padding: 0.2rem; }
+/* Max-Punkte-Felder: keine Spinner-Pfeile, wie bei der Punkteingabe. */
+.aufgabe-feld input[type=number]::-webkit-outer-spin-button,
+.aufgabe-feld input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.aufgabe-feld input[type=number] { -moz-appearance: textfield; }
 
 /* Gewichtung/Max-Punkte je Klausur/UL: Gewichtung als eigene Zeile oben,
    Speichern-Button unten rechts unter den (schmalen) Punkte-Feldern. */
