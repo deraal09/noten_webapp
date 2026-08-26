@@ -1,0 +1,145 @@
+<h1>Sitzplan: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p><a href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a></p>
+
+<p class="hint">
+  Plätze frei auf dem Blatt anordnen (beliebige Raumform möglich) und Namen eintragen.
+  Der Entwurf ist zunächst nur für dich sichtbar und wird automatisch gespeichert — erst der Button
+  "An andere Lehrkräfte übertragen" gibt ihn für alle Lehrkräfte dieser Klasse frei.
+</p>
+
+<% if (geteilt) { %>
+  <div class="card">
+    <p>
+      Zuletzt an alle Lehrkräfte übertragen: <strong><%= formatZeitLokal(geteilt.geteilt_at) %></strong>
+      von <%= geteilt.display_name || geteilt.username || 'unbekannt' %>
+      (<%= geteilt.plaetze.length %> Plätze).
+    </p>
+    <details>
+      <summary>Geteilten Sitzplan anzeigen</summary>
+      <div class="sitzplan-blatt sitzplan-vorschau">
+        <% geteilt.plaetze.forEach(function(p) { %>
+          <div class="platz" style="left: <%= p.x %>%; top: <%= p.y %>%;"><%= p.text %></div>
+        <% }); %>
+      </div>
+    </details>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/sitzplan/uebernehmen" class="inline"
+          onsubmit="return confirm('Den geteilten Sitzplan als eigenen Entwurf übernehmen? Dein aktueller Entwurf wird dabei überschrieben.')">
+      <button type="submit">📥 Geteilten Sitzplan übernehmen</button>
+    </form>
+  </div>
+<% } else { %>
+  <p class="hint">Noch kein Sitzplan an andere Lehrkräfte dieser Klasse übertragen.</p>
+<% } %>
+
+<div class="card">
+  <button type="button" id="platz-hinzufuegen">+ Platz hinzufügen</button>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/sitzplan/uebertragen" class="inline"
+        onsubmit="return confirm('Diesen Sitzplan jetzt an alle Lehrkräfte dieser Klasse übertragen?')">
+    <button type="submit">📤 An andere Lehrkräfte übertragen</button>
+  </form>
+  <span id="speicher-status" class="hint"></span>
+</div>
+
+<div id="sitzplan-blatt" class="sitzplan-blatt"></div>
+
+<datalist id="schueler-liste">
+  <% schueler.forEach(function(s) { %>
+    <option value="<%= s.nachname %>, <%= s.vorname %>"></option>
+  <% }); %>
+</datalist>
+
+<script>
+(function() {
+  const blatt = document.getElementById('sitzplan-blatt');
+  const status = document.getElementById('speicher-status');
+  const SPEICHER_URL = '/teacher/klassen/<%= klasse.id %>/sitzplan/speichern';
+  let plaetze = <%- JSON.stringify(plaetze) %>;
+  let naechsteId = plaetze.length;
+
+  function debounce(fn, ms) { let t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+  async function speichern() {
+    status.textContent = 'speichert …';
+    const body = new URLSearchParams();
+    body.append('plaetze', JSON.stringify(plaetze));
+    try {
+      const r = await fetch(SPEICHER_URL, { method: 'POST', body });
+      status.textContent = r.ok ? 'gespeichert ✓' : 'Fehler beim Speichern';
+    } catch (e) {
+      status.textContent = 'Fehler beim Speichern';
+    }
+  }
+  const speichernVerzoegert = debounce(speichern, 500);
+
+  function render() {
+    blatt.innerHTML = '';
+    plaetze.forEach(function(p) {
+      const el = document.createElement('div');
+      el.className = 'platz';
+      el.style.left = p.x + '%';
+      el.style.top = p.y + '%';
+      el.dataset.id = p.id;
+
+      const griff = document.createElement('span');
+      griff.className = 'platz-griff';
+      griff.title = 'Verschieben';
+      griff.textContent = '⠿';
+
+      const entfernen = document.createElement('button');
+      entfernen.type = 'button';
+      entfernen.className = 'platz-loeschen';
+      entfernen.title = 'Entfernen';
+      entfernen.textContent = '×';
+      entfernen.addEventListener('click', function() {
+        plaetze = plaetze.filter(function(x) { return x.id !== p.id; });
+        render();
+        speichernVerzoegert();
+      });
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'platz-name';
+      input.setAttribute('list', 'schueler-liste');
+      input.placeholder = 'Name';
+      input.value = p.text;
+      input.addEventListener('input', function() {
+        p.text = input.value;
+        speichernVerzoegert();
+      });
+
+      griff.addEventListener('pointerdown', function(ev) {
+        ev.preventDefault();
+        const rect = blatt.getBoundingClientRect();
+        function aufBewegen(mv) {
+          const x = ((mv.clientX - rect.left) / rect.width) * 100;
+          const y = ((mv.clientY - rect.top) / rect.height) * 100;
+          p.x = Math.min(94, Math.max(0, x));
+          p.y = Math.min(90, Math.max(0, y));
+          el.style.left = p.x + '%';
+          el.style.top = p.y + '%';
+        }
+        function aufLoslassen() {
+          document.removeEventListener('pointermove', aufBewegen);
+          document.removeEventListener('pointerup', aufLoslassen);
+          speichernVerzoegert();
+        }
+        document.addEventListener('pointermove', aufBewegen);
+        document.addEventListener('pointerup', aufLoslassen);
+      });
+
+      el.appendChild(griff);
+      el.appendChild(input);
+      el.appendChild(entfernen);
+      blatt.appendChild(el);
+    });
+  }
+
+  document.getElementById('platz-hinzufuegen').addEventListener('click', function() {
+    plaetze.push({ id: 'p' + (naechsteId++) + '-' + Date.now(), x: 4, y: 4, text: '' });
+    render();
+    speichernVerzoegert();
+  });
+
+  render();
+})();
+</script>

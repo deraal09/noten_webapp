@@ -1,6 +1,7 @@
 <h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
 <p>
   <a href="/teacher/klassen">← Meine Klassen</a>
+  · <a href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a>
   <% if (kannExportieren) { %>
     · <a href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
   <% } %>

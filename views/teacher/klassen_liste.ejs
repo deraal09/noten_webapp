@@ -82,13 +82,14 @@
   <p>Noch keine Klassen — leg oben eine an oder warte auf eine Zuweisung.</p>
 <% } else { %>
   <table class="data">
-    <thead><tr><th>Name</th><th>Schuljahr</th><th>Notenschlüssel</th></tr></thead>
+    <thead><tr><th>Name</th><th>Schuljahr</th><th>Notenschlüssel</th><th></th></tr></thead>
     <tbody>
       <% klassen.forEach(function(k) { %>
         <tr>
           <td><a href="/teacher/klassen/<%= k.id %>"><%= k.name %></a></td>
           <td><%= k.schuljahr_bezeichnung %></td>
           <td><%= k.notenschluessel %></td>
+          <td><a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a></td>
         </tr>
       <% }); %>
     </tbody>

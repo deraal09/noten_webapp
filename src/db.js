@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -259,6 +259,29 @@ CREATE TABLE IF NOT EXISTS notenbesprechung_notizen (
     text TEXT NOT NULL,
     created_by_id INTEGER REFERENCES users(id),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Sitzplan: freie Anordnung auf einem "Blatt" (x/y in Prozent, damit
+-- beliebige Raumformen abgebildet werden können, statt eines starren
+-- Raster-Layouts). Jede Lehrkraft mit Klassenzugriff hat einen eigenen,
+-- privaten Entwurf je Klasse — erst per Knopfdruck (Übertragen) wird er in
+-- sitzplan_geteilt kopiert und damit für andere Lehrkräfte der Klasse
+-- sichtbar (gleiches Prinzip wie der Noten-Sync: kein automatisches Teilen).
+CREATE TABLE IF NOT EXISTS sitzplaene (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
+    owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plaetze TEXT NOT NULL DEFAULT '[]', -- JSON-Array: [{id, x, y, text}]
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (klasse_id, owner_id)
+);
+
+-- Der zuletzt an alle Lehrkräfte der Klasse übertragene Sitzplan-Stand.
+CREATE TABLE IF NOT EXISTS sitzplan_geteilt (
+    klasse_id INTEGER PRIMARY KEY REFERENCES klassen(id) ON DELETE CASCADE,
+    plaetze TEXT NOT NULL DEFAULT '[]',
+    geteilt_von_id INTEGER REFERENCES users(id),
+    geteilt_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS schema_meta (
