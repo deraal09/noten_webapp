@@ -43,8 +43,8 @@
 <div id="sitzplan-blatt" class="sitzplan-blatt"></div>
 
 <datalist id="schueler-liste">
-  <% schueler.forEach(function(s) { %>
-    <option value="<%= s.vorname %>"></option>
+  <% namensvorschlaege.forEach(function(v) { %>
+    <option value="<%= v.label %>"></option>
   <% }); %>
 </datalist>
 
@@ -58,9 +58,22 @@
 
   function debounce(fn, ms) { let t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
-  // Kasten passt sich der Namenslänge an, statt einer festen Breite.
+  // Kasten passt sich der Namenslänge an: die tatsächliche Textbreite wird
+  // mit einem unsichtbaren Mess-Span in derselben Schrift gemessen (ch-Werte
+  // sind zu ungenau, besonders bei breiten Zeichen wie Ä/Ö/Ü/W/M).
+  const messSpan = document.createElement('span');
+  messSpan.style.position = 'absolute';
+  messSpan.style.visibility = 'hidden';
+  messSpan.style.whiteSpace = 'pre';
+  messSpan.style.left = '-9999px';
+  document.body.appendChild(messSpan);
+
   function groesseAnpassen(input) {
-    input.style.width = Math.max(3, input.value.length + 1) + 'ch';
+    const text = input.value || input.placeholder || '';
+    const stil = window.getComputedStyle(input);
+    messSpan.style.font = stil.font;
+    messSpan.textContent = text;
+    input.style.width = Math.max(30, messSpan.offsetWidth + 16) + 'px';
   }
 
   async function speichern() {

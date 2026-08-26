@@ -255,7 +255,7 @@ table.fz input[type=text] { width: 100%; min-width: 100px; }
 }
 .platz-griff { cursor: grab; color: var(--text-muted); user-select: none; touch-action: none; }
 .platz-griff:active { cursor: grabbing; }
-.platz-name { flex: none; min-width: 3ch; border: none; background: transparent; color: var(--text); padding: 0.2rem; font: inherit; }
+.platz-name { flex: none; min-width: 30px; border: none; background: transparent; color: var(--text); padding: 0.2rem; font: inherit; }
 .platz-name:focus { outline: 1px solid var(--accent); border-radius: 3px; }
 .platz-loeschen { background: transparent; color: var(--text-muted); padding: 0 0.2rem; line-height: 1; }
 .platz-loeschen:hover { background: var(--danger); color: var(--on-dark); border-radius: 3px; }

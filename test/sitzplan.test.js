@@ -205,6 +205,14 @@ test('Übernehmen: geteilten Sitzplan als eigenen Entwurf übernehmen überschre
   assert.deepEqual(JSON.parse(eigener.plaetze), JSON.parse(geteilt.plaetze));
 });
 
+test('Autocomplete: doppelter Vorname bekommt Nachname-Anfangsbuchstaben statt nur dem Vornamen', async () => {
+  await form(lehrerA, `/teacher/klassen/${klasseId}/schueler/neu`, { nachname: 'Berger', vorname: 'Anna' });
+  const html = await (await lehrerA(`/teacher/klassen/${klasseId}/sitzplan`)).text();
+  assert.doesNotMatch(html, /<option value="Anna">/, 'bei einer Dopplung darf der reine Vorname nicht mehr allein vorgeschlagen werden');
+  assert.match(html, /<option value="Anna A\.">/);
+  assert.match(html, /<option value="Anna B\.">/);
+});
+
 test.after(async () => {
   await fastify.close();
 });

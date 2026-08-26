@@ -8,6 +8,7 @@
 
 import { getDb } from '../db.js';
 import { requireAuth, userHatKlassenZugriff } from '../auth.js';
+import { sitzplanNamensvorschlaege } from '../sitzplan-namen.js';
 
 const MAX_PLAETZE = 200;
 const MAX_TEXT_LAENGE = 60;
@@ -63,7 +64,8 @@ export default async function sitzplanRoutes(fastify) {
       WHERE g.klasse_id = ?
     `).get(klasse.id);
     return reply.viewEjs('teacher/sitzplan.ejs', {
-      user: request.user, klasse, schueler,
+      user: request.user, klasse,
+      namensvorschlaege: sitzplanNamensvorschlaege(schueler),
       plaetze: eigener ? JSON.parse(eigener.plaetze) : [],
       geteilt: geteilt ? { ...geteilt, plaetze: JSON.parse(geteilt.plaetze) } : null,
     });
