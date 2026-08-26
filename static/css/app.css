@@ -240,8 +240,10 @@ table.fz input[type=text] { width: 100%; min-width: 100px; }
 }
 .platz {
   position: absolute;
-  width: 92px;
-  min-height: 60px;
+  width: max-content;
+  min-width: 2.5rem;
+  max-width: 220px;
+  min-height: 40px;
   background: var(--bg-tint-2);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -253,7 +255,7 @@ table.fz input[type=text] { width: 100%; min-width: 100px; }
 }
 .platz-griff { cursor: grab; color: var(--text-muted); user-select: none; touch-action: none; }
 .platz-griff:active { cursor: grabbing; }
-.platz-name { flex: 1; min-width: 0; width: auto; border: none; background: transparent; color: var(--text); padding: 0.2rem; font: inherit; }
+.platz-name { flex: none; min-width: 3ch; border: none; background: transparent; color: var(--text); padding: 0.2rem; font: inherit; }
 .platz-name:focus { outline: 1px solid var(--accent); border-radius: 3px; }
 .platz-loeschen { background: transparent; color: var(--text-muted); padding: 0 0.2rem; line-height: 1; }
 .platz-loeschen:hover { background: var(--danger); color: var(--on-dark); border-radius: 3px; }

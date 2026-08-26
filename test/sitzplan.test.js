@@ -89,7 +89,7 @@ test('Zugriffsschutz: nur Lehrkräfte mit Klassenzugriff sehen/bearbeiten den Si
   assert.equal(r.status, 200);
   const html = await r.text();
   assert.match(html, /Sitzplan/);
-  assert.match(html, /Adler, Anna/); // im Autocomplete-Datalist
+  assert.match(html, /<option value="Anna">/); // im Autocomplete-Datalist (nur Vorname)
 
   r = await lehrerB(`/teacher/klassen/${klasseId}/sitzplan/speichern`, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },

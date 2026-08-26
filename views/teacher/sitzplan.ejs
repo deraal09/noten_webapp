@@ -44,7 +44,7 @@
 
 <datalist id="schueler-liste">
   <% schueler.forEach(function(s) { %>
-    <option value="<%= s.nachname %>, <%= s.vorname %>"></option>
+    <option value="<%= s.vorname %>"></option>
   <% }); %>
 </datalist>
 
@@ -57,6 +57,11 @@
   let naechsteId = plaetze.length;
 
   function debounce(fn, ms) { let t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+  // Kasten passt sich der Namenslänge an, statt einer festen Breite.
+  function groesseAnpassen(input) {
+    input.style.width = Math.max(3, input.value.length + 1) + 'ch';
+  }
 
   async function speichern() {
     status.textContent = 'speichert …';
@@ -102,8 +107,10 @@
       input.setAttribute('list', 'schueler-liste');
       input.placeholder = 'Name';
       input.value = p.text;
+      groesseAnpassen(input);
       input.addEventListener('input', function() {
         p.text = input.value;
+        groesseAnpassen(input);
         speichernVerzoegert();
       });
 
