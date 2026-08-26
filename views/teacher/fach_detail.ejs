@@ -1,6 +1,7 @@
 <h1><%= fach.name %> – <%= fach.klasse_name %> <small>(<%= fach.schuljahr_bezeichnung %>, <%= fach.notenschluessel %>)</small></h1>
 <p>
   <a href="/teacher">← Meine Noteneingabe</a>
+  · <a href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
   <% if (schueler.length) { %>
     · <a href="/teacher/fach/<%= fach.id %>/besprechung/<%= schueler[0].id %>?hj=<%= encodeURIComponent(halbjahr) %>">🗣 Notenbesprechung starten</a>
   <% } %>
