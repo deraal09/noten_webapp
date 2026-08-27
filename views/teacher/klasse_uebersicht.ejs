@@ -36,6 +36,7 @@
           </th>
         <% }); %>
         <th>Ø Notenschnitt</th>
+        <th>Status</th>
         <th>Notizen</th>
         <th>Konferenz</th>
       </tr>
@@ -51,6 +52,17 @@
             </td>
           <% }); %>
           <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+          <td>
+            <% var sperre = sperren.get(z.schueler.id); %>
+            <% if (sperre) { %>
+              🔒 gesperrt
+              <% if (sperre.aufhebung_angefragt) { %>
+                <br><small class="hint" title="<%= sperre.aufhebung_grund || '' %>">
+                  Entsperrung angefragt von <%= sperre.angefragt_von_name || sperre.angefragt_von_username || '—' %>
+                </small>
+              <% } %>
+            <% } else { %>—<% } %>
+          </td>
           <td>
             <% if (!z.notizen.length) { %>
               —

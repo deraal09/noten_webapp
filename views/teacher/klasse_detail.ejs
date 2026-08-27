@@ -16,7 +16,39 @@
   <p class="flash flash-info">
     Du bist Klassenleitung dieser Klasse.
     <a href="/teacher/klassen/<%= klasse.id %>/uebersicht">→ Halbjahresübersicht (synchronisierte Noten, Notenschnitt)</a>
+    · <a href="/teacher/klassen/<%= klasse.id %>/abschluss">→ Abschluss-/Abgangsübersicht</a>
   </p>
+
+  <details class="card">
+    <summary>Klasse ins nächste Schuljahr übertragen</summary>
+    <% if (!andereSchuljahre.length) { %>
+      <p class="hint">Es gibt noch kein weiteres Schuljahr — bitte den Admin bitten, zuerst eins anzulegen.</p>
+    <% } else { %>
+      <p class="hint">
+        Legt eine neue Klasse im gewählten Schuljahr an und übernimmt die Schüler/innen (als neue
+        Datensätze — diese Klasse mit ihren Noten bleibt unverändert erhalten). Optional werden auch
+        die Fächer samt zugeordneten Lehrkräften übernommen (ohne Klausuren/ULs/Noten — die neuen
+        Fächer starten leer).
+      </p>
+      <form method="post" action="/teacher/klassen/<%= klasse.id %>/naechstes-schuljahr">
+        <label>Ziel-Schuljahr
+          <select name="ziel_schuljahr_id" required>
+            <% andereSchuljahre.forEach(function(sj) { %>
+              <option value="<%= sj.id %>"><%= sj.bezeichnung %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Name der neuen Klasse
+          <input type="text" name="neuer_name" value="<%= klasse.name %>" required>
+        </label>
+        <label>
+          <input type="checkbox" name="mit_faechern" value="1" checked>
+          Fächer (mit Lehrkraft-Zuordnung) übernehmen
+        </label>
+        <button type="submit">→ Übertragen</button>
+      </form>
+    <% } %>
+  </details>
 <% } else if (kannSelbstAlsKlassenlehrerEintragen) { %>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenlehrer/eintragen" class="inline">
     <button type="submit">Als Klassenleitung eintragen (alle Noten der Klasse sehen, Fächer zuordnen)</button>

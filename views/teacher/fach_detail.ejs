@@ -42,6 +42,31 @@
   </script>
 </div>
 
+<% if (darfFachAbschliessen) { %>
+  <div class="card">
+    <% if (fach.abgeschlossen) { %>
+      <p>
+        ✅ Fach abgeschlossen am <strong><%= formatZeitLokal(fach.abgeschlossen_am) %></strong> —
+        die Fachabschlussnote (Mittelwert aus allen Halbjahren, siehe Notenübersicht) ist eingefroren.
+      </p>
+      <form method="post" action="/teacher/fach/<%= fach.id %>/oeffnen" class="inline"
+            onsubmit="return confirm('Fach wieder öffnen? Die Fachabschlussnote bleibt bis zum nächsten Abschließen unverändert sichtbar.')">
+        <button type="submit">🔓 Fach wieder öffnen</button>
+      </form>
+    <% } else { %>
+      <p class="hint">
+        Optional: Manche Fächer laufen über mehrere Schuljahre und werden nie abgeschlossen. Beim
+        Abschließen wird je Schüler/in eine Fachabschlussnote aus allen vorhandenen Halbjahren
+        (aktuelle + historische, siehe unten) berechnet.
+      </p>
+      <form method="post" action="/teacher/fach/<%= fach.id %>/abschliessen" class="inline"
+            onsubmit="return confirm('Fach abschließen? Für jede Schülerin/jeden Schüler wird eine Fachabschlussnote aus allen Halbjahren berechnet.')">
+        <button type="submit">✅ Fach abschließen</button>
+      </form>
+    <% } %>
+  </div>
+<% } %>
+
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
     <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
@@ -65,30 +90,59 @@
         <th>Mündliche Note</th>
         <th>Schriftliche Note</th>
         <th>Gesamtnote</th>
+        <% if (fach.abgeschlossen) { %><th>Abschlussnote</th><% } %>
       </tr>
     </thead>
     <tbody>
-      <% rows.forEach(function(r) { %>
+      <% rows.forEach(function(r) {
+           var sperre = sperren.get(r.schueler_id); %>
         <tr data-schueler="<%= r.schueler_id %>">
-          <td class="name"><%= r.nachname %>, <%= r.vorname %></td>
+          <td class="name">
+            <%= r.nachname %>, <%= r.vorname %>
+            <% if (sperre) { %><span title="Noten für dieses Halbjahr gesperrt (Notenkonferenz)">🔒</span><% } %>
+          </td>
           <td class="manuell-muendlich">
             <% r.muendlich.forEach(function(n) { %>
-              <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
-                <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
-              </form>
+              <% if (sperre) { %>
+                <span class="tag" title="gesperrt"><%= Number(n.wert).toString().replace('.', ',') %></span>
+              <% } else { %>
+                <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
+                  <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
+                </form>
+              <% } %>
             <% }); %>
           </td>
           <td class="manuell-schriftlich">
             <% r.schriftlich.forEach(function(n) { %>
-              <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
-                <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
-              </form>
+              <% if (sperre) { %>
+                <span class="tag" title="gesperrt"><%= Number(n.wert).toString().replace('.', ',') %></span>
+              <% } else { %>
+                <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
+                  <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
+                </form>
+              <% } %>
             <% }); %>
           </td>
           <td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td>
           <td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td>
           <td class="gesamt-cell"><%= r.gesamt === null ? '–' : formatNote(r.gesamt) %></td>
+          <% if (fach.abgeschlossen) { %>
+            <td class="note-cell"><% var an = abschlussnoten.get(r.schueler_id); %><%= (an === null || an === undefined) ? '–' : formatNote(an) %></td>
+          <% } %>
         </tr>
+        <% if (sperre && !sperre.aufhebung_angefragt) { %>
+          <tr>
+            <td colspan="<%= fach.abgeschlossen ? 7 : 6 %>">
+              <form method="post" action="/teacher/fach/<%= fach.id %>/sperre/<%= r.schueler_id %>/anfragen" class="inline">
+                <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+                <input type="text" name="grund" placeholder="Grund (optional)" size="30">
+                <button type="submit">🔓 Entsperrung anfragen</button>
+              </form>
+            </td>
+          </tr>
+        <% } else if (sperre) { %>
+          <tr><td colspan="<%= fach.abgeschlossen ? 7 : 6 %>"><small class="hint">⏳ Entsperrung bereits angefragt.</small></td></tr>
+        <% } %>
       <% }); %>
     </tbody>
   </table>
@@ -97,7 +151,9 @@
     <summary>+ Manuelle Note hinzufügen</summary>
     <form method="post" action="/teacher/fach/<%= fach.id %>/noten/hinzufuegen" class="inline">
       <select name="schueler_id" required>
-        <% schueler.forEach(function(s) { %><option value="<%= s.id %>"><%= s.nachname %>, <%= s.vorname %></option><% }); %>
+        <% schueler.filter(function(s) { return !sperren.get(s.id); }).forEach(function(s) { %>
+          <option value="<%= s.id %>"><%= s.nachname %>, <%= s.vorname %></option>
+        <% }); %>
       </select>
       <select name="typ" required>
         <option value="muendlich">Mündlich</option>
@@ -107,6 +163,47 @@
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       <button type="submit">+ Note</button>
     </form>
+  </details>
+
+  <details class="card">
+    <summary>Historische Halbjahre <small>(Noten von vor Einführung der App)</small></summary>
+    <% if (!historischeHalbjahre.length) { %>
+      <p class="hint">Noch keine historischen Halbjahre hinterlegt.</p>
+    <% } %>
+    <% historischeHalbjahre.forEach(function(hh) { %>
+      <details class="card" open>
+        <summary><%= hh.bezeichnung %></summary>
+        <% if (darfHistorieAnlegen) { %>
+          <form method="post" action="/teacher/historie/<%= hh.id %>/loeschen" class="inline right" onsubmit="return confirm('Historisches Halbjahr entfernen?')">
+            <button type="submit" class="danger">🗑</button>
+          </form>
+        <% } %>
+        <form method="post" action="/teacher/historie/<%= hh.id %>/speichern">
+          <table class="data">
+            <thead><tr><th>Schüler/in</th><th>Note</th></tr></thead>
+            <tbody>
+              <% schueler.forEach(function(s) { %>
+                <tr>
+                  <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
+                  <td>
+                    <input type="number" name="note_<%= s.id %>" step="0.1"
+                           min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>"
+                           value="<%= hh.noten.get(s.id) === undefined ? '' : hh.noten.get(s.id) %>">
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+          <button type="submit">💾 Speichern</button>
+        </form>
+      </details>
+    <% }); %>
+    <% if (darfHistorieAnlegen) { %>
+      <form method="post" action="/teacher/fach/<%= fach.id %>/historie/neu" class="inline">
+        <input type="text" name="bezeichnung" placeholder="z. B. 1. Halbjahr 2022/23" required>
+        <button type="submit">+ Vergangenes Halbjahr hinzufügen</button>
+      </form>
+    <% } %>
   </details>
 </div>
 
@@ -172,12 +269,13 @@
         <tbody>
           <% rows.forEach(function(r) {
                var eintrag = r.klausuren.find(function(x) { return x.id === k.id; });
-               var summe = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0; %>
+               var summe = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
+               var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
             <tr>
-              <td class="name"><%= r.nachname %>, <%= r.vorname %></td>
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
-                <td><input type="number" class="punkt" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–"></td>
+                <td><input type="number" class="punkt" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
               <% }); %>
               <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe %> / <%= maxSumme %></td>
               <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
@@ -251,12 +349,13 @@
         <tbody>
           <% rows.forEach(function(r) {
                var eintrag = r.uls.find(function(x) { return x.id === u.id; });
-               var summeUl = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0; %>
+               var summeUl = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
+               var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
             <tr>
-              <td class="name"><%= r.nachname %>, <%= r.vorname %></td>
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
-                <td><input type="number" class="punkt" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–"></td>
+                <td><input type="number" class="punkt" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
               <% }); %>
               <td class="note-cell u-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>" data-max="<%= maxSummeUl %>"><%= summeUl %> / <%= maxSummeUl %></td>
               <td class="note-cell u-note" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>

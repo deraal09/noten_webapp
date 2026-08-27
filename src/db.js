@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -87,7 +87,70 @@ CREATE TABLE IF NOT EXISTS faecher (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
+    -- Optional: manche Fächer laufen über mehrere Schuljahre und werden nie
+    -- "abgeschlossen" — daher bewusst kein Pflichtfeld. Ist es gesetzt, ist
+    -- die Fachabschlussnote je Schüler/in in fach_abschlussnoten eingefroren
+    -- (siehe src/fach-abschluss.js) und wird nicht mehr live neu berechnet.
+    abgeschlossen INTEGER NOT NULL DEFAULT 0,
+    abgeschlossen_am TEXT,
+    abgeschlossen_von_id INTEGER REFERENCES users(id),
     UNIQUE (klasse_id, name)
+);
+
+-- Eingefrorene Fachabschlussnote je Schüler/in (Mittelwert aus allen
+-- vorhandenen Halbjahren dieses Fachs — aktuelle 1./2. Halbjahr UND
+-- historische, siehe historische_halbjahre). Wird beim "Fach abschließen"
+-- (neu) berechnet und beim "wieder öffnen" NICHT gelöscht (nur der
+-- abgeschlossen-Status auf faecher), damit ein erneutes Abschließen die
+-- Werte einfach überschreibt.
+CREATE TABLE IF NOT EXISTS fach_abschlussnoten (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    note REAL,
+    UNIQUE (fach_id, schueler_id)
+);
+
+-- Historische Halbjahre eines Fachs: für Noten aus der Zeit vor Einführung
+-- dieser App (oder von einer anderen Schule) — nur eine freie Bezeichnung
+-- und je Schüler/in eine manuell eingetragene Endnote, keine
+-- Klausuren/ULs. Von der Klassenleitung angelegt, von den dem Fach
+-- zugewiesenen Lehrkräften kontrollierbar/korrigierbar (siehe
+-- historische_noten, gleiche Berechtigung wie die Notentafel).
+CREATE TABLE IF NOT EXISTS historische_halbjahre (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    bezeichnung TEXT NOT NULL,
+    reihenfolge INTEGER NOT NULL DEFAULT 0,
+    erstellt_von_id INTEGER REFERENCES users(id),
+    erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS historische_noten (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    historisches_halbjahr_id INTEGER NOT NULL REFERENCES historische_halbjahre(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    note REAL,
+    UNIQUE (historisches_halbjahr_id, schueler_id)
+);
+
+-- Notensperre: nach der Notenkonferenz kann die Klassenleitung die Noten
+-- einer/eines Schüler:in klassenweit für ein Halbjahr sperren — betroffene
+-- Fachlehrkräfte können dann keine Punkte/Noten mehr für diese Person
+-- eintragen (siehe Durchsetzung in routes/teacher.js), können aber eine
+-- Aufhebung anfragen statt selbst zu entsperren.
+CREATE TABLE IF NOT EXISTS notensperren (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    gesperrt_von_id INTEGER REFERENCES users(id),
+    gesperrt_am TEXT NOT NULL DEFAULT (datetime('now')),
+    aufhebung_angefragt INTEGER NOT NULL DEFAULT 0,
+    aufhebung_angefragt_von_id INTEGER REFERENCES users(id),
+    aufhebung_angefragt_am TEXT,
+    aufhebung_grund TEXT,
+    UNIQUE (klasse_id, schueler_id, halbjahr)
 );
 
 CREATE TABLE IF NOT EXISTS fach_zuweisungen (
@@ -334,6 +397,9 @@ function migrate(db) {
   ensureColumn(db, 'fach_sync_stand', 'konferenz_note', 'konferenz_note REAL');
   ensureColumn(db, 'fach_sync_stand', 'konferenz_note_von_id', 'konferenz_note_von_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'fach_sync_stand', 'konferenz_note_am', 'konferenz_note_am TEXT');
+  ensureColumn(db, 'faecher', 'abgeschlossen', 'abgeschlossen INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'faecher', 'abgeschlossen_am', 'abgeschlossen_am TEXT');
+  ensureColumn(db, 'faecher', 'abgeschlossen_von_id', 'abgeschlossen_von_id INTEGER REFERENCES users(id)');
 }
 
 let _db = null;

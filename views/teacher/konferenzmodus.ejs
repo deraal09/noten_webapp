@@ -22,6 +22,34 @@
   <% } %>
 </div>
 
+<div class="card">
+  <% if (sperre) { %>
+    <p>
+      🔒 Noten für dieses Halbjahr <strong>gesperrt</strong> seit <%= formatZeitLokal(sperre.gesperrt_am) %>
+      von <%= sperre.gesperrt_von_name || sperre.gesperrt_von_username || 'unbekannt' %>.
+      Fachlehrkräfte können keine Punkte/Noten mehr für diese Person eintragen.
+    </p>
+    <% if (sperre.aufhebung_angefragt) { %>
+      <p class="flash flash-info">
+        Entsperrung angefragt von <%= sperre.angefragt_von_name || sperre.angefragt_von_username || '—' %>
+        am <%= formatZeitLokal(sperre.aufhebung_angefragt_am) %>
+        <% if (sperre.aufhebung_grund) { %>: „<%= sperre.aufhebung_grund %>"<% } %>
+      </p>
+    <% } %>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/konferenz/<%= schueler.id %>/entsperren" class="inline">
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">🔓 Entsperren</button>
+    </form>
+  <% } else { %>
+    <p>Noten für dieses Halbjahr sind nicht gesperrt.</p>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/konferenz/<%= schueler.id %>/sperren" class="inline"
+          onsubmit="return confirm('Noten dieser Person für dieses Halbjahr sperren? Fachlehrkräfte können danach keine Änderungen mehr vornehmen (nur eine Aufhebung anfragen).')">
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">🔒 Noten sperren</button>
+    </form>
+  <% } %>
+</div>
+
 <h2>Noten <%= halbjahr %> <small>Ø <%= schnitt === null ? '–' : formatNote(schnitt) %></small></h2>
 <p class="hint">
   Gezeigt wird der zuletzt synchronisierte Stand je Fach. Eine Konferenznote überschreibt diesen

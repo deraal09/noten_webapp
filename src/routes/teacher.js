@@ -11,6 +11,18 @@ import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_C
 import { starteVerknuepfung, beantworteVerknuepfung } from '../klassen-verknuepfung.js';
 import { ladeFachMitUmfeld, ladeNotenuebersicht } from '../noten-service.js';
 import { syncFach, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
+import {
+  ladeHistorischeHalbjahre, ladeHistorischeNoten, ladeAbschlussnoten, schliesseFachAb, oeffneFach,
+} from '../fach-abschluss.js';
+import {
+  istSchuelerGesperrtInFach, sperren, entsperren, aufhebungAnfragen, ladeSperrenFuerKlasse, holeSperre,
+} from '../noten-sperre.js';
+import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
+
+/** Fach-assignierte Lehrkraft ODER Klassenleitung darf die Notentafel/Historie eines Fachs bearbeiten. */
+function userDarfFachBearbeiten(user, fach) {
+  return userHatFachZgriff(user, fach.id) || userIstKlassenlehrer(user, fach.klasse_id);
+}
 
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -63,11 +75,19 @@ export default async function teacherRoutes(fastify) {
     const zuweisung = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?')
       .get(fach.id, request.user.id);
     const syncMeta = holeSyncMeta(fach.id, halbjahr);
+    const historischeHalbjahre = ladeHistorischeHalbjahre(fach.id).map((hh) => ({
+      ...hh, noten: ladeHistorischeNoten(hh.id),
+    }));
+    const abschlussnoten = fach.abgeschlossen ? ladeAbschlussnoten(fach.id) : new Map();
+    const sperren = ladeSperrenFuerKlasse(fach.klasse_id, halbjahr);
     return reply.viewEjs('teacher/fach_detail.ejs', {
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
+      historischeHalbjahre, abschlussnoten, sperren,
+      darfFachAbschliessen: userDarfFachBearbeiten(request.user, fach),
+      darfHistorieAnlegen: userIstKlassenlehrer(request.user, fach.klasse_id),
     });
   });
 
@@ -214,6 +234,9 @@ export default async function teacherRoutes(fastify) {
     if (!Number.isFinite(schuelerId) || !Number.isFinite(idx) || idx < 0 || idx >= maxArr.length) {
       return reply.code(400).send({ ok: false, error: 'bad params' });
     }
+    if (istSchuelerGesperrtInFach(k.fach_id, schuelerId, k.halbjahr)) {
+      return reply.code(403).send({ ok: false, error: 'gesperrt' });
+    }
     let wert = null;
     if (request.body?.wert !== '' && request.body?.wert !== null && request.body?.wert !== undefined) {
       wert = Number(request.body.wert);
@@ -312,6 +335,9 @@ export default async function teacherRoutes(fastify) {
     if (!Number.isFinite(schuelerId) || !Number.isFinite(idx) || idx < 0 || idx >= maxArr.length) {
       return reply.code(400).send({ ok: false, error: 'bad params' });
     }
+    if (istSchuelerGesperrtInFach(u.fach_id, schuelerId, u.halbjahr)) {
+      return reply.code(403).send({ ok: false, error: 'gesperrt' });
+    }
     let wert = null;
     if (request.body?.wert !== '' && request.body?.wert !== null && request.body?.wert !== undefined) {
       wert = Number(request.body.wert);
@@ -358,6 +384,10 @@ export default async function teacherRoutes(fastify) {
       request.flash?.('error', `Note außerhalb des Bereichs ${min}–${max}.`);
       return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
     }
+    if (istSchuelerGesperrtInFach(request.params.id, schuelerId, halbjahr)) {
+      request.flash?.('error', 'Die Noten dieser Person sind für dieses Halbjahr gesperrt (Notenkonferenz).');
+      return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
+    }
     const pos = getDb().prepare(
       'SELECT COUNT(*) AS c FROM noten WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ? AND typ = ?'
     ).get(request.params.id, halbjahr, schuelerId, typ).c;
@@ -369,12 +399,139 @@ export default async function teacherRoutes(fastify) {
   });
 
   fastify.post('/noten/:id/loeschen', async (request, reply) => {
-    const n = getDb().prepare('SELECT fach_id, halbjahr FROM noten WHERE id = ?').get(request.params.id);
+    const n = getDb().prepare('SELECT fach_id, halbjahr, schueler_id FROM noten WHERE id = ?').get(request.params.id);
     if (!n) return reply.redirect('/teacher');
     if (!userHatFachZgriff(request.user, n.fach_id)) return reply.code(403).send({ error: 'forbidden' });
+    if (istSchuelerGesperrtInFach(n.fach_id, n.schueler_id, n.halbjahr)) {
+      request.flash?.('error', 'Die Noten dieser Person sind für dieses Halbjahr gesperrt (Notenkonferenz).');
+      return reply.redirect(`/teacher/fach/${n.fach_id}?hj=${encodeURIComponent(n.halbjahr)}`);
+    }
     getDb().prepare('DELETE FROM noten WHERE id = ?').run(request.params.id);
     syncFallsAutoAktiv(n.fach_id, n.halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${n.fach_id}?hj=${encodeURIComponent(n.halbjahr)}`);
+  });
+
+  // ---------- Fachabschluss (optional — manche Fächer laufen über mehrere Schuljahre) ----------
+  fastify.post('/fach/:id/abschliessen', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userDarfFachBearbeiten(request.user, fach)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    schliesseFachAb(fach.id, request.user.id);
+    request.flash?.('success', 'Fach abgeschlossen — Fachabschlussnoten berechnet.');
+    return reply.redirect(`/teacher/fach/${fach.id}`);
+  });
+
+  fastify.post('/fach/:id/oeffnen', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userDarfFachBearbeiten(request.user, fach)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    oeffneFach(fach.id);
+    request.flash?.('success', 'Fach wieder geöffnet.');
+    return reply.redirect(`/teacher/fach/${fach.id}`);
+  });
+
+  // ---------- Historische Halbjahre (Noten von vor Einführung der App) ----------
+  fastify.post('/fach/:id/historie/neu', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann vergangene Halbjahre hinzufügen.' });
+    }
+    const bezeichnung = String(request.body?.bezeichnung || '').trim();
+    if (bezeichnung) {
+      const reihenfolge = getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(fach.id).c;
+      getDb().prepare(`
+        INSERT INTO historische_halbjahre (fach_id, bezeichnung, reihenfolge, erstellt_von_id)
+        VALUES (?, ?, ?, ?)
+      `).run(fach.id, bezeichnung, reihenfolge, request.user.id);
+    }
+    return reply.redirect(`/teacher/fach/${fach.id}`);
+  });
+
+  fastify.post('/historie/:id/speichern', async (request, reply) => {
+    const hh = getDb().prepare('SELECT * FROM historische_halbjahre WHERE id = ?').get(request.params.id);
+    if (!hh) return reply.redirect('/teacher');
+    const fach = ladeFachMitUmfeld(hh.fach_id);
+    if (!userDarfFachBearbeiten(request.user, fach)) return reply.code(403).send({ error: 'forbidden' });
+    const schuelerListe = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').all(fach.klasse_id);
+    const [min, max] = fach.notenschluessel === 'BG' ? [0, 15] : [1, 6];
+    const upsert = getDb().prepare(`
+      INSERT INTO historische_noten (historisches_halbjahr_id, schueler_id, note)
+      VALUES (?, ?, ?)
+      ON CONFLICT(historisches_halbjahr_id, schueler_id) DO UPDATE SET note = excluded.note
+    `);
+    const tx = getDb().transaction(() => {
+      for (const s of schuelerListe) {
+        const roh = String(request.body?.['note_' + s.id] ?? '').trim().replace(',', '.');
+        if (roh === '') {
+          upsert.run(hh.id, s.id, null);
+          continue;
+        }
+        const wert = Number(roh);
+        if (Number.isFinite(wert) && wert >= min && wert <= max) upsert.run(hh.id, s.id, wert);
+      }
+    });
+    tx();
+    request.flash?.('success', 'Historische Noten gespeichert.');
+    return reply.redirect(`/teacher/fach/${fach.id}`);
+  });
+
+  fastify.post('/historie/:id/loeschen', async (request, reply) => {
+    const hh = getDb().prepare('SELECT * FROM historische_halbjahre WHERE id = ?').get(request.params.id);
+    if (!hh) return reply.redirect('/teacher');
+    const fach = ladeFachMitUmfeld(hh.fach_id);
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann vergangene Halbjahre entfernen.' });
+    }
+    getDb().prepare('DELETE FROM historische_halbjahre WHERE id = ?').run(hh.id);
+    request.flash?.('success', 'Historisches Halbjahr entfernt.');
+    return reply.redirect(`/teacher/fach/${fach.id}`);
+  });
+
+  // ---------- Notensperre: Entsperrung anfragen (Fachlehrkraft) ----------
+  fastify.post('/fach/:id/sperre/:schuelerId/anfragen', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userHatFachZgriff(request.user, fach.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const grund = String(request.body?.grund || '').trim();
+    const gefunden = aufhebungAnfragen(fach.klasse_id, request.params.schuelerId, halbjahr, request.user.id, grund);
+    request.flash?.(gefunden ? 'success' : 'error',
+      gefunden ? 'Entsperrung angefragt — die Klassenleitung wurde informiert.' : 'Keine Sperre gefunden.');
+    return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
+  });
+
+  // ---------- Klasse ins nächste Schuljahr übertragen ----------
+  fastify.post('/klassen/:id/naechstes-schuljahr', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.redirect('/teacher/klassen');
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann die Klasse übertragen.' });
+    }
+    const zielSchuljahrId = parseInt(request.body?.ziel_schuljahr_id, 10);
+    if (!Number.isFinite(zielSchuljahrId)) {
+      request.flash?.('error', 'Bitte ein Ziel-Schuljahr auswählen.');
+      return reply.redirect(`/teacher/klassen/${klasse.id}`);
+    }
+    const mitFaechern = request.body?.mit_faechern === '1';
+    try {
+      const neueKlasseId = uebertrageKlasseInSchuljahr(
+        klasse.id, zielSchuljahrId, request.body?.neuer_name, mitFaechern, request.user.id,
+      );
+      request.flash?.('success', 'Klasse ins neue Schuljahr übertragen.');
+      return reply.redirect(`/teacher/klassen/${neueKlasseId}`);
+    } catch (e) {
+      request.flash?.('error', e.message.includes('UNIQUE')
+        ? 'In diesem Schuljahr gibt es bereits eine Klasse mit diesem Namen.'
+        : 'Übertragung fehlgeschlagen: ' + e.message);
+      return reply.redirect(`/teacher/klassen/${klasse.id}`);
+    }
   });
 
   // ---------- Selbstbedienung: Klassen anlegen/verwalten ohne Admin-Zuweisung ----------
@@ -553,7 +710,38 @@ export default async function teacherRoutes(fastify) {
 
     return reply.viewEjs('teacher/klasse_uebersicht.ejs', {
       user: request.user, klasse, halbjahr, faecher, zeilen, syncMeta,
+      sperren: ladeSperrenFuerKlasse(klasse.id, halbjahr),
     });
+  });
+
+  // ---------- Abschluss-/Abgangsübersicht (Klassenleitung/Admin) ----------
+  // Fasst die Fachabschlussnoten aller (optional abgeschlossenen) Fächer
+  // zusammen — für Fächer, die nicht abgeschlossen wurden, gibt es keine
+  // Abschlussnote (siehe src/fach-abschluss.js, bewusst optional).
+  fastify.get('/klassen/:id/abschluss', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin haben Zugriff auf die Abschlussübersicht.' });
+    }
+    const db = getDb();
+    const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
+    const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+    const abschlussByFach = new Map(faecher.map((f) => [f.id, f.abgeschlossen ? ladeAbschlussnoten(f.id) : new Map()]));
+
+    const zeilen = schueler.map((s) => {
+      const noten = faecher.map((f) => ({
+        fach: f, note: abschlussByFach.get(f.id).get(s.id) ?? null,
+      }));
+      const vorhanden = noten.filter((n) => n.fach.abgeschlossen).map((n) => n.note).filter((n) => n !== null && n !== undefined);
+      const schnitt = vorhanden.length ? Math.round((vorhanden.reduce((a, b) => a + b, 0) / vorhanden.length) * 100) / 100 : null;
+      return { schueler: s, noten, schnitt };
+    });
+
+    return reply.viewEjs('teacher/klasse_abschluss.ejs', { user: request.user, klasse, faecher, zeilen });
   });
 
   // ---------- Konferenzmodus (eine Schüler:in nach der anderen, klassenweit) ----------
@@ -612,7 +800,30 @@ export default async function teacherRoutes(fastify) {
       vorherige: idx > 0 ? schuelerListe[idx - 1] : null,
       naechste: idx < schuelerListe.length - 1 ? schuelerListe[idx + 1] : null,
       position: idx + 1, anzahl: schuelerListe.length,
+      sperre: holeSperre(klasse.id, schueler.id, halbjahr),
     });
+  });
+
+  fastify.post('/klassen/:id/konferenz/:schuelerId/sperren', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse || !userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    sperren(klasse.id, request.params.schuelerId, halbjahr, request.user.id);
+    request.flash?.('success', 'Noten für dieses Halbjahr gesperrt.');
+    return reply.redirect(`/teacher/klassen/${request.params.id}/konferenz/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
+  });
+
+  fastify.post('/klassen/:id/konferenz/:schuelerId/entsperren', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse || !userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    entsperren(klasse.id, request.params.schuelerId, halbjahr);
+    request.flash?.('success', 'Noten wieder entsperrt.');
+    return reply.redirect(`/teacher/klassen/${request.params.id}/konferenz/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
   });
 
   fastify.post('/klassen/:id/konferenz/:schuelerId/note', async (request, reply) => {
@@ -706,9 +917,14 @@ export default async function teacherRoutes(fastify) {
       `).all(klasse.id);
     }
 
+    const andereSchuljahre = istKlassenlehrer
+      ? getDb().prepare('SELECT * FROM schuljahre WHERE id != ? ORDER BY bezeichnung DESC').all(klasse.schuljahr_id)
+      : [];
+
     return reply.viewEjs('teacher/klasse_detail.ejs', {
       user: request.user, klasse, schueler, faecher, eigentuemer, kannExportieren,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
+      andereSchuljahre,
     });
   });
 

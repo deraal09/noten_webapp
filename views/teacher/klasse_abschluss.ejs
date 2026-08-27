@@ -1,0 +1,41 @@
+<h1>Abschluss-/Abgangsübersicht: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p>
+  <a href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
+  · <a href="/teacher/klassen/<%= klasse.id %>/uebersicht">Halbjahresübersicht</a>
+</p>
+
+<p class="hint">
+  Zeigt die Fachabschlussnote je Fach — nur für Fächer, die die Fachlehrkraft (oder du als
+  Klassenleitung) über "Fach abschließen" auf der Noteneingabe-Seite abgeschlossen hat. Nicht
+  abgeschlossene Fächer zeigen "läuft", da sie (noch) keine Abschlussnote haben.
+</p>
+
+<% if (!faecher.length) { %>
+  <p>Diese Klasse hat noch keine Fächer.</p>
+<% } else { %>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Schüler/in</th>
+        <% faecher.forEach(function(f) { %>
+          <th><%= f.name %><br><small><%= f.abgeschlossen ? 'abgeschlossen' : 'läuft' %></small></th>
+        <% }); %>
+        <th>Ø Abschluss</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% zeilen.forEach(function(z) { %>
+        <tr>
+          <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
+          <% z.noten.forEach(function(n) { %>
+            <td>
+              <% if (!n.fach.abgeschlossen) { %><span class="hint">läuft</span>
+              <% } else { %><%= n.note === null ? '–' : formatNote(n.note) %><% } %>
+            </td>
+          <% }); %>
+          <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
