@@ -2,7 +2,7 @@
 <p><a href="/teacher/klassen">← Meine Klassen</a></p>
 
 <p class="hint">
-  Nutzt die (inoffizielle) Untis-Schnittstelle. Dein Untis-Passwort wird <strong>nicht gespeichert</strong> —
+  Nutzt die (inoffizielle) Untis-Schnittstelle. Deine Untis-Zugangsdaten werden <strong>nicht gespeichert</strong> —
   du meldest dich bei jeder Verbindung neu an. Ob Untis dabei auch die Schülerliste je Klasse
   herausgibt, hängt von den Rechten deines Untis-Kontos und der Schulkonfiguration ab; wenn nicht,
   wird die Klasse trotzdem angelegt und Schüler/innen können danach wie gewohnt hinzugefügt werden.
@@ -20,11 +20,24 @@
     <label>Untis-Benutzername
       <input type="text" name="username" autocomplete="username" required>
     </label>
-    <label>Untis-Passwort
-      <input type="password" name="password" autocomplete="current-password" required>
+    <label>Untis-Passwort <small class="hint">(nur wenn bei deinem Konto KEINE Zwei-Faktor-Authentifizierung aktiv ist)</small>
+      <input type="password" name="password" autocomplete="current-password">
+    </label>
+    <label>ODER Secret <small class="hint">(bei aktiver Zwei-Faktor-Authentifizierung nötig — siehe Hinweis unten)</small>
+      <input type="text" name="secret" autocomplete="off" placeholder="z. B. JBSWY3DPEHPK3PXP">
     </label>
     <button type="submit">🔌 Verbinden</button>
   </form>
+  <details>
+    <summary>Wo finde ich das Secret? (bei aktiver Zwei-Faktor-Authentifizierung nötig)</summary>
+    <p class="hint">
+      In WebUntis unter „Mein Profil" → „Freigaben" (oder „Mobile-Zugriff") gibt es einen Punkt wie
+      „QR-Code für Mobile-Anwendungen anzeigen". Der dort angezeigte QR-Code enthält ein Secret, das
+      meist auch als Klartext danebensteht — genau dieses Secret hier eintragen (nicht das Passwort).
+      <strong>Achtung:</strong> Ein neu erzeugter QR-Code/Secret kann eine bereits auf dem Handy
+      eingerichtete Untis-Mobile-Anmeldung ungültig machen — die App müsste dann neu gekoppelt werden.
+    </p>
+  </details>
 <% } else { %>
   <div class="card">
     <p>

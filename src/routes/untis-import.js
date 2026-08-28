@@ -14,7 +14,7 @@ import {
   untisAnmelden, untisAbmelden, untisKlassen, untisStudentGroupMitglieder,
 } from '../untis-client.js';
 
-const STANDARD_SERVER = 'neilo.webuntis.com';
+const STANDARD_SERVER = 'bbz-rd-eck.webuntis.com';
 const STANDARD_SCHULE = 'bbz-rd-eck';
 
 export default async function untisImportRoutes(fastify) {
@@ -34,12 +34,13 @@ export default async function untisImportRoutes(fastify) {
     const school = String(request.body?.school || '').trim() || STANDARD_SCHULE;
     const username = String(request.body?.username || '').trim();
     const password = String(request.body?.password || '');
-    if (!username || !password) {
-      request.flash?.('error', 'Bitte Benutzername und Passwort eingeben.');
+    const secret = String(request.body?.secret || '').trim().replace(/\s+/g, '');
+    if (!username || (!password && !secret)) {
+      request.flash?.('error', 'Bitte Benutzername und Passwort oder Secret eingeben.');
       return reply.redirect('/teacher/untis-import');
     }
     try {
-      const anmeldung = await untisAnmelden({ server, school, username, password });
+      const anmeldung = await untisAnmelden({ server, school, username, password, secret });
       const klassen = await untisKlassen({ server, school, sessionId: anmeldung.sessionId });
       request.session.untisImport = {
         server, school, sessionId: anmeldung.sessionId,

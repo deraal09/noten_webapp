@@ -200,8 +200,19 @@ ohne die Klasse vorher manuell anzulegen. **Wichtig, bitte lesen:**
   auch der offizielle Untis-Login im Browser verwendet — inoffiziell, ohne
   Zusicherung, dass sie dauerhaft funktioniert oder mit den Untis-AGB
   vereinbar ist.
-- **Kein Passwort wird gespeichert.** Jede Lehrkraft meldet sich bei jeder
-  Verbindung neu mit den eigenen Untis-Zugangsdaten an (`src/untis-client.js`);
+- **Zwei Anmeldearten** (`src/untis-client.js`): Benutzername+Passwort
+  (Methode `authenticate`) funktioniert nur, wenn am Untis-Konto **keine
+  Zwei-Faktor-Authentifizierung** erzwungen wird. Ist 2FA aktiv (wie am
+  BBZ RD-Eck), muss stattdessen ein **Secret** verwendet werden — das
+  Untis-Profil zeigt es unter „Freigaben"/„Mobile-Zugriff" → „QR-Code
+  anzeigen" (Secret steht meist als Klartext neben dem QR-Code). Daraus
+  wird ein 6-stelliger TOTP-Code berechnet (Methode `getUserData2017`,
+  Endpunkt `/WebUntis/jsonrpc_intern.do`) — derselbe Mechanismus, den
+  Untis Mobile selbst nutzt. **Achtung:** ein neu erzeugter QR-Code kann
+  eine bereits auf dem Handy gekoppelte Untis-Mobile-Anmeldung ungültig
+  machen.
+- **Kein Passwort/Secret wird gespeichert.** Jede Lehrkraft meldet sich bei
+  jeder Verbindung neu mit den eigenen Untis-Zugangsdaten an;
   die Sitzung liegt nur kurz im Server-Session-Speicher und wird nach dem
   Import (oder per „Verbindung trennen") sofort beendet.
 - **Schülerlisten je Klasse sind technisch nicht zuverlässig abrufbar.**
