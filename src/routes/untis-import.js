@@ -96,7 +96,7 @@ export default async function untisImportRoutes(fastify) {
     for (const klasseId of ausgewaehlt) {
       const untisKlasse = v.klassen.find((k) => k.id === klasseId);
       if (!untisKlasse) continue;
-      const eintrag = { name: untisKlasse.name, status: null, schuelerAnzahl: null, klasseId: null };
+      const eintrag = { name: untisKlasse.name, status: null, schuelerAnzahl: null, schuelerFehler: null, klasseId: null };
       let neueKlasseId;
       try {
         const info = db.prepare(`
@@ -127,8 +127,11 @@ export default async function untisImportRoutes(fastify) {
           } else {
             eintrag.schuelerAnzahl = 0;
           }
-        } catch {
-          eintrag.schuelerAnzahl = null; // von Untis nicht verfügbar (Rechte/Konfiguration)
+        } catch (e) {
+          // von Untis nicht verfügbar (Rechte/Konfiguration) — Fehlertext für
+          // die Fehlersuche mit anzeigen, statt ihn stillschweigend zu verwerfen.
+          eintrag.schuelerAnzahl = null;
+          eintrag.schuelerFehler = e.message;
         }
       }
       ergebnisse.push(eintrag);

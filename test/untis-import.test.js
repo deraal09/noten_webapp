@@ -180,6 +180,7 @@ test('Import: Klasse mit Schüler/innen (Untis liefert eine Mitgliederliste)', a
   assert.match(html, /11C/);
   assert.match(html, /neu angelegt/);
   assert.match(html, /von Untis nicht verfügbar/);
+  assert.match(html, /keine Berechtigung/, 'der genaue Untis-Fehlertext muss zur Fehlersuche mit angezeigt werden');
 
   const klasse11B = getDb().prepare("SELECT * FROM klassen WHERE name = '11B' AND schuljahr_id = ?").get(sjId);
   assert.ok(klasse11B);

@@ -23,7 +23,7 @@
           <td>
             <% if (e.status !== 'angelegt') { %>—
             <% } else if (e.schuelerAnzahl === null) { %>
-              <span class="hint">von Untis nicht verfügbar — bitte manuell hinzufügen</span>
+              <span class="hint">von Untis nicht verfügbar — bitte manuell hinzufügen<% if (e.schuelerFehler) { %><br><small>(<%= e.schuelerFehler %>)</small><% } %></span>
             <% } else if (e.schuelerAnzahl === 0) { %>
               <span class="hint">keine gefunden</span>
             <% } else { %><%= e.schuelerAnzahl %><% } %>
