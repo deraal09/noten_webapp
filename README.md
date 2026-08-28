@@ -186,6 +186,39 @@ vergeben ist, entsteht **keine zweite, doppelte Klasse**. Stattdessen:
   alle zu, wird das von der anfragenden Person genannte Fach angelegt
   (falls es das noch nicht gibt) und sie diesem Fach zugewiesen.
 
+### Import aus Untis (`/teacher/untis-import`)
+
+Klassen (und optional Schüler/innen) lassen sich aus WebUntis importieren,
+ohne die Klasse vorher manuell anzulegen. **Wichtig, bitte lesen:**
+
+- Es gibt **keine offizielle, dokumentierte Programmierschnittstelle** für
+  einen einzelnen Lehrkraft-Login. Untis selbst bietet nur eine
+  Partner-API mit schulweiten OAuth-Client-Credentials an (Einrichtung
+  durch einen Untis-Admin, kein Login mit persönlichen Zugangsdaten). Diese
+  Anbindung nutzt stattdessen die seit Jahren von der Community
+  reverse-engineerte JSON-RPC-Schnittstelle (`/WebUntis/jsonrpc.do`), die
+  auch der offizielle Untis-Login im Browser verwendet — inoffiziell, ohne
+  Zusicherung, dass sie dauerhaft funktioniert oder mit den Untis-AGB
+  vereinbar ist.
+- **Kein Passwort wird gespeichert.** Jede Lehrkraft meldet sich bei jeder
+  Verbindung neu mit den eigenen Untis-Zugangsdaten an (`src/untis-client.js`);
+  die Sitzung liegt nur kurz im Server-Session-Speicher und wird nach dem
+  Import (oder per „Verbindung trennen") sofort beendet.
+- **Schülerlisten je Klasse sind technisch nicht zuverlässig abrufbar.**
+  Die WebUntis-API liefert zwar `getKlassen()` (Klassenliste) zuverlässig,
+  aber `getStudents()` liefert alle Schüler/innen der ganzen Schule **ohne**
+  Klassen-Zuordnung — es gibt keine dokumentierte Methode für „Schüler/innen
+  einer Klasse". Als bester verfügbarer Versuch wird
+  `getStudentGroupMembers(klasseId)` genutzt (in manchen Untis-Konfigurationen
+  ist eine feste Klasse zugleich eine „Studentengruppe" mit derselben ID) —
+  das hängt von der Schulkonfiguration und den Rechten des verwendeten
+  Untis-Kontos ab und kann leer bleiben oder fehlschlagen. In dem Fall wird
+  die Klasse trotzdem angelegt; Schüler/innen können danach wie gewohnt
+  per Hand oder Sammel-Einfügen ergänzt werden.
+- Klassen, die im Ziel-Schuljahr bereits existieren (Namenskollision),
+  werden beim Import übersprungen statt dupliziert — bei Bedarf über die
+  bestehende Verknüpfungsanfrage manuell verbinden.
+
 ### Noten-Sync statt Live-Zugriff für die Klassenleitung
 
 Die Klassenleitung sieht **nie** die Live-Notentafel fremder Fächer — nur

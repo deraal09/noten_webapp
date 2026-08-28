@@ -1,0 +1,35 @@
+<h1>Untis-Import: Ergebnis</h1>
+<p><a href="/teacher/klassen">← Meine Klassen</a></p>
+
+<table class="data">
+  <thead>
+    <tr>
+      <th>Untis-Klasse</th>
+      <th>Status</th>
+      <% if (mitSchuelern) { %><th>Schüler/innen importiert</th><% } %>
+    </tr>
+  </thead>
+  <tbody>
+    <% ergebnisse.forEach(function(e) { %>
+      <tr>
+        <td class="name">
+          <% if (e.klasseId) { %><a href="/teacher/klassen/<%= e.klasseId %>"><%= e.name %></a><% } else { %><%= e.name %><% } %>
+        </td>
+        <td>
+          <% if (e.status === 'angelegt') { %>✅ neu angelegt
+          <% } else { %>⏭ übersprungen (Klasse existiert in diesem Schuljahr bereits)<% } %>
+        </td>
+        <% if (mitSchuelern) { %>
+          <td>
+            <% if (e.status !== 'angelegt') { %>—
+            <% } else if (e.schuelerAnzahl === null) { %>
+              <span class="hint">von Untis nicht verfügbar — bitte manuell hinzufügen</span>
+            <% } else if (e.schuelerAnzahl === 0) { %>
+              <span class="hint">keine gefunden</span>
+            <% } else { %><%= e.schuelerAnzahl %><% } %>
+          </td>
+        <% } %>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>

@@ -36,6 +36,7 @@ import teacherRoutes from './src/routes/teacher.js';
 import klassenlehrerRoutes from './src/routes/klassenlehrer.js';
 import exportRoutes from './src/routes/export.js';
 import sitzplanRoutes from './src/routes/sitzplan.js';
+import untisImportRoutes from './src/routes/untis-import.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';
@@ -142,6 +143,7 @@ export async function buildApp(opts = {}) {
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(teacherRoutes, { prefix: '/teacher' });
   await app.register(sitzplanRoutes, { prefix: '/teacher' });
+  await app.register(untisImportRoutes, { prefix: '/teacher' });
   await app.register(klassenlehrerRoutes, { prefix: '/klassenlehrer' });
   await app.register(exportRoutes, { prefix: '/export' });
 

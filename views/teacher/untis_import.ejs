@@ -1,0 +1,68 @@
+<h1>Import aus Untis</h1>
+<p><a href="/teacher/klassen">← Meine Klassen</a></p>
+
+<p class="hint">
+  Nutzt die (inoffizielle) Untis-Schnittstelle. Dein Untis-Passwort wird <strong>nicht gespeichert</strong> —
+  du meldest dich bei jeder Verbindung neu an. Ob Untis dabei auch die Schülerliste je Klasse
+  herausgibt, hängt von den Rechten deines Untis-Kontos und der Schulkonfiguration ab; wenn nicht,
+  wird die Klasse trotzdem angelegt und Schüler/innen können danach wie gewohnt hinzugefügt werden.
+</p>
+
+<% if (!verbindung) { %>
+  <form method="post" action="/teacher/untis-import/verbinden" class="card">
+    <h2>1. Mit Untis verbinden</h2>
+    <label>Untis-Server
+      <input type="text" name="server" value="<%= standardServer %>" required>
+    </label>
+    <label>Schulkürzel
+      <input type="text" name="school" value="<%= standardSchule %>" required>
+    </label>
+    <label>Untis-Benutzername
+      <input type="text" name="username" autocomplete="username" required>
+    </label>
+    <label>Untis-Passwort
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">🔌 Verbinden</button>
+  </form>
+<% } else { %>
+  <div class="card">
+    <p>
+      ✅ Verbunden mit <strong><%= verbindung.server %></strong> (<%= verbindung.school %>) —
+      <%= verbindung.klassen.length %> Klasse(n) gefunden.
+    </p>
+    <form method="post" action="/teacher/untis-import/trennen" class="inline">
+      <button type="submit">Verbindung trennen</button>
+    </form>
+  </div>
+
+  <% if (!schuljahre.length) { %>
+    <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst eins anzulegen.</p>
+  <% } else if (!verbindung.klassen.length) { %>
+    <p class="hint">Untis hat keine Klassen geliefert.</p>
+  <% } else { %>
+    <form method="post" action="/teacher/untis-import/importieren" class="card">
+      <h2>2. Klassen auswählen und importieren</h2>
+      <label>Ziel-Schuljahr
+        <select name="schuljahr_id" required>
+          <% schuljahre.forEach(function(sj) { %><option value="<%= sj.id %>"><%= sj.bezeichnung %></option><% }); %>
+        </select>
+      </label>
+      <label>Notenschlüssel
+        <select name="notenschluessel">
+          <option value="IHK">IHK (1–6)</option>
+          <option value="BG">BG (0–15)</option>
+        </select>
+      </label>
+      <label>
+        <input type="checkbox" name="mit_schuelern" value="1" checked>
+        Schüler/innen mitimportieren (Versuch — klappt nicht bei jeder Untis-Konfiguration)
+      </label>
+      <p><strong>Klassen:</strong></p>
+      <% verbindung.klassen.forEach(function(k) { %>
+        <label><input type="checkbox" name="klasse_id" value="<%= k.id %>"> <%= k.name %><% if (k.longName) { %> <small class="hint">(<%= k.longName %>)</small><% } %></label>
+      <% }); %>
+      <button type="submit">📥 Ausgewählte Klassen importieren</button>
+    </form>
+  <% } %>
+<% } %>
