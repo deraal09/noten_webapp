@@ -206,6 +206,15 @@ const echterClient = {
     const { result } = await rpc(server, school, 'getStudentGroupMembers', { groupId }, cookieHeader);
     return Array.isArray(result) ? result : [];
   },
+
+  // Liefert ALLE Schüler/innen der ganzen Schule (kein Klassenbezug in den
+  // Feldern dokumentiert) — Fallback, seit getStudentGroupMembers auf
+  // manchen Untis-Instanzen mit "-32601: Method not found" gar nicht
+  // existiert. Siehe routes/untis-import.js für den Zuordnungsversuch.
+  async studenten({ server, school, cookieHeader }) {
+    const { result } = await rpc(server, school, 'getStudents', {}, cookieHeader);
+    return Array.isArray(result) ? result : [];
+  },
 };
 
 let _override;
@@ -223,3 +232,4 @@ export async function untisAnmelden(args) { return client().anmelden(args); }
 export async function untisAbmelden(args) { return client().abmelden(args); }
 export async function untisKlassen(args) { return client().klassen(args); }
 export async function untisStudentGroupMitglieder(args) { return client().studentGroupMitglieder(args); }
+export async function untisStudenten(args) { return client().studenten(args); }

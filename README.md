@@ -217,15 +217,20 @@ ohne die Klasse vorher manuell anzulegen. **Wichtig, bitte lesen:**
   Import (oder per „Verbindung trennen") sofort beendet.
 - **Schülerlisten je Klasse sind technisch nicht zuverlässig abrufbar.**
   Die WebUntis-API liefert zwar `getKlassen()` (Klassenliste) zuverlässig,
-  aber `getStudents()` liefert alle Schüler/innen der ganzen Schule **ohne**
-  Klassen-Zuordnung — es gibt keine dokumentierte Methode für „Schüler/innen
-  einer Klasse". Als bester verfügbarer Versuch wird
-  `getStudentGroupMembers(klasseId)` genutzt (in manchen Untis-Konfigurationen
-  ist eine feste Klasse zugleich eine „Studentengruppe" mit derselben ID) —
-  das hängt von der Schulkonfiguration und den Rechten des verwendeten
-  Untis-Kontos ab und kann leer bleiben oder fehlschlagen. In dem Fall wird
-  die Klasse trotzdem angelegt; Schüler/innen können danach wie gewohnt
-  per Hand oder Sammel-Einfügen ergänzt werden.
+  aber es gibt keine dokumentierte Methode für „Schüler/innen einer Klasse":
+  `getStudentGroupMembers(klasseId)` (Klasse == „Studentengruppe" mit
+  gleicher ID) existiert auf manchen Untis-Instanzen gar nicht (am BBZ
+  RD-Eck z. B. `-32601: Method not found`). Stattdessen wird **einmal pro
+  Import** die komplette Schülerliste der Schule geladen (`getStudents()`,
+  ohne dokumentierten Klassenbezug) und versucht, sie über plausible,
+  nicht offiziell dokumentierte Feldnamen (`klasseId`, `classId`, `klasse`,
+  `className` u. Ä.) den ausgewählten Klassen zuzuordnen. Ob das auf einer
+  gegebenen Untis-Instanz überhaupt funktioniert, ist ungewiss — die
+  Ergebnisseite zeigt zur Fehlersuche zusätzlich die Gesamtzahl der von
+  Untis gelieferten Schüler/innen sowie die tatsächlich vorhandenen
+  Feldnamen des ersten Datensatzes an. Bleiben die Treffer bei 0, wird die
+  Klasse trotzdem angelegt; Schüler/innen können dann wie gewohnt per Hand
+  oder Sammel-Einfügen ergänzt werden.
 - Klassen, die im Ziel-Schuljahr bereits existieren (Namenskollision),
   werden beim Import übersprungen statt dupliziert — bei Bedarf über die
   bestehende Verknüpfungsanfrage manuell verbinden.

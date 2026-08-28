@@ -1,6 +1,14 @@
 <h1>Untis-Import: Ergebnis</h1>
 <p><a href="/teacher/klassen">← Meine Klassen</a></p>
 
+<% if (mitSchuelern && schuelerGesamt !== null) { %>
+  <p class="hint">
+    Zur Fehlersuche: Untis hat schulweit <%= schuelerGesamt %> Schüler/innen geliefert (ohne
+    dokumentierten Klassenbezug — die Zuordnung unten ist ein Versuch über plausible Feldnamen).
+    <% if (beispielFelder) { %>Vorhandene Felder je Schüler/in: <code class="token"><%= beispielFelder.join(', ') %></code><% } %>
+  </p>
+<% } %>
+
 <table class="data">
   <thead>
     <tr>

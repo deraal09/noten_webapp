@@ -11,11 +11,36 @@ import { getDb } from '../db.js';
 import { requireAuth } from '../auth.js';
 import { DEFAULT_NS_CSV } from '../grade-calc.js';
 import {
-  untisAnmelden, untisAbmelden, untisKlassen, untisStudentGroupMitglieder,
+  untisAnmelden, untisAbmelden, untisKlassen, untisStudenten,
 } from '../untis-client.js';
 
 const STANDARD_SERVER = 'bbz-rd-eck.webuntis.com';
 const STANDARD_SCHULE = 'bbz-rd-eck';
+
+// getStudentGroupMembers (Untis-Klasse == "Studentengruppe" mit gleicher ID)
+// existiert nicht auf jeder Untis-Instanz (-32601 "Method not found" beim
+// BBZ RD-Eck) — stattdessen wird EINMAL die komplette Schülerliste der
+// Schule geladen (getStudents, kein Klassenbezug dokumentiert) und
+// versucht, sie über plausible, nicht offiziell dokumentierte Feldnamen
+// den ausgewählten Klassen zuzuordnen. Klappt die Zuordnung nicht (keines
+// der Felder vorhanden), bleibt es bei 0 Treffern — die auf der
+// Ergebnisseite mit angezeigten Beispiel-Felder zeigen dann, welche Felder
+// der Server tatsächlich liefert, für die weitere Fehlersuche.
+function klassenBezugAus(schueler) {
+  return {
+    klasseId: schueler.klasseId ?? schueler.classId ?? schueler.klasse_id ?? null,
+    klasseName: schueler.klasse ?? schueler.className ?? schueler.schoolClass ?? schueler.klassenName ?? null,
+  };
+}
+
+function schuelerFuerKlasse(alleSchueler, untisKlasse) {
+  return alleSchueler.filter((s) => {
+    const { klasseId, klasseName } = klassenBezugAus(s);
+    if (klasseId !== null && klasseId !== undefined && Number(klasseId) === Number(untisKlasse.id)) return true;
+    if (klasseName && String(klasseName).trim() === untisKlasse.name.trim()) return true;
+    return false;
+  });
+}
 
 export default async function untisImportRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -91,6 +116,21 @@ export default async function untisImportRoutes(fastify) {
       return reply.redirect('/teacher/untis-import');
     }
 
+    // Schülerliste (falls gewünscht) EINMAL für die ganze Schule laden,
+    // nicht pro Klasse — getStudents() kennt keinen Klassenfilter.
+    let alleUntisSchueler = null;
+    let schuelerAbrufFehler = null;
+    let beispielFelder = null;
+    if (mitSchuelern) {
+      try {
+        alleUntisSchueler = await untisStudenten({ server: v.server, school: v.school, cookieHeader: v.cookieHeader });
+        if (alleUntisSchueler.length) beispielFelder = Object.keys(alleUntisSchueler[0]);
+      } catch (e) {
+        schuelerAbrufFehler = e.message;
+        alleUntisSchueler = [];
+      }
+    }
+
     const db = getDb();
     const ergebnisse = [];
     for (const klasseId of ausgewaehlt) {
@@ -116,22 +156,15 @@ export default async function untisImportRoutes(fastify) {
       }
 
       if (mitSchuelern) {
-        try {
-          const mitglieder = await untisStudentGroupMitglieder({
-            server: v.server, school: v.school, cookieHeader: v.cookieHeader, groupId: untisKlasse.id,
-          });
-          if (mitglieder.length) {
+        if (schuelerAbrufFehler) {
+          eintrag.schuelerFehler = schuelerAbrufFehler;
+        } else {
+          const treffer = schuelerFuerKlasse(alleUntisSchueler, untisKlasse);
+          if (treffer.length) {
             const insert = db.prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
-            for (const m of mitglieder) insert.run(neueKlasseId, m.studentName || '', m.foreName || '');
-            eintrag.schuelerAnzahl = mitglieder.length;
-          } else {
-            eintrag.schuelerAnzahl = 0;
+            for (const m of treffer) insert.run(neueKlasseId, m.name || '', m.foreName || '');
           }
-        } catch (e) {
-          // von Untis nicht verfügbar (Rechte/Konfiguration) — Fehlertext für
-          // die Fehlersuche mit anzeigen, statt ihn stillschweigend zu verwerfen.
-          eintrag.schuelerAnzahl = null;
-          eintrag.schuelerFehler = e.message;
+          eintrag.schuelerAnzahl = treffer.length;
         }
       }
       ergebnisse.push(eintrag);
@@ -140,6 +173,9 @@ export default async function untisImportRoutes(fastify) {
     await untisAbmelden({ server: v.server, school: v.school, cookieHeader: v.cookieHeader }).catch(() => {});
     delete request.session.untisImport;
 
-    return reply.viewEjs('teacher/untis_import_ergebnis.ejs', { user: request.user, ergebnisse, mitSchuelern });
+    return reply.viewEjs('teacher/untis_import_ergebnis.ejs', {
+      user: request.user, ergebnisse, mitSchuelern,
+      schuelerGesamt: alleUntisSchueler?.length ?? null, beispielFelder,
+    });
   });
 }
