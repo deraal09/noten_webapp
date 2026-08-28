@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { berechneTotp } from '../src/untis-client.js';
+import { berechneTotp, cookieHeaderAus, findeCookieWert } from '../src/untis-client.js';
 
 // Base32 von "12345678901234567890" (der ASCII-Schlüssel aus RFC 4226 Anhang D).
 const RFC_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
@@ -39,4 +39,23 @@ test('berechneTotp: ist robust gegen Leerzeichen/Kleinschreibung im Secret (wie 
   const sauber = berechneTotp(RFC_SECRET, 0);
   const mitLeerzeichenUndKlein = berechneTotp('gezd gnbv gy3t qojq gezd gnbv gy3t qojq', 0);
   assert.equal(sauber, mitLeerzeichenUndKlein);
+});
+
+test('cookieHeaderAus: kombiniert mehrere Set-Cookie-Header zu einem Cookie-Header (nur name=value)', () => {
+  const setCookies = [
+    'JSESSIONID=abc123; Path=/WebUntis; HttpOnly',
+    'schoolname=_YmJ6LXJkLWVjaw==; Path=/; Secure',
+  ];
+  assert.equal(cookieHeaderAus(setCookies), 'JSESSIONID=abc123; schoolname=_YmJ6LXJkLWVjaw==');
+});
+
+test('cookieHeaderAus: leeres Array ergibt leeren String', () => {
+  assert.equal(cookieHeaderAus([]), '');
+});
+
+test('findeCookieWert: findet den Wert unabhängig von Position/weiteren Cookies', () => {
+  const header = 'schoolname=_xyz; JSESSIONID=abc123; other=1';
+  assert.equal(findeCookieWert(header, 'JSESSIONID'), 'abc123');
+  assert.equal(findeCookieWert(header, 'schoolname'), '_xyz');
+  assert.equal(findeCookieWert(header, 'fehlt'), null);
 });

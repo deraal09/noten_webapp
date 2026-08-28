@@ -2,7 +2,7 @@
  * Import von Klassen/Schüler:innen aus WebUntis. Nutzt die inoffizielle
  * JSON-RPC-API (siehe src/untis-client.js) — jede Lehrkraft meldet sich bei
  * jeder Verbindung neu mit ihren eigenen Untis-Zugangsdaten an, die NIE
- * gespeichert werden. Der laufende Untis-Login (sessionId) liegt nur
+ * gespeichert werden. Der laufende Untis-Login (Session-Cookie) liegt nur
  * kurzzeitig im Server-Session-Speicher (request.session), nie in der
  * Datenbank.
  */
@@ -39,17 +39,28 @@ export default async function untisImportRoutes(fastify) {
       request.flash?.('error', 'Bitte Benutzername und Passwort oder Secret eingeben.');
       return reply.redirect('/teacher/untis-import');
     }
+    // Anmeldung und anschließender Klassenabruf sind zwei getrennte
+    // Untis-Aufrufe — die Fehlermeldung nennt, welcher der beiden
+    // fehlgeschlagen ist, statt beides zu vermischen (wichtig für die
+    // Fehlersuche bei einer nicht offiziell dokumentierten Schnittstelle).
+    let anmeldung;
     try {
-      const anmeldung = await untisAnmelden({ server, school, username, password, secret });
-      const klassen = await untisKlassen({ server, school, sessionId: anmeldung.sessionId });
+      anmeldung = await untisAnmelden({ server, school, username, password, secret });
+    } catch (e) {
+      request.flash?.('error', `Anmeldung fehlgeschlagen: ${e.message}`);
+      return reply.redirect('/teacher/untis-import');
+    }
+    try {
+      const klassen = await untisKlassen({ server, school, cookieHeader: anmeldung.cookieHeader });
       request.session.untisImport = {
-        server, school, sessionId: anmeldung.sessionId,
+        server, school, cookieHeader: anmeldung.cookieHeader,
         klassen: klassen.map((k) => ({ id: k.id, name: k.name, longName: k.longName || '' }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       };
       request.flash?.('success', `Verbunden — ${klassen.length} Klasse(n) von Untis geladen.`);
     } catch (e) {
-      request.flash?.('error', e.message);
+      await untisAbmelden({ server, school, cookieHeader: anmeldung.cookieHeader }).catch(() => {});
+      request.flash?.('error', `Anmeldung war erfolgreich, aber Klassenabruf fehlgeschlagen: ${e.message}`);
     }
     return reply.redirect('/teacher/untis-import');
   });
@@ -57,7 +68,7 @@ export default async function untisImportRoutes(fastify) {
   fastify.post('/untis-import/trennen', async (request, reply) => {
     const v = request.session.untisImport;
     if (v) {
-      await untisAbmelden({ server: v.server, school: v.school, sessionId: v.sessionId }).catch(() => {});
+      await untisAbmelden({ server: v.server, school: v.school, cookieHeader: v.cookieHeader }).catch(() => {});
       delete request.session.untisImport;
     }
     return reply.redirect('/teacher/untis-import');
@@ -107,7 +118,7 @@ export default async function untisImportRoutes(fastify) {
       if (mitSchuelern) {
         try {
           const mitglieder = await untisStudentGroupMitglieder({
-            server: v.server, school: v.school, sessionId: v.sessionId, groupId: untisKlasse.id,
+            server: v.server, school: v.school, cookieHeader: v.cookieHeader, groupId: untisKlasse.id,
           });
           if (mitglieder.length) {
             const insert = db.prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
@@ -123,7 +134,7 @@ export default async function untisImportRoutes(fastify) {
       ergebnisse.push(eintrag);
     }
 
-    await untisAbmelden({ server: v.server, school: v.school, sessionId: v.sessionId }).catch(() => {});
+    await untisAbmelden({ server: v.server, school: v.school, cookieHeader: v.cookieHeader }).catch(() => {});
     delete request.session.untisImport;
 
     return reply.viewEjs('teacher/untis_import_ergebnis.ejs', { user: request.user, ergebnisse, mitSchuelern });

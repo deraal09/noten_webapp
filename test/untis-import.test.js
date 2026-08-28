@@ -76,7 +76,7 @@ class FakeUntisClient {
     if (username !== this.gueltigeZugangsdaten.username || password !== this.gueltigeZugangsdaten.password) {
       throw new Error('Untis-Anmeldung fehlgeschlagen (Code 4010) — Benutzername/Passwort prüfen.');
     }
-    return { sessionId: 'fake-session-123', personId: 1, personType: 2, klasseId: null };
+    return { sessionId: 'fake-session-123', personId: 1, personType: 2, klasseId: null, cookieHeader: 'JSESSIONID=fake-session-123' };
   }
   async abmelden() { this.abmeldeAufrufe++; }
   async klassen() { return this.klassenListe; }

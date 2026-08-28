@@ -22,6 +22,13 @@
  *   Anzeigen/Erzeugen des QR-Codes kann eine bereits gekoppelte
  *   Untis-Mobile-App-Anmeldung auf dem Handy ungültig machen.
  *
+ * SESSION-COOKIE: Bei beiden Anmeldearten werden ALLE vom Server per
+ * Set-Cookie gesendeten Cookies unverändert für die folgenden Aufrufe
+ * wiederverwendet (statt nur die JSESSIONID herauszulesen und einen
+ * schoolname-Cookie von Hand nachzubauen) — ein von Hand falsch
+ * zusammengesetzter Cookie führte zuvor zu "-8520: not authenticated" bei
+ * an sich erfolgreicher Anmeldung.
+ *
  * WICHTIGE EINSCHRÄNKUNG (unabhängig von der Anmeldeart): getStudents()
  * liefert ALLE Schüler/innen der Schule ohne Klassen-Zuordnung — es gibt
  * keine dokumentierte Methode, die direkt "Schüler/innen einer Klasse"
@@ -43,7 +50,32 @@ function bereinigeHost(server) {
   return String(server).trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
 }
 
-function baueCookie(school, sessionId) {
+/** Alle Set-Cookie-Header einer Antwort als Array roher Cookie-Strings. */
+function alleSetCookies(res) {
+  if (typeof res.headers.getSetCookie === 'function') {
+    return res.headers.getSetCookie();
+  }
+  const einzeln = res.headers.get('set-cookie');
+  return einzeln ? [einzeln] : [];
+}
+
+/** Baut aus mehreren Set-Cookie-Strings einen kombinierten Cookie-Header (nur name=value, ohne Attribute). */
+export function cookieHeaderAus(setCookieStrings) {
+  return setCookieStrings
+    .map((s) => s.split(';')[0].trim())
+    .filter(Boolean)
+    .join('; ');
+}
+
+export function findeCookieWert(cookieHeader, name) {
+  const treffer = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`).exec(cookieHeader || '');
+  return treffer ? treffer[1] : null;
+}
+
+// Fallback, falls der Server ausnahmsweise keinen schoolname-Cookie mitschickt
+// (siehe Dokumentation der Community-Reverse-Engineering-Projekte) — wird nur
+// verwendet, wenn aus den echten Set-Cookie-Headern kein cookieHeader entsteht.
+function baueFallbackCookie(school, sessionId) {
   const schoolBase64 = Buffer.from(school, 'utf8').toString('base64');
   return `JSESSIONID=${sessionId}; schoolname=_${schoolBase64}`;
 }
@@ -53,11 +85,11 @@ function fehlerAusAntwort(res, url, bodyText) {
   return new Error(`Untis antwortet mit HTTP ${res.status} für ${url}` + (kurzerBody ? ` — Antwort: "${kurzerBody}"` : ''));
 }
 
-async function rpc(server, school, method, params, cookie) {
+async function rpc(server, school, method, params, cookieHeader) {
   const host = bereinigeHost(server);
   const url = `https://${host}/WebUntis/jsonrpc.do?school=${encodeURIComponent(school)}`;
   const headers = { 'Content-Type': 'application/json' };
-  if (cookie) headers.Cookie = cookie;
+  if (cookieHeader) headers.Cookie = cookieHeader;
   let res;
   try {
     res = await fetch(url, {
@@ -74,7 +106,7 @@ async function rpc(server, school, method, params, cookie) {
   if (data.error) {
     throw new Error(`Untis-Fehler ${data.error.code ?? ''}: ${data.error.message || 'unbekannt'}`.trim());
   }
-  return data.result;
+  return { result: data.result, neuerCookieHeader: cookieHeaderAus(alleSetCookies(res)) || null };
 }
 
 // ---------- TOTP (RFC 6238) für die Secret-basierte Anmeldung ----------
@@ -127,9 +159,9 @@ async function anmeldenMitSecret({ server, school, username, secret }) {
   }
   const bodyText = await res.text();
   if (!res.ok) throw fehlerAusAntwort(res, url, bodyText);
-  const setCookieHeader = res.headers.get('set-cookie') || '';
-  const treffer = setCookieHeader.match(/JSESSIONID=([^;]+)/);
-  if (!treffer) {
+  const cookieHeader = cookieHeaderAus(alleSetCookies(res));
+  const sessionId = findeCookieWert(cookieHeader, 'JSESSIONID');
+  if (!sessionId) {
     let meldung = 'Untis-Anmeldung mit Secret fehlgeschlagen — keine Sitzung erhalten. Benutzername/Secret prüfen.';
     try {
       const data = JSON.parse(bodyText);
@@ -137,7 +169,7 @@ async function anmeldenMitSecret({ server, school, username, secret }) {
     } catch { /* Antwort war kein JSON */ }
     throw new Error(meldung);
   }
-  return { sessionId: treffer[1] };
+  return { sessionId, cookieHeader };
 }
 
 const echterClient = {
@@ -145,7 +177,9 @@ const echterClient = {
     if (secret) {
       return anmeldenMitSecret({ server, school, username, secret });
     }
-    const result = await rpc(server, school, 'authenticate', { user: username, password, client: CLIENT_NAME });
+    const { result, neuerCookieHeader } = await rpc(
+      server, school, 'authenticate', { user: username, password, client: CLIENT_NAME },
+    );
     if (!result || !result.sessionId) {
       const code = result?.code;
       throw new Error(code
@@ -155,22 +189,21 @@ const echterClient = {
     return {
       sessionId: result.sessionId, personId: result.personId,
       personType: result.personType, klasseId: result.klasseId,
+      cookieHeader: neuerCookieHeader || baueFallbackCookie(school, result.sessionId),
     };
   },
 
-  async abmelden({ server, school, sessionId }) {
-    await rpc(server, school, 'logout', {}, baueCookie(school, sessionId));
+  async abmelden({ server, school, cookieHeader }) {
+    await rpc(server, school, 'logout', {}, cookieHeader);
   },
 
-  async klassen({ server, school, sessionId }) {
-    const result = await rpc(server, school, 'getKlassen', {}, baueCookie(school, sessionId));
+  async klassen({ server, school, cookieHeader }) {
+    const { result } = await rpc(server, school, 'getKlassen', {}, cookieHeader);
     return Array.isArray(result) ? result : [];
   },
 
-  async studentGroupMitglieder({ server, school, sessionId, groupId }) {
-    const result = await rpc(
-      server, school, 'getStudentGroupMembers', { groupId }, baueCookie(school, sessionId),
-    );
+  async studentGroupMitglieder({ server, school, cookieHeader, groupId }) {
+    const { result } = await rpc(server, school, 'getStudentGroupMembers', { groupId }, cookieHeader);
     return Array.isArray(result) ? result : [];
   },
 };
