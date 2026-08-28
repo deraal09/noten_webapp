@@ -224,13 +224,26 @@ ohne die Klasse vorher manuell anzulegen. **Wichtig, bitte lesen:**
   Import** die komplette Schülerliste der Schule geladen (`getStudents()`,
   ohne dokumentierten Klassenbezug) und versucht, sie über plausible,
   nicht offiziell dokumentierte Feldnamen (`klasseId`, `classId`, `klasse`,
-  `className` u. Ä.) den ausgewählten Klassen zuzuordnen. Ob das auf einer
-  gegebenen Untis-Instanz überhaupt funktioniert, ist ungewiss — die
-  Ergebnisseite zeigt zur Fehlersuche zusätzlich die Gesamtzahl der von
-  Untis gelieferten Schüler/innen sowie die tatsächlich vorhandenen
-  Feldnamen des ersten Datensatzes an. Bleiben die Treffer bei 0, wird die
-  Klasse trotzdem angelegt; Schüler/innen können dann wie gewohnt per Hand
-  oder Sammel-Einfügen ergänzt werden.
+  `className` u. Ä.) den ausgewählten Klassen zuzuordnen. `getStudents()`
+  benötigt laut Community-Dokumentation außerdem das Recht „masterdata
+  students read for all" — fehlt es am Lehrkraft-Konto (Untis-Fehler
+  `-8509: no right for getStudents()`, ebenfalls am BBZ RD-Eck beobachtet),
+  wird als letzter, ebenfalls ungewisser Versuch pro ausgewählter Klasse
+  ein undokumentierter `klasseId`-Filter an `getStudents()` mitgegeben, für
+  den eine Untis-Instanz möglicherweise ein engeres Recht kennt. Ob einer
+  dieser Wege auf einer gegebenen Untis-Instanz funktioniert, ist ungewiss
+  — die Ergebnisseite zeigt zur Fehlersuche zusätzlich die Gesamtzahl der
+  von Untis gelieferten Schüler/innen sowie die tatsächlich vorhandenen
+  Feldnamen des ersten Datensatzes an (nur beim schulweiten Abruf) bzw.
+  den genauen Untis-Fehlertext, falls auch der Fallback scheitert. Bleiben
+  die Treffer bei 0, wird die Klasse trotzdem angelegt; Schüler/innen
+  können dann wie gewohnt per Hand oder Sammel-Einfügen ergänzt werden.
+  **Bleibt der Import dauerhaft ohne Schülerdaten**, ist der einzige noch
+  offene Weg, den lokalen WebUntis-Admin der Schule zu bitten, dem
+  verwendeten Lehrkraft-Konto (unter „Verwaltung"/„Digitale
+  Nutzerverwaltung" → Rechte) das Recht „Schülerstammdaten lesen" zu
+  geben — das ist eine reine Rechte-Einstellung im WebUntis-Backend, keine
+  App-Registrierung bei developer.untis.com.
 - Klassen, die im Ziel-Schuljahr bereits existieren (Namenskollision),
   werden beim Import übersprungen statt dupliziert — bei Bedarf über die
   bestehende Verknüpfungsanfrage manuell verbinden.

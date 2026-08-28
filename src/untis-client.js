@@ -211,8 +211,13 @@ const echterClient = {
   // Feldern dokumentiert) — Fallback, seit getStudentGroupMembers auf
   // manchen Untis-Instanzen mit "-32601: Method not found" gar nicht
   // existiert. Siehe routes/untis-import.js für den Zuordnungsversuch.
-  async studenten({ server, school, cookieHeader }) {
-    const { result } = await rpc(server, school, 'getStudents', {}, cookieHeader);
+  // getStudents() benötigt laut Community-Dokumentation das Recht
+  // "masterdata students read for all" — schlägt der schulweite Abruf mit
+  // "-8509: no right for getStudents()" fehl, kann optional ein
+  // klassenbezogener Filter mitgegeben werden (undokumentiert, nicht
+  // offiziell belegt, ob dafür ein engeres Recht ausreicht).
+  async studenten({ server, school, cookieHeader, filter }) {
+    const { result } = await rpc(server, school, 'getStudents', filter || {}, cookieHeader);
     return Array.isArray(result) ? result : [];
   },
 };

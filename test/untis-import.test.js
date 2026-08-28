@@ -65,11 +65,16 @@ const lehrerA = client();
 let sjId;
 
 class FakeUntisClient {
-  constructor({ gueltigeZugangsdaten, klassen, schuelerGesamt, wirftBeiSchuelern }) {
+  constructor({
+    gueltigeZugangsdaten, klassen, schuelerGesamt, wirftBeiSchuelern,
+    schuelerProKlasseFilter, wirftBeiSchuelernGefiltert,
+  }) {
     this.gueltigeZugangsdaten = gueltigeZugangsdaten;
     this.klassenListe = klassen;
     this.schuelerGesamt = schuelerGesamt || [];
     this.wirftBeiSchuelern = wirftBeiSchuelern || null;
+    this.schuelerProKlasseFilter = schuelerProKlasseFilter || {};
+    this.wirftBeiSchuelernGefiltert = wirftBeiSchuelernGefiltert || null;
     this.abmeldeAufrufe = 0;
   }
   async anmelden({ username, password }) {
@@ -80,7 +85,11 @@ class FakeUntisClient {
   }
   async abmelden() { this.abmeldeAufrufe++; }
   async klassen() { return this.klassenListe; }
-  async studenten() {
+  async studenten({ filter } = {}) {
+    if (filter && filter.klasseId !== undefined) {
+      if (this.wirftBeiSchuelernGefiltert) throw new Error(this.wirftBeiSchuelernGefiltert);
+      return this.schuelerProKlasseFilter[filter.klasseId] || [];
+    }
     if (this.wirftBeiSchuelern) throw new Error(this.wirftBeiSchuelern);
     return this.schuelerGesamt;
   }
@@ -198,11 +207,12 @@ test('Import: Klasse mit Schüler/innen (getStudents liefert die Schulliste, Zuo
   assert.match(nachDemImport, /Mit Untis verbinden/);
 });
 
-test('Import: Schülerliste kann nicht geladen werden — Klassen werden trotzdem angelegt, Fehler wird angezeigt', async () => {
+test('Import: schulweiter Schülerabruf ohne Rechte (-8509) — Fallback pro Klasse mit Filter funktioniert', async () => {
   const fake = new FakeUntisClient({
     gueltigeZugangsdaten: { username: 'lehrer.a', password: 'geheim123' },
     klassen: [{ id: 701, name: '12A', longName: '' }],
-    wirftBeiSchuelern: 'keine Berechtigung',
+    wirftBeiSchuelern: 'Untis-Fehler -8509: no right for getStudents()',
+    schuelerProKlasseFilter: { 701: [{ name: 'Cortes', foreName: 'Clara' }] },
   });
   setUntisClientForTests(fake);
   await form(lehrerA, '/teacher/untis-import/verbinden', {
@@ -219,12 +229,43 @@ test('Import: Schülerliste kann nicht geladen werden — Klassen werden trotzde
   const html = await r.text();
   assert.match(html, /12A/);
   assert.match(html, /neu angelegt/);
-  assert.match(html, /von Untis nicht verfügbar/);
-  assert.match(html, /keine Berechtigung/, 'der genaue Untis-Fehlertext muss zur Fehlersuche mit angezeigt werden');
+  assert.match(html, /no right for getStudents/, 'der ursprüngliche Rechte-Fehler muss zur Fehlersuche mit angezeigt werden');
 
   const klasse12A = getDb().prepare("SELECT * FROM klassen WHERE name = '12A' AND schuljahr_id = ?").get(sjId);
   assert.ok(klasse12A);
-  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(klasse12A.id).c, 0);
+  const schueler = getDb().prepare('SELECT * FROM schueler WHERE klasse_id = ?').all(klasse12A.id);
+  assert.equal(schueler.length, 1);
+  assert.equal(schueler[0].nachname, 'Cortes');
+});
+
+test('Import: schulweiter Schülerabruf UND Fallback pro Klasse scheitern beide — Klasse wird trotzdem angelegt', async () => {
+  const fake = new FakeUntisClient({
+    gueltigeZugangsdaten: { username: 'lehrer.a', password: 'geheim123' },
+    klassen: [{ id: 702, name: '12B', longName: '' }],
+    wirftBeiSchuelern: 'keine Berechtigung',
+    wirftBeiSchuelernGefiltert: 'keine Berechtigung',
+  });
+  setUntisClientForTests(fake);
+  await form(lehrerA, '/teacher/untis-import/verbinden', {
+    server: 'neilo.webuntis.com', school: 'bbz-rd-eck', username: 'lehrer.a', password: 'geheim123',
+  });
+
+  const r = await lehrerA('/teacher/untis-import/importieren', {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: multiForm([
+      ['schuljahr_id', String(sjId)], ['notenschluessel', 'IHK'], ['mit_schuelern', '1'], ['klasse_id', '702'],
+    ]),
+  });
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.match(html, /12B/);
+  assert.match(html, /neu angelegt/);
+  assert.match(html, /von Untis nicht verfügbar/);
+  assert.match(html, /keine Berechtigung/, 'der genaue Untis-Fehlertext muss zur Fehlersuche mit angezeigt werden');
+
+  const klasse12B = getDb().prepare("SELECT * FROM klassen WHERE name = '12B' AND schuljahr_id = ?").get(sjId);
+  assert.ok(klasse12B);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(klasse12B.id).c, 0);
 });
 
 test('Import: Namenskollision im Ziel-Schuljahr wird übersprungen, keine Dopplung', async () => {

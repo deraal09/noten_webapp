@@ -8,6 +8,13 @@
     <% if (beispielFelder) { %>Vorhandene Felder je Schüler/in: <code class="token"><%= beispielFelder.join(', ') %></code><% } %>
   </p>
 <% } %>
+<% if (mitSchuelern && schuelerAbrufFehler) { %>
+  <p class="hint">
+    Der schulweite Schülerabruf ist fehlgeschlagen (<%= schuelerAbrufFehler %>) — es wurde je
+    ausgewählter Klasse ein zusätzlicher, nicht offiziell dokumentierter Versuch mit
+    Klassen-Filter unternommen (Ergebnis siehe Tabelle unten).
+  </p>
+<% } %>
 
 <table class="data">
   <thead>

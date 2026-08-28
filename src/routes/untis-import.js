@@ -117,17 +117,23 @@ export default async function untisImportRoutes(fastify) {
     }
 
     // Schülerliste (falls gewünscht) EINMAL für die ganze Schule laden,
-    // nicht pro Klasse — getStudents() kennt keinen Klassenfilter.
+    // nicht pro Klasse — getStudents() kennt keinen dokumentierten
+    // Klassenfilter. Schlägt das an fehlenden Rechten fehl (-8509 "no
+    // right for getStudents()" — das Recht "masterdata students read for
+    // all" fehlt am Lehrkraft-Konto), wird als letzter, ungewisser Versuch
+    // pro ausgewählter Klasse ein undokumentierter klasseId-Filter
+    // mitgegeben (falls die Untis-Instanz dafür ein engeres Recht kennt).
     let alleUntisSchueler = null;
     let schuelerAbrufFehler = null;
     let beispielFelder = null;
+    let schuelerProKlasseFallback = false;
     if (mitSchuelern) {
       try {
         alleUntisSchueler = await untisStudenten({ server: v.server, school: v.school, cookieHeader: v.cookieHeader });
         if (alleUntisSchueler.length) beispielFelder = Object.keys(alleUntisSchueler[0]);
       } catch (e) {
         schuelerAbrufFehler = e.message;
-        alleUntisSchueler = [];
+        schuelerProKlasseFallback = true;
       }
     }
 
@@ -156,15 +162,27 @@ export default async function untisImportRoutes(fastify) {
       }
 
       if (mitSchuelern) {
-        if (schuelerAbrufFehler) {
-          eintrag.schuelerFehler = schuelerAbrufFehler;
-        } else {
+        if (alleUntisSchueler) {
           const treffer = schuelerFuerKlasse(alleUntisSchueler, untisKlasse);
           if (treffer.length) {
             const insert = db.prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
             for (const m of treffer) insert.run(neueKlasseId, m.name || '', m.foreName || '');
           }
           eintrag.schuelerAnzahl = treffer.length;
+        } else if (schuelerProKlasseFallback) {
+          try {
+            const gefiltert = await untisStudenten({
+              server: v.server, school: v.school, cookieHeader: v.cookieHeader,
+              filter: { klasseId: untisKlasse.id },
+            });
+            if (gefiltert.length) {
+              const insert = db.prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
+              for (const m of gefiltert) insert.run(neueKlasseId, m.name || '', m.foreName || '');
+            }
+            eintrag.schuelerAnzahl = gefiltert.length;
+          } catch (e) {
+            eintrag.schuelerFehler = e.message;
+          }
         }
       }
       ergebnisse.push(eintrag);
@@ -176,6 +194,7 @@ export default async function untisImportRoutes(fastify) {
     return reply.viewEjs('teacher/untis_import_ergebnis.ejs', {
       user: request.user, ergebnisse, mitSchuelern,
       schuelerGesamt: alleUntisSchueler?.length ?? null, beispielFelder,
+      schuelerAbrufFehler: schuelerProKlasseFallback ? schuelerAbrufFehler : null,
     });
   });
 }
