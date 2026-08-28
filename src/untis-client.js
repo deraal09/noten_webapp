@@ -25,7 +25,11 @@ function baueCookie(school, sessionId) {
 }
 
 async function rpc(server, school, method, params, cookie) {
-  const url = `https://${server}/WebUntis/jsonrpc.do?school=${encodeURIComponent(school)}`;
+  // Robust gegen versehentlich mit eingegebenes "https://" oder einen
+  // Pfad/Slash im Server-Feld (führt sonst zu einer kaputten URL bzw.
+  // einem irreführenden 404, ohne dass der eigentliche Tippfehler auffällt).
+  const host = String(server).trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+  const url = `https://${host}/WebUntis/jsonrpc.do?school=${encodeURIComponent(school)}`;
   const headers = { 'Content-Type': 'application/json' };
   if (cookie) headers.Cookie = cookie;
   let res;
@@ -36,9 +40,17 @@ async function rpc(server, school, method, params, cookie) {
       body: JSON.stringify({ id: 'req1', method, params: params || {}, jsonrpc: '2.0' }),
     });
   } catch (e) {
-    throw new Error(`Untis-Server nicht erreichbar (${server}): ${e.message}`);
+    throw new Error(`Untis-Server nicht erreichbar (${url}): ${e.message}`);
   }
-  if (!res.ok) throw new Error(`Untis antwortet mit HTTP ${res.status}`);
+  if (!res.ok) {
+    // Body mitliefern statt nur des Status — ein 404 kann z. B. eine HTML-
+    // Fehlerseite mit einem Hinweis auf die richtige Adresse enthalten.
+    const bodyText = await res.text().catch(() => '');
+    const kurzerBody = bodyText.replace(/\s+/g, ' ').trim().slice(0, 200);
+    throw new Error(
+      `Untis antwortet mit HTTP ${res.status} für ${url}` + (kurzerBody ? ` — Antwort: "${kurzerBody}"` : ''),
+    );
+  }
   const data = await res.json();
   if (data.error) {
     throw new Error(`Untis-Fehler ${data.error.code ?? ''}: ${data.error.message || 'unbekannt'}`.trim());
