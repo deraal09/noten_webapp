@@ -13,6 +13,8 @@ import { DEFAULT_NS_CSV } from '../grade-calc.js';
 import {
   untisAnmelden, untisAbmelden, untisKlassen, untisStudenten, untisIdentitaet, untisZeitplan,
 } from '../untis-client.js';
+import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
+import { sortiereSchuljahreAbsteigend } from '../schuljahr-utils.js';
 
 const STANDARD_SERVER = 'bbz-rd-eck.webuntis.com';
 const STANDARD_SCHULE = 'bbz-rd-eck';
@@ -107,7 +109,7 @@ export default async function untisImportRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
 
   fastify.get('/untis-import', async (request, reply) => {
-    const schuljahre = getDb().prepare('SELECT * FROM schuljahre ORDER BY bezeichnung DESC').all();
+    const schuljahre = sortiereSchuljahreAbsteigend(getDb().prepare('SELECT * FROM schuljahre').all());
     const verbindung = request.session.untisImport || null;
     return reply.viewEjs('teacher/untis_import.ejs', {
       user: request.user, schuljahre, verbindung,
@@ -229,10 +231,7 @@ export default async function untisImportRoutes(fastify) {
       if (mitSchuelern) {
         if (alleUntisSchueler) {
           const treffer = schuelerFuerKlasse(alleUntisSchueler, untisKlasse);
-          if (treffer.length) {
-            const insert = db.prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
-            for (const m of treffer) insert.run(neueKlasseId, m.name || '', m.foreName || '');
-          }
+          for (const m of treffer) fuegeSchuelerHinzuFallsNeu(neueKlasseId, m.name || '', m.foreName || '');
           eintrag.schuelerAnzahl = treffer.length;
         } else if (schuelerProKlasseFallback) {
           try {
@@ -240,10 +239,7 @@ export default async function untisImportRoutes(fastify) {
               server: v.server, school: v.school, cookieHeader: v.cookieHeader,
               filter: { klasseId: untisKlasse.id },
             });
-            if (gefiltert.length) {
-              const insert = db.prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
-              for (const m of gefiltert) insert.run(neueKlasseId, m.name || '', m.foreName || '');
-            }
+            for (const m of gefiltert) fuegeSchuelerHinzuFallsNeu(neueKlasseId, m.name || '', m.foreName || '');
             eintrag.schuelerAnzahl = gefiltert.length;
           } catch (e) {
             eintrag.schuelerFehler = e.message;

@@ -19,6 +19,8 @@ import {
 } from '../noten-sperre.js';
 import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
 import { parseSchuelerCsv } from '../csv-import.js';
+import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
+import { sortiereSchuljahreAbsteigend } from '../schuljahr-utils.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -66,9 +68,7 @@ export default async function teacherRoutes(fastify) {
   // ---------- Dashboard (Lehrkraft) ----------
   fastify.get('/', async (request, reply) => {
     if (request.user.isAdmin) {
-      const schuljahre = getDb().prepare(
-        'SELECT * FROM schuljahre ORDER BY bezeichnung DESC'
-      ).all();
+      const schuljahre = sortiereSchuljahreAbsteigend(getDb().prepare('SELECT * FROM schuljahre').all());
       return reply.viewEjs('teacher/dashboard_admin.ejs', { user: request.user, schuljahre });
     }
     // Faecher des Users, nach Klasse gruppiert
@@ -577,7 +577,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.get('/klassen', async (request, reply) => {
     const db = getDb();
-    const schuljahre = db.prepare('SELECT * FROM schuljahre ORDER BY bezeichnung DESC').all();
+    const schuljahre = sortiereSchuljahreAbsteigend(db.prepare('SELECT * FROM schuljahre').all());
     const klassen = db.prepare(`
       SELECT DISTINCT k.*, s.bezeichnung AS schuljahr_bezeichnung
       FROM klassen k
@@ -954,7 +954,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     const andereSchuljahre = istKlassenlehrer
-      ? getDb().prepare('SELECT * FROM schuljahre WHERE id != ? ORDER BY bezeichnung DESC').all(klasse.schuljahr_id)
+      ? sortiereSchuljahreAbsteigend(getDb().prepare('SELECT * FROM schuljahre WHERE id != ?').all(klasse.schuljahr_id))
       : [];
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
@@ -1024,8 +1024,9 @@ export default async function teacherRoutes(fastify) {
     const nn = String(request.body?.nachname || '').trim();
     const vn = String(request.body?.vorname || '').trim();
     if (nn && vn) {
-      getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)')
-        .run(request.params.id, nn, vn);
+      if (!fuegeSchuelerHinzuFallsNeu(request.params.id, nn, vn)) {
+        request.flash?.('info', `${nn}, ${vn} ist in dieser Klasse bereits vorhanden — nicht doppelt angelegt.`);
+      }
     }
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
   });
@@ -1035,15 +1036,17 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const text = String(request.body?.text || '');
-    const ins = getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
     const tx = getDb().transaction((lines) => {
+      let uebersprungen = 0;
       for (const line of lines) {
         const [nn, vn] = line.split(',', 2).map((s) => s.trim());
         if (!nn) continue;
-        ins.run(request.params.id, nn, vn || '');
+        if (!fuegeSchuelerHinzuFallsNeu(request.params.id, nn, vn || '')) uebersprungen++;
       }
+      return uebersprungen;
     });
-    tx(text.split(/\r?\n/));
+    const uebersprungen = tx(text.split(/\r?\n/));
+    if (uebersprungen) request.flash?.('info', `${uebersprungen} bereits vorhandene(r) Schüler/in übersprungen — nicht doppelt angelegt.`);
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
   });
 
@@ -1078,12 +1081,17 @@ export default async function teacherRoutes(fastify) {
         request.flash?.('error', 'Aus der Datei konnten keine Schüler/innen gelesen werden — Format prüfen (Nachname, Vorname je Zeile).');
         return reply.redirect(`/teacher/klassen/${request.params.id}`);
       }
-      const ins = getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
       const tx = getDb().transaction((rows) => {
-        for (const r of rows) ins.run(request.params.id, r.nachname, r.vorname);
+        let angelegt = 0;
+        let uebersprungen = 0;
+        for (const r of rows) {
+          if (fuegeSchuelerHinzuFallsNeu(request.params.id, r.nachname, r.vorname)) angelegt++; else uebersprungen++;
+        }
+        return { angelegt, uebersprungen };
       });
-      tx(zeilen);
-      request.flash?.('success', `${zeilen.length} Schüler/in(nen) aus der Datei importiert.`);
+      const { angelegt, uebersprungen } = tx(zeilen);
+      request.flash?.('success', `${angelegt} Schüler/in(nen) aus der Datei importiert.`
+        + (uebersprungen ? ` ${uebersprungen} bereits vorhandene(r) übersprungen.` : ''));
       return reply.redirect(`/teacher/klassen/${request.params.id}`);
     });
   });

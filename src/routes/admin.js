@@ -10,6 +10,10 @@ import { searchLehrkraefte } from '../auth/ldap.js';
 import {
   getLdapSettingsRow, saveLdapSettings, clearLdapBindPassword, resolveLdapConfig,
 } from '../auth/ldap-settings.js';
+import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
+import {
+  istGueltigesSchuljahrFormat, sortiereSchuljahreAbsteigend, aktuellesStartjahr, parseSchuljahr,
+} from '../schuljahr-utils.js';
 
 export default async function adminRoutes(fastify) {
   fastify.addHook('preHandler', requireAdmin);
@@ -25,9 +29,9 @@ export default async function adminRoutes(fastify) {
       faecher: db.prepare('SELECT COUNT(*) AS c FROM faecher').get().c,
       offene_einladungen: db.prepare('SELECT COUNT(*) AS c FROM invitations WHERE used_at IS NULL').get().c,
     };
-    const schuljahre = db.prepare(
-      'SELECT * FROM schuljahre ORDER BY bezeichnung DESC'
-    ).all();
+    const startjahrJetzt = aktuellesStartjahr();
+    const schuljahre = sortiereSchuljahreAbsteigend(db.prepare('SELECT * FROM schuljahre').all())
+      .map((sj) => ({ ...sj, istAktuell: parseSchuljahr(sj.bezeichnung)?.startJahr === startjahrJetzt }));
     return reply.viewEjs('admin/dashboard.ejs', { user: request.user, stats, schuljahre });
   });
 
@@ -36,6 +40,15 @@ export default async function adminRoutes(fastify) {
     const bez = String(request.body?.bezeichnung || '').trim();
     if (!bez) {
       request.flash?.('error', 'Bezeichnung fehlt.');
+      return reply.redirect('/admin');
+    }
+    // Erzwingt das feste Schema "YYYY/YY" (die zweite Jahreszahl ist immer
+    // YYYY + 1) — nur so lassen sich Schuljahre zuverlässig nach ihrem
+    // echten Startjahr erkennen/sortieren, unabhängig von der Reihenfolge,
+    // in der sie angelegt wurden (ein nachträglich erfasstes, vergangenes
+    // Schuljahr darf nie als "aktuell" oder "nächstes" erscheinen).
+    if (!istGueltigesSchuljahrFormat(bez)) {
+      request.flash?.('error', `Ungültiges Format „${bez}" — Schuljahre müssen als YYYY/YY angegeben werden, z. B. 2025/26.`);
       return reply.redirect('/admin');
     }
     try {
@@ -117,26 +130,26 @@ export default async function adminRoutes(fastify) {
     const nn = String(request.body?.nachname || '').trim();
     const vn = String(request.body?.vorname || '').trim();
     if (nn && vn) {
-      getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)')
-        .run(request.params.id, nn, vn);
+      if (!fuegeSchuelerHinzuFallsNeu(request.params.id, nn, vn)) {
+        request.flash?.('info', `${nn}, ${vn} ist in dieser Klasse bereits vorhanden — nicht doppelt angelegt.`);
+      }
     }
     return reply.redirect(`/admin/klassen/${request.params.id}`);
   });
 
   fastify.post('/klassen/:id/schueler/bulk', async (request, reply) => {
     const text = String(request.body?.text || '');
-    const ins = getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
     const tx = getDb().transaction((lines) => {
-      let count = 0;
+      let uebersprungen = 0;
       for (const line of lines) {
         const [nn, vn] = line.split(',', 2).map((s) => s.trim());
         if (!nn) continue;
-        ins.run(request.params.id, nn, vn || '');
-        count++;
+        if (!fuegeSchuelerHinzuFallsNeu(request.params.id, nn, vn || '')) uebersprungen++;
       }
-      return count;
+      return uebersprungen;
     });
-    tx(text.split(/\r?\n/));
+    const uebersprungen = tx(text.split(/\r?\n/));
+    if (uebersprungen) request.flash?.('info', `${uebersprungen} bereits vorhandene(r) Schüler/in übersprungen — nicht doppelt angelegt.`);
     return reply.redirect(`/admin/klassen/${request.params.id}`);
   });
 

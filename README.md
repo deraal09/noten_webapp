@@ -142,6 +142,23 @@ Stunden-Spalten (Schule 1 / Schule 2) plus eine live berechnete Summe. Ohne
 den Haken bleibt die Ansicht wie bisher (eine Spalte je Typ) — das ist rein
 optional pro Klasse.
 
+## Schuljahre: Format, Sortierung und "aktuelles" Schuljahr
+
+Schuljahre folgen im Admin-Bereich (`/admin`, „Schuljahr anlegen") zwingend
+dem Schema **„YYYY/YY"**, wobei die zweite Zahl immer (YYYY + 1) modulo 100
+ist (z. B. `2025/26`, am Jahrhundertwechsel `2099/00`) — jedes andere
+Format wird abgelehnt (`src/schuljahr-utils.js`, `parseSchuljahr`/
+`istGueltigesSchuljahrFormat`). Das ist keine reine Formsache: alle Listen
+und Auswahlfelder (Admin-Dashboard, Klassen-Übersicht, Klassen-Übertragung,
+Untis-Import) sortieren Schuljahre über `sortiereSchuljahreAbsteigend` nach
+dem **tatsächlichen Startjahr**, nicht nach der Reihenfolge, in der sie
+angelegt wurden. Wird ein vergangenes Schuljahr nachträglich erfasst (z. B.
+weil es beim Ersteinrichten vergessen wurde), landet es dadurch immer an
+der chronologisch richtigen Stelle — nie oben in der Liste und nie mit dem
+„(aktuell)"-Hinweis im Admin-Dashboard, der ausschließlich über das
+heutige Kalenderdatum ermittelt wird (deutsches Schuljahr läuft ca.
+August–Juli, siehe `aktuellesStartjahr()`).
+
 ## Klassen selbst anlegen (ohne Admin-Zuweisung)
 
 Jede angemeldete Lehrkraft kann unter **„Meine Klassen"** eigene Klassen in
@@ -151,6 +168,15 @@ Lehrkraft automatisch diesem Fach zugewiesen (sieht es sofort in der eigenen
 Notentafel).
 
 Schuljahre selbst legt weiterhin nur der Admin an (Admin → Dashboard).
+
+**Keine doppelten Schüler-Einträge:** Egal ob per Einzeleingabe,
+Sammel-Einfügen, CSV-Upload oder Untis-Import — vor jedem Anlegen prüft
+`src/schueler-utils.js` (`fuegeSchuelerHinzuFallsNeu`), ob in der Klasse
+bereits jemand mit demselben Nachnamen/Vornamen existiert (Groß-/
+Kleinschreibung und Leerzeichen am Rand spielen dabei keine Rolle). Ein
+erneuter Import oder ein zweiter Klick auf „Hinzufügen" legt niemanden
+doppelt an; betroffene Namen werden als „bereits vorhanden" übersprungen
+und das per Flash-Meldung/Ergebnisseite rückgemeldet.
 
 ### Klassenleitung (selbst eintragen, nicht nur Admin)
 

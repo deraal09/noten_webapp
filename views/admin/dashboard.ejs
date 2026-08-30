@@ -18,7 +18,7 @@
   <tbody>
     <% schuljahre.forEach(function(sj) { %>
       <tr>
-        <td><a href="/admin/schuljahre/<%= sj.id %>"><%= sj.bezeichnung %></a></td>
+        <td><a href="/admin/schuljahre/<%= sj.id %>"><%= sj.bezeichnung %></a><% if (sj.istAktuell) { %> <span class="hint">(aktuell)</span><% } %></td>
         <td>
           <form method="post" action="/admin/schuljahre/<%= sj.id %>/gewichtung" class="inline">
             <input type="number" name="gewichtung" min="0" max="100" value="<%= sj.gewichtung_muendlich %>" size="4">%

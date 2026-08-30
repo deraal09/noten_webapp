@@ -96,6 +96,18 @@ test('CSV-Upload: Semikolon-getrennt mit Kopfzeile legt Schüler/innen an', asyn
   assert.equal(schueler[0].vorname, 'Anna');
 });
 
+test('CSV-Upload: erneuter Upload derselben Datei legt niemanden doppelt an', async () => {
+  const vorher = getDb().prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(klasseId).c;
+  const csv = 'Nachname;Vorname\nMüller;Anna\nSchmidt;Bernd\n';
+  const r = await uploadCsv(lehrerA, `/teacher/klassen/${klasseId}/schueler/csv`, csv);
+  assert.equal(r.status, 302);
+  const html = await (await lehrerA(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /0 Schüler/);
+  assert.match(html, /2 bereits vorhandene\(r\) übersprungen/);
+  const nachher = getDb().prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(klasseId).c;
+  assert.equal(nachher, vorher, 'kein zweiter Datensatz für Müller/Schmidt');
+});
+
 test('CSV-Upload: leere/unlesbare Datei erzeugt Fehlermeldung statt Absturz', async () => {
   const r = await uploadCsv(lehrerA, `/teacher/klassen/${klasseId}/schueler/csv`, '');
   assert.equal(r.status, 302);
