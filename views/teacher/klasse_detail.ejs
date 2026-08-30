@@ -70,6 +70,19 @@ Meier, Carla"></textarea>
     <button type="submit">Alle anlegen</button>
   </form>
 </details>
+<details>
+  <summary>Schülerliste aus einer CSV-Datei importieren (z. B. ein manueller Untis-Export)</summary>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/csv" enctype="multipart/form-data" class="card">
+    <p class="hint">
+      Erwartet eine Spalte für Nachname und eine für Vorname — mit Kopfzeile
+      (z. B. „Nachname"/„Vorname" oder englisch „Name"/„Forename") oder
+      ohne (dann werden die ersten beiden Spalten verwendet). Semikolon,
+      Komma oder Tab als Trennzeichen werden automatisch erkannt.
+    </p>
+    <input type="file" name="datei" accept=".csv,text/csv" required>
+    <button type="submit">Datei importieren</button>
+  </form>
+</details>
 <table class="data">
   <thead><tr><th>Nachname</th><th>Vorname</th><th>Aktion</th></tr></thead>
   <tbody>

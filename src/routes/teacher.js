@@ -18,6 +18,42 @@ import {
   istSchuelerGesperrtInFach, sperren, entsperren, aufhebungAnfragen, ladeSperrenFuerKlasse, holeSperre,
 } from '../noten-sperre.js';
 import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
+import { parseSchuelerCsv } from '../csv-import.js';
+import Busboy from '@fastify/busboy';
+import { Readable } from 'node:stream';
+
+/**
+ * Liest genau ein Datei-Feld aus einem multipart/form-data-Buffer. Absichtlich
+ * ohne @fastify/multipart (das registriert seinen Content-Type-Parser global
+ * für die ganze App via fastify-plugin und würde damit dafür sorgen, dass
+ * ANDERE Routen multipart/form-data plötzlich mit leerem statt mit 415
+ * abgelehntem Body erhalten — siehe die Regression in
+ * fach_detail.ejs/Punkte-Eingabe, die genau auf dem alten 415-Verhalten
+ * beruht). Der Content-Type-Parser für multipart wird stattdessen weiter
+ * unten NUR innerhalb eines eigenen, gekapselten fastify.register()-Blocks
+ * registriert, gilt also wirklich nur für den CSV-Upload.
+ */
+function leseMultipartDatei(buffer, contentType, feldname) {
+  return new Promise((resolve, reject) => {
+    let busboy;
+    try {
+      busboy = new Busboy({ headers: { 'content-type': contentType } });
+    } catch (e) {
+      return reject(e);
+    }
+    let ergebnis = null;
+    busboy.on('file', (name, stream) => {
+      const chunks = [];
+      stream.on('data', (c) => chunks.push(c));
+      stream.on('end', () => {
+        if (name === feldname) ergebnis = Buffer.concat(chunks);
+      });
+    });
+    busboy.on('error', reject);
+    busboy.on('finish', () => resolve(ergebnis));
+    Readable.from(buffer).pipe(busboy);
+  });
+}
 
 /** Fach-assignierte Lehrkraft ODER Klassenleitung darf die Notentafel/Historie eines Fachs bearbeiten. */
 function userDarfFachBearbeiten(user, fach) {
@@ -1009,6 +1045,47 @@ export default async function teacherRoutes(fastify) {
     });
     tx(text.split(/\r?\n/));
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  // CSV-Datei-Upload (z. B. ein manueller Untis-Export) — Alternative zum
+  // automatischen Untis-Import, dem viele Lehrkraft-Konten die nötigen
+  // API-Rechte fehlen (siehe routes/untis-import.js). Eigener, gekapselter
+  // Plugin-Scope: der multipart/form-data-Content-Type-Parser gilt dadurch
+  // NUR für diese eine Route, alle übrigen Formulare/Routen der App bleiben
+  // unverändert bei application/x-www-form-urlencoded (siehe Kommentar bei
+  // leseMultipartDatei oben).
+  fastify.register(async function (scoped) {
+    scoped.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (request, payload, done) => {
+      done(null, payload);
+    });
+
+    scoped.post('/klassen/:id/schueler/csv', { bodyLimit: 1 * 1024 * 1024 }, async (request, reply) => {
+      if (!userHatKlassenZugriff(request.user, request.params.id)) {
+        return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+      }
+      let dateiBuffer;
+      try {
+        dateiBuffer = await leseMultipartDatei(request.body, request.headers['content-type'], 'datei');
+      } catch {
+        dateiBuffer = null;
+      }
+      if (!dateiBuffer) {
+        request.flash?.('error', 'Bitte eine CSV-Datei auswählen.');
+        return reply.redirect(`/teacher/klassen/${request.params.id}`);
+      }
+      const zeilen = parseSchuelerCsv(dateiBuffer.toString('utf8'));
+      if (!zeilen.length) {
+        request.flash?.('error', 'Aus der Datei konnten keine Schüler/innen gelesen werden — Format prüfen (Nachname, Vorname je Zeile).');
+        return reply.redirect(`/teacher/klassen/${request.params.id}`);
+      }
+      const ins = getDb().prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)');
+      const tx = getDb().transaction((rows) => {
+        for (const r of rows) ins.run(request.params.id, r.nachname, r.vorname);
+      });
+      tx(zeilen);
+      request.flash?.('success', `${zeilen.length} Schüler/in(nen) aus der Datei importiert.`);
+      return reply.redirect(`/teacher/klassen/${request.params.id}`);
+    });
   });
 
   fastify.post('/schueler/:id/loeschen', async (request, reply) => {

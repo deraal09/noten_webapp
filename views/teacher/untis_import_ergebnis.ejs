@@ -38,9 +38,12 @@
           <td>
             <% if (e.status !== 'angelegt') { %>—
             <% } else if (e.schuelerAnzahl === null) { %>
-              <span class="hint">von Untis nicht verfügbar — bitte manuell hinzufügen<% if (e.schuelerFehler) { %><br><small>(<%= e.schuelerFehler %>)</small><% } %></span>
+              <span class="hint">
+                von Untis nicht verfügbar<% if (e.schuelerFehler) { %><br><small>(<%= e.schuelerFehler %>)</small><% } %><br>
+                <a href="/teacher/klassen/<%= e.klasseId %>">bitte manuell oder per CSV-Datei hinzufügen</a>
+              </span>
             <% } else if (e.schuelerAnzahl === 0) { %>
-              <span class="hint">keine gefunden</span>
+              <span class="hint">keine gefunden — <a href="/teacher/klassen/<%= e.klasseId %>">manuell oder per CSV-Datei hinzufügen</a></span>
             <% } else { %><%= e.schuelerAnzahl %><% } %>
           </td>
         <% } %>

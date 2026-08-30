@@ -215,35 +215,31 @@ ohne die Klasse vorher manuell anzulegen. **Wichtig, bitte lesen:**
   jeder Verbindung neu mit den eigenen Untis-Zugangsdaten an;
   die Sitzung liegt nur kurz im Server-Session-Speicher und wird nach dem
   Import (oder per „Verbindung trennen") sofort beendet.
-- **Schülerlisten je Klasse sind technisch nicht zuverlässig abrufbar.**
-  Die WebUntis-API liefert zwar `getKlassen()` (Klassenliste) zuverlässig,
-  aber es gibt keine dokumentierte Methode für „Schüler/innen einer Klasse":
-  `getStudentGroupMembers(klasseId)` (Klasse == „Studentengruppe" mit
-  gleicher ID) existiert auf manchen Untis-Instanzen gar nicht (am BBZ
-  RD-Eck z. B. `-32601: Method not found`). Stattdessen wird **einmal pro
-  Import** die komplette Schülerliste der Schule geladen (`getStudents()`,
-  ohne dokumentierten Klassenbezug) und versucht, sie über plausible,
-  nicht offiziell dokumentierte Feldnamen (`klasseId`, `classId`, `klasse`,
-  `className` u. Ä.) den ausgewählten Klassen zuzuordnen. `getStudents()`
-  benötigt laut Community-Dokumentation außerdem das Recht „masterdata
-  students read for all" — fehlt es am Lehrkraft-Konto (Untis-Fehler
-  `-8509: no right for getStudents()`, ebenfalls am BBZ RD-Eck beobachtet),
-  wird als letzter, ebenfalls ungewisser Versuch pro ausgewählter Klasse
-  ein undokumentierter `klasseId`-Filter an `getStudents()` mitgegeben, für
-  den eine Untis-Instanz möglicherweise ein engeres Recht kennt. Ob einer
-  dieser Wege auf einer gegebenen Untis-Instanz funktioniert, ist ungewiss
-  — die Ergebnisseite zeigt zur Fehlersuche zusätzlich die Gesamtzahl der
-  von Untis gelieferten Schüler/innen sowie die tatsächlich vorhandenen
-  Feldnamen des ersten Datensatzes an (nur beim schulweiten Abruf) bzw.
-  den genauen Untis-Fehlertext, falls auch der Fallback scheitert. Bleiben
-  die Treffer bei 0, wird die Klasse trotzdem angelegt; Schüler/innen
-  können dann wie gewohnt per Hand oder Sammel-Einfügen ergänzt werden.
-  **Bleibt der Import dauerhaft ohne Schülerdaten**, ist der einzige noch
-  offene Weg, den lokalen WebUntis-Admin der Schule zu bitten, dem
-  verwendeten Lehrkraft-Konto (unter „Verwaltung"/„Digitale
-  Nutzerverwaltung" → Rechte) das Recht „Schülerstammdaten lesen" zu
-  geben — das ist eine reine Rechte-Einstellung im WebUntis-Backend, keine
-  App-Registrierung bei developer.untis.com.
+- **Schülerlisten je Klasse sind über die API nicht zuverlässig abrufbar —
+  am BBZ RD-Eck sogar gar nicht.** Die WebUntis-API liefert zwar
+  `getKlassen()` (Klassenliste) zuverlässig, aber es gibt keine
+  dokumentierte Methode für „Schüler/innen einer Klasse":
+  `getStudentGroupMembers(klasseId)` existiert auf dieser Untis-Instanz
+  nicht (`-32601: Method not found`), und der schulweite Fallback
+  `getStudents()` scheitert am fehlenden Recht „masterdata students read
+  for all" (`-8509: no right for getStudents()`) — auch mit einem
+  zusätzlich versuchten, undokumentierten `klasseId`-Filter pro Klasse.
+  Beide bekannten API-Wege sind damit für ein normales Lehrkraft-Konto
+  ohne erweiterte Rechte am BBZ RD-Eck ausgeschlossen (Details/Codepfade
+  in `src/untis-client.js` und `routes/untis-import.js`, falls sich die
+  Rechte am Konto später ändern und ein neuer Versuch sich lohnt).
+  Klassen werden trotzdem angelegt; Schüler/innen lassen sich danach auf
+  der Klassenseite ergänzen — entweder per Hand, per Sammel-Einfügen
+  (Textfeld, eine Zeile je Person) oder per **CSV-Datei-Upload**
+  (`POST /teacher/klassen/:id/schueler/csv`, `src/csv-import.js`): eine
+  Spalte Nachname und eine Vorname, mit oder ohne Kopfzeile, Semikolon/
+  Komma/Tab als Trennzeichen wird automatisch erkannt — z. B. für eine
+  von Hand aus WebUntis oder einer anderen Schulverwaltungssoftware
+  exportierte Liste. Dieser eine Endpunkt akzeptiert bewusst
+  `multipart/form-data` in einem eigenen, gekapselten Fastify-Plugin-Scope
+  (`@fastify/busboy` statt eines global registrierten Multipart-Plugins) —
+  alle übrigen Formulare der App bleiben unverändert bei
+  `application/x-www-form-urlencoded`.
 - Klassen, die im Ziel-Schuljahr bereits existieren (Namenskollision),
   werden beim Import übersprungen statt dupliziert — bei Bedarf über die
   bestehende Verknüpfungsanfrage manuell verbinden.
