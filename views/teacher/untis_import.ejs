@@ -49,6 +49,12 @@
       <button type="submit">Verbindung trennen</button>
     </form>
   </div>
+  <% if (!verbindung.eigeneKlassenIds && verbindung.eigeneKlassenFehler) { %>
+    <p class="hint">
+      Zur Fehlersuche: Die eigenen Klassen konnten nicht ermittelt werden, unten stehen deshalb
+      alle Klassen der Schule zur Auswahl. Grund: <%= verbindung.eigeneKlassenFehler %>
+    </p>
+  <% } %>
 
   <% if (!schuljahre.length) { %>
     <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst eins anzulegen.</p>

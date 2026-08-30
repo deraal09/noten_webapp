@@ -38,22 +38,44 @@ function datumMitOffsetTagen(basis, offsetTage) {
 // (z. B. eine Klausur-Vertretung oder ein Kurs in einer Pausenzeit) würden
 // dabei fehlen, deshalb bleibt "alle Klassen der Schule anzeigen" in der
 // Ansicht immer als Fallback wählbar. Schlägt der Versuch komplett fehl
-// (Identität oder Stundenplan nicht abrufbar), wird wie bisher ohne Filter
-// die volle Klassenliste gezeigt.
+// (Identität oder Stundenplan nicht abrufbar, oder keine Klasse im
+// erwarteten "kl"-Feld erkennbar), wird wie bisher ohne Filter die volle
+// Klassenliste gezeigt — der genaue Grund wird aber zurückgegeben, statt
+// still zu verschwinden, damit sich ein Fehlschlag auf der echten
+// Untis-Instanz konkret nachvollziehen lässt (siehe eigeneKlassenFehler
+// auf der Verbindungsseite).
 async function eigeneKlassenIdsErmitteln({ server, school, cookieHeader }) {
-  const { personId, personType } = await untisIdentitaet({ server, school, cookieHeader });
-  const heute = new Date();
-  const stunden = await untisZeitplan({
-    server, school, cookieHeader, personId, personType,
-    startDate: datumMitOffsetTagen(heute, -14), endDate: datumMitOffsetTagen(heute, 14),
-  });
+  let personId;
+  let personType;
+  try {
+    ({ personId, personType } = await untisIdentitaet({ server, school, cookieHeader }));
+  } catch (e) {
+    return { ids: null, fehler: `Eigene Identität nicht ermittelbar (app/config): ${e.message}` };
+  }
+  let stunden;
+  try {
+    const heute = new Date();
+    stunden = await untisZeitplan({
+      server, school, cookieHeader, personId, personType,
+      startDate: datumMitOffsetTagen(heute, -14), endDate: datumMitOffsetTagen(heute, 14),
+    });
+  } catch (e) {
+    return { ids: null, fehler: `Stundenplan nicht abrufbar (personId ${personId}, personType ${personType}): ${e.message}` };
+  }
   const ids = new Set();
   for (const stunde of stunden) {
     for (const k of (stunde.kl || [])) {
       if (k?.id !== undefined && k?.id !== null) ids.add(Number(k.id));
     }
   }
-  return ids.size ? Array.from(ids) : null;
+  if (ids.size) return { ids: Array.from(ids), fehler: null };
+  const beispielFelder = stunden.length ? Object.keys(stunden[0]) : null;
+  return {
+    ids: null,
+    fehler: stunden.length
+      ? `Stundenplan hat ${stunden.length} Eintrag/Einträge geliefert, aber keine Klasse im Feld "kl" gefunden. Vorhandene Felder je Eintrag: ${beispielFelder.join(', ')}`
+      : 'Stundenplan hat keine Einträge im Zeitraum ±14 Tage geliefert.',
+  };
 }
 
 // getStudentGroupMembers (Untis-Klasse == "Studentengruppe" mit gleicher ID)
@@ -116,15 +138,14 @@ export default async function untisImportRoutes(fastify) {
     }
     try {
       const klassen = await untisKlassen({ server, school, cookieHeader: anmeldung.cookieHeader });
-      let eigeneKlassenIds = null;
-      try {
-        eigeneKlassenIds = await eigeneKlassenIdsErmitteln({ server, school, cookieHeader: anmeldung.cookieHeader });
-      } catch { /* Fallback: alle Klassen der Schule anzeigen, siehe Kommentar oben */ }
+      const eigene = await eigeneKlassenIdsErmitteln({ server, school, cookieHeader: anmeldung.cookieHeader })
+        .catch((e) => ({ ids: null, fehler: `Unerwarteter Fehler: ${e.message}` }));
       request.session.untisImport = {
         server, school, cookieHeader: anmeldung.cookieHeader,
         klassen: klassen.map((k) => ({ id: k.id, name: k.name, longName: k.longName || '' }))
           .sort((a, b) => a.name.localeCompare(b.name)),
-        eigeneKlassenIds,
+        eigeneKlassenIds: eigene.ids,
+        eigeneKlassenFehler: eigene.fehler,
       };
       request.flash?.('success', `Verbunden — ${klassen.length} Klasse(n) von Untis geladen.`);
     } catch (e) {

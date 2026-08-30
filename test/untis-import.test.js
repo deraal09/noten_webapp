@@ -196,7 +196,25 @@ test('Stundenplan-Abruf nicht verfügbar: Fallback auf ungefilterte Klassenliste
   const html = await (await lehrerA('/teacher/untis-import')).text();
   assert.doesNotMatch(html, /laut deinem eigenen Stundenplan/);
   assert.doesNotMatch(html, /Alle \d+ Klassen der Schule anzeigen/, 'ohne Filter gibt es nichts Zusätzliches zum Ausklappen');
+  assert.match(html, /app\/config nicht erreichbar/, 'der genaue Grund des Fallbacks muss zur Fehlersuche angezeigt werden');
   assert.match(html, /12A/);
+});
+
+test('Stundenplan geliefert, aber ohne "kl"-Feld erkennbar: Diagnose zeigt tatsächliche Felder', async () => {
+  const fake = new FakeUntisClient({
+    gueltigeZugangsdaten: { username: 'lehrer.a', password: 'geheim123' },
+    klassen: [{ id: 801, name: '13A', longName: '' }],
+    identitaetErgebnis: { personId: 42, personType: 2 },
+    stunden: [{ klassen: [{ id: 801 }], lstext: 'Mathe' }],
+  });
+  setUntisClientForTests(fake);
+  await form(lehrerA, '/teacher/untis-import/verbinden', {
+    server: 'neilo.webuntis.com', school: 'bbz-rd-eck', username: 'lehrer.a', password: 'geheim123',
+  });
+  const html = await (await lehrerA('/teacher/untis-import')).text();
+  assert.doesNotMatch(html, /laut deinem eigenen Stundenplan/);
+  assert.match(html, /keine Klasse im Feld.*?kl.*? gefunden/, 'EJS escaped die Anführungszeichen als &#34; im HTML');
+  assert.match(html, /klassen, lstext/, 'die tatsächlichen Feldnamen müssen zur Fehlersuche angezeigt werden');
 });
 
 test('Trennen: Session-Verbindung wird gelöscht und bei Untis abgemeldet', async () => {
