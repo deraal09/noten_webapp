@@ -215,6 +215,22 @@ ohne die Klasse vorher manuell anzulegen. **Wichtig, bitte lesen:**
   jeder Verbindung neu mit den eigenen Untis-Zugangsdaten an;
   die Sitzung liegt nur kurz im Server-Session-Speicher und wird nach dem
   Import (oder per „Verbindung trennen") sofort beendet.
+- **`getKlassen()` liefert ausnahmslos ALLE Klassen der ganzen Schule**,
+  nicht nur die der anmeldenden Lehrkraft — es gibt keine dokumentierte
+  Methode, die das serverseitig einschränkt. Nach der Anmeldung wird
+  deshalb zusätzlich versucht, über den eigenen Stundenplan der Person
+  (`getTimetable`, Element-Typ „Lehrkraft", ±14 Tage um heute; personId/
+  personType kommen vom dokumentierten REST-Endpunkt `/WebUntis/api/app/
+  config`, der mit derselben Session unabhängig von der Anmeldeart
+  funktioniert) einzugrenzen, welche Klassen tatsächlich unterrichtet
+  werden — diese sind auf der Auswahlseite vorausgewählt, der Rest steht
+  hinter „Alle Klassen der Schule anzeigen". Da nur der Abfragezeitraum
+  betrachtet wird, kann eine Klasse ohne Unterricht in diesen zwei Wochen
+  fehlen (z. B. bei Randstunden-Fächern) — deshalb bleibt die volle Liste
+  immer erreichbar. Schlägt der Versuch komplett fehl (z. B. weil
+  `app/config` oder `getTimetable` auf einer Untis-Instanz nicht wie
+  erwartet funktionieren), wird ohne Fehlermeldung auf die ungefilterte
+  Liste zurückgefallen — das bisherige Verhalten.
 - **Schülerlisten je Klasse sind über die API nicht zuverlässig abrufbar —
   am BBZ RD-Eck sogar gar nicht.** Die WebUntis-API liefert zwar
   `getKlassen()` (Klassenliste) zuverlässig, aber es gibt keine

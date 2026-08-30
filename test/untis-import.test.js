@@ -68,6 +68,7 @@ class FakeUntisClient {
   constructor({
     gueltigeZugangsdaten, klassen, schuelerGesamt, wirftBeiSchuelern,
     schuelerProKlasseFilter, wirftBeiSchuelernGefiltert,
+    identitaetErgebnis, stunden, wirftBeiIdentitaet, wirftBeiZeitplan,
   }) {
     this.gueltigeZugangsdaten = gueltigeZugangsdaten;
     this.klassenListe = klassen;
@@ -75,6 +76,13 @@ class FakeUntisClient {
     this.wirftBeiSchuelern = wirftBeiSchuelern || null;
     this.schuelerProKlasseFilter = schuelerProKlasseFilter || {};
     this.wirftBeiSchuelernGefiltert = wirftBeiSchuelernGefiltert || null;
+    // Standardmäßig nicht implementiert (wie bei den meisten realen
+    // Untis-Instanzen, solange es nicht getestet wird) — der Import fällt
+    // dann auf die ungefilterte Klassenliste zurück, genau wie im Live-Betrieb.
+    this.identitaetErgebnis = identitaetErgebnis || null;
+    this.stunden = stunden || [];
+    this.wirftBeiIdentitaet = wirftBeiIdentitaet || null;
+    this.wirftBeiZeitplan = wirftBeiZeitplan || null;
     this.abmeldeAufrufe = 0;
   }
   async anmelden({ username, password }) {
@@ -85,6 +93,15 @@ class FakeUntisClient {
   }
   async abmelden() { this.abmeldeAufrufe++; }
   async klassen() { return this.klassenListe; }
+  async identitaet() {
+    if (this.wirftBeiIdentitaet) throw new Error(this.wirftBeiIdentitaet);
+    if (!this.identitaetErgebnis) throw new Error('app/config nicht implementiert (Fake-Standard)');
+    return this.identitaetErgebnis;
+  }
+  async zeitplan() {
+    if (this.wirftBeiZeitplan) throw new Error(this.wirftBeiZeitplan);
+    return this.stunden;
+  }
   async studenten({ filter } = {}) {
     if (filter && filter.klasseId !== undefined) {
       if (this.wirftBeiSchuelernGefiltert) throw new Error(this.wirftBeiSchuelernGefiltert);
@@ -141,6 +158,45 @@ test('Erfolgreicher Login: Klassen aus Untis werden zur Auswahl angezeigt', asyn
   const html = await (await lehrerA('/teacher/untis-import')).text();
   assert.match(html, /Klassen auswählen/);
   assert.match(html, /10A/);
+});
+
+test('Eigene Klassen laut Stundenplan werden vorausgewählt, der Rest hinter "Alle Klassen anzeigen"', async () => {
+  const fake = new FakeUntisClient({
+    gueltigeZugangsdaten: { username: 'lehrer.a', password: 'geheim123' },
+    klassen: [
+      { id: 601, name: '11B', longName: '' },
+      { id: 602, name: '11C', longName: '' },
+    ],
+    identitaetErgebnis: { personId: 42, personType: 2 },
+    stunden: [{ kl: [{ id: 601, name: '11B' }] }, { kl: [{ id: 601, name: '11B' }] }],
+  });
+  setUntisClientForTests(fake);
+  await form(lehrerA, '/teacher/untis-import/verbinden', {
+    server: 'neilo.webuntis.com', school: 'bbz-rd-eck', username: 'lehrer.a', password: 'geheim123',
+  });
+
+  const html = await (await lehrerA('/teacher/untis-import')).text();
+  assert.match(html, /davon 1 laut deinem eigenen Stundenplan/);
+  const vorAusklappen = html.slice(0, html.indexOf('Alle 2 Klassen der Schule anzeigen'));
+  assert.match(vorAusklappen, /value="601"[^>]*checked/, '11B (eigene Klasse) ist vorausgewählt außerhalb des Ausklapp-Bereichs');
+  assert.doesNotMatch(vorAusklappen, /value="602"/, '11C (nicht eigene Klasse) erscheint nicht vor dem Ausklapp-Bereich');
+  assert.match(html, /value="602"/, '11C ist trotzdem wählbar (im Ausklapp-Bereich)');
+});
+
+test('Stundenplan-Abruf nicht verfügbar: Fallback auf ungefilterte Klassenliste', async () => {
+  const fake = new FakeUntisClient({
+    gueltigeZugangsdaten: { username: 'lehrer.a', password: 'geheim123' },
+    klassen: [{ id: 701, name: '12A', longName: '' }],
+    wirftBeiIdentitaet: 'app/config nicht erreichbar',
+  });
+  setUntisClientForTests(fake);
+  await form(lehrerA, '/teacher/untis-import/verbinden', {
+    server: 'neilo.webuntis.com', school: 'bbz-rd-eck', username: 'lehrer.a', password: 'geheim123',
+  });
+  const html = await (await lehrerA('/teacher/untis-import')).text();
+  assert.doesNotMatch(html, /laut deinem eigenen Stundenplan/);
+  assert.doesNotMatch(html, /Alle \d+ Klassen der Schule anzeigen/, 'ohne Filter gibt es nichts Zusätzliches zum Ausklappen');
+  assert.match(html, /12A/);
 });
 
 test('Trennen: Session-Verbindung wird gelöscht und bei Untis abgemeldet', async () => {

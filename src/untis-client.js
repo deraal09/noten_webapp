@@ -29,14 +29,19 @@
  * zusammengesetzter Cookie führte zuvor zu "-8520: not authenticated" bei
  * an sich erfolgreicher Anmeldung.
  *
- * WICHTIGE EINSCHRÄNKUNG (unabhängig von der Anmeldeart): getStudents()
- * liefert ALLE Schüler/innen der Schule ohne Klassen-Zuordnung — es gibt
- * keine dokumentierte Methode, die direkt "Schüler/innen einer Klasse"
- * liefert. Als bester verfügbarer Ansatz wird getStudentGroupMembers(klasseId)
- * versucht (in vielen Untis-Konfigurationen ist eine feste Klasse zugleich
- * eine "Studentengruppe" mit derselben ID) — das kann je nach Schule/Rechten
- * leer bleiben oder fehlschlagen; das ist kein Bug, siehe Kommentar in
- * routes/untis-import.js.
+ * WICHTIGE EINSCHRÄNKUNG (unabhängig von der Anmeldeart): getKlassen()
+ * liefert ausnahmslos ALLE Klassen der ganzen Schule, nicht nur die der
+ * anmeldenden Lehrkraft — deshalb wird zusätzlich versucht, über den
+ * eigenen Stundenplan (getTimetable für die eigene Person, siehe zeitplan()
+ * unten) einzugrenzen, welche Klassen die Lehrkraft im Import-Zeitraum
+ * tatsächlich unterrichtet (Details in routes/untis-import.js). Schlägt das
+ * fehl, werden wie bisher alle Klassen der Schule angezeigt.
+ * Für Schülerlisten je Klasse gibt es KEINE dokumentierte Methode:
+ * getStudentGroupMembers(klasseId) existiert auf manchen Untis-Instanzen
+ * gar nicht (-32601), und der schulweite Fallback getStudents() benötigt
+ * das Recht "masterdata students read for all" (schlägt ohne dieses Recht
+ * mit -8509 fehl) — siehe routes/untis-import.js für den CSV-Datei-Upload
+ * als praktikable Alternative in diesem Fall.
  */
 
 import crypto from 'node:crypto';
@@ -107,6 +112,36 @@ async function rpc(server, school, method, params, cookieHeader) {
     throw new Error(`Untis-Fehler ${data.error.code ?? ''}: ${data.error.message || 'unbekannt'}`.trim());
   }
   return { result: data.result, neuerCookieHeader: cookieHeaderAus(alleSetCookies(res)) || null };
+}
+
+/**
+ * Ermittelt personId/personType der eingeloggten Person über den
+ * dokumentierten REST-Endpunkt /WebUntis/api/app/config (denselben, den
+ * Untis Mobile nach dem Login abfragt) — funktioniert mit derselben Session
+ * unabhängig davon, ob per Passwort oder per Secret/TOTP angemeldet wurde.
+ * Wird für den optionalen "nur meine Klassen"-Filter beim Import genutzt
+ * (siehe routes/untis-import.js); schlägt der Aufruf fehl, zeigt der Import
+ * wie bisher alle Klassen der Schule.
+ */
+async function eigeneIdentitaet({ server, school, cookieHeader }) {
+  const host = bereinigeHost(server);
+  const url = `https://${host}/WebUntis/api/app/config`;
+  let res;
+  try {
+    res = await fetch(url, { headers: { Cookie: cookieHeader } });
+  } catch (e) {
+    throw new Error(`Untis-Server nicht erreichbar (${url}): ${e.message}`);
+  }
+  const bodyText = await res.text();
+  if (!res.ok) throw fehlerAusAntwort(res, url, bodyText);
+  const data = JSON.parse(bodyText);
+  const user = data?.data?.loginServiceConfig?.user;
+  const personId = user?.personId;
+  if (personId === undefined || personId === null) {
+    throw new Error('Untis-Profildaten (app/config) enthalten keine personId.');
+  }
+  const personType = (user.persons || []).find((p) => p.id === personId)?.type ?? null;
+  return { personId, personType };
 }
 
 // ---------- TOTP (RFC 6238) für die Secret-basierte Anmeldung ----------
@@ -220,6 +255,28 @@ const echterClient = {
     const { result } = await rpc(server, school, 'getStudents', filter || {}, cookieHeader);
     return Array.isArray(result) ? result : [];
   },
+
+  async identitaet(args) {
+    return eigeneIdentitaet(args);
+  },
+
+  // Eigener Stundenplan (getTimetable, element type 2 = Lehrkraft) im
+  // angegebenen Datumsbereich (Format YYYYMMDD) — jede Stunde enthält ein
+  // "kl"-Array mit den beteiligten Klassen. Daraus lässt sich ableiten,
+  // welche Klassen die Lehrkraft im abgefragten Zeitraum tatsächlich
+  // unterrichtet, im Unterschied zu getKlassen() (liefert ausnahmslos ALLE
+  // Klassen der Schule). Für den eigenen Stundenplan ist laut
+  // Community-Dokumentation kein zusätzliches Recht dokumentiert.
+  async zeitplan({ server, school, cookieHeader, personId, personType, startDate, endDate }) {
+    const { result } = await rpc(server, school, 'getTimetable', {
+      options: {
+        element: { id: personId, type: personType },
+        startDate, endDate,
+        showLsText: true, showStudentgroup: true,
+      },
+    }, cookieHeader);
+    return Array.isArray(result) ? result : [];
+  },
 };
 
 let _override;
@@ -238,3 +295,5 @@ export async function untisAbmelden(args) { return client().abmelden(args); }
 export async function untisKlassen(args) { return client().klassen(args); }
 export async function untisStudentGroupMitglieder(args) { return client().studentGroupMitglieder(args); }
 export async function untisStudenten(args) { return client().studenten(args); }
+export async function untisIdentitaet(args) { return client().identitaet(args); }
+export async function untisZeitplan(args) { return client().zeitplan(args); }

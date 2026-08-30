@@ -42,7 +42,8 @@
   <div class="card">
     <p>
       ✅ Verbunden mit <strong><%= verbindung.server %></strong> (<%= verbindung.school %>) —
-      <%= verbindung.klassen.length %> Klasse(n) gefunden.
+      <%= verbindung.klassen.length %> Klasse(n) gefunden<% if (verbindung.eigeneKlassenIds) { %>,
+      davon <%= verbindung.eigeneKlassenIds.length %> laut deinem eigenen Stundenplan<% } %>.
     </p>
     <form method="post" action="/teacher/untis-import/trennen" class="inline">
       <button type="submit">Verbindung trennen</button>
@@ -72,9 +73,29 @@
         Schüler/innen mitimportieren (Versuch — klappt nicht bei jeder Untis-Konfiguration)
       </label>
       <p><strong>Klassen:</strong></p>
-      <% verbindung.klassen.forEach(function(k) { %>
-        <label><input type="checkbox" name="klasse_id" value="<%= k.id %>"> <%= k.name %><% if (k.longName) { %> <small class="hint">(<%= k.longName %>)</small><% } %></label>
+      <%
+        var eigeneIds = verbindung.eigeneKlassenIds;
+        var eigene = eigeneIds ? verbindung.klassen.filter(function(k) { return eigeneIds.includes(k.id); }) : verbindung.klassen;
+        var andere = eigeneIds ? verbindung.klassen.filter(function(k) { return !eigeneIds.includes(k.id); }) : [];
+      %>
+      <% if (eigeneIds) { %>
+        <p class="hint">
+          Nur die Klassen, die laut deinem eigenen Stundenplan der letzten/nächsten zwei Wochen bei
+          dir vorkommen, sind unten vorausgewählt. Fehlt eine Klasse (z. B. weil sie im Abfragezeitraum
+          keinen Unterricht hat), unten „Alle Klassen der Schule anzeigen" aufklappen.
+        </p>
+      <% } %>
+      <% eigene.forEach(function(k) { %>
+        <label><input type="checkbox" name="klasse_id" value="<%= k.id %>" <% if (eigeneIds) { %>checked<% } %>> <%= k.name %><% if (k.longName) { %> <small class="hint">(<%= k.longName %>)</small><% } %></label>
       <% }); %>
+      <% if (andere.length) { %>
+        <details>
+          <summary>Alle <%= verbindung.klassen.length %> Klassen der Schule anzeigen</summary>
+          <% andere.forEach(function(k) { %>
+            <label><input type="checkbox" name="klasse_id" value="<%= k.id %>"> <%= k.name %><% if (k.longName) { %> <small class="hint">(<%= k.longName %>)</small><% } %></label>
+          <% }); %>
+        </details>
+      <% } %>
       <button type="submit">📥 Ausgewählte Klassen importieren</button>
     </form>
   <% } %>

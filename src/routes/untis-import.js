@@ -11,11 +11,50 @@ import { getDb } from '../db.js';
 import { requireAuth } from '../auth.js';
 import { DEFAULT_NS_CSV } from '../grade-calc.js';
 import {
-  untisAnmelden, untisAbmelden, untisKlassen, untisStudenten,
+  untisAnmelden, untisAbmelden, untisKlassen, untisStudenten, untisIdentitaet, untisZeitplan,
 } from '../untis-client.js';
 
 const STANDARD_SERVER = 'bbz-rd-eck.webuntis.com';
 const STANDARD_SCHULE = 'bbz-rd-eck';
+
+function datumYyyymmdd(datum) {
+  const y = datum.getFullYear();
+  const m = String(datum.getMonth() + 1).padStart(2, '0');
+  const d = String(datum.getDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}
+
+function datumMitOffsetTagen(basis, offsetTage) {
+  const d = new Date(basis);
+  d.setDate(d.getDate() + offsetTage);
+  return datumYyyymmdd(d);
+}
+
+// getKlassen() liefert ausnahmslos ALLE Klassen der Schule, nicht nur die
+// der anmeldenden Lehrkraft. Als bester verfügbarer Ansatz wird versucht,
+// über den eigenen Stundenplan (±14 Tage um heute, deckt auch vierzehntägig
+// stattfindenden Unterricht ab) einzugrenzen, welche Klassen tatsächlich
+// unterrichtet werden — Klassen ganz ohne Unterricht im Abfragezeitraum
+// (z. B. eine Klausur-Vertretung oder ein Kurs in einer Pausenzeit) würden
+// dabei fehlen, deshalb bleibt "alle Klassen der Schule anzeigen" in der
+// Ansicht immer als Fallback wählbar. Schlägt der Versuch komplett fehl
+// (Identität oder Stundenplan nicht abrufbar), wird wie bisher ohne Filter
+// die volle Klassenliste gezeigt.
+async function eigeneKlassenIdsErmitteln({ server, school, cookieHeader }) {
+  const { personId, personType } = await untisIdentitaet({ server, school, cookieHeader });
+  const heute = new Date();
+  const stunden = await untisZeitplan({
+    server, school, cookieHeader, personId, personType,
+    startDate: datumMitOffsetTagen(heute, -14), endDate: datumMitOffsetTagen(heute, 14),
+  });
+  const ids = new Set();
+  for (const stunde of stunden) {
+    for (const k of (stunde.kl || [])) {
+      if (k?.id !== undefined && k?.id !== null) ids.add(Number(k.id));
+    }
+  }
+  return ids.size ? Array.from(ids) : null;
+}
 
 // getStudentGroupMembers (Untis-Klasse == "Studentengruppe" mit gleicher ID)
 // existiert nicht auf jeder Untis-Instanz (-32601 "Method not found" beim
@@ -77,10 +116,15 @@ export default async function untisImportRoutes(fastify) {
     }
     try {
       const klassen = await untisKlassen({ server, school, cookieHeader: anmeldung.cookieHeader });
+      let eigeneKlassenIds = null;
+      try {
+        eigeneKlassenIds = await eigeneKlassenIdsErmitteln({ server, school, cookieHeader: anmeldung.cookieHeader });
+      } catch { /* Fallback: alle Klassen der Schule anzeigen, siehe Kommentar oben */ }
       request.session.untisImport = {
         server, school, cookieHeader: anmeldung.cookieHeader,
         klassen: klassen.map((k) => ({ id: k.id, name: k.name, longName: k.longName || '' }))
           .sort((a, b) => a.name.localeCompare(b.name)),
+        eigeneKlassenIds,
       };
       request.flash?.('success', `Verbunden — ${klassen.length} Klasse(n) von Untis geladen.`);
     } catch (e) {
