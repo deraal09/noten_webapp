@@ -52,47 +52,71 @@
   </table>
 <% } %>
 
-<h2>Neue Klasse anlegen</h2>
-<p><a href="/teacher/untis-import">📥 Aus Untis importieren</a> (Klassen und optional Schüler/innen)</p>
-<% if (!schuljahre.length) { %>
-  <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
-<% } else { %>
-  <form method="post" action="/teacher/klassen/neu" class="card">
-    <label>Schuljahr
-      <select name="schuljahr_id">
-        <% schuljahre.forEach(function(s) { %>
-          <option value="<%= s.id %>"><%= s.bezeichnung %></option>
-        <% }); %>
-      </select>
-    </label>
-    <label>Klassenname
-      <input type="text" name="name" placeholder="z. B. 12BFI1" required>
-    </label>
-    <label>Notenschlüssel
-      <select name="notenschluessel">
-        <option value="IHK">IHK (1–6)</option>
-        <option value="BG">BG (0–15)</option>
-      </select>
-    </label>
-    <button type="submit">+ Klasse anlegen</button>
-  </form>
-<% } %>
+<details>
+  <summary>Neue Klasse anlegen</summary>
+  <p><a href="/teacher/untis-import">📥 Aus Untis importieren</a> (Klassen und optional Schüler/innen)</p>
+  <% if (!schuljahre.length) { %>
+    <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
+  <% } else { %>
+    <form method="post" action="/teacher/klassen/neu" class="card">
+      <label>Schuljahr
+        <select name="schuljahr_id">
+          <% schuljahre.forEach(function(s) { %>
+            <option value="<%= s.id %>"><%= s.bezeichnung %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label>Klassenname
+        <input type="text" name="name" placeholder="z. B. 12BFI1" required>
+      </label>
+      <label>Notenschlüssel
+        <select name="notenschluessel">
+          <option value="IHK">IHK (1–6)</option>
+          <option value="BG">BG (0–15)</option>
+        </select>
+      </label>
+      <button type="submit">+ Klasse anlegen</button>
+    </form>
+  <% } %>
+</details>
 
 <h2>Vorhandene Klassen</h2>
-<% if (!klassen.length) { %>
-  <p>Noch keine Klassen — leg oben eine an oder warte auf eine Zuweisung.</p>
+<% if (!schuljahreReiter.length) { %>
+  <p>Noch kein Schuljahr angelegt.</p>
 <% } else { %>
-  <table class="data">
-    <thead><tr><th>Name</th><th>Schuljahr</th><th>Notenschlüssel</th><th></th></tr></thead>
-    <tbody>
-      <% klassen.forEach(function(k) { %>
-        <tr>
-          <td><a href="/teacher/klassen/<%= k.id %>"><%= k.name %></a></td>
-          <td><%= k.schuljahr_bezeichnung %></td>
-          <td><%= k.notenschluessel %></td>
-          <td><a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a></td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
+  <div class="reiter">
+    <% schuljahreReiter.forEach(function(sj, i) { %>
+      <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="sj-panel-<%= sj.id %>"><%= sj.bezeichnung %></button>
+    <% }); %>
+  </div>
+  <% schuljahreReiter.forEach(function(sj, i) {
+       var sjKlassen = klassenNachSchuljahr.get(sj.id) || []; %>
+    <div id="sj-panel-<%= sj.id %>" class="reiter-panel <%= i === 0 ? 'active' : '' %>">
+      <% if (!sjKlassen.length) { %>
+        <p>Keine Klassen im Schuljahr <%= sj.bezeichnung %> — leg oben eine an oder warte auf eine Zuweisung.</p>
+      <% } else { %>
+        <table class="data">
+          <thead><tr><th>Name</th><th>Notenschlüssel</th><th></th></tr></thead>
+          <tbody>
+            <% sjKlassen.forEach(function(k) { %>
+              <tr>
+                <td><a href="/teacher/klassen/<%= k.id %>"><%= k.name %></a></td>
+                <td><%= k.notenschluessel %></td>
+                <td><a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  <% }); %>
 <% } %>
+
+<script>
+  document.querySelectorAll('.reiter button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.reiter button').forEach(function(b) { b.classList.toggle('active', b === btn); });
+      document.querySelectorAll('.reiter-panel').forEach(function(p) { p.classList.toggle('active', p.id === btn.dataset.target); });
+    });
+  });
+</script>

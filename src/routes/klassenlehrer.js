@@ -53,11 +53,13 @@ export default async function klassenlehrerRoutes(fastify) {
     ).all(klasse.id);
     const fehlMap = {};
     const fehlMap2 = {};
+    const notizenMap = {};
     for (const s of schueler) {
       fehlMap[s.id] = {};
       fehlMap2[s.id] = {};
+      notizenMap[s.id] = [];
       for (const t of FEHLZEIT_TYPEN) {
-        fehlMap[s.id][t] = { stunden: 0, notiz: '' };
+        fehlMap[s.id][t] = { stunden: 0 };
         fehlMap2[s.id][t] = { stunden: 0 };
       }
     }
@@ -65,10 +67,10 @@ export default async function klassenlehrerRoutes(fastify) {
       const ids = schueler.map((s) => s.id);
       const placeholders = ids.map(() => '?').join(',');
       const rows = getDb().prepare(
-        `SELECT schueler_id, typ, stunden, notiz FROM fehlzeiten WHERE halbjahr = ? AND schueler_id IN (${placeholders})`
+        `SELECT schueler_id, typ, stunden FROM fehlzeiten WHERE halbjahr = ? AND schueler_id IN (${placeholders})`
       ).all(halbjahr, ...ids);
       for (const r of rows) {
-        if (fehlMap[r.schueler_id]?.[r.typ]) fehlMap[r.schueler_id][r.typ] = { stunden: r.stunden, notiz: r.notiz || '' };
+        if (fehlMap[r.schueler_id]?.[r.typ]) fehlMap[r.schueler_id][r.typ] = { stunden: r.stunden };
       }
       if (klasse.zwei_schulen) {
         const rows2 = getDb().prepare(
@@ -78,10 +80,33 @@ export default async function klassenlehrerRoutes(fastify) {
           if (fehlMap2[r.schueler_id]?.[r.typ]) fehlMap2[r.schueler_id][r.typ] = { stunden: r.stunden };
         }
       }
+      const notizRows = getDb().prepare(`
+        SELECT n.schueler_id, n.text, n.created_at, u.display_name, u.username
+        FROM schueler_notizen n LEFT JOIN users u ON u.id = n.created_by_id
+        WHERE n.schueler_id IN (${placeholders})
+        ORDER BY n.created_at
+      `).all(...ids);
+      for (const n of notizRows) notizenMap[n.schueler_id]?.push(n);
     }
     return reply.viewEjs('klassenlehrer/klasse_detail.ejs', {
-      user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2,
+      user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2, notizenMap,
     });
+  });
+
+  // ---------- Freie Notizen je Schüler/in (unabhängig von Noten/Fehlzeiten) ----------
+  fastify.post('/schueler/:id/notiz', async (request, reply) => {
+    const schueler = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
+    if (!schueler) return reply.redirect('/klassenlehrer');
+    if (!userIstKlassenlehrer(request.user, schueler.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const text = String(request.body?.text || '').trim();
+    if (text) {
+      getDb().prepare('INSERT INTO schueler_notizen (schueler_id, text, created_by_id) VALUES (?, ?, ?)')
+        .run(request.params.id, text, request.user.id);
+    }
+    const halbjahr = HALBJAHRE.includes(request.body?.hj) ? request.body.hj : HALBJAHRE[0];
+    return reply.redirect(`/klassenlehrer/klasse/${schueler.klasse_id}?hj=${encodeURIComponent(halbjahr)}`);
   });
 
   fastify.post('/klasse/:id/speichern', async (request, reply) => {
@@ -94,12 +119,15 @@ export default async function klassenlehrerRoutes(fastify) {
     const schueler = getDb().prepare(
       'SELECT id FROM schueler WHERE klasse_id = ?'
     ).all(klasse.id);
+    // Das alte notiz-Feld (je Fehlzeitenart) wird nicht mehr im UI gepflegt
+    // (siehe schueler_notizen) — beim Speichern bewusst unangetastet lassen,
+    // statt es bei jedem Speichern stillschweigend mit einem leeren String
+    // zu überschreiben.
     const upsert = getDb().prepare(`
-      INSERT INTO fehlzeiten (schueler_id, halbjahr, typ, stunden, notiz, updated_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
+      INSERT INTO fehlzeiten (schueler_id, halbjahr, typ, stunden, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
       ON CONFLICT (schueler_id, halbjahr, typ) DO UPDATE SET
         stunden = excluded.stunden,
-        notiz = excluded.notiz,
         updated_at = datetime('now')
     `);
     const upsert2 = getDb().prepare(`
@@ -116,8 +144,7 @@ export default async function klassenlehrerRoutes(fastify) {
           const stundenRaw = request.body?.['stunden_' + s.id + '_' + t];
           if (stundenRaw !== undefined && stundenRaw !== '') {
             const stunden = Math.max(0, Number(stundenRaw) || 0);
-            const notiz = String(request.body?.['notiz_' + s.id + '_' + t] || '').trim();
-            upsert.run(s.id, halbjahr, t, stunden, notiz);
+            upsert.run(s.id, halbjahr, t, stunden);
             count++;
           }
           if (klasse.zwei_schulen) {

@@ -146,6 +146,23 @@ Stunden-Spalten (Schule 1 / Schule 2) plus eine live berechnete Summe. Ohne
 den Haken bleibt die Ansicht wie bisher (eine Spalte je Typ) — das ist rein
 optional pro Klasse.
 
+### Notizen je Schüler/in (Klassenleitungsseite)
+
+Statt einem Notiz-Textfeld je Fehlzeitenart (drei pro Zeile, unübersichtlich)
+gibt es auf der Fehlzeiten-Seite jetzt genau **einen „📝 Notizen"-Button je
+Schüler/in**. Er öffnet einen Dialog (natives `<dialog>`-Element) mit einem
+gemeinsamen, chronologischen Notizbuch für diese Person: alle bisherigen
+Einträge werden mit Autor/in und Zeitstempel angezeigt, jede Klassenlehrkraft
+der Klasse (Klassenleitung **und** Co-Klassenlehrkraft) kann unten einen
+neuen Eintrag hinzufügen. Bestehende Einträge werden nie überschrieben
+(`schueler_notizen`-Tabelle, Verlauf statt ein einzelnes Feld). Das ist
+bewusst **unabhängig** von den Notizen, die bei der Notenbesprechung zu
+einem Fach/Halbjahr eingetragen werden können (`notenbesprechung_notizen`).
+Das alte, pro Fehlzeitenart gespeicherte `fehlzeiten.notiz`-Feld wird nicht
+mehr im UI angezeigt oder befüllt — vorhandene Altdaten bleiben aus
+Bestandsschutz in der Datenbank erhalten, gehen also nicht verloren, sind
+aber nicht mehr sichtbar/editierbar.
+
 ## Schuljahre: Format, Sortierung und "aktuelles" Schuljahr
 
 Schuljahre folgen im Admin-Bereich (`/admin`, „Schuljahr anlegen") zwingend
@@ -169,9 +186,16 @@ Jede angemeldete Lehrkraft kann unter **„Meine Klassen"** eigene Klassen in
 einem bestehenden Schuljahr anlegen — eine vorherige Zuweisung durch den
 Admin ist nicht nötig. Beim Anlegen eines Fachs wird die erstellende
 Lehrkraft automatisch diesem Fach zugewiesen (sieht es sofort in der eigenen
-Notentafel).
+Notentafel). Das Formular „Neue Klasse anlegen" ist standardmäßig
+eingeklappt (`<details>`), damit die Felder nur bei Bedarf erscheinen.
 
-Schuljahre selbst legt weiterhin nur der Admin an (Admin → Dashboard).
+Schuljahre selbst legt weiterhin nur der Admin an (Admin → Dashboard). Auf
+„Meine Klassen" werden die vorhandenen Klassen in **Reitern je Schuljahr**
+angezeigt (`.reiter`/`.reiter-panel`, reines Client-Side-Umschalten ohne
+Neuladen) — das aktuelle Schuljahr steht dabei immer ganz links, alle
+anderen folgen absteigend nach Startjahr (`sortiereSchuljahreFuerReiter`
+in `src/schuljahr-utils.js`). Ein nachträglich erfasstes, vergangenes
+Schuljahr landet dadurch am Ende der Reiter statt ganz vorne.
 
 **Keine doppelten Schüler-Einträge:** Egal ob per Einzeleingabe,
 Sammel-Einfügen, CSV-Upload oder Untis-Import — vor jedem Anlegen prüft
@@ -200,6 +224,14 @@ ebenfalls). Als Klassenleitung:
 Jede Lehrkraft sieht die Live-Notentafel weiterhin nur für Fächer, die sie
 selbst angelegt hat oder denen sie zugewiesen wurde — auch die
 Klassenleitung nicht ausgenommen.
+
+**Co-Klassenlehrkraft:** Eine bestehende Klassenleitung kann auf der
+Klassenseite (Abschnitt „Klassenleitung") weitere Personen als
+gleichberechtigte Co-Klassenlehrkraft eintragen (und wieder entfernen).
+Diese haben danach exakt dieselben Rechte — insbesondere Zugriff auf die
+Klassenleitungsseite und damit auf die Fehlzeiten-Pflege —, da die
+Berechtigungsprüfung (`userIstKlassenlehrer`) ohnehin schon jede Person in
+der `klassenleitung`-Tabelle als vollwertige Klassenleitung behandelt.
 
 ### Verknüpfungsanfrage bei Namenskollisionen
 

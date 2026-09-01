@@ -21,7 +21,7 @@ import {
 import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
 import { parseSchuelerCsv } from '../csv-import.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
-import { sortiereSchuljahreAbsteigend } from '../schuljahr-utils.js';
+import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../schuljahr-utils.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -579,7 +579,11 @@ export default async function teacherRoutes(fastify) {
   fastify.get('/klassen', async (request, reply) => {
     const db = getDb();
     const schuljahre = sortiereSchuljahreAbsteigend(db.prepare('SELECT * FROM schuljahre').all());
+    const schuljahreReiter = sortiereSchuljahreFuerReiter(schuljahre);
     const klassen = ladeMeineKlassen(request.user.id);
+    const klassenNachSchuljahr = new Map();
+    for (const sj of schuljahreReiter) klassenNachSchuljahr.set(sj.id, []);
+    for (const k of klassen) klassenNachSchuljahr.get(k.schuljahr_id)?.push(k);
 
     // Verknüpfungsanfragen, auf deren Zustimmung ich noch warte
     const wartetAufMich = db.prepare(`
@@ -608,7 +612,7 @@ export default async function teacherRoutes(fastify) {
     `).all(request.user.id);
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
-      user: request.user, schuljahre, klassen, wartetAufMich, meineAnfragen,
+      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, wartetAufMich, meineAnfragen,
     });
   });
 
@@ -930,6 +934,7 @@ export default async function teacherRoutes(fastify) {
 
     let zuweisbareLehrkraefte = [];
     let zuweisungen = [];
+    let klassenleitungListe = [];
     if (istKlassenlehrer) {
       zuweisbareLehrkraefte = getDb().prepare(
         "SELECT id, username, display_name FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
@@ -942,6 +947,12 @@ export default async function teacherRoutes(fastify) {
         WHERE f.klasse_id = ?
         ORDER BY f.name, u.username
       `).all(klasse.id);
+      klassenleitungListe = getDb().prepare(`
+        SELECT kls.id, kls.user_id, u.display_name, u.username
+        FROM klassenleitung kls JOIN users u ON u.id = kls.user_id
+        WHERE kls.klasse_id = ?
+        ORDER BY u.username
+      `).all(klasse.id);
     }
 
     const andereSchuljahre = istKlassenlehrer
@@ -951,7 +962,7 @@ export default async function teacherRoutes(fastify) {
     return reply.viewEjs('teacher/klasse_detail.ejs', {
       user: request.user, klasse, schueler, faecher, eigentuemer, kannExportieren,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
-      andereSchuljahre,
+      klassenleitungListe, andereSchuljahre,
     });
   });
 
@@ -965,6 +976,35 @@ export default async function teacherRoutes(fastify) {
       .run(request.params.id, request.user.id);
     request.flash?.('success', 'Du bist jetzt als Klassenleitung eingetragen und siehst alle Noten dieser Klasse.');
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  // ---------- Co-Klassenlehrkraft: eine bestehende Klassenleitung kann
+  // weitere Personen als gleichberechtigte Klassenleitung eintragen (u. a.
+  // damit diese auch Fehlzeiten pflegen können, siehe routes/klassenlehrer.js). ----------
+  fastify.post('/klassen/:id/klassenleitung/hinzufuegen', async (request, reply) => {
+    if (!userIstKlassenlehrer(request.user, request.params.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann weitere Klassenlehrkräfte eintragen.' });
+    }
+    const userId = parseInt(request.body?.user_id, 10);
+    if (!userId) {
+      request.flash?.('error', 'Bitte eine Lehrkraft auswählen.');
+      return reply.redirect(`/teacher/klassen/${request.params.id}`);
+    }
+    getDb().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)')
+      .run(request.params.id, userId);
+    request.flash?.('success', 'Als Co-Klassenlehrkraft eingetragen.');
+    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  fastify.post('/klassenleitung/:id/entfernen', async (request, reply) => {
+    const eintrag = getDb().prepare('SELECT klasse_id FROM klassenleitung WHERE id = ?').get(request.params.id);
+    if (!eintrag) return reply.redirect('/teacher/klassen');
+    if (!userIstKlassenlehrer(request.user, eintrag.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Einträge entfernen.' });
+    }
+    getDb().prepare('DELETE FROM klassenleitung WHERE id = ?').run(request.params.id);
+    request.flash?.('success', 'Klassenleitung entfernt.');
+    return reply.redirect(`/teacher/klassen/${eintrag.klasse_id}`);
   });
 
   fastify.post('/klassen/:id/zuweisungen/neu', async (request, reply) => {

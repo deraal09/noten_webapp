@@ -185,11 +185,23 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .hj-tab { padding: 0.4rem 1rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 4px 4px 0 0; color: var(--text); }
 .hj-tab.active { background: var(--primary); color: var(--on-dark); border-color: var(--primary); }
 
-.reiter { display: flex; gap: 0.5rem; margin: 1rem 0 0; }
+.reiter { display: flex; gap: 0.5rem; margin: 1rem 0 0; flex-wrap: wrap; }
 .reiter button { background: var(--bg-card); color: var(--primary); border: 1px solid var(--primary); }
 .reiter button.active { background: var(--primary); color: var(--on-dark); }
 .reiter-panel { display: none; }
 .reiter-panel.active { display: block; }
+
+/* Notizen-Dialog (Klassenleitungsseite/Fehlzeiten): natives <dialog>, ein
+   gemeinsames Notizbuch je Schüler/in. */
+.notiz-dialog { border: none; border-radius: 8px; padding: 1.5rem; max-width: 480px; width: 90vw; background: var(--bg-card); color: var(--text); box-shadow: 0 4px 20px var(--shadow); }
+.notiz-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+.notiz-dialog textarea { width: 100%; margin: 0.5rem 0; }
+.notiz-dialog .form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.notiz-liste { list-style: none; padding: 0; margin: 0 0 1rem; max-height: 260px; overflow-y: auto; }
+.notiz-liste li { padding: 0.5rem 0; border-bottom: 1px solid var(--border-subtle); }
+.notiz-liste li:last-child { border-bottom: none; }
+.notiz-text { white-space: pre-wrap; }
+.notiz-meta { margin-top: 0.2rem; }
 
 .btn.disabled { background: var(--border-strong); color: var(--text-muted); cursor: default; pointer-events: none; }
 

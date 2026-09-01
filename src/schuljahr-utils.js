@@ -49,3 +49,19 @@ export function aktuellesStartjahr(heute = new Date()) {
   const monat = heute.getMonth(); // 0-basiert, 7 = August
   return monat >= 7 ? heute.getFullYear() : heute.getFullYear() - 1;
 }
+
+/**
+ * Wie sortiereSchuljahreAbsteigend, aber das nach heutigem Datum aktuelle
+ * Schuljahr wird zusätzlich an die erste Stelle gezogen (für Reiter/Tabs,
+ * bei denen das aktuelle Schuljahr immer ganz links stehen soll — auch
+ * wenn z. B. schon ein zukünftiges Schuljahr angelegt wurde, das sonst
+ * beim reinen Sortieren nach Startjahr davor stünde).
+ */
+export function sortiereSchuljahreFuerReiter(schuljahre, heute = new Date()) {
+  const sortiert = sortiereSchuljahreAbsteigend(schuljahre);
+  const jetzt = aktuellesStartjahr(heute);
+  const idx = sortiert.findIndex((sj) => parseSchuljahr(sj.bezeichnung)?.startJahr === jetzt);
+  if (idx <= 0) return sortiert;
+  const [aktuelles] = sortiert.splice(idx, 1);
+  return [aktuelles, ...sortiert];
+}

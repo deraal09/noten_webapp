@@ -20,6 +20,43 @@
   </p>
 
   <details class="card">
+    <summary>Klassenleitung (<%= klassenleitungListe.length %>)</summary>
+    <p class="hint">
+      Alle hier eingetragenen Personen sind gleichberechtigte Klassenleitung — sie sehen alle Noten
+      der Klasse und können auf der Klassenleitungsseite Fehlzeiten eintragen.
+    </p>
+    <table class="data">
+      <thead><tr><th>Lehrkraft</th><th>Aktion</th></tr></thead>
+      <tbody>
+        <% klassenleitungListe.forEach(function(kl) { %>
+          <tr>
+            <td><%= kl.display_name || kl.username %></td>
+            <td>
+              <form method="post" action="/teacher/klassenleitung/<%= kl.id %>/entfernen" class="inline" onsubmit="return confirm('Klassenleitung entfernen?')">
+                <button type="submit" class="danger">🗑</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% var moeglicheCoLehrkraefte = zuweisbareLehrkraefte.filter(function(u) {
+         return !klassenleitungListe.some(function(kl) { return kl.user_id === u.id; });
+       }); %>
+    <% if (moeglicheCoLehrkraefte.length) { %>
+      <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenleitung/hinzufuegen" class="inline">
+        <select name="user_id" required>
+          <option value="">— Co-Klassenlehrkraft wählen —</option>
+          <% moeglicheCoLehrkraefte.forEach(function(u) { %>
+            <option value="<%= u.id %>"><%= u.display_name || u.username %></option>
+          <% }); %>
+        </select>
+        <button type="submit">+ Als Co-Klassenlehrkraft eintragen</button>
+      </form>
+    <% } %>
+  </details>
+
+  <details class="card">
     <summary>Klasse ins nächste Schuljahr übertragen</summary>
     <% if (!andereSchuljahre.length) { %>
       <p class="hint">Es gibt noch kein weiteres Schuljahr — bitte den Admin bitten, zuerst eins anzulegen.</p>

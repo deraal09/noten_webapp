@@ -21,16 +21,17 @@
     <thead>
       <tr>
         <th rowspan="2">Schüler/in</th>
+        <th rowspan="2">Notizen</th>
         <% FEHLZEIT_TYPEN.forEach(function(typ) { %>
-          <th colspan="<%= klasse.zwei_schulen ? 4 : 2 %>"><%= typ %></th>
+          <th colspan="<%= klasse.zwei_schulen ? 3 : 1 %>"><%= typ %></th>
         <% }); %>
       </tr>
       <tr>
         <% FEHLZEIT_TYPEN.forEach(function() { %>
           <% if (klasse.zwei_schulen) { %>
-            <th>Schule 1 (h)</th><th>Schule 2 (h)</th><th>Summe</th><th>Notiz</th>
+            <th>Schule 1 (h)</th><th>Schule 2 (h)</th><th>Summe</th>
           <% } else { %>
-            <th>h</th><th>Notiz</th>
+            <th>h</th>
           <% } %>
         <% }); %>
       </tr>
@@ -39,6 +40,11 @@
       <% schueler.forEach(function(s) { %>
         <tr>
           <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
+          <td>
+            <button type="button" onclick="document.getElementById('notiz-dialog-<%= s.id %>').showModal()">
+              📝 Notizen<% if (notizenMap[s.id].length) { %> (<%= notizenMap[s.id].length %>)<% } %>
+            </button>
+          </td>
           <% FEHLZEIT_TYPEN.forEach(function(typ) {
                var fz = fehlMap[s.id][typ];
                var fz2 = fehlMap2[s.id][typ]; %>
@@ -47,7 +53,6 @@
               <td><input type="number" name="stunden2_<%= s.id %>_<%= typ %>" value="<%= fz2.stunden || 0 %>" min="0" step="0.5" size="5" class="fz-s2" data-sid="<%= s.id %>" data-typ="<%= typ %>"></td>
               <td><output class="fz-summe" data-sid="<%= s.id %>" data-typ="<%= typ %>"><%= (Number(fz.stunden)||0) + (Number(fz2.stunden)||0) %></output></td>
             <% } %>
-            <td><input type="text" name="notiz_<%= s.id %>_<%= typ %>" value="<%= fz.notiz || '' %>" placeholder="optional"></td>
           <% }); %>
         </tr>
       <% }); %>
@@ -55,6 +60,37 @@
   </table>
   <p><button type="submit">💾 Fehlzeiten speichern</button></p>
 </form>
+
+<% schueler.forEach(function(s) { %>
+  <dialog id="notiz-dialog-<%= s.id %>" class="notiz-dialog">
+    <h2>Notizen: <%= s.nachname %>, <%= s.vorname %></h2>
+    <p class="hint">
+      Gemeinsames Notizbuch aller Klassenlehrkräfte dieser Klasse — unabhängig von Notizen,
+      die bei den Noten (Notenbesprechung) eingetragen werden. Ältere Einträge bleiben
+      erhalten, es wird nichts überschrieben.
+    </p>
+    <% if (!notizenMap[s.id].length) { %>
+      <p class="hint">Noch keine Notizen.</p>
+    <% } else { %>
+      <ul class="notiz-liste">
+        <% notizenMap[s.id].forEach(function(n) { %>
+          <li>
+            <div class="notiz-text"><%= n.text %></div>
+            <div class="notiz-meta hint"><%= n.display_name || n.username || 'unbekannt' %> · <%= formatZeitLokal(n.created_at) %></div>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+    <form method="post" action="/klassenlehrer/schueler/<%= s.id %>/notiz">
+      <input type="hidden" name="hj" value="<%= halbjahr %>">
+      <textarea name="text" rows="3" placeholder="Neue Notiz hinzufügen…" required></textarea>
+      <div class="form-actions">
+        <button type="submit">+ Notiz hinzufügen</button>
+        <button type="button" onclick="document.getElementById('notiz-dialog-<%= s.id %>').close()">Schließen</button>
+      </div>
+    </form>
+  </dialog>
+<% }); %>
 
 <% if (klasse.zwei_schulen) { %>
 <script>

@@ -324,6 +324,20 @@ CREATE TABLE IF NOT EXISTS notenbesprechung_notizen (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Freie Notizen zu einer Person auf der Klassenleitungsseite (Fehlzeiten) —
+-- unabhängig von notenbesprechung_notizen (an Noten/Halbjahre gebunden) und
+-- vom alten fehlzeiten.notiz-Feld (je Fehlzeitenart, nicht mehr im UI
+-- genutzt, aber aus Bestandsschutz nicht gelöscht). Verlauf statt ein
+-- überschreibbares Feld — mehrere Klassenlehrkräfte tragen hier
+-- gemeinsam ein, keiner soll den Eintrag der/des anderen überschreiben.
+CREATE TABLE IF NOT EXISTS schueler_notizen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    created_by_id INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Sitzplan: freie Anordnung auf einem "Blatt" (x/y in Prozent, damit
 -- beliebige Raumformen abgebildet werden können, statt eines starren
 -- Raster-Layouts). Jede Lehrkraft mit Klassenzugriff hat einen eigenen,
