@@ -6,17 +6,17 @@
 
 <% byKlasse.forEach(function(k) { %>
   <h2><%= k.name %> <small>(<%= k.schuljahr_bezeichnung %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
-  <table class="data">
-    <thead><tr><th>Fach</th><th>Klausuren</th><th>ULs</th><th>Aktion</th></tr></thead>
-    <tbody>
-      <% k.faecher.forEach(function(f) { %>
-        <tr>
-          <td><%= f.name %></td>
-          <td><%= f.anzahl_klausuren %></td>
-          <td><%= f.anzahl_uls %></td>
-          <td><a class="btn" href="/teacher/fach/<%= f.id %>">📝 Noteneingabe</a></td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
+  <ul class="klasse-liste">
+    <% k.faecher.forEach(function(f) { %>
+      <li>
+        <a href="/teacher/fach/<%= f.id %>">
+          <div class="kachel-zeile">
+            <span class="kachel-icon-klein">📝</span>
+            <span class="kachel-titel-klein"><%= f.name %></span>
+          </div>
+        </a>
+        <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)</div>
+      </li>
+    <% }); %>
+  </ul>
 <% }); %>

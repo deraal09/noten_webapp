@@ -113,13 +113,13 @@ test('Jede Klasse erscheint nur im Panel ihres eigenen Schuljahrs', async () => 
   const sjAktuellId = getDb().prepare('SELECT id FROM schuljahre WHERE bezeichnung = ?').get(bezAktuell).id;
   const sjNachgetragenId = getDb().prepare('SELECT id FROM schuljahre WHERE bezeichnung = ?').get(bezNachgetragen).id;
   const panelAktuellStart = html.indexOf(`id="sj-panel-${sjAktuellId}"`);
-  const panelAktuellEnde = html.indexOf('</div>', html.indexOf('</table>', panelAktuellStart));
+  const panelAktuellEnde = html.indexOf('</div>', html.indexOf('</ul>', panelAktuellStart));
   const panelAktuell = html.slice(panelAktuellStart, panelAktuellEnde);
   assert.match(panelAktuell, /9A/);
   assert.doesNotMatch(panelAktuell, /5B/);
 
   const panelNachgetragenStart = html.indexOf(`id="sj-panel-${sjNachgetragenId}"`);
-  const panelNachgetragenEnde = html.indexOf('</div>', html.indexOf('</table>', panelNachgetragenStart));
+  const panelNachgetragenEnde = html.indexOf('</div>', html.indexOf('</ul>', panelNachgetragenStart));
   const panelNachgetragen = html.slice(panelNachgetragenStart, panelNachgetragenEnde);
   assert.match(panelNachgetragen, /5B/);
   assert.doesNotMatch(panelNachgetragen, /9A/);

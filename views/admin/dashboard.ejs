@@ -13,24 +13,27 @@
   <input type="text" name="bezeichnung" placeholder="z. B. 2026/27" required>
   <button type="submit">+ Schuljahr anlegen</button>
 </form>
-<table class="data">
-  <thead><tr><th>Bezeichnung</th><th>Gewichtung Mündlich</th><th>Aktion</th></tr></thead>
-  <tbody>
-    <% schuljahre.forEach(function(sj) { %>
-      <tr>
-        <td><a href="/admin/schuljahre/<%= sj.id %>"><%= sj.bezeichnung %></a><% if (sj.istAktuell) { %> <span class="hint">(aktuell)</span><% } %></td>
-        <td>
-          <form method="post" action="/admin/schuljahre/<%= sj.id %>/gewichtung" class="inline">
+<ul class="klasse-liste">
+  <% schuljahre.forEach(function(sj) { %>
+    <li>
+      <a href="/admin/schuljahre/<%= sj.id %>">
+        <div class="kachel-zeile">
+          <span class="kachel-icon-klein">📅</span>
+          <span class="kachel-titel-klein"><%= sj.bezeichnung %></span>
+        </div>
+      </a>
+      <% if (sj.istAktuell) { %><div class="kachel-sub">(aktuell)</div><% } %>
+      <div class="kachel-aktionen">
+        <form method="post" action="/admin/schuljahre/<%= sj.id %>/gewichtung" class="inline">
+          <label>Gewichtung mündlich
             <input type="number" name="gewichtung" min="0" max="100" value="<%= sj.gewichtung_muendlich %>" size="4">%
-            <button type="submit">💾</button>
-          </form>
-        </td>
-        <td>
-          <form method="post" action="/admin/schuljahre/<%= sj.id %>/loeschen" class="inline" onsubmit="return confirm('Schuljahr wirklich löschen?')">
-            <button type="submit" class="danger">🗑 Löschen</button>
-          </form>
-        </td>
-      </tr>
-    <% }); %>
-  </tbody>
-</table>
+          </label>
+          <button type="submit">💾</button>
+        </form>
+        <form method="post" action="/admin/schuljahre/<%= sj.id %>/loeschen" class="inline" onsubmit="return confirm('Schuljahr wirklich löschen?')">
+          <button type="submit" class="danger">🗑</button>
+        </form>
+      </div>
+    </li>
+  <% }); %>
+</ul>

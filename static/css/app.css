@@ -45,8 +45,15 @@
   --flash-info-border: #bee5eb;
 }
 
+/*
+ * Drei Zustände: "System" folgt der Betriebssystem-Einstellung (kein
+ * data-theme-Attribut → die @media-Regel greift), "Hell"/"Dunkel" sind
+ * eine bewusste Wahl über den Umschalter im Kopfbereich (setzt
+ * data-theme="light"/"dark" auf <html>, siehe partials/layout.ejs) und
+ * gewinnt in beide Richtungen — auch wenn das System das Gegenteil sagt.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #14181f;
     --bg-card: #1c222c;
     --bg-subtle: #20262f;
@@ -88,6 +95,57 @@
     --flash-info-border: #1f4a58;
   }
 }
+
+:root[data-theme="dark"] {
+  --bg: #14181f;
+  --bg-card: #1c222c;
+  --bg-subtle: #20262f;
+  --bg-header: #232a35;
+  --bg-input: #262d38;
+  --bg-tint: #1e3348;
+  --bg-tint-2: #1a2733;
+
+  --text: #e6e8eb;
+  --text-muted: #9aa4b2;
+
+  --border: #333a45;
+  --border-strong: #4a5261;
+  --border-subtle: #2b323d;
+
+  --link: #6cb2f4;
+
+  --primary: #2c4a73;
+  --primary-hover: #3a5c8c;
+  --topbar-link: #c3d5e8;
+
+  --accent: #4a9eef;
+  --accent-hover: #6cb2f4;
+
+  --danger: #e35d68;
+  --danger-hover: #ef7b85;
+
+  --shadow: rgba(0, 0, 0, 0.35);
+  --shadow-strong: rgba(0, 0, 0, 0.5);
+
+  --flash-success-bg: #16341f;
+  --flash-success-text: #8fd19e;
+  --flash-success-border: #2f5c3a;
+  --flash-error-bg: #3a1a1e;
+  --flash-error-text: #f5a3ab;
+  --flash-error-border: #5c2932;
+  --flash-info-bg: #16303a;
+  --flash-info-text: #8fd0e0;
+  --flash-info-border: #1f4a58;
+}
+
+/* Umschalter im Kopfbereich (System/Hell/Dunkel). */
+.theme-switch { display: flex; gap: 0.15rem; background: rgba(255,255,255,0.08); border-radius: 6px; padding: 0.15rem; }
+.theme-switch button {
+  background: transparent; border: none; border-radius: 4px; padding: 0.25rem 0.5rem;
+  cursor: pointer; font-size: 0.95rem; line-height: 1; color: var(--topbar-link);
+}
+.theme-switch button.active { background: rgba(255,255,255,0.18); color: var(--on-dark); }
+.theme-switch button:hover { background: rgba(255,255,255,0.14); }
 
 * { box-sizing: border-box; }
 
@@ -229,8 +287,21 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 
 .besprechung-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 
-.klasse-liste { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
-.klasse-liste li { background: var(--bg-card); padding: 1rem; border-radius: 6px; box-shadow: 0 1px 3px var(--shadow); }
+/* Übersichts-/Listenseiten (Meine Klassen, Klassenleitung-Dashboard,
+   Noteneingabe, Sitzpläne, Admin-Übersichten): Kacheln statt Tabellen,
+   optisch an .kacheln/.kachel (Startseite) angelehnt, aber kompakter und
+   linksbündig, damit auch Zusatzinfos/Aktionen reinpassen. */
+.klasse-liste { list-style: none; padding: 0; margin: 1rem 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+.klasse-liste li {
+  background: var(--bg-card); padding: 1.1rem 1.25rem; border-radius: 10px; box-shadow: 0 1px 3px var(--shadow);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.klasse-liste li:hover { box-shadow: 0 4px 12px var(--shadow); transform: translateY(-2px); }
+.klasse-liste .kachel-zeile { display: flex; align-items: center; gap: 0.5rem; }
+.klasse-liste .kachel-icon-klein { font-size: 1.4rem; }
+.klasse-liste .kachel-titel-klein { font-weight: 600; font-size: 1.05rem; }
+.klasse-liste .kachel-sub { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem; }
+.klasse-liste .kachel-aktionen { margin-top: 0.6rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 
 /* Startseite: große Kacheln zu den vier Hauptbereichen der App, mittig
    auf dem Bildschirm (auch vertikal, abzüglich Kopf-/Fußzeile). */

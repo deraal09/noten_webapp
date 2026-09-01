@@ -109,18 +109,22 @@
       <% if (!sjKlassen.length) { %>
         <p>Keine Klassen im Schuljahr <%= sj.bezeichnung %> — leg oben eine an oder warte auf eine Zuweisung.</p>
       <% } else { %>
-        <table class="data">
-          <thead><tr><th>Name</th><th>Notenschlüssel</th><th></th></tr></thead>
-          <tbody>
-            <% sjKlassen.forEach(function(k) { %>
-              <tr>
-                <td><a href="/teacher/klassen/<%= k.id %>"><%= k.name %></a></td>
-                <td><%= k.notenschluessel %></td>
-                <td><a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+        <ul class="klasse-liste">
+          <% sjKlassen.forEach(function(k) { %>
+            <li>
+              <a href="/teacher/klassen/<%= k.id %>">
+                <div class="kachel-zeile">
+                  <span class="kachel-icon-klein">🏫</span>
+                  <span class="kachel-titel-klein"><%= k.name %></span>
+                </div>
+              </a>
+              <div class="kachel-sub">Notenschlüssel: <%= k.notenschluessel %></div>
+              <div class="kachel-aktionen">
+                <a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
       <% } %>
     </div>
   <% }); %>

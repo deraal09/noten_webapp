@@ -4,16 +4,17 @@
 <% if (!klassen.length) { %>
   <p>Noch keine Klassen mit Zugriff — siehe <a href="/teacher/klassen">Meine Klassen</a>.</p>
 <% } else { %>
-  <table class="data">
-    <thead><tr><th>Klasse</th><th>Schuljahr</th><th></th></tr></thead>
-    <tbody>
-      <% klassen.forEach(function(k) { %>
-        <tr>
-          <td><%= k.name %></td>
-          <td><%= k.schuljahr_bezeichnung %></td>
-          <td><a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan öffnen</a></td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
+  <ul class="klasse-liste">
+    <% klassen.forEach(function(k) { %>
+      <li>
+        <a href="/teacher/klassen/<%= k.id %>/sitzplan">
+          <div class="kachel-zeile">
+            <span class="kachel-icon-klein">🪑</span>
+            <span class="kachel-titel-klein"><%= k.name %></span>
+          </div>
+        </a>
+        <div class="kachel-sub"><%= k.schuljahr_bezeichnung %></div>
+      </li>
+    <% }); %>
+  </ul>
 <% } %>

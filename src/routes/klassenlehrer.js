@@ -24,14 +24,21 @@ export default async function klassenlehrerRoutes(fastify) {
         ORDER BY s.bezeichnung DESC, k.name
       `).all();
     } else {
+      // Klassenleitung kommt aus ZWEI Tabellen (klassenleitung: klassenweite
+      // Selbstregistrierung/Co-Klassenlehrkraft; klassen_lehrkraefte: alte,
+      // je Fach eintragende Admin-Zuweisung) — beide müssen hier
+      // berücksichtigt werden, sonst fehlt z. B. eine per Co-Klassenlehrkraft
+      // eingetragene Person auf ihrem eigenen Dashboard (userIstKlassenlehrer
+      // in src/auth.js prüft dieselben zwei Tabellen für den Seitenzugriff).
       klassen = getDb().prepare(`
         SELECT DISTINCT k.*, s.bezeichnung AS schuljahr_bezeichnung
         FROM klassen k
-        JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id
         JOIN schuljahre s ON s.id = k.schuljahr_id
-        WHERE kl.user_id = ?
+        LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
+        LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
+        WHERE kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL
         ORDER BY s.bezeichnung DESC, k.name
-      `).all(request.user.id);
+      `).all(request.user.id, request.user.id);
     }
     return reply.viewEjs('klassenlehrer/dashboard.ejs', { user: request.user, klassen });
   });

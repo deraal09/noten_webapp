@@ -385,6 +385,46 @@ Fächer), und — per Knopfdruck aufklappbar — allen Notizen aus
 Notenbesprechungen/Notenkonferenzen (siehe unten) als Vorbereitung für
 Halbjahresgespräche.
 
+## Kacheloptik für Übersichtsseiten & Theme-Umschalter
+
+### Kacheloptik (`.klasse-liste`/`.kachel-*` in `static/css/app.css`)
+
+Alle reinen **Übersichts-/Listenseiten** — Seiten, die im Kern „eine Liste
+von Dingen zum Anklicken" sind — verwenden ein einheitliches Kachel-Layout
+(`<ul class="klasse-liste">`, je Eintrag ein `<li>` mit `.kachel-zeile`
+(Icon + Titel), optional `.kachel-sub` (Untertext) und `.kachel-aktionen`
+(Aktionen-Zeile)) statt einer klassischen Tabelle:
+
+- Admin-Dashboard (Schuljahre), Schuljahr-Detailseite (Klassen),
+  Klassenleitung-Dashboard, Sitzplan-Übersicht, Lehrkraft-Dashboard
+  (Fächer je Klasse), Klassen-Übersicht der Lehrkraft.
+
+**Bewusst nicht umgestellt** sind Tabellen mit tatsächlicher
+Dateneingabe/-bearbeitung (Notentafel, Fehlzeiten-Pflege, Schüler- und
+Fächer-Verwaltungstabellen) — dort bleibt die kompakte, tabellarische
+Darstellung erhalten, da sie für Zeilen-für-Zeilen-Bearbeitung besser
+geeignet ist als Kacheln.
+
+### Theme-Umschalter: System/Hell/Dunkel
+
+Oben rechts im Kopfbereich (auch ohne Anmeldung, z. B. auf `/setup` oder der
+Login-Seite, da es eine Geräte- und keine Kontoeinstellung ist) lässt sich
+das Farbschema umschalten:
+
+- 🖥️ **System** (Standard): folgt der Betriebssystem-/Browser-Einstellung
+  (`prefers-color-scheme`).
+- ☀️ **Hell** / 🌙 **Dunkel**: erzwingt das jeweilige Schema unabhängig von
+  der Systemeinstellung.
+
+Technisch steuert das `data-theme="light"|"dark"` am `<html>`-Element
+(fehlt das Attribut, gilt „System"), gespeichert in `localStorage`
+(`theme-pref`) — rein browserseitig, kein Serverkontakt, keine Cookie- oder
+Konto-Bindung. Ein kleines, blockierendes `<script>` ganz am Anfang von
+`<head>` (vor dem CSS-`<link>`, siehe `views/partials/layout.ejs`) liest den
+gespeicherten Wert und setzt das Attribut synchron, bevor überhaupt etwas
+gerendert wird — ohne das würde beim Laden kurz das falsche Schema
+aufblitzen (Flash of Wrong Theme).
+
 ## Noteneingabe (vormals „Fächer")
 
 Die Notentafel eines Fachs (jetzt „Noteneingabe" genannt) ist neu

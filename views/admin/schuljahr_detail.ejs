@@ -10,20 +10,22 @@
   </select>
   <button type="submit">+ Klasse anlegen</button>
 </form>
-<table class="data">
-  <thead><tr><th>Name</th><th>Notenschlüssel</th><th>Aktion</th></tr></thead>
-  <tbody>
-    <% klassen.forEach(function(k) { %>
-      <tr>
-        <td><a href="/admin/klassen/<%= k.id %>"><%= k.name %></a></td>
-        <td><%= k.notenschluessel %></td>
-        <td>
-          <a class="btn" href="/export/klasse/<%= k.id %>.csv">📥 CSV</a>
-          <form method="post" action="/admin/klassen/<%= k.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
-            <button type="submit" class="danger">🗑</button>
-          </form>
-        </td>
-      </tr>
-    <% }); %>
-  </tbody>
-</table>
+<ul class="klasse-liste">
+  <% klassen.forEach(function(k) { %>
+    <li>
+      <a href="/admin/klassen/<%= k.id %>">
+        <div class="kachel-zeile">
+          <span class="kachel-icon-klein">🏫</span>
+          <span class="kachel-titel-klein"><%= k.name %></span>
+        </div>
+      </a>
+      <div class="kachel-sub">Notenschlüssel: <%= k.notenschluessel %></div>
+      <div class="kachel-aktionen">
+        <a class="btn" href="/export/klasse/<%= k.id %>.csv">📥 CSV</a>
+        <form method="post" action="/admin/klassen/<%= k.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
+          <button type="submit" class="danger">🗑</button>
+        </form>
+      </div>
+    </li>
+  <% }); %>
+</ul>

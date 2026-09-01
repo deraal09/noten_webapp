@@ -4,6 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= typeof title !== 'undefined' ? title + ' – ' : '' %><%= appName %></title>
+  <script>
+    // Vor dem ersten Rendern ausführen (kein defer/async, kein type=module),
+    // damit kein falsches Farbschema kurz aufblitzt, bevor die manuelle Wahl
+    // greift. "System" (kein gespeicherter Wert) lässt @media
+    // prefers-color-scheme in app.css entscheiden.
+    (function () {
+      try {
+        var pref = localStorage.getItem('theme-pref');
+        if (pref === 'light' || pref === 'dark') document.documentElement.setAttribute('data-theme', pref);
+      } catch (e) { /* z. B. privater Modus ohne localStorage */ }
+    })();
+  </script>
   <link rel="stylesheet" href="/static/css/app.css?v=<%= typeof cssVersion !== 'undefined' ? cssVersion : '' %>">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E">
 </head>
@@ -37,6 +49,11 @@
         <a class="logout" href="/logout">Abmelden</a>
       </div>
     <% } %>
+    <div class="theme-switch" role="group" aria-label="Farbschema">
+      <button type="button" data-theme-choice="system" title="System">🖥️</button>
+      <button type="button" data-theme-choice="light" title="Hell">☀️</button>
+      <button type="button" data-theme-choice="dark" title="Dunkel">🌙</button>
+    </div>
   </div>
 </header>
 <% if (typeof flash !== 'undefined' && flash && flash.length) { %>
@@ -50,5 +67,25 @@
 <footer class="footer">
   <small>Notenverwaltung · <%= now.getFullYear() %></small>
 </footer>
+<script>
+  (function () {
+    var buttons = document.querySelectorAll('.theme-switch button');
+    var pref = 'system';
+    try { pref = localStorage.getItem('theme-pref') || 'system'; } catch (e) { /* z. B. privater Modus */ }
+    function markiereAktiv() {
+      buttons.forEach(function (b) { b.classList.toggle('active', b.dataset.themeChoice === pref); });
+    }
+    markiereAktiv();
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        pref = btn.dataset.themeChoice;
+        try { localStorage.setItem('theme-pref', pref); } catch (e) { /* z. B. privater Modus */ }
+        if (pref === 'system') document.documentElement.removeAttribute('data-theme');
+        else document.documentElement.setAttribute('data-theme', pref);
+        markiereAktiv();
+      });
+    });
+  })();
+</script>
 </body>
 </html>

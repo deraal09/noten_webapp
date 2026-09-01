@@ -96,10 +96,10 @@ test('Das tatsächlich aktuelle Schuljahr (nach heutigem Datum) wird als "(aktue
   const bezAktuell = baueSchuljahrBezeichnung(aktuellesStartjahr());
   await form(admin, '/admin/schuljahre/neu', { bezeichnung: bezAktuell });
   const html = await (await admin('/admin')).text();
-  const tabellenStart = html.indexOf('<tbody>');
-  const start = html.indexOf(`>${bezAktuell}<`, tabellenStart);
-  assert.ok(start !== -1, 'die Tabellenzeile (nicht das Platzhalter-Beispiel im Formular) muss gefunden werden');
-  const zeile = html.slice(start, start + 80);
+  const listeStart = html.indexOf('class="klasse-liste"');
+  const start = html.indexOf(`>${bezAktuell}<`, listeStart);
+  assert.ok(start !== -1, 'die Kachel (nicht das Platzhalter-Beispiel im Formular) muss gefunden werden');
+  const zeile = html.slice(start, start + 120);
   assert.match(zeile, /\(aktuell\)/);
 });
 
