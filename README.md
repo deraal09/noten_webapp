@@ -21,6 +21,10 @@ die App direkt und routet die Subdomain darauf.
 
 ## Funktionen
 
+- **Startseite (`/start`):** Landet jede Lehrkraft nach dem Anmelden auf
+  (Admins weiterhin auf `/admin`) — vier Kacheln zu Meine Klassen,
+  Sitzpläne, Noteneingabe und Klassenleitung (`src/routes/start.js`,
+  `views/start.ejs`).
 - **Rollen:** Admin / Lehrkraft / Klassenleitung
 - **Setup:** Beim ersten Start wird der erste Admin via `/setup` angelegt
 - **LDAP/Active-Directory-Login:** optional, siehe Abschnitt „LDAP-Konfiguration"

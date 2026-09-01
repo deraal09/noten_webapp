@@ -13,6 +13,7 @@
     <a class="brand" href="/">📚 <%= appName %></a>
     <% if (typeof user !== 'undefined' && user) { %>
       <nav class="nav">
+        <a href="/start">Start</a>
         <% if (user.isAdmin) { %>
           <a href="/admin">Dashboard</a>
           <a href="/admin/users">Lehrkräfte</a>
@@ -23,6 +24,7 @@
         <% } else { %>
           <a href="/teacher/klassen">Meine Klassen</a>
         <% } %>
+        <a href="/teacher/sitzplaene">Sitzpläne</a>
         <a href="/teacher">Noteneingabe</a>
         <a href="/klassenlehrer">Klassenleitung</a>
       </nav>

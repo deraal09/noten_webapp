@@ -199,6 +199,28 @@ export function userHatKlassenZugriff(user, klasseId) {
 }
 
 /**
+ * Klassen, auf die die Lehrkraft Zugriff hat (Ersteller/in, Fach-Zuweisung,
+ * Klassenlehrkraft oder Klassenleitung) — die Listen-Variante von
+ * userHatKlassenZugriff, für Übersichtsseiten wie "Meine Klassen" und die
+ * Sitzplan-Übersicht. Zeigt auch bei Admin-Accounts (wie bisher bei "Meine
+ * Klassen") nur die eigene Teilmenge, nicht automatisch alle Klassen der
+ * Schule — ein Admin sieht die volle Liste weiterhin über /admin.
+ */
+export function ladeMeineKlassen(userId) {
+  return getDb().prepare(`
+    SELECT DISTINCT k.*, s.bezeichnung AS schuljahr_bezeichnung
+    FROM klassen k
+    JOIN schuljahre s ON s.id = k.schuljahr_id
+    LEFT JOIN faecher f ON f.klasse_id = k.id
+    LEFT JOIN fach_zuweisungen fz ON fz.fach_id = f.id AND fz.user_id = ?
+    LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
+    LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
+    WHERE k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL
+    ORDER BY s.bezeichnung DESC, k.name
+  `).all(userId, userId, userId, userId);
+}
+
+/**
  * Darf der User die Klasse per CSV exportieren? CSV enthält Live-Werte —
  * bewusst KEIN Blanket-Export für die Klassenleitung (userIstKlassenlehrer):
  * die soll nur über den Sync-Stand Einblick bekommen (siehe noten-sync.js),

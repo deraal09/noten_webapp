@@ -1,0 +1,19 @@
+<h1>Sitzpläne</h1>
+<p><a href="/start">← Start</a></p>
+
+<% if (!klassen.length) { %>
+  <p>Noch keine Klassen mit Zugriff — siehe <a href="/teacher/klassen">Meine Klassen</a>.</p>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Klasse</th><th>Schuljahr</th><th></th></tr></thead>
+    <tbody>
+      <% klassen.forEach(function(k) { %>
+        <tr>
+          <td><%= k.name %></td>
+          <td><%= k.schuljahr_bezeichnung %></td>
+          <td><a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan öffnen</a></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>

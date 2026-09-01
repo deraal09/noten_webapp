@@ -6,6 +6,7 @@
 import { getDb } from '../db.js';
 import {
   requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
+  ladeMeineKlassen,
 } from '../auth.js';
 import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
 import { starteVerknuepfung, beantworteVerknuepfung } from '../klassen-verknuepfung.js';
@@ -578,17 +579,7 @@ export default async function teacherRoutes(fastify) {
   fastify.get('/klassen', async (request, reply) => {
     const db = getDb();
     const schuljahre = sortiereSchuljahreAbsteigend(db.prepare('SELECT * FROM schuljahre').all());
-    const klassen = db.prepare(`
-      SELECT DISTINCT k.*, s.bezeichnung AS schuljahr_bezeichnung
-      FROM klassen k
-      JOIN schuljahre s ON s.id = k.schuljahr_id
-      LEFT JOIN faecher f ON f.klasse_id = k.id
-      LEFT JOIN fach_zuweisungen fz ON fz.fach_id = f.id AND fz.user_id = ?
-      LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
-      LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
-      WHERE k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL
-      ORDER BY s.bezeichnung DESC, k.name
-    `).all(request.user.id, request.user.id, request.user.id, request.user.id);
+    const klassen = ladeMeineKlassen(request.user.id);
 
     // Verknüpfungsanfragen, auf deren Zustimmung ich noch warte
     const wartetAufMich = db.prepare(`

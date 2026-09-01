@@ -7,7 +7,7 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth, userHatKlassenZugriff } from '../auth.js';
+import { requireAuth, userHatKlassenZugriff, ladeMeineKlassen } from '../auth.js';
 import { sitzplanNamensvorschlaege } from '../sitzplan-namen.js';
 
 const MAX_PLAETZE = 200;
@@ -47,6 +47,12 @@ function parsePlaetze(raw) {
 
 export default async function sitzplanRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
+
+  // ---------- Übersicht: eigene Sitzpläne über alle Klassen ----------
+  fastify.get('/sitzplaene', async (request, reply) => {
+    const klassen = ladeMeineKlassen(request.user.id);
+    return reply.viewEjs('teacher/sitzplaene_liste.ejs', { user: request.user, klassen });
+  });
 
   fastify.get('/klassen/:id/sitzplan', async (request, reply) => {
     const klasse = ladeKlasse(request.params.id);
