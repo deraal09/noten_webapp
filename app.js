@@ -23,6 +23,7 @@ import fastifyFormbody from '@fastify/formbody';
 import fastifyStatic from '@fastify/static';
 import ejs from 'ejs';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 
 import { getDb } from './src/db.js';
 import { authPreHandler, SESSION_COOKIE } from './src/auth.js';
@@ -48,6 +49,20 @@ if (!SECRET) {
   console.error('FEHLER: ENV-Variable SECRET muss in Produktion gesetzt sein (mind. 32 Zeichen).');
   process.exit(1);
 }
+
+// Cache-Busting fürs CSS: Browser (und ggf. ein vorgeschalteter Proxy)
+// dürfen /static/-Dateien beliebig lange cachen — ohne Versions-Query
+// bekämen Nutzer/innen nach einem Deploy sonst so lange die ALTE CSS-Datei
+// aus dem Cache, bis sie manuell hart neu laden (genau das führte dazu,
+// dass neue Styles wie die Start-Kacheln nach dem Deploy unsichtbar
+// blieben). Der Hash wird einmal beim Start aus dem tatsächlichen
+// Dateiinhalt berechnet, ändert sich also automatisch bei jedem Deploy mit
+// geänderter CSS-Datei.
+let cssVersion = 'dev';
+try {
+  const cssInhalt = readFileSync(path.join(__dirname, 'static', 'css', 'app.css'));
+  cssVersion = crypto.createHash('sha1').update(cssInhalt).digest('hex').slice(0, 10);
+} catch { /* static/css/app.css sollte immer vorhanden sein — Fallback bleibt 'dev' */ }
 
 export async function buildApp(opts = {}) {
   const app = fastify({
@@ -116,6 +131,7 @@ export async function buildApp(opts = {}) {
     reply.locals.appName = 'Notenverwaltung';
     reply.locals.now = new Date();
     reply.locals.PUBLIC_URL = PUBLIC_URL;
+    reply.locals.cssVersion = cssVersion;
     // Geteilte Anzeige-Konstanten/-Helfer für alle Templates verfügbar machen.
     reply.locals.HALBJAHRE = HALBJAHRE;
     reply.locals.NOTE_TYPEN = NOTE_TYPEN;
