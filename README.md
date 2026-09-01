@@ -182,12 +182,23 @@ August–Juli, siehe `aktuellesStartjahr()`).
 
 ## Klassen selbst anlegen (ohne Admin-Zuweisung)
 
-Jede angemeldete Lehrkraft kann unter **„Meine Klassen"** eigene Klassen in
-einem bestehenden Schuljahr anlegen — eine vorherige Zuweisung durch den
-Admin ist nicht nötig. Beim Anlegen eines Fachs wird die erstellende
-Lehrkraft automatisch diesem Fach zugewiesen (sieht es sofort in der eigenen
-Notentafel). Das Formular „Neue Klasse anlegen" ist standardmäßig
-eingeklappt (`<details>`), damit die Felder nur bei Bedarf erscheinen.
+Lehrkräfte mit **LDAP-Zugang** (also von der Schule verwaltete Konten) können
+unter **„Meine Klassen"** eigene Klassen in einem bestehenden Schuljahr
+anlegen — eine vorherige Zuweisung durch den Admin ist nicht nötig. Beim
+Anlegen eines Fachs wird die erstellende Lehrkraft automatisch diesem Fach
+zugewiesen (sieht es sofort in der eigenen Notentafel). Das Formular „Neue
+Klasse anlegen" ist standardmäßig eingeklappt (`<details>`), damit die
+Felder nur bei Bedarf erscheinen.
+
+**Über einen Einladungslink registrierte ("externe") Konten haben dieses
+Selbstbedienungsrecht bewusst NICHT** (`userDarfSelbstKlasseAnlegen` in
+`src/auth.js`, geprüft anhand `auth_source`: `'ldap'` vs. `'lokal'`) — sie
+sehen an derselben Stelle nur einen Hinweis, sich von einer Klassenleitung
+oder dem Admin einem Fach zuweisen zu lassen. Das gilt für `POST
+/teacher/klassen/neu`, die Verknüpfungsanfrage bei Namenskollisionen
+(`/teacher/klassen/:id/verknuepfen`) und den Untis-Import gleichermaßen —
+alle drei sind letztlich Wege, sich selbst Zugriff auf ein Fach zu
+verschaffen, ohne dass jemand anders das explizit entschieden hat.
 
 Schuljahre selbst legt weiterhin nur der Admin an (Admin → Dashboard). Auf
 „Meine Klassen" werden die vorhandenen Klassen in **Reitern je Schuljahr**
@@ -232,6 +243,29 @@ Diese haben danach exakt dieselben Rechte — insbesondere Zugriff auf die
 Klassenleitungsseite und damit auf die Fehlzeiten-Pflege —, da die
 Berechtigungsprüfung (`userIstKlassenlehrer`) ohnehin schon jede Person in
 der `klassenleitung`-Tabelle als vollwertige Klassenleitung behandelt.
+
+### Externe Lehrkräfte einladen (`/teacher/einladungen`)
+
+Nicht mehr nur der Admin (`/admin/einladungen`), sondern **jede
+Klassenleitung** kann Einladungslinks für externe Lehrkräfte erzeugen
+(`istIrgendeineKlassenleitung` in `src/auth.js` — jede Person mit
+mindestens einem Eintrag in `klassenleitung`/`klassen_lehrkraefte`, oder
+der Admin). Der Nav-Link „Einladungen" erscheint nur, wenn das zutrifft.
+
+Über so einen Link registriert sich die eingeladene Person **sofort
+selbst** mit eigenem Benutzernamen/Passwort — keine Freischaltung durch
+den Admin nötig, das Konto ist direkt einsatzbereit (genau wie bei den
+bisherigen Admin-Einladungen). Der entscheidende Unterschied liegt in den
+**Rechten**: ein so entstandenes Konto (`auth_source = 'lokal'`) bekommt
+**kein** Selbstbedienungsrecht (siehe oben) — es kann ausschließlich in
+Fächern Noten eintragen, denen es von einer Klassenleitung oder dem Admin
+explizit zugewiesen wurde (Klassenseite → „Lehrkräfte zuordnen" oder als
+Co-Klassenlehrkraft). Lehrkräfte mit LDAP-Zugang sind davon nicht
+betroffen und behalten ihr volles Selbstbedienungsrecht.
+
+Jede Klassenleitung sieht und verwaltet dabei nur ihre **eigenen**
+erzeugten Einladungen (`created_by_id`) — der Admin sieht weiterhin alle
+unter `/admin/einladungen`.
 
 ### Verknüpfungsanfrage bei Namenskollisionen
 

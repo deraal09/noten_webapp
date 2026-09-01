@@ -85,6 +85,7 @@ test('Vorbereitung: Admin, Schuljahr, drei Lehrkräfte, Klasse mit Klassenleitun
     username: 'lehrerc', display_name: 'Lehrer C', password: 'passwortC1', password2: 'passwortC1',
   });
   lehrerBId = getDb().prepare("SELECT id FROM users WHERE username = 'lehrerb'").get().id;
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 
   r = await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '9A', notenschluessel: 'IHK' });
   assert.equal(r.status, 302);

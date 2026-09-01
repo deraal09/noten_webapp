@@ -8,7 +8,7 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth } from '../auth.js';
+import { requireAuth, userDarfSelbstKlasseAnlegen } from '../auth.js';
 import { DEFAULT_NS_CSV } from '../grade-calc.js';
 import {
   untisAnmelden, untisAbmelden, untisKlassen, untisStudenten, untisIdentitaet, untisZeitplan,
@@ -109,6 +109,11 @@ export default async function untisImportRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
 
   fastify.get('/untis-import', async (request, reply) => {
+    if (!userDarfSelbstKlasseAnlegen(request.user)) {
+      return reply.code(403).viewEjs('error.ejs', {
+        code: 403, message: 'Nur Lehrkräfte mit LDAP-Zugang können eigene Klassen importieren. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.',
+      });
+    }
     const schuljahre = sortiereSchuljahreAbsteigend(getDb().prepare('SELECT * FROM schuljahre').all());
     const verbindung = request.session.untisImport || null;
     return reply.viewEjs('teacher/untis_import.ejs', {
@@ -167,6 +172,11 @@ export default async function untisImportRoutes(fastify) {
   });
 
   fastify.post('/untis-import/importieren', async (request, reply) => {
+    if (!userDarfSelbstKlasseAnlegen(request.user)) {
+      return reply.code(403).viewEjs('error.ejs', {
+        code: 403, message: 'Nur Lehrkräfte mit LDAP-Zugang können eigene Klassen importieren. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.',
+      });
+    }
     const v = request.session.untisImport;
     if (!v) {
       request.flash?.('error', 'Keine aktive Untis-Verbindung — bitte erneut anmelden.');

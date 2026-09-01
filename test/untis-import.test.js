@@ -126,6 +126,8 @@ test('Vorbereitung: Admin, Schuljahr, Lehrkraft', async () => {
     username: 'lehrera', display_name: 'Lehrer A', password: 'passwortA1', password2: 'passwortA1',
   });
   assert.equal(r.status, 302);
+  // Untis-Import (Klassenanlage) ist an LDAP-Zugang gebunden (userDarfSelbstKlasseAnlegen).
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 });
 
 test('Login-Formular ist erreichbar, ohne Verbindung wird Schritt 1 gezeigt', async () => {

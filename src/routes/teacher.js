@@ -6,7 +6,7 @@
 import { getDb } from '../db.js';
 import {
   requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
-  ladeMeineKlassen,
+  ladeMeineKlassen, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
 import { starteVerknuepfung, beantworteVerknuepfung } from '../klassen-verknuepfung.js';
@@ -613,10 +613,15 @@ export default async function teacherRoutes(fastify) {
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
       user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, wartetAufMich, meineAnfragen,
+      kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user),
     });
   });
 
   fastify.post('/klassen/neu', async (request, reply) => {
+    if (!userDarfSelbstKlasseAnlegen(request.user)) {
+      request.flash?.('error', 'Nur Lehrkräfte mit LDAP-Zugang können eigene Klassen anlegen. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.');
+      return reply.redirect('/teacher/klassen');
+    }
     const schuljahrId = parseInt(request.body?.schuljahr_id, 10);
     const name = String(request.body?.name || '').trim();
     let ns = String(request.body?.notenschluessel || 'IHK');
@@ -650,12 +655,22 @@ export default async function teacherRoutes(fastify) {
     `).get(request.params.id);
     if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
     if (userHatKlassenZugriff(request.user, klasse.id)) return reply.redirect(`/teacher/klassen/${klasse.id}`);
+    if (!userDarfSelbstKlasseAnlegen(request.user)) {
+      return reply.code(403).viewEjs('error.ejs', {
+        code: 403, message: 'Nur Lehrkräfte mit LDAP-Zugang können sich selbst einer Klasse zuordnen. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.',
+      });
+    }
     return reply.viewEjs('teacher/klasse_verknuepfen.ejs', { user: request.user, klasse });
   });
 
   fastify.post('/klassen/:id/verknuepfen', async (request, reply) => {
     const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
     if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userDarfSelbstKlasseAnlegen(request.user)) {
+      return reply.code(403).viewEjs('error.ejs', {
+        code: 403, message: 'Nur Lehrkräfte mit LDAP-Zugang können sich selbst einer Klasse zuordnen. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.',
+      });
+    }
     const fach = String(request.body?.fach || '').trim();
     if (!fach) {
       request.flash?.('error', 'Bitte ein Fach angeben.');
@@ -1166,6 +1181,52 @@ export default async function teacherRoutes(fastify) {
     }
     getDb().prepare('DELETE FROM faecher WHERE id = ?').run(request.params.id);
     return reply.redirect(`/teacher/klassen/${f.klasse_id}`);
+  });
+
+  // ---------- Einladungen für externe Lehrkräfte (nicht mehr nur Admin) ----------
+  // Jede Klassenleitung kann externe Personen per Link einladen. Die so
+  // registrierten Konten (auth_source 'lokal') bekommen bewusst KEIN
+  // Selbstbedienungsrecht (siehe userDarfSelbstKlasseAnlegen) — sie müssen
+  // von einer Klassenleitung/dem Admin einem Fach zugewiesen werden
+  // (Klassenseite → "Lehrkräfte zuordnen"/"Klassenleitung"), genau wie
+  // jede andere Lehrkraft, die dort in der Auswahlliste auftaucht.
+  fastify.get('/einladungen', async (request, reply) => {
+    if (!istIrgendeineKlassenleitung(request.user)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann externe Lehrkräfte einladen.' });
+    }
+    const einladungen = getDb().prepare(`
+      SELECT i.*, bu.username AS verwendet_von
+      FROM invitations i
+      LEFT JOIN users bu ON bu.id = i.used_by_id
+      WHERE i.created_by_id = ?
+      ORDER BY i.created_at DESC
+    `).all(request.user.id);
+    return reply.viewEjs('teacher/einladungen.ejs', { user: request.user, einladungen });
+  });
+
+  fastify.post('/einladungen/neu', async (request, reply) => {
+    if (!istIrgendeineKlassenleitung(request.user)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann externe Lehrkräfte einladen.' });
+    }
+    const email = String(request.body?.email || '').trim() || null;
+    const displayName = String(request.body?.display_name || '').trim() || null;
+    const ttl = parseInt(request.body?.ttl_days, 10) || 14;
+    const expires = new Date(Date.now() + ttl * 86400 * 1000).toISOString();
+    getDb().prepare(`INSERT INTO invitations
+      (token, email, display_name, role, created_by_id, expires_at)
+      VALUES (?, ?, ?, 'teacher', ?, ?)`)
+      .run(makeToken(), email, displayName, request.user.id, expires);
+    return reply.redirect('/teacher/einladungen');
+  });
+
+  fastify.post('/einladungen/:id/loeschen', async (request, reply) => {
+    const inv = getDb().prepare('SELECT created_by_id FROM invitations WHERE id = ?').get(request.params.id);
+    if (!inv) return reply.redirect('/teacher/einladungen');
+    if (inv.created_by_id !== request.user.id && !request.user.isAdmin) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die eigenen Einladungen können gelöscht werden.' });
+    }
+    getDb().prepare('DELETE FROM invitations WHERE id = ?').run(request.params.id);
+    return reply.redirect('/teacher/einladungen');
   });
 }
 

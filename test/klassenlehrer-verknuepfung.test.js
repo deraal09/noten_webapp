@@ -88,6 +88,9 @@ test('Vorbereitung: Admin, Schuljahr, drei Lehrkräfte', async () => {
     username: 'lehrerc', display_name: 'Lehrer C', password: 'passwortC1', password2: 'passwortC1',
   });
   assert.equal(r.status, 302);
+  // Selbstbedienungs-Klassenanlage ist an LDAP-Zugang gebunden — für A und C
+  // (die in diesem Test eigene Klassen anlegen) testweise simuliert.
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username IN ('lehrera', 'lehrerc')").run();
 });
 
 test('Klassenleitung: Selbstregistrierung nur für Ersteller/in, KEIN Live-Zugriff auf fremde Fächer', async () => {

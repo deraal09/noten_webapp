@@ -82,6 +82,12 @@ test('Selbstbedienung: Lehrkraft legt eigene Klasse ohne Zuweisung an', async ()
   });
   assert.equal(r.status, 302);
 
+  // Selbstbedienungs-Klassenanlage ist an einen LDAP-Zugang gebunden (siehe
+  // userDarfSelbstKlasseAnlegen) — per Einladungslink registrierte Konten
+  // simulieren hier testweise einen LDAP-Ursprung, um genau dieses (davon
+  // unabhängige) Verhalten zu prüfen.
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
+
   // Lehrer A legt selbst eine Klasse an — ohne jede Admin-Zuweisung
   r = await form(lehrerA, '/teacher/klassen/neu', {
     schuljahr_id: String(sj.id), name: '12BFI1', notenschluessel: 'IHK',

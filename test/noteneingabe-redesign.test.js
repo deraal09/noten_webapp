@@ -76,6 +76,7 @@ test('Vorbereitung: Admin, Klasse, Fach, zwei Schüler/innen, zwei Klausuren', a
   await form(lehrerB, `/einladung/${invs[1].token}`, {
     username: 'lehrerb', display_name: 'Lehrer B', password: 'passwortB1', password2: 'passwortB1',
   });
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '11A', notenschluessel: 'IHK' });
   klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '11A'").get().id;

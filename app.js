@@ -26,7 +26,7 @@ import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 
 import { getDb } from './src/db.js';
-import { authPreHandler, SESSION_COOKIE } from './src/auth.js';
+import { authPreHandler, SESSION_COOKIE, istIrgendeineKlassenleitung } from './src/auth.js';
 import {
   HALBJAHRE, NOTE_TYPEN, FEHLZEIT_TYPEN, formatNote, formatNoteG,
 } from './src/grade-calc.js';
@@ -139,6 +139,10 @@ export async function buildApp(opts = {}) {
     reply.locals.formatNote = formatNote;
     reply.locals.formatNoteG = formatNoteG;
     reply.locals.formatZeitLokal = formatZeitLokal;
+    // Nav-Link "Einladungen" (extern Lehrkräfte einladen) nur für Admin
+    // und Klassenleitung — einmal pro Request berechnet statt in der
+    // Layout-Vorlage selbst eine DB-Abfrage zu brauchen.
+    reply.locals.kannEinladen = request.user ? istIrgendeineKlassenleitung(request.user) : false;
     const pending = request.session?.flash;
     reply.locals.flash = pending && pending.length ? pending : null;
     if (pending && pending.length) request.session.flash = [];

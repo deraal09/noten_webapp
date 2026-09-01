@@ -1,7 +1,13 @@
 <h1>Meine Klassen</h1>
 <p><small>
-  Klassen können von jeder Lehrkraft selbst angelegt werden — eine Zuweisung durch den Admin
-  ist nicht nötig, kann aber jederzeit zusätzlich erfolgen (Admin → Zuweisungen).
+  <% if (kannSelbstKlasseAnlegen) { %>
+    Als Lehrkraft mit LDAP-Zugang kannst du eigene Klassen selbst anlegen — eine Zuweisung durch
+    den Admin ist nicht nötig, kann aber jederzeit zusätzlich erfolgen (Admin → Zuweisungen).
+  <% } else { %>
+    Hier erscheinen die Klassen, denen du zugewiesen bist. Eigene Klassen anlegen können nur
+    Lehrkräfte mit LDAP-Zugang — bitte eine Klassenleitung oder den Admin bitten, dich einem
+    Fach zuzuweisen.
+  <% } %>
 </small></p>
 
 <% if (wartetAufMich.length) { %>
@@ -54,29 +60,37 @@
 
 <details>
   <summary>Neue Klasse anlegen</summary>
-  <p><a href="/teacher/untis-import">📥 Aus Untis importieren</a> (Klassen und optional Schüler/innen)</p>
-  <% if (!schuljahre.length) { %>
-    <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
+  <% if (!kannSelbstKlasseAnlegen) { %>
+    <p class="hint">
+      Eigene Klassen anlegen können nur Lehrkräfte mit LDAP-Zugang. Bitte eine Klassenleitung oder
+      den Admin bitten, dich einem Fach zuzuweisen — sobald das geschehen ist, erscheint die
+      passende Klasse hier automatisch.
+    </p>
   <% } else { %>
-    <form method="post" action="/teacher/klassen/neu" class="card">
-      <label>Schuljahr
-        <select name="schuljahr_id">
-          <% schuljahre.forEach(function(s) { %>
-            <option value="<%= s.id %>"><%= s.bezeichnung %></option>
-          <% }); %>
-        </select>
-      </label>
-      <label>Klassenname
-        <input type="text" name="name" placeholder="z. B. 12BFI1" required>
-      </label>
-      <label>Notenschlüssel
-        <select name="notenschluessel">
-          <option value="IHK">IHK (1–6)</option>
-          <option value="BG">BG (0–15)</option>
-        </select>
-      </label>
-      <button type="submit">+ Klasse anlegen</button>
-    </form>
+    <p><a href="/teacher/untis-import">📥 Aus Untis importieren</a> (Klassen und optional Schüler/innen)</p>
+    <% if (!schuljahre.length) { %>
+      <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
+    <% } else { %>
+      <form method="post" action="/teacher/klassen/neu" class="card">
+        <label>Schuljahr
+          <select name="schuljahr_id">
+            <% schuljahre.forEach(function(s) { %>
+              <option value="<%= s.id %>"><%= s.bezeichnung %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Klassenname
+          <input type="text" name="name" placeholder="z. B. 12BFI1" required>
+        </label>
+        <label>Notenschlüssel
+          <select name="notenschluessel">
+            <option value="IHK">IHK (1–6)</option>
+            <option value="BG">BG (0–15)</option>
+          </select>
+        </label>
+        <button type="submit">+ Klasse anlegen</button>
+      </form>
+    <% } %>
   <% } %>
 </details>
 

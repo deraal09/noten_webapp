@@ -23,6 +23,9 @@
           <a href="/admin/zuweisungen">Zuweisungen</a>
         <% } else { %>
           <a href="/teacher/klassen">Meine Klassen</a>
+          <% if (typeof kannEinladen !== 'undefined' && kannEinladen) { %>
+            <a href="/teacher/einladungen">Einladungen</a>
+          <% } %>
         <% } %>
         <a href="/teacher/sitzplaene">Sitzpläne</a>
         <a href="/teacher">Noteneingabe</a>

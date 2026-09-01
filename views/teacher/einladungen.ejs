@@ -1,0 +1,64 @@
+<h1>Externe Lehrkräfte einladen</h1>
+<p class="hint">
+  Über diesen Link registriert sich eine Person selbst mit eigenem Benutzernamen und Passwort —
+  eine Zuweisung durch den Admin ist nicht nötig. Diese Konten bekommen aber <strong>keine</strong>
+  eigene Klassen-Anlage: erst wenn du sie über „Lehrkräfte zuordnen" (Klassenseite) oder als
+  Co-Klassenlehrkraft einträgst, können sie dort Noten eintragen.
+</p>
+
+<h2>Neue Einladung erstellen</h2>
+<form method="post" action="/teacher/einladungen/neu" class="card">
+  <label>Anzeigename (optional)
+    <input type="text" name="display_name" placeholder="z. B. Frau Müller">
+  </label>
+  <label>E-Mail (optional)
+    <input type="email" name="email">
+  </label>
+  <label>Gültig für
+    <select name="ttl_days">
+      <option value="3">3 Tage</option>
+      <option value="7">7 Tage</option>
+      <option value="14" selected>14 Tage</option>
+      <option value="30">30 Tage</option>
+    </select>
+  </label>
+  <button type="submit">+ Einladungslink erzeugen</button>
+</form>
+
+<h2>Meine Einladungen</h2>
+<% if (!einladungen.length) { %><p>Noch keine Einladungen.</p><% } else { %>
+  <table class="data">
+    <thead>
+      <tr><th>Token / Link</th><th>Erstellt</th><th>Gültig bis</th><th>Status</th><th>Aktion</th></tr>
+    </thead>
+    <tbody>
+      <% einladungen.forEach(function(e) { %>
+        <% var base = PUBLIC_URL || ''; var link = base + '/einladung/' + e.token; %>
+        <% var status = e.used_at ? '✅ eingelöst' : ((e.expires_at && new Date(e.expires_at) < now) ? '⏱ abgelaufen' : '🟢 offen'); %>
+        <tr>
+          <td><code class="token" data-link="<%= link %>"><%= e.token.slice(0, 12) %>…</code> <button type="button" class="copy-btn" data-target="<%= link %>">📋</button></td>
+          <td><%= e.created_at %></td>
+          <td><%= e.expires_at || '∞' %></td>
+          <td><%= status %></td>
+          <td>
+            <% if (!e.used_at) { %>
+              <form method="post" action="/teacher/einladungen/<%= e.id %>/loeschen" class="inline" onsubmit="return confirm('Einladung löschen?')">
+                <button type="submit" class="danger">🗑</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+<script>
+  document.querySelectorAll('.copy-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      navigator.clipboard.writeText(btn.dataset.target).then(function() {
+        btn.textContent = '✅';
+        setTimeout(function() { btn.textContent = '📋'; }, 1500);
+      });
+    });
+  });
+</script>

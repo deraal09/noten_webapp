@@ -78,6 +78,7 @@ test('Vorbereitung: Klasse mit Klassenleitung (A), zugewiesene Fachlehrkraft (B)
     username: 'lehrerb', display_name: 'Lehrer B', password: 'passwortB1', password2: 'passwortB1',
   });
   const lehrerBId = getDb().prepare('SELECT id FROM users WHERE username = ?').get('lehrerb').id;
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '9A', notenschluessel: 'IHK' });
   klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '9A'").get().id;

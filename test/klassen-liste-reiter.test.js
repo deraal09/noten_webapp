@@ -78,6 +78,7 @@ test('Vorbereitung: Admin, Lehrkraft, drei Schuljahre (das älteste zuletzt/"nac
     username: 'lehrera', display_name: 'Lehrer A', password: 'passwortA1', password2: 'passwortA1',
   });
   assert.equal(r.status, 302);
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 
   const sjAktuellId = getDb().prepare('SELECT id FROM schuljahre WHERE bezeichnung = ?').get(bezAktuell).id;
   const sjNachgetragenId = getDb().prepare('SELECT id FROM schuljahre WHERE bezeichnung = ?').get(bezNachgetragen).id;

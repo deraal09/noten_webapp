@@ -80,6 +80,9 @@ test('Vorbereitung: Admin, zwei Schuljahre, Klasse mit Klassenleitung/Fach/Zuwei
     username: 'lehrerb', display_name: 'Lehrer B', password: 'passwortB1', password2: 'passwortB1',
   });
   lehrerBId = getDb().prepare('SELECT id FROM users WHERE username = ?').get('lehrerb').id;
+  // Selbstbedienungs-Klassenanlage ist an LDAP-Zugang gebunden (siehe
+  // userDarfSelbstKlasseAnlegen) — für diesen Test unabhängiges Verhalten simuliert.
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjAltId), name: '10A', notenschluessel: 'IHK' });
   klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '10A'").get().id;

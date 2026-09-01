@@ -99,7 +99,7 @@ export async function authPreHandler(request, reply) {
   const session = request.session;
   if (!session?.userId) return; // anonymous OK
   const user = getDb()
-    .prepare('SELECT id, username, email, role, display_name, active FROM users WHERE id = ?')
+    .prepare('SELECT id, username, email, role, display_name, active, auth_source FROM users WHERE id = ?')
     .get(session.userId);
   if (!user || !user.active) {
     await destroySession(request);
@@ -112,6 +112,7 @@ export async function authPreHandler(request, reply) {
     role: user.role,
     displayName: user.display_name,
     isAdmin: user.role === 'admin',
+    authSource: user.auth_source,
   };
 }
 
@@ -174,6 +175,34 @@ export function userIstKlassenlehrer(user, klasseId) {
   if (neu) return true;
   const alt = db.prepare('SELECT 1 FROM klassen_lehrkraefte WHERE user_id = ? AND klasse_id = ?')
     .get(user.id, klasseId);
+  return Boolean(alt);
+}
+
+/**
+ * Darf sich selbst eine neue Klasse anlegen (und wird damit automatisch
+ * deren Ersteller/in mit vollem Zugriff)? Nur Admin und Lehrkräfte mit
+ * LDAP-Zugang — also verifizierte, von der Schule verwaltete Konten.
+ * Über einen Einladungslink registrierte ("extern angelegte") Konten
+ * (auth_source 'lokal') haben dieses Selbstbedienungsrecht bewusst NICHT:
+ * sie bekommen Zugriff ausschließlich über eine explizite Fach-Zuweisung
+ * durch eine Klassenleitung oder den Admin (siehe routes/teacher.js,
+ * POST /klassen/neu und POST /untis-import/importieren).
+ */
+export function userDarfSelbstKlasseAnlegen(user) {
+  return user.isAdmin || user.authSource === 'ldap';
+}
+
+/**
+ * Ist der User irgendwo Klassenleitung (oder Admin)? Damit dürfen sie
+ * Einladungslinks für externe Lehrkräfte erzeugen (siehe
+ * routes/teacher.js, GET/POST /einladungen) — nicht mehr nur der Admin.
+ */
+export function istIrgendeineKlassenleitung(user) {
+  if (user.isAdmin) return true;
+  const db = getDb();
+  const neu = db.prepare('SELECT 1 FROM klassenleitung WHERE user_id = ?').get(user.id);
+  if (neu) return true;
+  const alt = db.prepare('SELECT 1 FROM klassen_lehrkraefte WHERE user_id = ?').get(user.id);
   return Boolean(alt);
 }
 
