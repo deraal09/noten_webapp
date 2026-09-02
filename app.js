@@ -27,6 +27,7 @@ import { readFileSync } from 'node:fs';
 
 import { getDb } from './src/db.js';
 import { authPreHandler, SESSION_COOKIE, istIrgendeineKlassenleitung } from './src/auth.js';
+import { SqliteSessionStore } from './src/auth/sqlite-session-store.js';
 import {
   HALBJAHRE, NOTE_TYPEN, FEHLZEIT_TYPEN, formatNote, formatNoteG,
 } from './src/grade-calc.js';
@@ -79,11 +80,14 @@ export async function buildApp(opts = {}) {
   await app.register(fastifySession, {
     secret: SECRET,
     cookieName: SESSION_COOKIE,
+    // SQLite statt des Default-In-Memory-Stores, damit eine Anmeldung einen
+    // Neustart des Node-Prozesses übersteht (siehe sqlite-session-store.js).
+    store: new SqliteSessionStore(getDb()),
     cookie: {
       secure: isProd,
       httpOnly: true,
       sameSite: 'lax',
-      maxAge: 1000 * 60 * 60 * 12, // 12 h
+      maxAge: 1000 * 60 * 60 * 12, // 12 h ohne "Angemeldet bleiben" (siehe routes/auth.js)
     },
     saveUninitialized: false,
   });

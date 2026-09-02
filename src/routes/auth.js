@@ -11,6 +11,19 @@ import {
 const MIN_PW_LEN = 8;
 const MIN_USER_LEN = 3;
 
+// Ohne Haken "Angemeldet bleiben": deckt sich mit der Cookie-Voreinstellung
+// in app.js. Mit Haken: deutlich länger, damit sich Lehrkräfte nicht bei
+// jedem Besuch neu anmelden müssen (siehe zugehöriges Kontrollkästchen in
+// views/auth/login.ejs).
+const MAXAGE_STANDARD = 1000 * 60 * 60 * 12; // 12 h
+const MAXAGE_ANGEMELDET_BLEIBEN = 1000 * 60 * 60 * 24 * 30; // 30 Tage
+
+/** Setzt die Sitzungsdauer je nach Haken "Angemeldet bleiben" im Login-Formular. */
+function wendeSessionDauerAn(request) {
+  const bleibenAngemeldet = Boolean(request.body?.angemeldet_bleiben);
+  request.session.cookie.maxAge = bleibenAngemeldet ? MAXAGE_ANGEMELDET_BLEIBEN : MAXAGE_STANDARD;
+}
+
 export default async function authRoutes(fastify) {
   // ---------- /setup (nur solange noch kein User existiert) ----------
   fastify.get('/setup', async (request, reply) => {
@@ -99,6 +112,7 @@ export default async function authRoutes(fastify) {
         try {
           const neu = provisionLdapUser(ergebnis, uname);
           request.session.userId = neu.id;
+          wendeSessionDauerAn(request);
           const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';
           return reply.redirect(safeNext);
         } catch (e) {
@@ -145,6 +159,7 @@ export default async function authRoutes(fastify) {
     }
 
     request.session.userId = row.id;
+    wendeSessionDauerAn(request);
     // Nur relative Pfade ohne Host erlauben (Open-Redirect-Schutz).
     const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';
     return reply.redirect(safeNext);

@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -388,6 +388,18 @@ CREATE TABLE IF NOT EXISTS ldap_settings (
     auto_provision INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Server-seitiger Sitzungsspeicher für @fastify/session
+-- (src/auth/sqlite-session-store.js) statt des Default-In-Memory-Stores.
+-- Damit übersteht eine Anmeldung einen App-Neustart (z. B. nach jedem
+-- Deploy auf Plesk) — ohne diese Tabelle wären sonst alle angemeldeten
+-- Personen bei jedem Neustart ohne Vorwarnung ausgeloggt.
+CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 `;
 
 // Fügt einer bereits existierenden Tabelle (aus einer älteren SCHEMA_VERSION)

@@ -142,6 +142,36 @@ Einladungslink (Admin → Einladungen) — beide Kontotypen (LDAP / lokal)
 funktionieren parallel und sind in **Admin → Lehrkräfte** an der Spalte
 „Quelle" zu erkennen.
 
+## Anmeldung: Sitzungen & „Angemeldet bleiben"
+
+### Sitzungsspeicher in SQLite statt im Arbeitsspeicher
+
+Sitzungen (`@fastify/session`) liegen in der Tabelle `sessions` derselben
+SQLite-Datenbank (`src/auth/sqlite-session-store.js`) statt im
+Default-In-Memory-Store. Der Unterschied merkt man vor allem beim
+Plesk-Deploy: Ein `npm-Installation` + `App neu starten` beendet den
+Node-Prozess — mit dem alten In-Memory-Store wäre danach **jede**
+angemeldete Person ohne Vorwarnung ausgeloggt gewesen. Mit dem
+SQLite-Store übersteht eine Anmeldung den Neustart, solange die Sitzung
+selbst noch nicht abgelaufen ist. Abgelaufene Zeilen werden beiläufig bei
+jedem Login mit aufgeräumt, ein separater Cronjob ist nicht nötig.
+
+### Haken „Angemeldet bleiben" auf der Login-Seite
+
+Die Login-Seite hat ein vorausgewähltes Kontrollkästchen **„Angemeldet
+bleiben"**:
+
+- **Gesetzt (Standard):** die Sitzung gilt **30 Tage**, statt wie bisher
+  nur 12 Stunden — für den üblichen Fall, dass eine Lehrkraft ihr eigenes
+  Gerät nutzt und sich nicht bei jedem Besuch neu anmelden möchte.
+- **Entfernt:** wie bisher 12 Stunden Inaktivität, empfohlen auf einem
+  fremden/gemeinsam genutzten Gerät.
+
+Technisch wird dazu beim Login `request.session.cookie.maxAge` gesetzt
+(`src/routes/auth.js`, Funktion `wendeSessionDauerAn`) — unabhängig davon,
+ob die Anmeldung lokal per Passwort oder per LDAP (inkl. Auto-Provisioning)
+erfolgt.
+
 ## Fehlzeiten: optionale zweite Schule
 
 Manche Schüler/innen werden an zwei Schulen unterrichtet (z. B. duales
