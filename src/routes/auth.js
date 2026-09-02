@@ -7,6 +7,7 @@ import {
   hashPassword, checkPassword, makeToken, SESSION_COOKIE, requireAuth, destroySession,
   getLdapAuthenticator, isLdapConfigured, isAutoProvisionEnabled, provisionLdapUser,
 } from '../auth.js';
+import { pruefeSperre, vermerkeFehlversuch, setzeZurueck } from '../auth/login-ratelimit.js';
 
 const MIN_PW_LEN = 8;
 const MIN_USER_LEN = 3;
@@ -79,6 +80,17 @@ export default async function authRoutes(fastify) {
     const { username = '', password = '' } = request.body || {};
     const next = request.body?.next || '';
     const uname = String(username).trim();
+
+    const sperre = pruefeSperre(uname);
+    if (sperre.gesperrt) {
+      const einheit = sperre.restSekunden === 1 ? 'Sekunde' : 'Sekunden';
+      return reply.viewEjs('auth/login.ejs', {
+        user: null,
+        error: `Zu viele Fehlversuche. Bitte in ${sperre.restSekunden} ${einheit} erneut versuchen.`,
+        next,
+      });
+    }
+
     // COLLATE NOCASE: Benutzername beim Login unabhängig von Groß-/Kleinschreibung
     // finden. Wichtig vor allem für LDAP-Konten — das AD ist bei sAMAccountName
     // selbst nicht case-sensitiv, unsere Login-Suche war es aber bisher, sodass
@@ -112,6 +124,7 @@ export default async function authRoutes(fastify) {
         try {
           const neu = provisionLdapUser(ergebnis, uname);
           request.session.userId = neu.id;
+          setzeZurueck(uname);
           wendeSessionDauerAn(request);
           const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';
           return reply.redirect(safeNext);
@@ -123,6 +136,7 @@ export default async function authRoutes(fastify) {
     }
 
     if (!row) {
+      vermerkeFehlversuch(uname);
       return reply.viewEjs('auth/login.ejs', {
         user: null, error: 'Benutzername oder Passwort ist falsch.', next,
       });
@@ -148,17 +162,20 @@ export default async function authRoutes(fastify) {
         });
       }
       if (!ergebnis) {
+        vermerkeFehlversuch(uname);
         return reply.viewEjs('auth/login.ejs', {
           user: null, error: 'Benutzername oder Passwort ist falsch.', next,
         });
       }
     } else if (!checkPassword(password, row.password_hash)) {
+      vermerkeFehlversuch(uname);
       return reply.viewEjs('auth/login.ejs', {
         user: null, error: 'Benutzername oder Passwort ist falsch.', next,
       });
     }
 
     request.session.userId = row.id;
+    setzeZurueck(uname);
     wendeSessionDauerAn(request);
     // Nur relative Pfade ohne Host erlauben (Open-Redirect-Schutz).
     const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';

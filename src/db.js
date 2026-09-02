@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -400,6 +400,17 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
+-- Ratelimit für Login-Versuche (src/auth/login-ratelimit.js): ab dem 3.
+-- Fehlversuch in Folge für einen Benutzernamen wird die Anmeldung für eine
+-- Weile gesperrt, jede weitere fehlgeschlagene Anmeldung danach verdoppelt
+-- die Sperrdauer (exponentieller Backoff gegen automatisiertes
+-- Durchprobieren von Passwörtern).
+CREATE TABLE IF NOT EXISTS login_ratelimit (
+    schluessel TEXT PRIMARY KEY,
+    fehlversuche INTEGER NOT NULL DEFAULT 0,
+    gesperrt_bis INTEGER
+);
 `;
 
 // Fügt einer bereits existierenden Tabelle (aus einer älteren SCHEMA_VERSION)

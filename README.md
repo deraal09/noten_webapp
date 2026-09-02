@@ -172,6 +172,29 @@ Technisch wird dazu beim Login `request.session.cookie.maxAge` gesetzt
 ob die Anmeldung lokal per Passwort oder per LDAP (inkl. Auto-Provisioning)
 erfolgt.
 
+### Ratelimit gegen automatisiertes Durchprobieren von Passwörtern
+
+`src/auth/login-ratelimit.js`, persistiert in der Tabelle `login_ratelimit`
+(übersteht wie die Sitzungen einen App-Neustart):
+
+- Die ersten beiden falschen Anmeldeversuche für einen Benutzernamen zeigen
+  nur die normale Fehlermeldung.
+- Der **3. Fehlversuch in Folge** sperrt weitere Anmeldeversuche für diesen
+  Benutzernamen für **30 Sekunden** — unabhängig vom Passwort, also auch
+  ein danach korrekt eingegebenes.
+- Jeder weitere Fehlversuch **nach Ablauf** der vorherigen Sperre
+  **verdoppelt** deren Dauer (30s → 60s → 120s → 240s → …,
+  exponentieller Backoff). Eine erfolgreiche Anmeldung setzt den Zähler
+  auf null zurück.
+- Versuche **während** einer bereits aktiven Sperre zählen bewusst nicht
+  zusätzlich und verlängern sie nicht — sonst ließe sich ein fremdes Konto
+  durch bloßes Weiter-Versuchen beliebig lange sperren.
+- Der Schlüssel ist der eingegebene Benutzername (klein geschrieben,
+  getrimmt) — unabhängig davon, ob er überhaupt existiert, damit sich auch
+  das Erraten von Benutzernamen nicht per Skript durchprobieren lässt.
+  Technische Fehler (z. B. LDAP-Server nicht erreichbar) zählen nicht als
+  Fehlversuch, nur tatsächlich falsche Zugangsdaten.
+
 ## Fehlzeiten: optionale zweite Schule
 
 Manche Schüler/innen werden an zwei Schulen unterrichtet (z. B. duales
