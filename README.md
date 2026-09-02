@@ -92,18 +92,25 @@ unverändert.
 
 Zwei Modi, einstellbar unter Admin → LDAP-Einstellungen:
 
-- **Ohne Auto-Provisioning (Standard bei reiner ENV-Konfiguration):**
-  Rollen/Konten kommen ausschließlich aus der lokalen DB. Eine LDAP-Anmeldung
-  funktioniert nur für Konten, die der Admin vorher unter
-  **Admin → LDAP-Import** angelegt hat (Verzeichnis durchsuchen oder
-  LDAP-Kennung manuell eintragen → „Anlegen").
-- **Mit Auto-Provisioning** (Haken „Anmeldung ohne Vorab-Import"): Jede
-  Person mit gültigen LDAP-Zugangsdaten kann sich anmelden — das Konto
-  (Rolle „Lehrkraft") wird beim ersten erfolgreichen Login automatisch
-  angelegt, ganz ohne Admin-Aktion. **Achtung:** Das gilt für jeden Bind,
-  der zu Base-DN/Suchfilter passt — bei einem gemeinsamen Verzeichnis mit
-  z. B. Schüler-Konten unbedingt Base-DN/Filter auf die Lehrkräfte-OU
-  eingrenzen.
+- **Ohne Auto-Provisioning (Standard):** Rollen/Konten kommen ausschließlich
+  aus der lokalen DB. Eine LDAP-Anmeldung funktioniert nur für Konten, die
+  der Admin vorher unter **Admin → LDAP-Import** angelegt hat (Verzeichnis
+  durchsuchen oder LDAP-Kennung manuell eintragen → „Anlegen").
+- **Mit Auto-Provisioning** (Haken „Anmeldung ohne Vorab-Import" unter
+  Admin → LDAP-Einstellungen): Jede Person mit gültigen LDAP-Zugangsdaten
+  kann sich anmelden — das Konto (Rolle „Lehrkraft", `auth_source = 'ldap'`)
+  wird beim ersten erfolgreichen Login automatisch angelegt, ganz ohne
+  Admin-Aktion. Da es sich um ein LDAP-Konto handelt, bekommt es sofort
+  volles Selbstbedienungsrecht (siehe unten) — die Person kann direkt eigene
+  Klassen anlegen. **Der Haken wirkt unabhängig davon, ob die LDAP-URL selbst
+  in der DB oder per Plesk-ENV-Variable konfiguriert ist** — bei reiner
+  ENV-Konfiguration reicht es, hier nur den Haken zu setzen und das Feld
+  „LDAP-URL" leer zu lassen. Neu angelegte Konten erscheinen danach ganz
+  normal in „Lehrkräfte zuordnen" auf der Klassenseite, sodass eine
+  Klassenleitung sie zusätzlich gezielt einem Fach zuweisen kann. **Achtung:**
+  Das gilt für jeden Bind, der zu Base-DN/Suchfilter passt — bei einem
+  gemeinsamen Verzeichnis mit z. B. Schüler-Konten unbedingt Base-DN/Filter
+  auf die Lehrkräfte-OU eingrenzen.
 
 ### Env-Variablen (Plesk-Node.js-UI → Umgebungsvariablen)
 

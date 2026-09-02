@@ -69,3 +69,21 @@ test('clearLdapBindPassword entfernt das Passwort', () => {
 test('Unvollständige DB-Konfiguration (kein Direkt-Bind, kein Service-Account) wirft klaren Fehler', () => {
   assert.throws(() => resolveLdapConfig(), /Service-Account-Passwort fehlt/);
 });
+
+test('Auto-Provisioning wirkt auch bei reiner ENV-Konfiguration (keine LDAP-URL in der DB gespeichert)', () => {
+  // Regression: isAutoProvisionEnabled() verlangte früher zusätzlich eine in
+  // der DB-Zeile gespeicherte URL, wodurch der Haken bei einer reinen
+  // Plesk-ENV-Installation (nur LDAP_URL etc.) wirkungslos blieb, selbst wenn
+  // er gesetzt war — LDAP-Logins funktionierten dann weiterhin nur für vom
+  // Admin vorab importierte Konten.
+  process.env.LDAP_URL = 'ldaps://dc01.schule.local:636';
+  try {
+    saveLdapSettings({ auto_provision: true }); // bewusst keine url -> bleibt in der DB-Zeile leer
+    assert.equal(getLdapSettingsRow().url, null, 'Testannahme: keine URL in der DB gespeichert');
+    assert.equal(isLdapConfigured(), true, 'LDAP gilt dank ENV-Variable als konfiguriert');
+    assert.equal(isAutoProvisionEnabled(), true,
+      'der Haken muss auch ohne DB-URL wirken, solange LDAP per ENV konfiguriert ist');
+  } finally {
+    delete process.env.LDAP_URL;
+  }
+});

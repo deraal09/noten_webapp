@@ -25,7 +25,12 @@ export function isLdapConfigured() {
 
 export function isAutoProvisionEnabled() {
   const row = getLdapSettingsRow();
-  return Boolean(row?.url) && Boolean(row?.auto_provision);
+  // Der Haken selbst lebt immer in der DB-Zeile (id=1) — unabhängig davon,
+  // ob die eigentliche LDAP-URL/Bind-Konfiguration aus dieser Zeile oder
+  // (bei reiner Plesk-ENV-Installation) aus LDAP_URL etc. kommt. Früher war
+  // hier zusätzlich `row?.url` gefordert, wodurch Auto-Provisioning bei
+  // reiner ENV-Konfiguration nie griff, selbst wenn der Haken gesetzt war.
+  return isLdapConfigured() && Boolean(row?.auto_provision);
 }
 
 /** Löst die aktive LDAP-Konfiguration auf (DB hat Vorrang vor ENV). Wirft bei unvollständiger Konfiguration. */

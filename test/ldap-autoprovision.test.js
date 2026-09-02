@@ -168,6 +168,41 @@ test('Regression: technischer LDAP-Fehler beim Auto-Provisioning zeigt "nicht ve
   }
 });
 
+test('Regression: Auto-Provisioning greift auch, wenn die LDAP-URL nur per ENV gesetzt ist (nicht in der DB)', async () => {
+  // Reine Plesk-ENV-Installation: LDAP_URL kommt aus der Umgebung, in der
+  // DB-Zeile steht keine URL — nur der Haken "auto_provision". Vorher wurde
+  // isAutoProvisionEnabled() zusätzlich eine in der DB gespeicherte URL
+  // verlangt, wodurch der Haken hier wirkungslos blieb.
+  process.env.LDAP_URL = 'ldaps://dc01.schule.local:636';
+  try {
+    saveLdapSettings({ auto_provision: true }); // bewusst keine url -> DB-Zeile bleibt ohne URL
+    const row = getDb().prepare('SELECT url FROM ldap_settings WHERE id = 1').get();
+    assert.equal(row.url, null, 'Testannahme: keine URL in der DB gespeichert');
+
+    setLdapAuthenticatorForTests(new FakeAuthenticator({
+      envkonto: { passwort: 'geheim456', name: 'ENV-Konto' },
+    }));
+
+    const req = client();
+    const r = await req('/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ username: 'envkonto', password: 'geheim456' }),
+    });
+    assert.equal(r.status, 302, 'Auto-Provisioning muss auch bei reiner ENV-Konfiguration greifen');
+    assert.equal(r.headers.get('location'), '/');
+
+    const angelegt = getDb().prepare('SELECT * FROM users WHERE username = ?').get('envkonto');
+    assert.ok(angelegt);
+    assert.equal(angelegt.auth_source, 'ldap');
+  } finally {
+    delete process.env.LDAP_URL;
+    setLdapAuthenticatorForTests(new FakeAuthenticator({
+      neu123: { passwort: 'geheim123', name: 'Neue Lehrkraft' },
+    }));
+  }
+});
+
 test.after(async () => {
   setLdapAuthenticatorForTests(undefined);
   await fastify.close();
