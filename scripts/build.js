@@ -53,8 +53,8 @@ ok('package.json ist valide');
 
 // --- 2. app.js syntaktisch prüfen -----------------------------------------
 // `node --check` parsed die Datei, führt sie aber NICHT aus. Das vermeidet,
-// dass native Abhängigkeiten (z. B. better-sqlite3) kompiliert werden
-// müssen, nur um die Syntax zu validieren.
+// dass native Abhängigkeiten (z. B. better-sqlite3-multiple-ciphers)
+// kompiliert werden müssen, nur um die Syntax zu validieren.
 
 import { execFileSync } from 'node:child_process';
 

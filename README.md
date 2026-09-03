@@ -195,6 +195,37 @@ erfolgt.
   Technische Fehler (z. B. LDAP-Server nicht erreichbar) zählen nicht als
   Fehlversuch, nur tatsächlich falsche Zugangsdaten.
 
+## Datenbank-Verschlüsselung
+
+Die komplette SQLite-Datei liegt verschlüsselt auf der Platte (SQLCipher
+über `better-sqlite3-multiple-ciphers`, ein Drop-in-Ersatz für
+`better-sqlite3` mit identischer API) — nicht nur einzelne Felder. Das
+schützt die Datenbankdatei selbst und jedes Backup davon, z. B. falls
+mehrere Personen Zugriff auf den Server haben. **Nicht** geschützt ist,
+wer bereits Zugriff auf den laufenden Prozess bzw. dessen
+Umgebungsvariablen hat — der käme über `DB_ENCRYPTION_KEY` ohnehin an die
+Klardaten.
+
+- **Schlüssel:** eigene ENV-Variable `DB_ENCRYPTION_KEY` (unabhängig von
+  `SECRET`, damit sich beide getrennt rotieren lassen), in Produktion
+  zwingend erforderlich — ohne sie startet die App gar nicht erst (wie bei
+  `SECRET`).
+- **Bestehende, noch unverschlüsselte Installationen** werden beim ersten
+  Start nach dem Update **automatisch und ohne Datenverlust** migriert
+  (`migriereZuVerschluesselt()` in `src/db.js`): alle Tabellen + Daten
+  werden in eine neue, verschlüsselte Datei kopiert, die alte
+  Klartext-Datei bleibt als Sicherung unter
+  `noten.sqlite3.vor-verschluesselung.bak` erhalten (nach Prüfung, dass
+  alles funktioniert, kann sie gelöscht werden). Ein zweiter Start
+  migriert nicht erneut.
+- **Anwendungscode bleibt unverändert:** Da die Verschlüsselung auf
+  Datei-Ebene passiert, sieht jede SQL-Abfrage (Sortierung, Suche, Export
+  …) weiterhin normalen Klartext — kein Risiko, eine Stelle im Code zu
+  übersehen und dort unverschlüsselte Daten zu erzeugen.
+- **`DB_ENCRYPTION_KEY` niemals verlieren oder zusammen mit dem Backup der
+  `.sqlite3`-Datei ablegen** — ohne ihn ist die Datenbank unwiederbringlich
+  unlesbar.
+
 ## Fehlzeiten: optionale zweite Schule
 
 Manche Schüler/innen werden an zwei Schulen unterrichtet (z. B. duales
@@ -579,19 +610,27 @@ zu und konfiguriert nginx dorthin. `app.js` erkennt beides automatisch
 |---------------|-------------------------------------------------|
 | `NODE_ENV`    | `production`                                    |
 | `SECRET`      | 64+ zufällige Zeichen (z. B. `openssl rand -hex 32`) |
+| `DB_ENCRYPTION_KEY` | 64+ zufällige Zeichen, unabhängig von `SECRET` (z. B. `openssl rand -hex 32`) — verschlüsselt die Datenbankdatei, siehe unten |
 | `PUBLIC_URL`  | `https://noten.bbz-rd-eck.com`                  |
 | `DB_PFAD`     | (optional, Default: `data/noten.sqlite3`)       |
 
 Wichtig: `SECRET` ist das Session-Secret — wenn die App neu gestartet
 wird, werden alle Sessions ungültig, wenn du es änderst.
-**Fehlt `SECRET`, beendet sich die App sofort mit Exit 1** → Symptom ist
-dann **504** auf jedem Request.
+**Fehlt `SECRET` oder `DB_ENCRYPTION_KEY`, beendet sich die App sofort mit
+Exit 1** → Symptom ist dann **504** auf jedem Request.
+**`DB_ENCRYPTION_KEY` niemals verlieren** (separat sichern, z. B.
+Passwort-Tresor) — ohne ihn ist die Datenbankdatei unwiederbringlich
+unlesbar, auch für uns nicht wiederherstellbar.
 
-> **⚠ Natives Modul `better-sqlite3`:** Wird beim Install **gegen die
-> Node-Version der Subdomain kompiliert** (node-gyp). Voraussetzungen
-> auf dem Server: `python3`, `make`, `g++`/build-essential. **Wenn
-> später die Node-Version in der Plesk-UI gewechselt wird, muss
-> `npm rebuild better-sqlite3` (oder erneut `npm ci`) laufen**.
+> **Natives Modul `better-sqlite3-multiple-ciphers`:** liefert
+> vorkompilierte Binärdateien für die gängigen Linux/macOS/Windows-
+> Plattformen mit aus — normalerweise ist **kein** Kompilieren auf dem
+> Server nötig. Nur falls für die genaue Node-Version/Architektur der
+> Plesk-Subdomain keine passende vorkompilierte Datei existiert, baut
+> `npm install` automatisch aus dem Quellcode (dann sind `python3`,
+> `make`, `g++`/build-essential auf dem Server nötig). Bei einem Wechsel
+> der Node-Version in der Plesk-UI sicherheitshalber `npm rebuild` (oder
+> erneut `npm ci`) laufen lassen.
 
 ### 4. Dependencies installieren (über Plesk-UI)
 
@@ -691,6 +730,7 @@ webapp/
 | `PORT`        | `3001` (lokal)                | Plesk/Passenger setzt selbst – Zahl ODER Socket-Pfad |
 | `HOST`        | `0.0.0.0`                     | Bind-Adresse (nur bei TCP-Port)    |
 | `SECRET`      | (zwingend in Produktion)      | Session-Secret (≥32 Zeichen)       |
+| `DB_ENCRYPTION_KEY` | (zwingend in Produktion) | Schlüssel für die Datenbank-Verschlüsselung (≥32 Zeichen), siehe unten |
 | `DB_PFAD`     | `data/noten.sqlite3`          | Pfad zur SQLite-Datei              |
 | `PUBLIC_URL`  | `http(s)://Host:Port`         | Basis-URL für Einladungslinks      |
 | `NODE_ENV`    | (nicht gesetzt)               | `production` für kompaktes Logging |
@@ -698,7 +738,9 @@ webapp/
 ## Backup
 
 Nur die Datei `data/noten.sqlite3` muss gesichert werden. Sie enthält
-alle Schuljahre, Klassen, Schüler/innen, Fächer, Noten und Fehlzeiten.
+alle Schuljahre, Klassen, Schüler/innen, Fächer, Noten und Fehlzeiten —
+und liegt seit der Datenbank-Verschlüsselung (siehe unten) bereits
+verschlüsselt auf der Platte, das Backup ist also automatisch mitgesichert.
 
 ```bash
 # Plesk-UI → Backup-Manager → Datenbank-Dateien einschließen
@@ -706,6 +748,11 @@ alle Schuljahre, Klassen, Schüler/innen, Fächer, Noten und Fehlzeiten.
 cp /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/data/noten.sqlite3 \
    /backup/noten-$(date +%Y%m%d).sqlite3
 ```
+
+**Wichtig:** `DB_ENCRYPTION_KEY` gehört **nicht** in dasselbe Backup wie
+die Datenbankdatei (sonst schützt die Verschlüsselung ein gestohlenes
+Backup nicht mehr) — getrennt sichern, z. B. in einem Passwort-Tresor.
+Ohne diesen Schlüssel ist auch ein Backup der `.sqlite3`-Datei wertlos.
 
 ## Architektur-Wechsel: warum?
 

@@ -23,13 +23,14 @@ import process from 'node:process';
   console.log('NODE_ENV:', process.env.NODE_ENV || '(nicht gesetzt)');
   console.log('PORT:', process.env.PORT || '(nicht gesetzt)');
   console.log('SECRET gesetzt:', process.env.SECRET ? 'ja (' + process.env.SECRET.length + ' Zeichen)' : 'NEIN');
+  console.log('DB_ENCRYPTION_KEY gesetzt:', process.env.DB_ENCRYPTION_KEY ? 'ja (' + process.env.DB_ENCRYPTION_KEY.length + ' Zeichen)' : 'NEIN');
   console.log('DB_PFAD:', process.env.DB_PFAD || '(default)');
   console.log('CWD:', process.cwd());
 
   try {
-    console.log('\n--- Modul better-sqlite3 laden ---');
-    await import('better-sqlite3');
-    console.log('better-sqlite3 geladen');
+    console.log('\n--- Modul better-sqlite3-multiple-ciphers laden ---');
+    await import('better-sqlite3-multiple-ciphers');
+    console.log('better-sqlite3-multiple-ciphers geladen');
 
     console.log('\n--- Datenbank initialisieren ---');
     const { getDb } = await import('../src/db.js');
