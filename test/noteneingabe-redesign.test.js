@@ -293,6 +293,16 @@ test('Notenbesprechungsmodus: Navigation, Zugriffsschutz, Notizen (Besprechung +
   assert.match(html, /1 \/ 2/);
   assert.match(html, /Weiter/);
 
+  // Klausuren-Tabelle: K1 (aus der Vorbereitung, Gewichtung 100%, s1 mit
+  // 9/10 Punkten -> Note 1,6) muss korrekt in der Notenbesprechung erscheinen,
+  // nicht nur in der normalen Notentafel.
+  assert.match(html, /<h3>Klausuren<\/h3>/);
+  const klausurBlock = html.slice(html.indexOf('<h3>Klausuren</h3>'), html.indexOf('<h3>Datumstabelle'));
+  assert.match(klausurBlock, /K1/, 'Name der Klausur muss in der Notenbesprechung angezeigt werden');
+  assert.match(klausurBlock, /100%/, 'Gewichtung der Klausur muss angezeigt werden');
+  assert.match(klausurBlock, />9</, 'eingetragene Punkte müssen angezeigt werden');
+  assert.match(klausurBlock, /1,6/, 'aus 9\/10 Punkten berechnete Note muss angezeigt werden');
+
   // Notiz (Notenbesprechung, an dieses Fach gebunden) hinzufügen
   r = await form(lehrerA, `/teacher/fach/${fachId}/besprechung/${s1}/notiz`, {
     halbjahr: HJ, typ: 'besprechung', text: 'Gute mündliche Mitarbeit, schriftlich ausbaufähig.',
