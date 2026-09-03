@@ -120,6 +120,7 @@ export default async function teacherRoutes(fastify) {
     return reply.viewEjs('teacher/fach_detail.ejs', {
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
+      termine: uebersicht.termine,
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       historischeHalbjahre, abschlussnoten, sperren,
@@ -311,10 +312,14 @@ export default async function teacherRoutes(fastify) {
     const name = String(request.body?.name || '').trim();
     const aufgaben = Math.max(1, parseInt(request.body?.aufgaben, 10) || 1);
     if (!name) return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
+    // Gewichtung startet bewusst bei 0 (uncounted), keine automatische
+    // Verteilung mehr: eine Zusatzleistung zählt erst, wenn die Lehrkraft ihr
+    // explizit einen Anteil am Unterrichtsleistungs-Topf gibt — der Rest
+    // entfällt sonst automatisch auf die Datumstabelle (siehe
+    // unterrichtsleistungNote() in grade-calc.js).
     getDb().prepare(`INSERT INTO unterrichtsleistungen (fach_id, halbjahr, name, max_punkte_pro_aufgabe, gewichtung)
                      VALUES (?, ?, ?, ?, 0)`)
       .run(request.params.id, halbjahr, name, JSON.stringify(Array(aufgaben).fill(1)));
-    autoVerteileUls(request.params.id, halbjahr, { erzwingen: true });
     syncFallsAutoAktiv(request.params.id, halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
   });
@@ -324,7 +329,6 @@ export default async function teacherRoutes(fastify) {
     if (!u) return reply.redirect('/teacher');
     if (!userHatFachZgriff(request.user, u.fach_id)) return reply.code(403).send({ error: 'forbidden' });
     getDb().prepare('DELETE FROM unterrichtsleistungen WHERE id = ?').run(request.params.id);
-    autoVerteileUls(u.fach_id, u.halbjahr);
     syncFallsAutoAktiv(u.fach_id, u.halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${u.fach_id}?hj=${encodeURIComponent(u.halbjahr)}`);
   });
@@ -402,6 +406,55 @@ export default async function teacherRoutes(fastify) {
         .run(request.params.id, schuelerId, JSON.stringify(arr));
     }
     syncFallsAutoAktiv(u.fach_id, u.halbjahr, request.user.id);
+    return reply.send({ ok: true });
+  });
+
+  // ---------- Datumstabelle (Unterrichtsleistung ohne Einzelgewichtung) ----------
+  fastify.post('/fach/:id/unterricht/termine/neu', async (request, reply) => {
+    if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const datum = String(request.body?.datum || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) {
+      request.flash?.('error', 'Ungültiges Datum.');
+      return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
+    }
+    getDb().prepare('INSERT INTO unterricht_termine (fach_id, halbjahr, datum) VALUES (?, ?, ?)')
+      .run(request.params.id, halbjahr, datum);
+    return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
+  });
+
+  fastify.post('/unterricht/termine/:id/loeschen', async (request, reply) => {
+    const t = getDb().prepare('SELECT fach_id, halbjahr FROM unterricht_termine WHERE id = ?').get(request.params.id);
+    if (!t) return reply.redirect('/teacher');
+    if (!userHatFachZgriff(request.user, t.fach_id)) return reply.code(403).send({ error: 'forbidden' });
+    getDb().prepare('DELETE FROM unterricht_termine WHERE id = ?').run(request.params.id);
+    syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.user.id);
+    return reply.redirect(`/teacher/fach/${t.fach_id}?hj=${encodeURIComponent(t.halbjahr)}`);
+  });
+
+  fastify.post('/unterricht/termine/:id/note', async (request, reply) => {
+    const t = getDb().prepare('SELECT fach_id, halbjahr FROM unterricht_termine WHERE id = ?').get(request.params.id);
+    if (!t) return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userHatFachZgriff(request.user, t.fach_id)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    const schuelerId = parseInt(request.body?.schueler_id, 10);
+    if (!Number.isFinite(schuelerId)) return reply.code(400).send({ ok: false, error: 'bad params' });
+    if (istSchuelerGesperrtInFach(t.fach_id, schuelerId, t.halbjahr)) {
+      return reply.code(403).send({ ok: false, error: 'gesperrt' });
+    }
+    const fach = ladeFachMitUmfeld(t.fach_id);
+    const [min, max] = fach.notenschluessel === 'BG' ? [0, 15] : [1, 6];
+    let wert = null;
+    if (request.body?.wert !== '' && request.body?.wert !== null && request.body?.wert !== undefined) {
+      wert = Number(request.body.wert);
+      if (!Number.isFinite(wert) || wert < min || wert > max) {
+        return reply.code(400).send({ ok: false, error: `Note außerhalb des Bereichs ${min}–${max}.` });
+      }
+    }
+    getDb().prepare(`
+      INSERT INTO unterricht_noten (termin_id, schueler_id, wert) VALUES (?, ?, ?)
+      ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert
+    `).run(request.params.id, schuelerId, wert);
+    syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.user.id);
     return reply.send({ ok: true });
   });
 
@@ -1268,31 +1321,6 @@ function autoVerteileKlausuren(fachId, halbjahr, { erzwingen = false } = {}) {
   if (!offene.length) return;
   const belegt = klausuren.reduce((sum, k) => sum + k.gewichtung, 0);
   const rest = Math.max(0, schriftlichPct - belegt);
-  const weights = autoDistribute(offene.length, rest);
-  for (let i = 0; i < offene.length; i++) upd.run(weights[i], offene[i].id);
-}
-
-function autoVerteileUls(fachId, halbjahr, { erzwingen = false } = {}) {
-  const uls = getDb().prepare(
-    'SELECT id, gewichtung FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
-  ).all(fachId, halbjahr);
-  if (!uls.length) return;
-  const fach = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
-  const sj = getDb().prepare(`
-    SELECT s.gewichtung_muendlich FROM schuljahre s JOIN klassen k ON k.schuljahr_id = s.id WHERE k.id = ?
-  `).get(fach.klasse_id);
-  const ulPct = sj?.gewichtung_muendlich || DEFAULT_GEWICHTUNG;
-  const upd = getDb().prepare('UPDATE unterrichtsleistungen SET gewichtung = ? WHERE id = ?');
-
-  if (erzwingen) {
-    const weights = autoDistribute(uls.length, ulPct);
-    for (let i = 0; i < uls.length; i++) upd.run(weights[i], uls[i].id);
-    return;
-  }
-  const offene = uls.filter((u) => u.gewichtung === 0);
-  if (!offene.length) return;
-  const belegt = uls.reduce((sum, u) => sum + u.gewichtung, 0);
-  const rest = Math.max(0, ulPct - belegt);
   const weights = autoDistribute(offene.length, rest);
   for (let i = 0; i < offene.length; i++) upd.run(weights[i], offene[i].id);
 }

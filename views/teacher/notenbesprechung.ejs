@@ -53,8 +53,18 @@
   </tbody>
 </table>
 
-<h3>Unterrichtsleistungen</h3>
-<% if (!zeile.uls.length) { %><p class="hint">Keine Unterrichtsleistungen in diesem Halbjahr.</p><% } %>
+<h3>Datumstabelle (Unterrichtsleistung)</h3>
+<% if (!zeile.terminNoten.length) { %><p class="hint">Noch keine Termine in diesem Halbjahr.</p><% } else { %>
+  <p>
+    <% zeile.terminNoten.forEach(function(tn) { %>
+      <span class="tag" title="<%= tn.datum %>"><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.wert === null ? '–' : Number(tn.wert).toString().replace('.', ',') %></span>
+    <% }); %>
+  </p>
+  <p>Ø Datumstabelle: <strong><%= zeile.datumsDurchschnitt === null ? '–' : formatNote(zeile.datumsDurchschnitt) %></strong></p>
+<% } %>
+
+<h3>Zusatzleistungen</h3>
+<% if (!zeile.uls.length) { %><p class="hint">Keine Zusatzleistungen in diesem Halbjahr.</p><% } %>
 <table class="data">
   <thead><tr><th>Name</th><th>Gewichtung</th><th>Punkte</th><th>Note</th></tr></thead>
   <tbody>

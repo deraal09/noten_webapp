@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -271,6 +271,30 @@ CREATE TABLE IF NOT EXISTS ul_ergebnisse (
     schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
     punkte TEXT NOT NULL DEFAULT '[]',
     UNIQUE (ul_id, schueler_id)
+);
+
+-- Datumstabelle für die Unterrichtsleistung: eine Spalte je Unterrichtstermin,
+-- eine Note je Schüler/in und Termin, ohne Einzelgewichtung -- der
+-- Durchschnitt aller eingetragenen Werte bildet die Basis der
+-- Unterrichtsleistungsnote (siehe unterrichtsleistungNote() in
+-- grade-calc.js). "unterrichtsleistungen" bleiben davon unberührt und
+-- fungieren seither als frei gewichtbare Zusatzleistungen (z. B.
+-- Präsentationen), deren Gewichtung den Anteil bestimmt, den die
+-- Datumstabelle NICHT ausmacht.
+CREATE TABLE IF NOT EXISTS unterricht_termine (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    datum TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_unterricht_termine_fach ON unterricht_termine(fach_id, halbjahr);
+
+CREATE TABLE IF NOT EXISTS unterricht_noten (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    termin_id INTEGER NOT NULL REFERENCES unterricht_termine(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    wert REAL,
+    UNIQUE (termin_id, schueler_id)
 );
 
 CREATE TABLE IF NOT EXISTS noten (

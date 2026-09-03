@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   nsCsvParse, nsCsvLookup, noteAusPunkten, gesamtnoteHj, teilNote,
   gesamtnoteJahr, autoDistribute, nichtBestanden, formatNote, DEFAULT_NS_CSV,
+  unterrichtsleistungNote,
 } from '../src/grade-calc.js';
 
 const IHK_CSV = DEFAULT_NS_CSV.IHK;
@@ -158,4 +159,43 @@ test('teilNote: fehlende/ungewichtete Einträge werden ignoriert, leer → null'
   assert.equal(teilNote([{ note: null, gewichtung: 50 }, { note: 3, gewichtung: 50 }]), 3);
   assert.equal(teilNote([{ note: 2, gewichtung: 0 }]), null);
   assert.equal(teilNote([]), null);
+});
+
+test('unterrichtsleistungNote: nur Datumstabelle (keine Zusatzleistungen) → Durchschnitt zählt zu 100 %', () => {
+  const { datumsDurchschnitt, note } = unterrichtsleistungNote([2, 3, 4], []);
+  assert.equal(datumsDurchschnitt, 3);
+  assert.equal(note, 3);
+});
+
+test('unterrichtsleistungNote: Beispiel aus der Anforderung (60 % Unterrichtsleistung, Präsentation 10 %)', () => {
+  // Datumstabelle-Ø 2, Präsentation-Note 4 mit 10 % Anteil an der
+  // Unterrichtsleistung -> Rest (90 %) entfällt auf die Datumstabelle.
+  // 2*0.9 + 4*0.1 = 1.8 + 0.4 = 2.2
+  const { datumsDurchschnitt, note } = unterrichtsleistungNote([2, 2], [{ note: 4, gewichtung: 10 }]);
+  assert.equal(datumsDurchschnitt, 2);
+  assert.equal(note, 2.2);
+});
+
+test('unterrichtsleistungNote: keine Datumstabelle, nur Zusatzleistungen → diese zählen zu 100 % (untereinander normiert)', () => {
+  const { datumsDurchschnitt, note } = unterrichtsleistungNote([], [{ note: 2, gewichtung: 50 }, { note: 4, gewichtung: 50 }]);
+  assert.equal(datumsDurchschnitt, null);
+  assert.equal(note, 3);
+});
+
+test('unterrichtsleistungNote: weder Datumstabelle noch benotete Zusatzleistungen → null', () => {
+  const { datumsDurchschnitt, note } = unterrichtsleistungNote([], [{ note: null, gewichtung: 10 }]);
+  assert.equal(datumsDurchschnitt, null);
+  assert.equal(note, null);
+});
+
+test('unterrichtsleistungNote: Zusatzleistungen ohne Gewichtung (0) zählen nicht mit', () => {
+  const { note } = unterrichtsleistungNote([2, 2], [{ note: 6, gewichtung: 0 }]);
+  assert.equal(note, 2, 'ungewichtete Zusatzleistung darf die Datumstabelle nicht verwässern');
+});
+
+test('unterrichtsleistungNote: Summe der Zusatzleistungs-Gewichtungen über 100 % → Rest für Datumstabelle wird auf 0 begrenzt', () => {
+  const { note } = unterrichtsleistungNote([1, 1], [{ note: 5, gewichtung: 60 }, { note: 3, gewichtung: 60 }]);
+  // Rest = max(0, 100-120) = 0 -> Datumstabelle zählt nicht mit, nur die
+  // beiden Zusatzleistungen (untereinander normiert auf ihre 60/60).
+  assert.equal(note, 4);
 });

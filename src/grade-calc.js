@@ -131,6 +131,36 @@ export function teilNote(items) {
   return totalGew > 0 ? Math.round((totalWeighted / totalGew) * 100) / 100 : null;
 }
 
+/**
+ * Note für die Unterrichtsleistung aus der Datumstabelle (unbewertet
+ * eingetragene Noten je Unterrichtstermin, gleich gewichtet) und optionalen
+ * Zusatzleistungen (z. B. Präsentationen, wie bisherige Unterrichtsleistungen
+ * mit eigener Gewichtung).
+ *
+ * Die Gewichtung einer Zusatzleistung gilt als Anteil INNERHALB der
+ * Unterrichtsleistung (nicht der Gesamtnote) -- der Rest bis 100 % dieses
+ * Anteils entfällt automatisch auf den Datumstabellen-Durchschnitt. Sind
+ * keine Zusatzleistungen benotet, zählt die Datumstabelle zu 100 %; ist die
+ * Datumstabelle leer, zählen nur die Zusatzleistungen (gleiche
+ * "nur tatsächlich Vorhandenes zählt"-Logik wie bei gesamtnoteHj/teilNote).
+ *
+ * @param {Array<number>} datumsWerte - eingetragene Noten der Datumstabelle (bereits ohne Lücken)
+ * @param {Array<{note: number|null, gewichtung: number}>} zusatzleistungen
+ * @returns {{ datumsDurchschnitt: number|null, note: number|null }}
+ */
+export function unterrichtsleistungNote(datumsWerte, zusatzleistungen) {
+  const datumsDurchschnitt = durchschnitt(datumsWerte);
+  const belegt = zusatzleistungen.reduce((summe, z) => (
+    z.note !== null && z.note !== undefined && z.gewichtung > 0 ? summe + z.gewichtung : summe
+  ), 0);
+  const rest = Math.max(0, 100 - belegt);
+  const items = [...zusatzleistungen];
+  if (datumsDurchschnitt !== null && rest > 0) {
+    items.push({ note: datumsDurchschnitt, gewichtung: rest });
+  }
+  return { datumsDurchschnitt, note: teilNote(items) };
+}
+
 export function gesamtnoteJahr(hjNoten) {
   const notes = hjNoten.filter((n) => n !== null && n !== undefined);
   if (!notes.length) return null;

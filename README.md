@@ -501,6 +501,35 @@ strukturiert:
   Punkteeingabe. Die daraus berechnete Note fließt live (ohne Neuladen) in
   die Notenübersicht oben.
 
+### Unterrichtsleistung: Datumstabelle + Zusatzleistungen
+
+Der Reiter „Unterrichtsleistung" hat zwei Bereiche:
+
+- **Datumstabelle**: eine Spalte je Unterrichtstermin (per „+ Datum
+  hinzufügen" angelegt), eine Note je Schüler/in **ohne Einzelgewichtung** —
+  gedacht für z. B. eine mündliche Note pro Unterrichtsstunde. Der
+  Durchschnitt aller eingetragenen Noten (Spalte „Ø") bildet die Basis der
+  Unterrichtsleistungsnote.
+- **Zusatzleistungen** (technisch weiterhin die bisherigen
+  „Unterrichtsleistungen" — Name, Teilaufgaben/Punkte, eigene Gewichtung):
+  zusätzliche, einzeln benotete Leistungen wie Präsentationen. Die
+  Gewichtung gilt als **Anteil an der Unterrichtsleistung** (nicht der
+  Gesamtnote) — der Rest bis 100 % dieses Anteils entfällt automatisch auf
+  die Datumstabelle. Beispiel: Unterrichtsleistung zählt 60 % der
+  Gesamtnote, eine Präsentation bekommt 10 % Gewichtung → die Präsentation
+  zählt 10 % der 60 %, die Datumstabelle die restlichen 90 % der 60 %.
+  Ohne Gewichtung zählt eine Zusatzleistung nicht mit (kein
+  Auto-Verteilen mehr wie früher bei „Unterrichtsleistungen" — eine neu
+  angelegte Zusatzleistung startet bei 0 %, bis die Lehrkraft ihr
+  ausdrücklich einen Anteil gibt). Ist die Datumstabelle leer, zählen nur
+  die Zusatzleistungen (untereinander normiert), analog zur bestehenden
+  „nur tatsächlich Vorhandenes zählt"-Logik bei Klausuren/Gesamtnote.
+
+Die frühere, rein dekorative „+ Manuelle Note hinzufügen"-Option
+„Mündlich" (floss nie in die Berechnung ein) ist durch die Datumstabelle
+ersetzt und aus dem Formular entfernt; bereits vorhandene alte Einträge
+bleiben unverändert sichtbar/löschbar.
+
 ### Notenbesprechungsmodus
 
 Über „🗣 Notenbesprechung starten" auf der Noteneingabe-Seite gelangt man in

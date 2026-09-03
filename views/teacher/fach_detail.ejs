@@ -156,13 +156,13 @@
         <% }); %>
       </select>
       <select name="typ" required>
-        <option value="muendlich">Mündlich</option>
         <option value="schriftlich">Schriftlich</option>
       </select>
       <input type="number" name="wert" step="0.1" min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" required>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       <button type="submit">+ Note</button>
     </form>
+    <p class="hint">Für mündliche Noten die Datumstabelle im Reiter „Unterrichtsleistung" nutzen — die zählt (anders als diese Notiz hier) direkt in die Berechnung.</p>
   </details>
 
   <details class="card">
@@ -288,32 +288,92 @@
 </div>
 
 <div id="panel-uls" class="reiter-panel">
+  <h3>Datumstabelle</h3>
+  <p class="hint">
+    Eine Spalte je Unterrichtstermin, eine Note je Schüler/in ohne
+    Einzelgewichtung. Der Durchschnitt aller eingetragenen Noten bildet die
+    Basis der Unterrichtsleistungsnote — Zusatzleistungen (unten) zählen
+    zusätzlich mit ihrer eigenen Gewichtung.
+  </p>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/unterricht/termine/neu" class="inline">
+    <input type="date" name="datum" required>
+    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+    <button type="submit">+ Datum hinzufügen</button>
+  </form>
+
+  <% if (!termine.length) { %><p class="hint">Noch keine Termine.</p><% } else { %>
+    <div class="tabelle-scroll">
+    <table class="tafel" id="datumstabelle">
+      <thead>
+        <tr>
+          <th>Schüler/in</th>
+          <% termine.forEach(function(t) { %>
+            <th class="datum-head">
+              <%= t.datum.split('-').reverse().join('.') %>
+              <form method="post" action="/teacher/unterricht/termine/<%= t.id %>/loeschen" class="inline"
+                    onsubmit="return confirm('Termin löschen? Alle Noten dieses Termins gehen verloren.')">
+                <button type="submit" class="danger" title="Termin löschen">🗑</button>
+              </form>
+            </th>
+          <% }); %>
+          <th>Ø</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function(r) {
+             var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
+          <tr>
+            <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
+            <% r.terminNoten.forEach(function(tn) { %>
+              <td>
+                <input type="number" class="note-datum" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
+                  min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" step="0.1"
+                  value="<%= tn.wert === null ? '' : tn.wert %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>>
+              </td>
+            <% }); %>
+            <td class="note-cell datums-durchschnitt" data-sid="<%= r.schueler_id %>">
+              <%= r.datumsDurchschnitt === null ? '–' : formatNote(r.datumsDurchschnitt) %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    </div>
+  <% } %>
+
+  <h3>Zusatzleistungen</h3>
+  <p class="hint">
+    Zusätzliche, einzeln benotete Leistungen (z. B. Präsentationen). Die
+    Gewichtung gilt als Anteil an der Unterrichtsleistung — der Rest bis
+    100 % entfällt automatisch auf die Datumstabelle oben. Ohne Gewichtung
+    zählt eine Zusatzleistung nicht mit.
+  </p>
   <details class="card">
-    <summary>+ Unterrichtsleistung anlegen</summary>
+    <summary>+ Zusatzleistung anlegen</summary>
     <form method="post" action="/teacher/fach/<%= fach.id %>/uls/neu">
       <div class="erstellen-felder">
-        <label class="feld">Name der Unterrichtsleistung (mündliche Leistung)
-          <input type="text" name="name" placeholder="z. B. UL 1 oder Mitarbeit 1. Halbjahr" required>
+        <label class="feld">Name der Zusatzleistung
+          <input type="text" name="name" placeholder="z. B. Präsentation" required>
         </label>
         <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen)
           <input type="number" name="aufgaben" min="1" value="1">
         </label>
       </div>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-      <button type="submit">+ Unterrichtsleistung anlegen</button>
+      <button type="submit">+ Zusatzleistung anlegen</button>
     </form>
   </details>
 
-  <% if (!uls.length) { %><p class="hint">Noch keine ULs.</p><% } %>
+  <% if (!uls.length) { %><p class="hint">Noch keine Zusatzleistungen.</p><% } %>
   <% uls.forEach(function(u) { %>
     <% var maxArr = JSON.parse(u.max_punkte_pro_aufgabe); %>
     <details class="card" open>
-      <summary><%= u.name %> <small>(<%= u.gewichtung %>%)</small></summary>
-      <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('UL löschen?')">
+      <summary><%= u.name %> <small>(<%= u.gewichtung %>% der Unterrichtsleistung)</small></summary>
+      <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('Zusatzleistung löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
       <form method="post" action="/teacher/uls/<%= u.id %>/gewichtung" class="einstellungen">
-        <label class="feld">Gewichtung
+        <label class="feld">Gewichtung (Anteil an der Unterrichtsleistung)
           <span class="feld-mit-einheit"><input type="number" name="gewichtung" value="<%= u.gewichtung %>" min="0" max="100" step="0.1">%</span>
         </label>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
@@ -427,6 +487,10 @@
           tr.querySelector('.schriftliche-note').textContent = s.schriftlicheNote !== null ? s.schriftlicheNote.toString().replace('.', ',') : '–';
           tr.querySelector('.gesamt-cell').textContent = s.gesamt !== null ? s.gesamt.toString().replace('.', ',') : '–';
         }
+        const datumsZelle = document.querySelector('.datums-durchschnitt[data-sid="' + s.schueler_id + '"]');
+        if (datumsZelle) {
+          datumsZelle.textContent = s.datumsDurchschnitt !== null ? s.datumsDurchschnitt.toString().replace('.', ',') : '–';
+        }
       });
     } catch (e) { console.warn(e); }
   }
@@ -447,6 +511,15 @@
         ? '/teacher/klausuren/' + inp.dataset.kid + '/punkte'
         : '/teacher/uls/' + inp.dataset.kid + '/punkte';
       await fetch(url, { method: 'POST', body });
+      refresh();
+    }, 400));
+  });
+  document.querySelectorAll('input.note-datum').forEach(function(inp) {
+    inp.addEventListener('input', debounce(async function() {
+      const body = new URLSearchParams();
+      body.append('schueler_id', inp.dataset.sid);
+      body.append('wert', inp.value);
+      await fetch('/teacher/unterricht/termine/' + inp.dataset.termin + '/note', { method: 'POST', body });
       refresh();
     }, 400));
   });

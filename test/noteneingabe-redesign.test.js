@@ -142,7 +142,7 @@ test('Regression: Punkte-Eingabe funktioniert mit der Kodierung, die der Browser
   assert.match(punktListenerBlock, /new URLSearchParams\(\)/);
 });
 
-test('Regression: neu angelegte Klausur/UL bekommt automatisch eine Gewichtung > 0', async () => {
+test('Regression: neu angelegte Klausur bekommt automatisch eine Gewichtung > 0, eine neue Zusatzleistung (UL) bewusst nicht', async () => {
   // Eigenes, frisches Fach — die K1/UL1 aus der Vorbereitung haben ihre
   // Gewichtung bereits manuell überschrieben und würden den Bug verdecken.
   await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Chemie' });
@@ -152,9 +152,14 @@ test('Regression: neu angelegte Klausur/UL bekommt automatisch eine Gewichtung >
   const klausur = getDb().prepare('SELECT * FROM klausuren WHERE fach_id = ?').get(chemieId);
   assert.notEqual(klausur.gewichtung, 0, 'Gewichtung sollte automatisch verteilt werden, nicht bei 0 bleiben');
 
+  // Zusatzleistungen (ehem. "Unterrichtsleistungen") werden NICHT mehr
+  // automatisch verteilt: sie zählen erst, wenn die Lehrkraft ihnen
+  // ausdrücklich einen Anteil am Unterrichtsleistungs-Topf gibt — sonst
+  // entfällt der volle Anteil auf die Datumstabelle (siehe
+  // unterrichtsleistungNote() in grade-calc.js).
   await form(lehrerA, `/teacher/fach/${chemieId}/uls/neu`, { name: 'UL1', aufgaben: '1', halbjahr: HJ });
   const ul = getDb().prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ?').get(chemieId);
-  assert.notEqual(ul.gewichtung, 0, 'Gewichtung sollte automatisch verteilt werden, nicht bei 0 bleiben');
+  assert.equal(ul.gewichtung, 0, 'eine neu angelegte Zusatzleistung startet ungewichtet (uncounted), keine Auto-Verteilung mehr');
 
   // Mit einer Gewichtung > 0 muss ein eingetragener Punktwert auch in der
   // Notenübersicht (schriftliche/mündliche Note, Gesamtnote) ankommen.

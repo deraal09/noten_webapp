@@ -5,7 +5,44 @@
  */
 
 import { getDb } from './db.js';
-import { noteAusPunkten, gesamtnoteHj, teilNote, nichtBestanden, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from './grade-calc.js';
+import {
+  noteAusPunkten, gesamtnoteHj, teilNote, unterrichtsleistungNote, nichtBestanden,
+  DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
+} from './grade-calc.js';
+
+/** Lädt Unterrichtstermine + eingetragene Noten für ein Fach+Halbjahr (Datumstabelle). */
+function ladeUnterrichtTermine(fachId, halbjahr) {
+  const db = getDb();
+  const termine = db.prepare(
+    'SELECT * FROM unterricht_termine WHERE fach_id = ? AND halbjahr = ? ORDER BY datum, id'
+  ).all(fachId, halbjahr);
+  const noten = new Map(); // schueler_id -> Map<termin_id, wert>
+  if (termine.length) {
+    const rows = db.prepare(`
+      SELECT un.termin_id, un.schueler_id, un.wert
+      FROM unterricht_noten un
+      JOIN unterricht_termine ut ON ut.id = un.termin_id
+      WHERE ut.fach_id = ? AND ut.halbjahr = ?
+    `).all(fachId, halbjahr);
+    for (const r of rows) {
+      if (!noten.has(r.schueler_id)) noten.set(r.schueler_id, new Map());
+      noten.get(r.schueler_id).set(r.termin_id, r.wert);
+    }
+  }
+  return { termine, noten };
+}
+
+/** Eingetragene Datumstabellen-Werte eines/einer Schüler/in (ohne Lücken). */
+function datumsWerteFuerSchueler(schuelerId, termine, notenMap) {
+  const eigene = notenMap.get(schuelerId);
+  if (!eigene) return [];
+  const werte = [];
+  for (const t of termine) {
+    const w = eigene.get(t.id);
+    if (w !== null && w !== undefined) werte.push(w);
+  }
+  return werte;
+}
 
 export function ladeFachMitUmfeld(id) {
   return getDb().prepare(`
@@ -55,6 +92,7 @@ export function berechneGesamtnoten(fachId, halbjahr) {
     const rows = db.prepare('SELECT schueler_id, punkte FROM ul_ergebnisse WHERE ul_id = ?').all(u.id);
     ulErgs.set(u.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
   }
+  const { termine, noten: terminNoten } = ladeUnterrichtTermine(fachId, halbjahr);
 
   for (const s of schueler) {
     const klausurData = klausuren.map((k) => {
@@ -62,12 +100,14 @@ export function berechneGesamtnoten(fachId, halbjahr) {
       const note = punkte ? noteAusPunkten(punkte, JSON.parse(k.max_punkte_pro_aufgabe), csvStr) : null;
       return { note, gewichtung: k.gewichtung };
     });
-    const ulData = uls.map((u) => {
+    const zusatzleistungen = uls.map((u) => {
       const punkte = ulErgs.get(u.id)?.get(s.id) || null;
       const note = punkte ? noteAusPunkten(punkte, JSON.parse(u.max_punkte_pro_aufgabe), csvStr) : null;
       return { note, gewichtung: u.gewichtung };
     });
-    const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, ulData, csvStr);
+    const datumsWerte = datumsWerteFuerSchueler(s.id, termine, terminNoten);
+    const { note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen);
+    const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
     ergebnis.set(s.id, gn);
   }
   return ergebnis;
@@ -112,6 +152,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     if (!manuelleMap.has(n.schueler_id)) manuelleMap.set(n.schueler_id, { muendlich: [], schriftlich: [] });
     manuelleMap.get(n.schueler_id)[n.typ].push({ id: n.id, wert: n.wert });
   }
+  const { termine, noten: terminNoten } = ladeUnterrichtTermine(fach.id, halbjahr);
 
   const rows = schueler.map((s) => {
     const klausurData = klausuren.map((k) => {
@@ -125,17 +166,22 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       return { id: u.id, name: u.name, gewichtung: u.gewichtung, punkte, note };
     });
     const manuelle = manuelleMap.get(s.id) || { muendlich: [], schriftlich: [] };
-    const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, ulData, csvStr);
+    const eigeneTerminNoten = terminNoten.get(s.id) || new Map();
+    const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null }));
+    const datumsWerte = datumsWerteFuerSchueler(s.id, termine, terminNoten);
+    const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, ulData);
+    const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
     return {
       schueler_id: s.id, nachname: s.nachname, vorname: s.vorname,
-      klausuren: klausurData, uls: ulData,
+      klausuren: klausurData, uls: ulData, terminNoten: terminZeile,
       muendlich: manuelle.muendlich, schriftlich: manuelle.schriftlich,
       schriftlicheNote: teilNote(klausurData),
-      muendlicheNote: teilNote(ulData),
+      datumsDurchschnitt,
+      muendlicheNote,
       gesamt: gn,
       nicht_bestanden: gn !== null ? nichtBestanden(gn, fach.notenschluessel) : false,
     };
   });
 
-  return { schriftlichPct, ulPct, csvStr, klausuren, uls, schueler, rows };
+  return { schriftlichPct, ulPct, csvStr, klausuren, uls, termine, schueler, rows };
 }

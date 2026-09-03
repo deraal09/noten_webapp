@@ -208,6 +208,17 @@ table.tafel .aufgabe-head { background: var(--bg-tint-2); font-size: 0.8rem; }
 table.tafel .gesamt-cell { background: var(--primary); color: var(--on-dark); }
 table.tafel .gesamt-cell.nb { background: var(--danger); }
 
+/* Datumstabelle (Unterrichtsleistung): kann viele Termine/Spalten haben. */
+.tabelle-scroll { overflow-x: auto; }
+table.tafel input.note-datum { width: 50px; padding: 0.2rem; border: 1px solid var(--border-strong); border-radius: 3px; text-align: center; background: var(--bg-input); color: var(--text); }
+table.tafel input.note-datum::-webkit-outer-spin-button,
+table.tafel input.note-datum::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+table.tafel input.note-datum { -moz-appearance: textfield; }
+table.tafel .datum-head { white-space: nowrap; font-size: 0.8rem; text-align: center; }
+table.tafel .datum-head form { display: inline; }
+table.tafel .datum-head button { padding: 0 0.3rem; font-size: 0.75rem; }
+table.tafel .datums-durchschnitt { text-align: center; font-weight: 600; background: var(--bg-header); min-width: 40px; }
+
 .tag { background: var(--primary); color: var(--on-dark); border: none; border-radius: 50%; padding: 0.2rem 0.4rem; cursor: pointer; font-size: 0.8rem; margin: 0 2px; }
 .tag:hover { background: var(--danger); }
 
