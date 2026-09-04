@@ -70,7 +70,7 @@
   </tbody>
 </table>
 <script>
-  var faecher = <%- JSON.stringify(faecher.map(function(f){return {id:f.id, klasse_id:f.klasse_id, klasse_name:f.klasse_name, schuljahr_bezeichnung:f.schuljahr_bezeichnung, name:f.name};})) %>;
+  var faecher = <%- jsonFuerSkript(faecher.map(function(f){return {id:f.id, klasse_id:f.klasse_id, klasse_name:f.klasse_name, schuljahr_bezeichnung:f.schuljahr_bezeichnung, name:f.name};})) %>;
   var klasseSel = document.getElementById('klasse-lehrer');
   var fachSel = document.getElementById('fach-lehrer');
   var grouped = {};

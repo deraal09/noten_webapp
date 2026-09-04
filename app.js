@@ -31,7 +31,7 @@ import { SqliteSessionStore } from './src/auth/sqlite-session-store.js';
 import {
   HALBJAHRE, NOTE_TYPEN, FEHLZEIT_TYPEN, formatNote, formatNoteG,
 } from './src/grade-calc.js';
-import { formatZeitLokal } from './src/format.js';
+import { formatZeitLokal, jsonFuerSkript } from './src/format.js';
 import authRoutes from './src/routes/auth.js';
 import adminRoutes from './src/routes/admin.js';
 import teacherRoutes from './src/routes/teacher.js';
@@ -143,6 +143,9 @@ export async function buildApp(opts = {}) {
     reply.locals.formatNote = formatNote;
     reply.locals.formatNoteG = formatNoteG;
     reply.locals.formatZeitLokal = formatZeitLokal;
+    // Pflicht für JSON in einem <script>-Block (siehe src/format.js) —
+    // JSON.stringify() allein lässt sich mit "</script>" aushebeln.
+    reply.locals.jsonFuerSkript = jsonFuerSkript;
     // Nav-Link "Einladungen" (extern Lehrkräfte einladen) nur für Admin
     // und Klassenleitung — einmal pro Request berechnet statt in der
     // Layout-Vorlage selbst eine DB-Abfrage zu brauchen.

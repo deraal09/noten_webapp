@@ -53,7 +53,7 @@
   const blatt = document.getElementById('sitzplan-blatt');
   const status = document.getElementById('speicher-status');
   const SPEICHER_URL = '/teacher/klassen/<%= klasse.id %>/sitzplan/speichern';
-  let plaetze = <%- JSON.stringify(plaetze) %>;
+  let plaetze = <%- jsonFuerSkript(plaetze) %>;
   let naechsteId = plaetze.length;
 
   function debounce(fn, ms) { let t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
