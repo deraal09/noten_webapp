@@ -6,6 +6,7 @@ import { getDb } from '../db.js';
 import {
   hashPassword, checkPassword, makeToken, SESSION_COOKIE, requireAuth, destroySession,
   getLdapAuthenticator, isLdapConfigured, isAutoProvisionEnabled, provisionLdapUser,
+  findeBenutzerFuerLogin,
 } from '../auth.js';
 import { pruefeSperre, vermerkeFehlversuch, setzeZurueck } from '../auth/login-ratelimit.js';
 
@@ -91,14 +92,21 @@ export default async function authRoutes(fastify) {
       });
     }
 
-    // COLLATE NOCASE: Benutzername beim Login unabhängig von Groß-/Kleinschreibung
-    // finden. Wichtig vor allem für LDAP-Konten — das AD ist bei sAMAccountName
-    // selbst nicht case-sensitiv, unsere Login-Suche war es aber bisher, sodass
-    // ein Login mit abweichender Schreibweise als "Benutzername oder Passwort
-    // ist falsch" abgelehnt wurde, obwohl das LDAP-Bind selbst geklappt hätte.
-    let row = getDb()
-      .prepare('SELECT id, username, password_hash, active, auth_source, login_sub FROM users WHERE username = ? COLLATE NOCASE')
-      .get(uname);
+    // Benutzername unabhängig von Groß-/Kleinschreibung finden (das AD ist
+    // bei sAMAccountName ebenfalls nicht case-sensitiv). Details und der
+    // Sonderfall zweier nur in der Schreibweise verschiedener Altkonten:
+    // findeBenutzerFuerLogin() in src/auth.js.
+    const { row: gefunden, mehrdeutig } = findeBenutzerFuerLogin(uname);
+    if (mehrdeutig) {
+      request.log.error({ username: uname }, 'Login abgelehnt: Benutzername existiert mehrfach in abweichender Schreibweise');
+      return reply.viewEjs('auth/login.ejs', {
+        user: null,
+        error: 'Dieser Benutzername existiert mehrfach in unterschiedlicher Schreibweise. '
+          + 'Bitte an den Admin wenden — die Konten müssen eindeutig benannt werden.',
+        next: '',
+      });
+    }
+    let row = gefunden;
 
     // Kein lokales/importiertes Konto bekannt: Ist Auto-Provisioning aktiv,
     // bei erfolgreicher LDAP-Anmeldung automatisch ein Konto anlegen statt

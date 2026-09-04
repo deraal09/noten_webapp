@@ -75,6 +75,36 @@ export function provisionLdapUser(ergebnis, eingegebenerName) {
   }
 }
 
+/**
+ * Sucht das Konto zu einem eingegebenen Benutzernamen — unabhängig von
+ * Groß-/Kleinschreibung, weil das AD bei sAMAccountName ebenfalls nicht
+ * zwischen "mueller" und "Mueller" unterscheidet.
+ *
+ * Neu angelegte Datenbanken erzwingen diese Eindeutigkeit schon im Schema
+ * (users.username COLLATE NOCASE, siehe db.js). In einer Bestandsdatenbank
+ * können aber noch zwei Konten existieren, die sich nur in der Schreibweise
+ * unterscheiden. Ein schlichtes `WHERE username = ? COLLATE NOCASE` mit
+ * `.get()` griff sich dann eine beliebige der beiden Zeilen heraus — womit
+ * ein per Einladungslink angelegtes Konto "Mueller" die LDAP-Lehrkraft
+ * "mueller" dauerhaft aussperren konnte.
+ *
+ * Deshalb: Eine exakt passende Schreibweise gewinnt immer (dann können beide
+ * Konten sich weiterhin mit ihrer eigenen Schreibweise anmelden). Bleibt es
+ * ohne exakten Treffer mehrdeutig, wird die Anmeldung abgelehnt statt
+ * geraten — der Aufrufer meldet das als Fall für den Admin.
+ *
+ * @returns {{ row: object|null, mehrdeutig: boolean }}
+ */
+export function findeBenutzerFuerLogin(username) {
+  const treffer = getDb().prepare(`
+    SELECT id, username, password_hash, active, auth_source, login_sub
+    FROM users WHERE username = ? COLLATE NOCASE
+  `).all(username);
+  if (treffer.length <= 1) return { row: treffer[0] || null, mehrdeutig: false };
+  const exakt = treffer.find((u) => u.username === username);
+  return exakt ? { row: exakt, mehrdeutig: false } : { row: null, mehrdeutig: true };
+}
+
 export function hashPassword(plain) {
   return bcrypt.hashSync(plain, 12);
 }

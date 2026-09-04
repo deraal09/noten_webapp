@@ -58,7 +58,14 @@ export const SCHEMA_VERSION = 12;
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
+    -- COLLATE NOCASE: Der Login sucht den Benutzernamen unabhängig von
+    -- Groß-/Kleinschreibung (das AD tut das bei sAMAccountName auch), also
+    -- muss er auch case-unabhängig EINDEUTIG sein. Ohne das konnten
+    -- "mueller" und "Mueller" nebeneinander existieren, und die Login-Suche
+    -- traf eine beliebige der beiden Zeilen -- ein per Einladungslink
+    -- angelegtes Konto konnte damit eine LDAP-Lehrkraft dauerhaft aussperren.
+    -- (NOCASE faltet nur ASCII A-Z; "Müller"/"müller" bleiben verschieden.)
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
     email TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'teacher',
@@ -480,11 +487,42 @@ function ensureColumn(db, table, column, ddl) {
   }
 }
 
+// Erzwingt, dass Benutzernamen auch unabhängig von Groß-/Kleinschreibung
+// eindeutig sind. Bei neu angelegten Datenbanken erledigt das schon die
+// Spaltendefinition (username ... COLLATE NOCASE); Bestandsdatenbanken haben
+// dort noch die case-sensitive Variante, und eine Spalten-Kollation lässt
+// sich in SQLite nicht per ALTER TABLE ändern -- ein zusätzlicher
+// UNIQUE-Index mit COLLATE NOCASE erreicht dasselbe. Auf neuen Datenbanken
+// ist er redundant, aber harmlos (die users-Tabelle ist winzig).
+//
+// Existieren bereits Namen, die sich nur in der Schreibweise unterscheiden,
+// lässt sich der Index nicht anlegen. Die App startet dann trotzdem -- ein
+// Schulserver soll wegen Altdaten nicht stehen bleiben -- weist aber bei
+// jedem Start darauf hin. Missbrauchen lässt sich der Zustand nicht mehr:
+// findeBenutzerFuerLogin() in src/auth.js verweigert eine mehrdeutige
+// Anmeldung, statt eine beliebige der Zeilen zu nehmen.
+function stelleBenutzernamenEindeutigSicher(db) {
+  try {
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_nocase ON users(username COLLATE NOCASE)');
+  } catch {
+    const dubletten = db.prepare(`
+      SELECT GROUP_CONCAT(username, ', ') AS namen
+      FROM users GROUP BY username COLLATE NOCASE HAVING COUNT(*) > 1
+    `).all().map((r) => r.namen);
+    console.warn(
+      '[db] ACHTUNG: Diese Benutzernamen unterscheiden sich nur in der Groß-/Kleinschreibung: '
+      + `${dubletten.join(' | ')}. Anmeldungen mit abweichender Schreibweise werden abgelehnt, `
+      + 'bis die Namen eindeutig sind (Admin → Lehrkräfte). Danach greift die Eindeutigkeit automatisch.',
+    );
+  }
+}
+
 function migrate(db) {
   ensureColumn(db, 'users', 'auth_source', "auth_source TEXT NOT NULL DEFAULT 'lokal'");
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
   // Partial-Index: login_sub muss nur unter LDAP-Konten eindeutig sein.
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_sub ON users(login_sub) WHERE login_sub IS NOT NULL');
+  stelleBenutzernamenEindeutigSicher(db);
   ensureColumn(db, 'klassen', 'created_by_id', 'created_by_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'fach_zuweisungen', 'auto_sync', 'auto_sync INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'zwei_schulen', 'zwei_schulen INTEGER NOT NULL DEFAULT 0');

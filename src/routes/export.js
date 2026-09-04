@@ -4,7 +4,7 @@
  */
 
 import { getDb } from '../db.js';
-import { requireAuth, userHatFachZgriff, userDarfKlasseExportieren } from '../auth.js';
+import { requireAuth, userDarfKlasseExportieren } from '../auth.js';
 import {
   HALBJAHRE, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr, unterrichtsleistungNote, formatNote,
 } from '../grade-calc.js';
@@ -26,24 +26,20 @@ export default async function exportRoutes(fastify) {
     const sj = getDb().prepare('SELECT * FROM schuljahre WHERE id = ?').get(request.params.id);
     if (!sj) return reply.code(404).send('Schuljahr nicht gefunden');
 
-    let klassen;
-    if (request.user.isAdmin) {
-      klassen = getDb().prepare(
-        'SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE s.id = ? ORDER BY k.name'
-      ).all(sj.id);
-    } else {
-      const ids = new Set();
-      const kls = getDb().prepare(`
-        SELECT DISTINCT k.id, k.name, k.schuljahr_id, k.notenschluessel, k.notenschluessel_csv, s.bezeichnung AS schuljahr_bezeichnung
-        FROM klassen k
-        JOIN schuljahre s ON s.id = k.schuljahr_id
-        LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id
-        LEFT JOIN fach_zuweisungen fz ON fz.fach_id IN (SELECT id FROM faecher WHERE klasse_id = k.id)
-        WHERE (kl.user_id = ? OR fz.user_id = ?) AND s.id = ?
-        ORDER BY k.name
-      `).all(request.user.id, request.user.id, sj.id);
-      klassen = kls;
-    }
+    // Dieselbe Regel wie beim Einzel-Export oben: userDarfKlasseExportieren()
+    // ist die einzige Quelle dafür, wer eine Klasse exportieren darf.
+    // Vorher stand hier eine eigene Abfrage, die zusätzlich
+    // `klassen_lehrkraefte` einschloss — damit konnte die Klassenleitung über
+    // den Schuljahres-Export genau die Live-Noten herausziehen, die ihr der
+    // Einzel-Export bewusst verweigert (sie soll nur den Sync-Stand sehen,
+    // siehe src/noten-sync.js). Umgekehrt fehlte dort `created_by_id`, sodass
+    // die Ersteller/in ihrer eigenen Klasse hier leer ausging.
+    const alleKlassen = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE s.id = ? ORDER BY k.name
+    `).all(sj.id);
+    const klassen = alleKlassen.filter((k) => userDarfKlasseExportieren(request.user, k.id));
     if (!klassen.length) return reply.code(403).send('Keine Berechtigung');
 
     const bufs = ['\ufeff'];
