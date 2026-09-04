@@ -207,17 +207,30 @@ Umgebungsvariablen hat — der käme über `DB_ENCRYPTION_KEY` ohnehin an die
 Klardaten.
 
 - **Schlüssel:** eigene ENV-Variable `DB_ENCRYPTION_KEY` (unabhängig von
-  `SECRET`, damit sich beide getrennt rotieren lassen), in Produktion
-  zwingend erforderlich — ohne sie startet die App gar nicht erst (wie bei
-  `SECRET`).
+  `SECRET`, damit sich beide getrennt setzen lassen). **Immer
+  erforderlich** — ohne sie startet die App gar nicht erst, mit einem
+  Hinweis auf der Konsole. Das hängt bewusst *nicht* an `NODE_ENV`: die
+  Variable wird auf einem Plesk-Server schnell einmal vergessen, und ein
+  Ersatzschlüssel aus dem Quelltext hätte die Verschlüsselung dann still
+  wertlos gemacht. Einzige Ausnahme ist die Testsuite (`NODE_ENV=test`),
+  die ohnehin nur temporäre Wegwerf-Datenbanken anlegt.
 - **Bestehende, noch unverschlüsselte Installationen** werden beim ersten
   Start nach dem Update **automatisch und ohne Datenverlust** migriert
   (`migriereZuVerschluesselt()` in `src/db.js`): alle Tabellen + Daten
-  werden in eine neue, verschlüsselte Datei kopiert, die alte
-  Klartext-Datei bleibt als Sicherung unter
-  `noten.sqlite3.vor-verschluesselung.bak` erhalten (nach Prüfung, dass
-  alles funktioniert, kann sie gelöscht werden). Ein zweiter Start
-  migriert nicht erneut.
+  werden in eine neue, verschlüsselte Datei kopiert, deren Zeilenzahlen
+  gegen das Original geprüft und erst dann an die Stelle der
+  Klartext-Datei geschoben (ein einzelner, atomarer `rename`). Scheitert
+  irgendetwas davor, bleibt die alte Datei unverändert liegen und der
+  Start bricht mit dem echten Fehler ab. Ein zweiter Start migriert nicht
+  erneut. **Vor dem Update trotzdem einmal von Hand sichern** (siehe
+  Backup) — die Klartext-Datei wird ersetzt, es bleibt bewusst keine
+  unverschlüsselte Kopie daneben liegen: die hätte jedes Backup des
+  Datenverzeichnisses mitgenommen und die Verschlüsselung damit praktisch
+  aufgehoben.
+- **Von einer früheren Version dieser Migration** kann noch eine Datei
+  `noten.sqlite3.vor-verschluesselung.bak` im Datenverzeichnis liegen. Sie
+  enthält **alle Daten im Klartext**; die App weist bei jedem Start darauf
+  hin. Nach der Prüfung, dass alles läuft, löschen.
 - **Anwendungscode bleibt unverändert:** Da die Verschlüsselung auf
   Datei-Ebene passiert, sieht jede SQL-Abfrage (Sortierung, Suche, Export
   …) weiterhin normalen Klartext — kein Risiko, eine Stelle im Code zu
@@ -622,8 +635,10 @@ zu und konfiguriert nginx dorthin. `app.js` erkennt beides automatisch
 
 Wichtig: `SECRET` ist das Session-Secret — wenn die App neu gestartet
 wird, werden alle Sessions ungültig, wenn du es änderst.
-**Fehlt `SECRET` oder `DB_ENCRYPTION_KEY`, beendet sich die App sofort mit
-Exit 1** → Symptom ist dann **504** auf jedem Request.
+**Fehlt `DB_ENCRYPTION_KEY`, beendet sich die App sofort mit Exit 1** —
+unabhängig von `NODE_ENV`. Fehlt `SECRET`, gilt dasselbe, sobald
+`NODE_ENV=production` gesetzt ist. Symptom ist dann jeweils **504** auf
+jedem Request; der Grund steht im Node-Log von Plesk.
 **`DB_ENCRYPTION_KEY` niemals verlieren** (separat sichern, z. B.
 Passwort-Tresor) — ohne ihn ist die Datenbankdatei unwiederbringlich
 unlesbar, auch für uns nicht wiederherstellbar.
@@ -736,7 +751,7 @@ webapp/
 | `PORT`        | `3001` (lokal)                | Plesk/Passenger setzt selbst – Zahl ODER Socket-Pfad |
 | `HOST`        | `0.0.0.0`                     | Bind-Adresse (nur bei TCP-Port)    |
 | `SECRET`      | (zwingend in Produktion)      | Session-Secret (≥32 Zeichen)       |
-| `DB_ENCRYPTION_KEY` | (zwingend in Produktion) | Schlüssel für die Datenbank-Verschlüsselung (≥32 Zeichen), siehe unten |
+| `DB_ENCRYPTION_KEY` | (immer zwingend)         | Schlüssel für die Datenbank-Verschlüsselung (≥32 Zeichen), siehe unten |
 | `DB_PFAD`     | `data/noten.sqlite3`          | Pfad zur SQLite-Datei              |
 | `PUBLIC_URL`  | `http(s)://Host:Port`         | Basis-URL für Einladungslinks      |
 | `NODE_ENV`    | (nicht gesetzt)               | `production` für kompaktes Logging |
@@ -754,6 +769,11 @@ verschlüsselt auf der Platte, das Backup ist also automatisch mitgesichert.
 cp /var/www/vhosts/bbz-rd-eck.com/noten.bbz-rd-eck.com/data/noten.sqlite3 \
    /backup/noten-$(date +%Y%m%d).sqlite3
 ```
+
+Wird stattdessen das ganze `data/`-Verzeichnis gesichert: vorher prüfen,
+dass dort keine `noten.sqlite3.vor-verschluesselung.bak` mehr liegt —
+diese Datei stammt aus einer früheren Version der Migration und enthält
+alle Daten im Klartext (die App warnt beim Start davor).
 
 **Wichtig:** `DB_ENCRYPTION_KEY` gehört **nicht** in dasselbe Backup wie
 die Datenbankdatei (sonst schützt die Verschlüsselung ein gestohlenes

@@ -7,6 +7,7 @@ import os from 'node:os';
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'noten-test-ldapsettings-'));
 process.env.DB_PFAD = path.join(tempDir, 'test.sqlite3');
 process.env.SECRET = 'test-secret-fuer-ldap-settings-bitte-lang-genug';
+process.env.NODE_ENV = 'test';
 delete process.env.LDAP_URL;
 
 const {

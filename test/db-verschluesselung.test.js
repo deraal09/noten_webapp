@@ -85,19 +85,27 @@ test('Bestehende Klartext-Datenbank wird beim nächsten Start automatisch versch
   assert.notEqual(nachherBytes.slice(0, 15).toString('utf8'), 'SQLite format 3',
     'nach der Migration muss die Hauptdatei verschlüsselt sein');
   assert.ok(!nachherBytes.includes(Buffer.from('bestandskonto')));
+});
 
-  // Sicherungskopie der ursprünglichen Klartext-Datei muss existieren (kein
-  // Datenverlust-Risiko) und tatsächlich noch die alten Klardaten enthalten.
-  const sicherungPfad = dbPfad + '.vor-verschluesselung.bak';
-  assert.ok(fs.existsSync(sicherungPfad), 'Sicherungskopie der Klartext-Datei muss angelegt werden');
-  const sicherungBytes = fs.readFileSync(sicherungPfad);
-  assert.ok(sicherungBytes.includes(Buffer.from('bestandskonto')));
+test('Die Migration lässt KEINE Klartext-Kopie der Daten im Datenverzeichnis zurück', () => {
+  // Eine dauerhaft daneben liegende, unverschlüsselte Vollkopie würde die
+  // Verschlüsselung praktisch aufheben (jedes Backup des Verzeichnisses
+  // hätte sie mitgenommen) -- deshalb wird die Klartext-Datei nach
+  // bestandener Gegenprüfung ersetzt, nicht umbenannt.
+  const dbPfad = path.join(tempDir, 'bestand.sqlite3');
+  for (const uebrig of fs.readdirSync(tempDir)) {
+    if (!uebrig.startsWith('bestand.sqlite3')) continue;
+    const bytes = fs.readFileSync(path.join(tempDir, uebrig));
+    assert.ok(!bytes.includes(Buffer.from('bestandskonto')),
+      `${uebrig} enthält die Daten im Klartext -- nach der Migration darf keine Datei das mehr tun`);
+  }
+  assert.ok(!fs.existsSync(dbPfad + '.vor-verschluesselung.bak'));
+  assert.ok(!fs.existsSync(dbPfad + '.migration-tmp'));
 });
 
 test('Wiederholter Start nach der Migration löst keine erneute Migration mehr aus', async () => {
   const dbPfad = path.join(tempDir, 'bestand.sqlite3');
-  const sicherungPfad = dbPfad + '.vor-verschluesselung.bak';
-  const sicherungVorher = fs.statSync(sicherungPfad).mtimeMs;
+  const dbVorher = fs.statSync(dbPfad).mtimeMs;
 
   process.env.DB_PFAD = dbPfad;
   process.env.DB_ENCRYPTION_KEY = 'migrations-schluessel-lang-genug-abc123';
@@ -106,20 +114,49 @@ test('Wiederholter Start nach der Migration löst keine erneute Migration mehr a
   assert.equal(zeile.username, 'bestandskonto');
   closeDb();
 
-  assert.equal(fs.statSync(sicherungPfad).mtimeMs, sicherungVorher,
-    'die Sicherungsdatei darf beim zweiten Start nicht nochmal überschrieben werden (keine erneute Migration)');
+  assert.equal(fs.statSync(dbPfad).mtimeMs, dbVorher,
+    'die Datenbankdatei darf beim zweiten Start nicht erneut ersetzt werden (keine erneute Migration)');
 });
 
-test('DB_ENCRYPTION_KEY ist in Produktion zwingend (Prozess beendet sich sonst mit Fehler)', () => {
+/** Startet src/db.js in einem eigenen Prozess und gibt zurück, ob der Start gelang. */
+function starteDbModulMit(env) {
   const dbJsUrl = new URL('../src/db.js', import.meta.url).href;
-  const skriptPfad = path.join(tempDir, 'prod-check.mjs');
-  fs.writeFileSync(skriptPfad, `import(${JSON.stringify(dbJsUrl)}).then(() => console.log('unerwartet gestartet'));`);
-  assert.throws(() => {
+  const skriptPfad = path.join(tempDir, 'start-check.mjs');
+  fs.writeFileSync(skriptPfad, `import(${JSON.stringify(dbJsUrl)}).then(() => console.log('gestartet'));`);
+  try {
     execFileSync('node', [skriptPfad], {
-      env: { ...process.env, NODE_ENV: 'production', DB_ENCRYPTION_KEY: '', SECRET: 'irrelevant-fuer-diesen-test-lang-genug' },
+      env: { ...process.env, SECRET: 'irrelevant-fuer-diesen-test-lang-genug', ...env },
       stdio: 'pipe',
     });
-  }, /Command failed/);
+    return { gestartet: true, ausgabe: '' };
+  } catch (e) {
+    return { gestartet: false, ausgabe: String(e.stderr || '') };
+  }
+}
+
+test('DB_ENCRYPTION_KEY ist in Produktion zwingend (Prozess beendet sich sonst mit Fehler)', () => {
+  const { gestartet } = starteDbModulMit({ NODE_ENV: 'production', DB_ENCRYPTION_KEY: '' });
+  assert.equal(gestartet, false);
+});
+
+test('Ohne DB_ENCRYPTION_KEY startet die App auch bei fehlendem NODE_ENV nicht', () => {
+  // Der eigentliche Fallstrick: auf einem Plesk-Server wird NODE_ENV leicht
+  // vergessen. Früher fiel die App dann auf einen im Quelltext stehenden
+  // Ersatzschlüssel zurück -- die Datei war zwar verschlüsselt, aber mit
+  // einem öffentlich bekannten Schlüssel, ohne jeden Hinweis darauf.
+  const { gestartet, ausgabe } = starteDbModulMit({ NODE_ENV: '', DB_ENCRYPTION_KEY: '' });
+  assert.equal(gestartet, false, 'ohne Schlüssel darf die App nicht einfach durchstarten');
+  assert.match(ausgabe, /DB_ENCRYPTION_KEY/);
+});
+
+test('Der Quelltext enthält keinen als Datenschlüssel nutzbaren Ersatzwert', async () => {
+  // Gegenprobe zum Test darüber: selbst wenn die Abfrage oben einmal
+  // umgebaut wird, darf kein Schlüssel-Literal übrig bleiben, mit dem sich
+  // echte Daten verschlüsseln ließen.
+  const quelltext = fs.readFileSync(new URL('../src/db.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(quelltext, /entwicklung-unsicherer-default-schluessel/);
+  assert.match(quelltext, /NODE_ENV === 'test'/,
+    'der einzige Ersatzwert darf ausschließlich für die Testsuite gelten');
 });
 
 test.after(() => {

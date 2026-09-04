@@ -14,6 +14,7 @@ import os from 'node:os';
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'noten-test-sessionstore-'));
 process.env.DB_PFAD = path.join(tempDir, 'test.sqlite3');
 process.env.SECRET = 'test-secret-fuer-sessionstore-bitte-lang-genug';
+process.env.NODE_ENV = 'test';
 
 const { getDb } = await import('../src/db.js');
 const { SqliteSessionStore } = await import('../src/auth/sqlite-session-store.js');

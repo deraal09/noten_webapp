@@ -26,16 +26,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DB_PATH = path.join(__dirname, '..', 'data', 'noten.sqlite3');
 export const DB_PATH = process.env.DB_PFAD || DEFAULT_DB_PATH;
 
-const isProd = process.env.NODE_ENV === 'production';
 // Eigene ENV-Variable statt SECRET, damit sich der DB-Schlüssel unabhängig
-// vom Session-Secret setzen/rotieren lässt. In Produktion zwingend
-// erforderlich (wie SECRET in app.js); außerhalb (Tests/lokale Entwicklung)
-// ein fester Default, da jeder Testlauf ohnehin eine eigene, frische
-// Wegwerf-Datenbank in einem temporären Verzeichnis anlegt.
+// vom Session-Secret setzen lässt. Der Schlüssel MUSS aus der Umgebung
+// kommen — die einzige Ausnahme ist die Testsuite.
+//
+// Bewusst NICHT an "ist nicht Produktion" gekoppelt: NODE_ENV wird auf einem
+// Plesk-Server leicht vergessen, und ein Ersatzschlüssel aus dem Quelltext
+// hätte die Verschlüsselung dann still wertlos gemacht — die Datei wäre zwar
+// verschlüsselt gewesen, aber mit einem Schlüssel, der öffentlich im
+// Repository steht. Hier muss NODE_ENV=test ausdrücklich gesetzt sein
+// (was in app.js ohnehin den Serverstart unterbindet), sonst bricht der
+// Start ab. Für die Testsuite reicht ein fester Wert: jeder Lauf legt eine
+// eigene, frische Wegwerf-Datenbank in einem temporären Verzeichnis an.
+const TEST_SCHLUESSEL = 'nur-fuer-die-testsuite-niemals-fuer-echte-daten';
 export const DB_ENCRYPTION_KEY = process.env.DB_ENCRYPTION_KEY
-  || (isProd ? null : 'entwicklung-unsicherer-default-schluessel-nie-in-produktion-verwenden');
+  || (process.env.NODE_ENV === 'test' ? TEST_SCHLUESSEL : null);
 if (!DB_ENCRYPTION_KEY) {
-  console.error('FEHLER: ENV-Variable DB_ENCRYPTION_KEY muss in Produktion gesetzt sein (mind. 32 Zeichen empfohlen).');
+  console.error(
+    'FEHLER: ENV-Variable DB_ENCRYPTION_KEY ist nicht gesetzt.\n'
+    + 'Die Datenbank wird damit verschlüsselt und ist ohne diesen Schlüssel nicht mehr lesbar.\n'
+    + 'Erzeugen mit:  openssl rand -hex 32\n'
+    + 'Setzen in Plesk unter Node.js → Umgebungsvariablen (lokal: export DB_ENCRYPTION_KEY=...).\n'
+    + 'Den Schlüssel getrennt von der Datenbank sichern — geht er verloren, sind die Daten unwiederbringlich verloren.',
+  );
   process.exit(1);
 }
 
@@ -505,42 +518,121 @@ function istUnverschluesseltePlaintextDatei(pfad) {
   }
 }
 
+// SQL-Bezeichner (Tabellenname) escapen -- Tabellennamen kommen aus
+// sqlite_master und lassen sich nicht als Parameter binden.
+function alsSqlBezeichner(name) {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+// Zählt die Zeilen jeder Tabelle der frisch verschlüsselten Kopie und
+// vergleicht sie mit der Quelle. Schlägt das fehl (oder lässt sich die Kopie
+// gar nicht mit dem Schlüssel öffnen), gilt die Migration als gescheitert --
+// der Aufrufer lässt die Klartext-Datei dann unangetastet stehen.
+function pruefeKopie(tempPfad, schluessel, erwarteteZeilen) {
+  const kopie = new Database(tempPfad, { fileMustExist: true });
+  try {
+    kopie.pragma("cipher='sqlcipher'");
+    kopie.pragma(`key='${alsSqlLiteral(schluessel)}'`);
+    for (const { name, anzahl } of erwarteteZeilen) {
+      const c = kopie.prepare(`SELECT COUNT(*) AS c FROM ${alsSqlBezeichner(name)}`).get().c;
+      if (c !== anzahl) {
+        throw new Error(`Tabelle ${name}: ${c} statt ${anzahl} Zeilen in der verschlüsselten Kopie`);
+      }
+    }
+  } finally {
+    kopie.close();
+  }
+}
+
 // Verschlüsselt eine bestehende Klartext-Datenbankdatei einmalig, ohne
 // vorhandene Daten unbrauchbar zu machen: Tabellen + Inhalte werden in eine
 // neue, mit `schluessel` verschlüsselte Datei kopiert (Indizes fehlen dort
 // zunächst -- SCHEMA/migrate() erzeugen sie direkt danach über
-// "CREATE INDEX IF NOT EXISTS" neu, siehe getDb()). Die alte Klartext-Datei
-// wird als Sicherheitsnetz umbenannt statt gelöscht.
+// "CREATE INDEX IF NOT EXISTS" neu, siehe getDb()).
+//
+// Die Klartext-Datei wird dabei NICHT als Sicherungskopie behalten: eine
+// vollständige, unverschlüsselte Kopie aller Noten und Fehlzeiten, die
+// dauerhaft neben der verschlüsselten Datei im selben Verzeichnis liegt,
+// würde die Verschlüsselung praktisch aufheben (jedes Backup des
+// Datenverzeichnisses hätte sie mitgenommen). Stattdessen wird die Kopie
+// VOR dem Ersetzen gegengeprüft (pruefeKopie) und danach per rename über die
+// Klartext-Datei geschoben -- unter POSIX ein atomarer Schritt, es gibt also
+// keinen Moment, in dem die Datenbank fehlt oder halb geschrieben ist.
+// Scheitert irgendetwas davor, bleibt die Klartext-Datei unverändert liegen
+// und der Start bricht mit dem echten Fehler ab.
 function migriereZuVerschluesselt(pfad, schluessel) {
   const tempPfad = pfad + '.migration-tmp';
-  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(tempPfad + suffix, { force: true });
+  const tempAufraeumen = () => {
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(tempPfad + suffix, { force: true });
+  };
+  try {
+    tempAufraeumen();
+    const quelle = new Database(pfad);
+    let zeilenzahlen;
+    try {
+      // Cipher VOR dem ATTACH festlegen -- sonst würde die angehängte Zieldatei
+      // mit dem Standard-Cipher der Bibliothek (sqleet) statt sqlcipher
+      // verschlüsselt, und getDb() könnte sie unten mit cipher='sqlcipher' nicht
+      // mehr öffnen.
+      quelle.pragma("cipher='sqlcipher'");
+      quelle.exec(`ATTACH DATABASE '${alsSqlLiteral(tempPfad)}' AS verschluesselt KEY '${alsSqlLiteral(schluessel)}'`);
+      const tabellen = quelle.prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL"
+      ).all();
+      for (const t of tabellen) {
+        quelle.exec(t.sql.replace(/^CREATE TABLE/i, 'CREATE TABLE verschluesselt.'));
+        quelle.exec(`INSERT INTO verschluesselt.${alsSqlBezeichner(t.name)} SELECT * FROM main.${alsSqlBezeichner(t.name)}`);
+      }
+      zeilenzahlen = tabellen.map((t) => ({
+        name: t.name,
+        anzahl: quelle.prepare(`SELECT COUNT(*) AS c FROM main.${alsSqlBezeichner(t.name)}`).get().c,
+      }));
+      quelle.exec('DETACH DATABASE verschluesselt');
+      quelle.pragma('wal_checkpoint(TRUNCATE)');
+    } finally {
+      quelle.close();
+    }
 
-  const quelle = new Database(pfad);
-  // Cipher VOR dem ATTACH festlegen -- sonst würde die angehängte Zieldatei
-  // mit dem Standard-Cipher der Bibliothek (sqleet) statt sqlcipher
-  // verschlüsselt, und getDb() könnte sie unten mit cipher='sqlcipher' nicht
-  // mehr öffnen.
-  quelle.pragma("cipher='sqlcipher'");
-  quelle.exec(`ATTACH DATABASE '${alsSqlLiteral(tempPfad)}' AS verschluesselt KEY '${alsSqlLiteral(schluessel)}'`);
-  const tabellen = quelle.prepare(
-    "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL"
-  ).all();
-  for (const t of tabellen) {
-    quelle.exec(t.sql.replace(/^CREATE TABLE/i, 'CREATE TABLE verschluesselt.'));
-    quelle.exec(`INSERT INTO verschluesselt.${t.name} SELECT * FROM main.${t.name}`);
+    pruefeKopie(tempPfad, schluessel, zeilenzahlen);
+
+    // Erst jetzt, nach bestandener Gegenprüfung: die Klartext-Datei atomar
+    // durch die verschlüsselte ersetzen. Ihr -wal/-shm gehört zur alten,
+    // unverschlüsselten Datei und muss mit weg.
+    fs.renameSync(tempPfad, pfad);
+    for (const suffix of ['-wal', '-shm']) fs.rmSync(pfad + suffix, { force: true });
+    const gesamt = zeilenzahlen.reduce((summe, t) => summe + t.anzahl, 0);
+    console.log(
+      `[db] Bestehende Datenbank wurde verschlüsselt (${zeilenzahlen.length} Tabellen, ${gesamt} Zeilen geprüft). `
+      + 'Die bisherige Klartext-Datei wurde dabei ersetzt und existiert nicht mehr.',
+    );
+  } catch (e) {
+    // Aufräumen darf den eigentlichen Fehler nicht überdecken -- scheitert
+    // es (z. B. weil genau dieser Pfad das Problem war), bleibt die
+    // Ursachenmeldung erhalten und die Reste werden beim nächsten Versuch
+    // entfernt.
+    try { tempAufraeumen(); } catch { /* Ursache unten ist die wichtigere Meldung */ }
+    throw new Error(
+      `Verschlüsselung der bestehenden Datenbank fehlgeschlagen: ${e.message}. `
+      + `Die bisherige Datenbank unter ${pfad} wurde nicht verändert.`,
+      { cause: e },
+    );
   }
-  quelle.exec('DETACH DATABASE verschluesselt');
-  quelle.pragma('wal_checkpoint(TRUNCATE)');
-  quelle.close();
+}
 
+// Frühere Versionen dieser Migration haben die Klartext-Datei als
+// ".vor-verschluesselung.bak" liegen lassen. Wer damals schon migriert hat,
+// hat also weiterhin eine vollständige, unverschlüsselte Kopie aller Daten
+// im Datenverzeichnis -- bei jedem Start deutlich darauf hinweisen, bis sie
+// weg ist. Bewusst kein automatisches Löschen: es ist die einzige Datei, die
+// diese Installation vor der Verschlüsselung hatte.
+function warneVorAlterKlartextSicherung(pfad) {
   const sicherungPfad = pfad + '.vor-verschluesselung.bak';
-  fs.rmSync(sicherungPfad, { force: true });
-  fs.renameSync(pfad, sicherungPfad);
-  for (const suffix of ['-wal', '-shm']) fs.rmSync(pfad + suffix, { force: true });
-  fs.renameSync(tempPfad, pfad);
-  console.log(
-    `[db] Bestehende Datenbank wurde verschlüsselt. Klartext-Sicherung liegt unter ${sicherungPfad} ` +
-    '-- nach Prüfung, dass alles funktioniert, kann sie gelöscht werden.'
+  if (!fs.existsSync(sicherungPfad)) return;
+  console.warn(
+    `[db] ACHTUNG: ${sicherungPfad} ist eine UNVERSCHLÜSSELTE Kopie der kompletten Datenbank `
+    + '(aus einer früheren Version dieser Migration). Solange sie existiert, schützt die '
+    + 'Verschlüsselung weder die Platte noch Backups des Datenverzeichnisses. '
+    + 'Bitte prüfen, dass die App läuft, und die Datei anschließend löschen.',
   );
 }
 
@@ -553,6 +645,7 @@ export function getDb() {
   if (istUnverschluesseltePlaintextDatei(DB_PATH)) {
     migriereZuVerschluesselt(DB_PATH, DB_ENCRYPTION_KEY);
   }
+  warneVorAlterKlartextSicherung(DB_PATH);
 
   _db = new Database(DB_PATH);
   _db.pragma("cipher='sqlcipher'");
