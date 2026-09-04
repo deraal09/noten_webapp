@@ -183,6 +183,41 @@ test('Regression: neu angelegte Klausur bekommt automatisch eine Gewichtung > 0,
   assert.notEqual(klausuren[1].gewichtung, 0, 'Zweite Klausur darf nicht bei Gewichtung 0 hängen bleiben');
 });
 
+test('Mehrere Klausuren/Zusatzleistungen erscheinen als Unter-Reiter, nicht gestapelt untereinander', async () => {
+  // "Chemie" hat aus der vorigen Vorbereitung bereits zwei Klausuren (K1, K2).
+  const chemieId = getDb().prepare("SELECT id FROM faecher WHERE name = 'Chemie'").get().id;
+  await form(lehrerA, `/teacher/fach/${chemieId}/uls/neu`, { name: 'Präsentation', aufgaben: '1', halbjahr: HJ });
+  await form(lehrerA, `/teacher/fach/${chemieId}/uls/neu`, { name: 'Referat', aufgaben: '1', halbjahr: HJ });
+  const uls = getDb().prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? ORDER BY id').all(chemieId);
+
+  const html = await (await lehrerA(`/teacher/fach/${chemieId}?hj=${encodeURIComponent(HJ)}`)).text();
+
+  // Ein Unter-Reiter mit einem Button je Klausur, jeweils mit eigenem Panel.
+  assert.match(html, /class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-klausuren-\d+"/);
+  assert.match(html, /data-target="klausur-panel-\d+">K1/);
+  assert.match(html, /data-target="klausur-panel-\d+">K2/);
+  assert.match(html, /id="klausur-panel-\d+" class="reiter-panel unter-panel card active"/,
+    'genau ein Klausur-Panel startet aktiv (das erste)');
+
+  // Dasselbe für die Zusatzleistungen (ULs).
+  assert.match(html, /class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-uls-\d+"/);
+  assert.match(html, /data-target="ul-panel-\d+">Präsentation/);
+  assert.match(html, /data-target="ul-panel-\d+">Referat/);
+  assert.match(html, /id="ul-panel-\d+" class="reiter-panel unter-panel card active"/);
+
+  // Nicht mehr als altes <details>-Stapel-Markup für einzelne Klausuren/ULs.
+  const klausurenPanel = html.slice(html.indexOf('id="panel-klausuren"'), html.indexOf('id="panel-uls"'));
+  assert.doesNotMatch(klausurenPanel, /<details class="card" open>\s*<summary>K1/,
+    'Klausuren dürfen nicht mehr als gestapelte <details>-Karten gerendert werden');
+
+  // Nur EIN Panel je Gruppe ist beim ersten Laden aktiv (server-seitig).
+  const klausurAktivTreffer = klausurenPanel.match(/reiter-panel unter-panel card active/g) || [];
+  assert.equal(klausurAktivTreffer.length, 1, 'nur die erste Klausur ist initial aktiv, nicht alle');
+
+  // UL1 stammt schon aus der vorigen Vorbereitung, plus die zwei neuen hier.
+  assert.equal(uls.length, 3);
+});
+
 test('Notenübersicht (JSON-API): schriftliche/mündliche Note getrennt berechnet', async () => {
   const r = await lehrerA(`/teacher/fach/${fachId}/noten?hj=${encodeURIComponent(HJ)}`);
   assert.equal(r.status, 200);

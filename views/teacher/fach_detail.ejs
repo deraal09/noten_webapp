@@ -73,7 +73,7 @@
   <% }); %>
 </div>
 
-<div class="reiter">
+<div class="reiter" data-storage-key="noteneingabe-reiter-<%= fach.id %>">
   <button type="button" class="active" data-target="panel-uebersicht">Notenübersicht</button>
   <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
   <button type="button" data-target="panel-klausuren">Klausuren</button>
@@ -225,10 +225,16 @@
   </details>
 
   <% if (!klausuren.length) { %><p class="hint">Noch keine Klausuren.</p><% } %>
-  <% klausuren.forEach(function(k) { %>
+  <% if (klausuren.length) { %>
+    <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
+      <% klausuren.forEach(function(k, i) { %>
+        <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%)</small></button>
+      <% }); %>
+    </div>
+  <% } %>
+  <% klausuren.forEach(function(k, i) { %>
     <% var maxArr = JSON.parse(k.max_punkte_pro_aufgabe); %>
-    <details class="card" open>
-      <summary><%= k.name %> <small>(<%= k.gewichtung %>%)</small></summary>
+    <div id="klausur-panel-<%= k.id %>" class="reiter-panel unter-panel card <%= i === 0 ? 'active' : '' %>">
       <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
@@ -283,7 +289,7 @@
           <% }); %>
         </tbody>
       </table>
-    </details>
+    </div>
   <% }); %>
 </div>
 
@@ -365,10 +371,16 @@
   </details>
 
   <% if (!uls.length) { %><p class="hint">Noch keine Zusatzleistungen.</p><% } %>
-  <% uls.forEach(function(u) { %>
+  <% if (uls.length) { %>
+    <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-uls-<%= fach.id %>">
+      <% uls.forEach(function(u, i) { %>
+        <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="ul-panel-<%= u.id %>"><%= u.name %> <small>(<%= u.gewichtung %>%)</small></button>
+      <% }); %>
+    </div>
+  <% } %>
+  <% uls.forEach(function(u, i) { %>
     <% var maxArr = JSON.parse(u.max_punkte_pro_aufgabe); %>
-    <details class="card" open>
-      <summary><%= u.name %> <small>(<%= u.gewichtung %>% der Unterrichtsleistung)</small></summary>
+    <div id="ul-panel-<%= u.id %>" class="reiter-panel unter-panel card <%= i === 0 ? 'active' : '' %>">
       <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('Zusatzleistung löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
@@ -423,37 +435,48 @@
           <% }); %>
         </tbody>
       </table>
-    </details>
+    </div>
   <% }); %>
 </div>
 
 <script>
-  // Reiter (Klausuren/ULs) umschalten. Der gewählte Reiter wird pro Fach in
+  // Reiter (Notenübersicht/Unterrichtsleistung/Klausuren, sowie die
+  // Unter-Reiter je Klausur und je Zusatzleistung) umschalten. Jede
+  // .reiter-Gruppe verwaltet nur ihre eigenen Buttons/Panels (sonst würde
+  // ein Klick auf einen Unter-Reiter versehentlich auch die oberste
+  // Reiter-Ebene umschalten). Der gewählte Reiter wird je Gruppe in
   // localStorage gemerkt, damit er nach einem Seiten-Reload (z. B. nach dem
   // Anlegen/Löschen einer Klausur oder UL, oder dem Speichern von
   // Gewichtung/Max-Punkten — alles normale Form-POSTs mit vollem Reload)
-  // erhalten bleibt, statt immer wieder auf "Klausuren" zurückzuspringen.
-  const REITER_KEY = 'noteneingabe-reiter-<%= fach.id %>';
-  function setzeReiter(targetId) {
-    document.querySelectorAll('.reiter button').forEach(function(b) {
-      b.classList.toggle('active', b.dataset.target === targetId);
-    });
-    document.querySelectorAll('.reiter-panel').forEach(function(p) {
-      p.classList.toggle('active', p.id === targetId);
-    });
-  }
-  document.querySelectorAll('.reiter button').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      setzeReiter(btn.dataset.target);
-      try { localStorage.setItem(REITER_KEY, btn.dataset.target); } catch (e) { /* z. B. privater Modus */ }
-    });
-  });
-  try {
-    const gemerkterReiter = localStorage.getItem(REITER_KEY);
-    if (gemerkterReiter && document.getElementById(gemerkterReiter)) {
-      setzeReiter(gemerkterReiter);
+  // erhalten bleibt, statt immer wieder auf den ersten Reiter zurückzuspringen.
+  function initReiterGruppe(gruppe) {
+    const buttons = Array.from(gruppe.querySelectorAll(':scope > button'));
+    const storageKey = gruppe.dataset.storageKey;
+    function setzeReiter(targetId) {
+      buttons.forEach(function(b) { b.classList.toggle('active', b.dataset.target === targetId); });
+      buttons.forEach(function(b) {
+        const panel = document.getElementById(b.dataset.target);
+        if (panel) panel.classList.toggle('active', b.dataset.target === targetId);
+      });
     }
-  } catch (e) { /* z. B. privater Modus */ }
+    buttons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        setzeReiter(btn.dataset.target);
+        if (storageKey) {
+          try { localStorage.setItem(storageKey, btn.dataset.target); } catch (e) { /* z. B. privater Modus */ }
+        }
+      });
+    });
+    if (storageKey) {
+      try {
+        const gemerkterReiter = localStorage.getItem(storageKey);
+        if (gemerkterReiter && document.getElementById(gemerkterReiter)) {
+          setzeReiter(gemerkterReiter);
+        }
+      } catch (e) { /* z. B. privater Modus */ }
+    }
+  }
+  document.querySelectorAll('.reiter').forEach(initReiterGruppe);
 
   // Live-Update via JSON-API: aktualisiert Punkt-Noten UND die Notenübersicht oben
   const API_URL = '/teacher/fach/<%= fach.id %>/noten?hj=' + encodeURIComponent('<%= halbjahr %>');

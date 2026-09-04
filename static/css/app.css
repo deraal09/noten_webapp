@@ -260,6 +260,12 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .reiter-panel { display: none; }
 .reiter-panel.active { display: block; }
 
+/* Unter-Reiter (je Klausur/Zusatzleistung innerhalb eines Hauptreiters) --
+   optisch etwas zurückhaltender als die oberste Reiter-Ebene. */
+.reiter.unter-reiter { margin-top: 0; margin-bottom: 0.75rem; }
+.reiter.unter-reiter button { font-size: 0.85rem; padding: 0.35rem 0.6rem; }
+.reiter-panel.unter-panel { margin-top: 0; }
+
 /* Notizen-Dialog (Klassenleitungsseite/Fehlzeiten): natives <dialog>, ein
    gemeinsames Notizbuch je Schüler/in. */
 .notiz-dialog { border: none; border-radius: 8px; padding: 1.5rem; max-width: 480px; width: 90vw; background: var(--bg-card); color: var(--text); box-shadow: 0 4px 20px var(--shadow); }

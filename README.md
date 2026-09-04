@@ -531,6 +531,12 @@ strukturiert:
   werden; jede bekommt eine eigene Tabelle mit allen Schüler/innen zur
   Punkteeingabe. Die daraus berechnete Note fließt live (ohne Neuladen) in
   die Notenübersicht oben.
+- Gibt es mehrere Klausuren bzw. mehrere Zusatzleistungen, erscheinen sie
+  innerhalb ihres Reiters als eigene **Unter-Reiter** (z. B. „Klausur 1" /
+  „Klausur 2" nebeneinander) statt als gestapelte Karten untereinander —
+  immer nur eine Klausur/Zusatzleistung ist sichtbar. Die Auswahl wird wie
+  bei den Hauptreitern je Fach in `localStorage` gemerkt, damit sie nach
+  einem Formular-Speichern (voller Seiten-Reload) erhalten bleibt.
 
 ### Unterrichtsleistung: Datumstabelle + Zusatzleistungen
 
