@@ -262,7 +262,7 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 
 /* Unter-Reiter (je Klausur/Zusatzleistung innerhalb eines Hauptreiters) --
    optisch etwas zurückhaltender als die oberste Reiter-Ebene. */
-.reiter.unter-reiter { margin-top: 0; margin-bottom: 0.75rem; }
+.reiter.unter-reiter { margin-top: 0.75rem; margin-bottom: 0.75rem; }
 .reiter.unter-reiter button { font-size: 0.85rem; padding: 0.35rem 0.6rem; }
 .reiter-panel.unter-panel { margin-top: 0; }
 
