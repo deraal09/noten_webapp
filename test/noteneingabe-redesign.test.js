@@ -199,11 +199,21 @@ test('Mehrere Klausuren/Zusatzleistungen erscheinen als Unter-Reiter, nicht gest
   assert.match(html, /id="klausur-panel-\d+" class="reiter-panel unter-panel card active"/,
     'genau ein Klausur-Panel startet aktiv (das erste)');
 
-  // Dasselbe für die Zusatzleistungen (ULs).
+  // Dasselbe für die Zusatzleistungen (ULs): Datumstabelle und jede
+  // Zusatzleistung sind eigene Register, "+ Zusatzleistung anlegen" bleibt
+  // dabei immer die letzte Registerkarte (nicht mehr ein separates
+  // <details>-Formular oberhalb der Liste).
   assert.match(html, /class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-uls-\d+"/);
+  const ulReiterHtml = html.slice(html.indexOf('data-storage-key="noteneingabe-subreiter-uls-'), html.indexOf('</div>', html.indexOf('data-storage-key="noteneingabe-subreiter-uls-')));
+  const ulButtonZiele = Array.from(ulReiterHtml.matchAll(/data-target="([^"]+)"/g)).map((m) => m[1]);
+  assert.equal(ulButtonZiele[0], 'ul-panel-datumstabelle', 'Datumstabelle ist das erste Register');
+  assert.equal(ulButtonZiele[ulButtonZiele.length - 1], 'ul-panel-anlegen',
+    '"+ Zusatzleistung anlegen" muss immer die letzte Registerkarte sein');
   assert.match(html, /data-target="ul-panel-\d+">Präsentation/);
   assert.match(html, /data-target="ul-panel-\d+">Referat/);
-  assert.match(html, /id="ul-panel-\d+" class="reiter-panel unter-panel card active"/);
+  assert.match(html, /id="ul-panel-datumstabelle" class="reiter-panel unter-panel card active"/,
+    'die Datumstabelle startet als aktives Register, nicht die erste Zusatzleistung');
+  assert.match(html, /id="ul-panel-anlegen" class="reiter-panel unter-panel card"/);
 
   // Nicht mehr als altes <details>-Stapel-Markup für einzelne Klausuren/ULs.
   const klausurenPanel = html.slice(html.indexOf('id="panel-klausuren"'), html.indexOf('id="panel-uls"'));
@@ -213,6 +223,11 @@ test('Mehrere Klausuren/Zusatzleistungen erscheinen als Unter-Reiter, nicht gest
   // Nur EIN Panel je Gruppe ist beim ersten Laden aktiv (server-seitig).
   const klausurAktivTreffer = klausurenPanel.match(/reiter-panel unter-panel card active/g) || [];
   assert.equal(klausurAktivTreffer.length, 1, 'nur die erste Klausur ist initial aktiv, nicht alle');
+
+  const ulPanelStart = html.indexOf('id="panel-uls"');
+  const ulPanel = html.slice(ulPanelStart, html.indexOf('<script>', ulPanelStart));
+  const ulAktivTreffer = ulPanel.match(/reiter-panel unter-panel card active/g) || [];
+  assert.equal(ulAktivTreffer.length, 1, 'nur ein UL-Register ist initial aktiv, nicht mehrere');
 
   // UL1 stammt schon aus der vorigen Vorbereitung, plus die zwei neuen hier.
   assert.equal(uls.length, 3);

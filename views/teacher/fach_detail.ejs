@@ -294,93 +294,71 @@
 </div>
 
 <div id="panel-uls" class="reiter-panel">
-  <h3>Datumstabelle</h3>
-  <p class="hint">
-    Eine Spalte je Unterrichtstermin, eine Note je Schüler/in ohne
-    Einzelgewichtung. Der Durchschnitt aller eingetragenen Noten bildet die
-    Basis der Unterrichtsleistungsnote — Zusatzleistungen (unten) zählen
-    zusätzlich mit ihrer eigenen Gewichtung.
-  </p>
-  <form method="post" action="/teacher/fach/<%= fach.id %>/unterricht/termine/neu" class="inline">
-    <input type="date" name="datum" required>
-    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-    <button type="submit">+ Datum hinzufügen</button>
-  </form>
+  <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-uls-<%= fach.id %>">
+    <button type="button" class="active" data-target="ul-panel-datumstabelle">Datumstabelle</button>
+    <% uls.forEach(function(u) { %>
+      <button type="button" data-target="ul-panel-<%= u.id %>"><%= u.name %> <small>(<%= u.gewichtung %>%)</small></button>
+    <% }); %>
+    <button type="button" data-target="ul-panel-anlegen">+ Zusatzleistung anlegen</button>
+  </div>
 
-  <% if (!termine.length) { %><p class="hint">Noch keine Termine.</p><% } else { %>
-    <div class="tabelle-scroll">
-    <table class="tafel" id="datumstabelle">
-      <thead>
-        <tr>
-          <th>Schüler/in</th>
-          <% termine.forEach(function(t) { %>
-            <th class="datum-head">
-              <%= t.datum.split('-').reverse().join('.') %>
-              <form method="post" action="/teacher/unterricht/termine/<%= t.id %>/loeschen" class="inline"
-                    onsubmit="return confirm('Termin löschen? Alle Noten dieses Termins gehen verloren.')">
-                <button type="submit" class="danger" title="Termin löschen">🗑</button>
-              </form>
-            </th>
-          <% }); %>
-          <th>Ø</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% rows.forEach(function(r) {
-             var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
-          <tr>
-            <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
-            <% r.terminNoten.forEach(function(tn) { %>
-              <td>
-                <input type="number" class="note-datum" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
-                  min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" step="0.1"
-                  value="<%= tn.wert === null ? '' : tn.wert %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>>
-              </td>
-            <% }); %>
-            <td class="note-cell datums-durchschnitt" data-sid="<%= r.schueler_id %>">
-              <%= r.datumsDurchschnitt === null ? '–' : formatNote(r.datumsDurchschnitt) %>
-            </td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
-    </div>
-  <% } %>
-
-  <h3>Zusatzleistungen</h3>
-  <p class="hint">
-    Zusätzliche, einzeln benotete Leistungen (z. B. Präsentationen). Die
-    Gewichtung gilt als Anteil an der Unterrichtsleistung — der Rest bis
-    100 % entfällt automatisch auf die Datumstabelle oben. Ohne Gewichtung
-    zählt eine Zusatzleistung nicht mit.
-  </p>
-  <details class="card">
-    <summary>+ Zusatzleistung anlegen</summary>
-    <form method="post" action="/teacher/fach/<%= fach.id %>/uls/neu">
-      <div class="erstellen-felder">
-        <label class="feld">Name der Zusatzleistung
-          <input type="text" name="name" placeholder="z. B. Präsentation" required>
-        </label>
-        <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen)
-          <input type="number" name="aufgaben" min="1" value="1">
-        </label>
-      </div>
+  <div id="ul-panel-datumstabelle" class="reiter-panel unter-panel card active">
+    <p class="hint">
+      Eine Spalte je Unterrichtstermin, eine Note je Schüler/in ohne
+      Einzelgewichtung. Der Durchschnitt aller eingetragenen Noten bildet die
+      Basis der Unterrichtsleistungsnote — Zusatzleistungen (eigene Reiter)
+      zählen zusätzlich mit ihrer eigenen Gewichtung.
+    </p>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/unterricht/termine/neu" class="inline">
+      <input type="date" name="datum" required>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-      <button type="submit">+ Zusatzleistung anlegen</button>
+      <button type="submit">+ Datum hinzufügen</button>
     </form>
-  </details>
 
-  <% if (!uls.length) { %><p class="hint">Noch keine Zusatzleistungen.</p><% } %>
-  <% if (uls.length) { %>
-    <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-uls-<%= fach.id %>">
-      <% uls.forEach(function(u, i) { %>
-        <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="ul-panel-<%= u.id %>"><%= u.name %> <small>(<%= u.gewichtung %>%)</small></button>
-      <% }); %>
-    </div>
-  <% } %>
-  <% uls.forEach(function(u, i) { %>
+    <% if (!termine.length) { %><p class="hint">Noch keine Termine.</p><% } else { %>
+      <div class="tabelle-scroll">
+      <table class="tafel" id="datumstabelle">
+        <thead>
+          <tr>
+            <th>Schüler/in</th>
+            <% termine.forEach(function(t) { %>
+              <th class="datum-head">
+                <%= t.datum.split('-').reverse().join('.') %>
+                <form method="post" action="/teacher/unterricht/termine/<%= t.id %>/loeschen" class="inline"
+                      onsubmit="return confirm('Termin löschen? Alle Noten dieses Termins gehen verloren.')">
+                  <button type="submit" class="danger" title="Termin löschen">🗑</button>
+                </form>
+              </th>
+            <% }); %>
+            <th>Ø</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function(r) {
+               var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
+            <tr>
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
+              <% r.terminNoten.forEach(function(tn) { %>
+                <td>
+                  <input type="number" class="note-datum" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
+                    min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" step="0.1"
+                    value="<%= tn.wert === null ? '' : tn.wert %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>>
+                </td>
+              <% }); %>
+              <td class="note-cell datums-durchschnitt" data-sid="<%= r.schueler_id %>">
+                <%= r.datumsDurchschnitt === null ? '–' : formatNote(r.datumsDurchschnitt) %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      </div>
+    <% } %>
+  </div>
+
+  <% uls.forEach(function(u) { %>
     <% var maxArr = JSON.parse(u.max_punkte_pro_aufgabe); %>
-    <div id="ul-panel-<%= u.id %>" class="reiter-panel unter-panel card <%= i === 0 ? 'active' : '' %>">
+    <div id="ul-panel-<%= u.id %>" class="reiter-panel unter-panel card">
       <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('Zusatzleistung löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
@@ -437,6 +415,27 @@
       </table>
     </div>
   <% }); %>
+
+  <div id="ul-panel-anlegen" class="reiter-panel unter-panel card">
+    <p class="hint">
+      Zusätzliche, einzeln benotete Leistungen (z. B. Präsentationen). Die
+      Gewichtung gilt als Anteil an der Unterrichtsleistung — der Rest bis
+      100 % entfällt automatisch auf die Datumstabelle. Ohne Gewichtung
+      zählt eine Zusatzleistung nicht mit.
+    </p>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/uls/neu">
+      <div class="erstellen-felder">
+        <label class="feld">Name der Zusatzleistung
+          <input type="text" name="name" placeholder="z. B. Präsentation" required>
+        </label>
+        <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen)
+          <input type="number" name="aufgaben" min="1" value="1">
+        </label>
+      </div>
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">+ Zusatzleistung anlegen</button>
+    </form>
+  </div>
 </div>
 
 <script>
