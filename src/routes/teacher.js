@@ -63,6 +63,12 @@ function userDarfFachBearbeiten(user, fach) {
   return userHatFachZgriff(user, fach.id) || userIstKlassenlehrer(user, fach.klasse_id);
 }
 
+/** Datum einer Klausur/Zusatzleistung: optional, aber wenn angegeben nur im validen YYYY-MM-DD-Format -- sonst null. */
+function alsGueltigesDatumOderNull(wert) {
+  const s = String(wert || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
 
@@ -207,10 +213,11 @@ export default async function teacherRoutes(fastify) {
     const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
     const name = String(request.body?.name || '').trim();
     const aufgaben = Math.max(1, parseInt(request.body?.aufgaben, 10) || 1);
+    const datum = alsGueltigesDatumOderNull(request.body?.datum);
     if (!name) return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
-    getDb().prepare(`INSERT INTO klausuren (fach_id, halbjahr, name, max_punkte_pro_aufgabe, gewichtung)
-                     VALUES (?, ?, ?, ?, 0)`)
-      .run(request.params.id, halbjahr, name, JSON.stringify(Array(aufgaben).fill(1)));
+    getDb().prepare(`INSERT INTO klausuren (fach_id, halbjahr, name, datum, max_punkte_pro_aufgabe, gewichtung)
+                     VALUES (?, ?, ?, ?, ?, 0)`)
+      .run(request.params.id, halbjahr, name, datum, JSON.stringify(Array(aufgaben).fill(1)));
     autoVerteileKlausuren(request.params.id, halbjahr, { erzwingen: true });
     syncFallsAutoAktiv(request.params.id, halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
@@ -233,6 +240,15 @@ export default async function teacherRoutes(fastify) {
     const gw = Number(request.body?.gewichtung) || 0;
     getDb().prepare('UPDATE klausuren SET gewichtung = ? WHERE id = ?').run(gw, request.params.id);
     syncFallsAutoAktiv(k.fach_id, k.halbjahr, request.user.id);
+    return reply.redirect(`/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}`);
+  });
+
+  fastify.post('/klausuren/:id/datum', async (request, reply) => {
+    const k = getDb().prepare('SELECT fach_id, halbjahr FROM klausuren WHERE id = ?').get(request.params.id);
+    if (!k) return reply.redirect('/teacher');
+    if (!userHatFachZgriff(request.user, k.fach_id)) return reply.code(403).send({ error: 'forbidden' });
+    const datum = alsGueltigesDatumOderNull(request.body?.datum);
+    getDb().prepare('UPDATE klausuren SET datum = ? WHERE id = ?').run(datum, request.params.id);
     return reply.redirect(`/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}`);
   });
 
@@ -311,15 +327,16 @@ export default async function teacherRoutes(fastify) {
     const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
     const name = String(request.body?.name || '').trim();
     const aufgaben = Math.max(1, parseInt(request.body?.aufgaben, 10) || 1);
+    const datum = alsGueltigesDatumOderNull(request.body?.datum);
     if (!name) return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
     // Gewichtung startet bewusst bei 0 (uncounted), keine automatische
     // Verteilung mehr: eine Zusatzleistung zählt erst, wenn die Lehrkraft ihr
     // explizit einen Anteil am Unterrichtsleistungs-Topf gibt — der Rest
     // entfällt sonst automatisch auf die Datumstabelle (siehe
     // unterrichtsleistungNote() in grade-calc.js).
-    getDb().prepare(`INSERT INTO unterrichtsleistungen (fach_id, halbjahr, name, max_punkte_pro_aufgabe, gewichtung)
-                     VALUES (?, ?, ?, ?, 0)`)
-      .run(request.params.id, halbjahr, name, JSON.stringify(Array(aufgaben).fill(1)));
+    getDb().prepare(`INSERT INTO unterrichtsleistungen (fach_id, halbjahr, name, datum, max_punkte_pro_aufgabe, gewichtung)
+                     VALUES (?, ?, ?, ?, ?, 0)`)
+      .run(request.params.id, halbjahr, name, datum, JSON.stringify(Array(aufgaben).fill(1)));
     syncFallsAutoAktiv(request.params.id, halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
   });
@@ -340,6 +357,15 @@ export default async function teacherRoutes(fastify) {
     const gw = Number(request.body?.gewichtung) || 0;
     getDb().prepare('UPDATE unterrichtsleistungen SET gewichtung = ? WHERE id = ?').run(gw, request.params.id);
     syncFallsAutoAktiv(u.fach_id, u.halbjahr, request.user.id);
+    return reply.redirect(`/teacher/fach/${u.fach_id}?hj=${encodeURIComponent(u.halbjahr)}`);
+  });
+
+  fastify.post('/uls/:id/datum', async (request, reply) => {
+    const u = getDb().prepare('SELECT fach_id, halbjahr FROM unterrichtsleistungen WHERE id = ?').get(request.params.id);
+    if (!u) return reply.redirect('/teacher');
+    if (!userHatFachZgriff(request.user, u.fach_id)) return reply.code(403).send({ error: 'forbidden' });
+    const datum = alsGueltigesDatumOderNull(request.body?.datum);
+    getDb().prepare('UPDATE unterrichtsleistungen SET datum = ? WHERE id = ?').run(datum, request.params.id);
     return reply.redirect(`/teacher/fach/${u.fach_id}?hj=${encodeURIComponent(u.halbjahr)}`);
   });
 

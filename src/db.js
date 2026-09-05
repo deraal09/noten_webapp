@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -284,6 +284,9 @@ CREATE TABLE IF NOT EXISTS klausuren (
     fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
     halbjahr TEXT NOT NULL,
     name TEXT NOT NULL,
+    -- Datum der Klausur (YYYY-MM-DD), optional -- Nachweis, wann die
+    -- Leistung erbracht wurde (z. B. für eine Notenkonferenz).
+    datum TEXT,
     max_punkte_pro_aufgabe TEXT NOT NULL DEFAULT '[]',
     gewichtung REAL NOT NULL DEFAULT 0
 );
@@ -301,6 +304,9 @@ CREATE TABLE IF NOT EXISTS unterrichtsleistungen (
     fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
     halbjahr TEXT NOT NULL,
     name TEXT NOT NULL,
+    -- Datum der Zusatzleistung (YYYY-MM-DD), optional -- Nachweis, wann die
+    -- Leistung erbracht wurde (z. B. für eine Notenkonferenz).
+    datum TEXT,
     max_punkte_pro_aufgabe TEXT NOT NULL DEFAULT '[]',
     gewichtung REAL NOT NULL DEFAULT 0
 );
@@ -547,6 +553,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'abgeschlossen', 'abgeschlossen INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'faecher', 'abgeschlossen_am', 'abgeschlossen_am TEXT');
   ensureColumn(db, 'faecher', 'abgeschlossen_von_id', 'abgeschlossen_von_id INTEGER REFERENCES users(id)');
+  ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
+  ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
 }
 
 // SQL-String-Literal escapen (einfache Anführungszeichen verdoppeln) --

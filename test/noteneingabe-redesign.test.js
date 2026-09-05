@@ -439,6 +439,50 @@ test('Fehlzeiten: optionale zweite Schule mit zwei Spalten + Summe', async () =>
   assert.match(html, /value="2"/);
 });
 
+test('Klausuren/Zusatzleistungen: Datum ist nachweisbar hinterlegbar und wird im Register angezeigt', async () => {
+  await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Erdkunde' });
+  const bioId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Erdkunde'").get(klasseId).id;
+
+  // Datum direkt beim Anlegen mitgeben.
+  await form(lehrerA, `/teacher/fach/${bioId}/klausuren/neu`, { name: 'Klausur 1', aufgaben: '1', halbjahr: HJ, datum: '2026-03-12' });
+  const klausur = getDb().prepare("SELECT * FROM klausuren WHERE fach_id = ? AND name = 'Klausur 1'").get(bioId);
+  assert.equal(klausur.datum, '2026-03-12');
+
+  await form(lehrerA, `/teacher/fach/${bioId}/uls/neu`, { name: 'Referat', aufgaben: '1', halbjahr: HJ, datum: '2026-04-01' });
+  const ul = getDb().prepare("SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND name = 'Referat'").get(bioId);
+  assert.equal(ul.datum, '2026-04-01');
+
+  // Ungültiges/leeres Datum wird nicht übernommen, führt aber nicht zum Absturz.
+  await form(lehrerA, `/teacher/fach/${bioId}/klausuren/neu`, { name: 'Klausur 2', aufgaben: '1', halbjahr: HJ, datum: 'keine-datumsangabe' });
+  const klausur2 = getDb().prepare("SELECT * FROM klausuren WHERE fach_id = ? AND name = 'Klausur 2'").get(bioId);
+  assert.equal(klausur2.datum, null);
+
+  // Nachträgliches Setzen/Ändern über eigene Routen.
+  let r = await form(lehrerA, `/teacher/klausuren/${klausur2.id}/datum`, { datum: '2026-05-20' });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT datum FROM klausuren WHERE id = ?').get(klausur2.id).datum, '2026-05-20');
+
+  r = await form(lehrerA, `/teacher/uls/${ul.id}/datum`, { datum: '2026-06-01' });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT datum FROM unterrichtsleistungen WHERE id = ?').get(ul.id).datum, '2026-06-01');
+
+  // Leeres Datum löscht ein zuvor gesetztes wieder (statt es unverändert zu lassen).
+  await form(lehrerA, `/teacher/klausuren/${klausur2.id}/datum`, { datum: '' });
+  assert.equal(getDb().prepare('SELECT datum FROM klausuren WHERE id = ?').get(klausur2.id).datum, null);
+
+  // Fremde Lehrkraft ohne Fachzugriff darf das Datum nicht ändern.
+  r = await form(lehrerB, `/teacher/klausuren/${klausur.id}/datum`, { datum: '2026-01-01' });
+  assert.equal(r.status, 403);
+
+  // Das Datum erscheint im Register-Button (Anzeige im Format TT.MM.JJJJ).
+  const html = await (await lehrerA(`/teacher/fach/${bioId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /Klausur 1 <small>\(\d+(\.\d+)?%, 12\.03\.2026\)<\/small>/);
+  assert.match(html, /Referat <small>\(\d+(\.\d+)?%, 01\.06\.2026\)<\/small>/);
+  // Editierbares Datumsfeld je Klausur/Zusatzleistung im Formular vorhanden.
+  assert.match(html, /name="datum" value="2026-03-12"/);
+  assert.match(html, /name="datum" value="2026-06-01"/);
+});
+
 test.after(async () => {
   await fastify.close();
 });

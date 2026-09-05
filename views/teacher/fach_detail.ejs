@@ -210,7 +210,7 @@
 <div id="panel-klausuren" class="reiter-panel">
   <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
     <% klausuren.forEach(function(k, i) { %>
-      <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%)</small></button>
+      <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%<%= k.datum ? ', ' + k.datum.split('-').reverse().join('.') : '' %>)</small></button>
     <% }); %>
     <button type="button" class="<%= klausuren.length === 0 ? 'active' : '' %>" data-target="klausur-panel-anlegen">+ Klausur anlegen</button>
   </div>
@@ -226,6 +226,12 @@
           <span class="feld-mit-einheit"><input type="number" name="gewichtung" value="<%= k.gewichtung %>" min="0" max="100" step="0.1">%</span>
         </label>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+        <button type="submit">💾</button>
+      </form>
+      <form method="post" action="/teacher/klausuren/<%= k.id %>/datum" class="einstellungen">
+        <label class="feld">Datum
+          <input type="date" name="datum" value="<%= k.datum || '' %>">
+        </label>
         <button type="submit">💾</button>
       </form>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="einstellungen">
@@ -281,6 +287,9 @@
         <label class="feld">Name der Klausur
           <input type="text" name="name" placeholder="z. B. Klausur 1" required>
         </label>
+        <label class="feld">Datum (optional)
+          <input type="date" name="datum">
+        </label>
         <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen), z. B. 3 bei drei Teilaufgaben
           <input type="number" name="aufgaben" min="1" value="1">
         </label>
@@ -295,7 +304,7 @@
   <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-uls-<%= fach.id %>">
     <button type="button" class="active" data-target="ul-panel-datumstabelle">Datumstabelle</button>
     <% uls.forEach(function(u) { %>
-      <button type="button" data-target="ul-panel-<%= u.id %>"><%= u.name %> <small>(<%= u.gewichtung %>%)</small></button>
+      <button type="button" data-target="ul-panel-<%= u.id %>"><%= u.name %> <small>(<%= u.gewichtung %>%<%= u.datum ? ', ' + u.datum.split('-').reverse().join('.') : '' %>)</small></button>
     <% }); %>
     <button type="button" data-target="ul-panel-anlegen">+ Zusatzleistung anlegen</button>
   </div>
@@ -367,6 +376,12 @@
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
         <button type="submit">💾</button>
       </form>
+      <form method="post" action="/teacher/uls/<%= u.id %>/datum" class="einstellungen">
+        <label class="feld">Datum
+          <input type="date" name="datum" value="<%= u.datum || '' %>">
+        </label>
+        <button type="submit">💾</button>
+      </form>
       <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" class="einstellungen">
         <label class="feld">Anzahl Aufgaben
           <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
@@ -425,6 +440,9 @@
       <div class="erstellen-felder">
         <label class="feld">Name der Zusatzleistung
           <input type="text" name="name" placeholder="z. B. Präsentation" required>
+        </label>
+        <label class="feld">Datum (optional)
+          <input type="date" name="datum">
         </label>
         <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen)
           <input type="number" name="aufgaben" min="1" value="1">
