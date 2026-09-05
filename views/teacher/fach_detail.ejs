@@ -208,30 +208,13 @@
 </div>
 
 <div id="panel-klausuren" class="reiter-panel">
-  <details class="card">
-    <summary>+ Klausur anlegen</summary>
-    <form method="post" action="/teacher/fach/<%= fach.id %>/klausuren/neu">
-      <div class="erstellen-felder">
-        <label class="feld">Name der Klausur
-          <input type="text" name="name" placeholder="z. B. Klausur 1" required>
-        </label>
-        <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen), z. B. 3 bei drei Teilaufgaben
-          <input type="number" name="aufgaben" min="1" value="1">
-        </label>
-      </div>
-      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-      <button type="submit">+ Klausur anlegen</button>
-    </form>
-  </details>
+  <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
+    <% klausuren.forEach(function(k, i) { %>
+      <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%)</small></button>
+    <% }); %>
+    <button type="button" class="<%= klausuren.length === 0 ? 'active' : '' %>" data-target="klausur-panel-anlegen">+ Klausur anlegen</button>
+  </div>
 
-  <% if (!klausuren.length) { %><p class="hint">Noch keine Klausuren.</p><% } %>
-  <% if (klausuren.length) { %>
-    <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
-      <% klausuren.forEach(function(k, i) { %>
-        <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%)</small></button>
-      <% }); %>
-    </div>
-  <% } %>
   <% klausuren.forEach(function(k, i) { %>
     <% var maxArr = JSON.parse(k.max_punkte_pro_aufgabe); %>
     <div id="klausur-panel-<%= k.id %>" class="reiter-panel unter-panel card <%= i === 0 ? 'active' : '' %>">
@@ -291,6 +274,21 @@
       </table>
     </div>
   <% }); %>
+
+  <div id="klausur-panel-anlegen" class="reiter-panel unter-panel card<%= klausuren.length === 0 ? ' active' : '' %>">
+    <form method="post" action="/teacher/fach/<%= fach.id %>/klausuren/neu">
+      <div class="erstellen-felder">
+        <label class="feld">Name der Klausur
+          <input type="text" name="name" placeholder="z. B. Klausur 1" required>
+        </label>
+        <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen), z. B. 3 bei drei Teilaufgaben
+          <input type="number" name="aufgaben" min="1" value="1">
+        </label>
+      </div>
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">+ Klausur anlegen</button>
+    </form>
+  </div>
 </div>
 
 <div id="panel-uls" class="reiter-panel">

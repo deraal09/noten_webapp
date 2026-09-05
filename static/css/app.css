@@ -254,7 +254,7 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .hj-tab { padding: 0.4rem 1rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 4px 4px 0 0; color: var(--text); }
 .hj-tab.active { background: var(--primary); color: var(--on-dark); border-color: var(--primary); }
 
-.reiter { display: flex; gap: 0.5rem; margin: 1rem 0 0; flex-wrap: wrap; }
+.reiter { display: flex; gap: 0.75rem; margin: 1rem 0 0; flex-wrap: wrap; }
 .reiter button { background: var(--bg-card); color: var(--primary); border: 1px solid var(--primary); }
 .reiter button.active { background: var(--primary); color: var(--on-dark); }
 .reiter-panel { display: none; }

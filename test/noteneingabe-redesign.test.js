@@ -193,11 +193,20 @@ test('Mehrere Klausuren/Zusatzleistungen erscheinen als Unter-Reiter, nicht gest
   const html = await (await lehrerA(`/teacher/fach/${chemieId}?hj=${encodeURIComponent(HJ)}`)).text();
 
   // Ein Unter-Reiter mit einem Button je Klausur, jeweils mit eigenem Panel.
+  // "+ Klausur anlegen" ist dabei immer die letzte Registerkarte (nicht mehr
+  // ein separates <details>-Formular oberhalb der Liste).
   assert.match(html, /class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-klausuren-\d+"/);
+  const klausurReiterHtml = html.slice(html.indexOf('data-storage-key="noteneingabe-subreiter-klausuren-'), html.indexOf('</div>', html.indexOf('data-storage-key="noteneingabe-subreiter-klausuren-')));
+  const klausurButtonZiele = Array.from(klausurReiterHtml.matchAll(/data-target="([^"]+)"/g)).map((m) => m[1]);
+  assert.equal(klausurButtonZiele[klausurButtonZiele.length - 1], 'klausur-panel-anlegen',
+    '"+ Klausur anlegen" muss immer die letzte Registerkarte sein');
   assert.match(html, /data-target="klausur-panel-\d+">K1/);
   assert.match(html, /data-target="klausur-panel-\d+">K2/);
   assert.match(html, /id="klausur-panel-\d+" class="reiter-panel unter-panel card active"/,
     'genau ein Klausur-Panel startet aktiv (das erste)');
+  assert.match(html, /id="klausur-panel-anlegen" class="reiter-panel unter-panel card"/);
+  assert.doesNotMatch(html, /<summary>\+ Klausur anlegen<\/summary>/,
+    'Klausur-Anlegen darf nicht mehr als <details>-Formular oberhalb der Liste stehen');
 
   // Dasselbe für die Zusatzleistungen (ULs): Datumstabelle und jede
   // Zusatzleistung sind eigene Register, "+ Zusatzleistung anlegen" bleibt
