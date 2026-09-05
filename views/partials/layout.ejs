@@ -42,6 +42,10 @@
         <a href="/teacher/sitzplaene">Sitzpläne</a>
         <a href="/teacher">Noteneingabe</a>
         <a href="/klassenlehrer">Klassenleitung</a>
+        <% if (typeof kalenderUrl !== 'undefined' && kalenderUrl) { %>
+          <%# Schwester-App: dank Single Sign-on ohne zweite Anmeldung (src/sso.js) %>
+          <a href="<%= kalenderUrl %>" target="_blank" rel="noopener">Lehrerkalender ↗</a>
+        <% } %>
       </nav>
       <div class="userbox">
         <span class="user"><%= user.displayName || user.username %></span>

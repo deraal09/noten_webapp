@@ -592,6 +592,70 @@ gebunden) oder als **Notenkonferenz-Entscheidung** (klassenweit, fachübergreife
 sichtbar). Alle Notizen einer Schüler/in erscheinen in der
 Halbjahresübersicht der Klassenleitung.
 
+## Single Sign-on für den Lehrerkalender
+
+Diese App ist der **Anmeldedienst** für den Lehrerkalender
+(`HaacB/lehrerkalender`): Wer hier angemeldet ist, kommt ohne zweite
+Anmeldung in den Kalender. Umgekehrt schickt der Kalender Unangemeldete
+hierher, sodass es schulweit **eine** Anmeldemaske gibt — die dieser App.
+
+### Ablauf
+
+```
+Kalender  ──GET /sso/authorize?client_id&redirect_uri&state──▶  Notenverwaltung
+                                                                 │ (ggf. /login)
+Kalender  ◀──302 redirect_uri?code=<Einmal-Code>&state──────────┘
+Kalender  ──POST /sso/token {client_id, client_secret, code}───▶  (server-zu-server)
+Kalender  ◀──{ sub, username, name, rolle }─────────────────────┘
+```
+
+Der Code ist **einmalig**, 60 Sekunden gültig und liegt nur als
+SHA-256-Hash in `sso_codes`. `redirect_uri` muss exakt in
+`SSO_REDIRECT_URIS` stehen — eine unbekannte Adresse wird nie angesprungen.
+
+### Kennung (`sub`)
+
+| Kontotyp | `sub` |
+|----------|-------|
+| AD/LDAP  | `login_sub` (sAMAccountName), kleingeschrieben |
+| lokal (Einladungslink) | `nv:` + Benutzername, kleingeschrieben |
+
+Der Kalender leitet daraus Dateiname und Schlüssel seiner
+Pro-Nutzer-Datenbank ab. Bei AD-Konten ist das exakt die Kennung, die er
+bisher aus seinem eigenen LDAP-Login gewonnen hat — bestehende
+Kalenderdaten bleiben nach der Umstellung also erreichbar. Das `nv:`-Präfix
+bei lokalen Konten kann nie mit einer AD-Kennung kollidieren (`:` ist im
+sAMAccountName nicht erlaubt).
+
+### Lese-Schnittstelle für die Klassen-Verknüpfung
+
+Ebenfalls server-zu-server, mit demselben Geheimnis als Bearer-Token und
+der Kennung der Lehrkraft in `X-Noten-Sub`:
+
+| Endpunkt | Antwort |
+|----------|---------|
+| `GET /api/extern/ping` | `{ ok, app, version }` |
+| `GET /api/extern/klassen` | Klassen der Lehrkraft mit Fächern, Schuljahr, Schülerzahl, Rolle |
+| `GET /api/extern/klassen/:id` | dieselbe Klasse **plus** Schülerliste (`nachname`, `vorname`) |
+
+Herausgegeben wird nur, worauf die Lehrkraft auch in der Oberfläche Zugriff
+hätte (dieselben Helfer aus `src/auth.js`). **Noten werden bewusst nicht
+geliefert:** Der Kalender verknüpft Klassen und verlinkt in die Notentafel
+(`/teacher/fach/:id`, `/teacher/klassen/:id`) — Quelle der Noten bleibt
+diese App.
+
+### Einrichtung
+
+```
+SSO_CLIENT_SECRET=<openssl rand -base64 32>          # identisch im Kalender
+SSO_REDIRECT_URIS=https://kalender.bbz-rd-eck.com/auth/sso/callback
+LEHRERKALENDER_URL=https://kalender.bbz-rd-eck.com   # optional: Navigationslink
+```
+
+Ohne `SSO_CLIENT_SECRET`/`SSO_REDIRECT_URIS` sind `/sso/*` und
+`/api/extern/*` abgeschaltet (404) — die App verhält sich dann exakt wie
+vorher.
+
 ## Deployment auf Plesk (noten.bbz-rd-eck.com)
 
 Plesk-Web-Admin-Edition hat **kein** Python/Passenger für Flask. Wir nutzen
@@ -723,6 +787,8 @@ webapp/
 │   ├── grade-calc.js   # Notenberechnung (portiert aus grade_calc.py)
 │   ├── routes/
 │   │   ├── auth.js     # /login, /logout, /setup, /einladung/<token>
+│   │   ├── sso.js      # /sso/authorize, /sso/token (Lehrerkalender-SSO)
+│   │   ├── api-extern.js # /api/extern/* (Klassen/Schüler für den Kalender)
 │   │   ├── admin.js    # Schuljahre, Klassen, Schüler, Fächer, …
 │   │   ├── teacher.js  # Notentafel, Klausuren, ULs, AJAX-API
 │   │   ├── klassenlehrer.js  # Fehlzeiten
@@ -755,6 +821,10 @@ webapp/
 | `DB_PFAD`     | `data/noten.sqlite3`          | Pfad zur SQLite-Datei              |
 | `PUBLIC_URL`  | `http(s)://Host:Port`         | Basis-URL für Einladungslinks      |
 | `NODE_ENV`    | (nicht gesetzt)               | `production` für kompaktes Logging |
+| `SSO_CLIENT_ID`     | `lehrerkalender`        | Kennung der Partner-App (Lehrerkalender) |
+| `SSO_CLIENT_SECRET` | (leer = SSO aus)        | gemeinsames Geheimnis, identisch im Kalender als `NOTEN_CLIENT_SECRET` |
+| `SSO_REDIRECT_URIS` | (leer = SSO aus)        | erlaubte Rücksprungadressen, kommagetrennt |
+| `LEHRERKALENDER_URL`| (nicht gesetzt)         | Basis-URL des Kalenders → Link in der Navigation |
 
 ## Backup
 

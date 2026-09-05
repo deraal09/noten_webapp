@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -470,6 +470,21 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 -- Weile gesperrt, jede weitere fehlgeschlagene Anmeldung danach verdoppelt
 -- die Sperrdauer (exponentieller Backoff gegen automatisiertes
 -- Durchprobieren von Passwörtern).
+-- Einmal-Codes für Single Sign-on von Schwester-Apps (src/sso.js): Der
+-- Lehrerkalender schickt Lehrkräfte zum Anmelden hierher und tauscht danach
+-- server-zu-server einen 60 Sekunden gültigen Code gegen die Identität ein.
+-- Gespeichert wird nur der SHA-256-Hash des Codes — ein Blick in die DB
+-- erlaubt also kein Nachspielen. Der Code wird beim Einlösen gelöscht.
+CREATE TABLE IF NOT EXISTS sso_codes (
+    code_hash TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    redirect_uri TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sso_codes_expires_at ON sso_codes(expires_at);
+
 CREATE TABLE IF NOT EXISTS login_ratelimit (
     schluessel TEXT PRIMARY KEY,
     fehlversuche INTEGER NOT NULL DEFAULT 0,

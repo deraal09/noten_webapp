@@ -26,6 +26,7 @@ import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 
 import { getDb } from './src/db.js';
+import { ssoConfig } from './src/sso.js';
 import { authPreHandler, SESSION_COOKIE, istIrgendeineKlassenleitung } from './src/auth.js';
 import { SqliteSessionStore } from './src/auth/sqlite-session-store.js';
 import {
@@ -40,6 +41,8 @@ import exportRoutes from './src/routes/export.js';
 import sitzplanRoutes from './src/routes/sitzplan.js';
 import untisImportRoutes from './src/routes/untis-import.js';
 import startRoutes from './src/routes/start.js';
+import ssoRoutes from './src/routes/sso.js';
+import apiExternRoutes from './src/routes/api-extern.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';
@@ -150,6 +153,9 @@ export async function buildApp(opts = {}) {
     // und Klassenleitung — einmal pro Request berechnet statt in der
     // Layout-Vorlage selbst eine DB-Abfrage zu brauchen.
     reply.locals.kannEinladen = request.user ? istIrgendeineKlassenleitung(request.user) : false;
+    // Link "Lehrerkalender" in der Navigation, sobald LEHRERKALENDER_URL gesetzt
+    // ist — dank SSO ohne zweite Anmeldung (siehe src/sso.js).
+    reply.locals.kalenderUrl = ssoConfig().kalenderUrl || null;
     const pending = request.session?.flash;
     reply.locals.flash = pending && pending.length ? pending : null;
     if (pending && pending.length) request.session.flash = [];
@@ -175,6 +181,9 @@ export async function buildApp(opts = {}) {
   await app.register(untisImportRoutes, { prefix: '/teacher' });
   await app.register(klassenlehrerRoutes, { prefix: '/klassenlehrer' });
   await app.register(exportRoutes, { prefix: '/export' });
+  // Single Sign-on + Lese-Schnittstelle für den Lehrerkalender (src/sso.js).
+  await app.register(ssoRoutes, { prefix: '/sso' });
+  await app.register(apiExternRoutes, { prefix: '/api/extern' });
 
   app.setNotFoundHandler((request, reply) => {
     reply.code(404).viewEjs('error', { code: 404, message: 'Seite nicht gefunden.' });
