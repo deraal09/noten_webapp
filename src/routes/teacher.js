@@ -683,7 +683,7 @@ export default async function teacherRoutes(fastify) {
       .map((r) => r.name);
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
-      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr,
+      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen,
       kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), bekannteKlassennamen,
     });
   });
@@ -1252,6 +1252,36 @@ export default async function teacherRoutes(fastify) {
       }
     }
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  // ---------- Neuen Kurs anlegen (Fach, dessen Teilnehmerliste sich aus
+  // mehreren Klassen zusammensetzt) -- technisch dasselbe wie ein Fach in
+  // einer Klasse (siehe Route oben), nur direkt von der Klassenübersicht aus
+  // erreichbar: die Kurslehrkraft muss dafür keine eigene Klasse anlegen,
+  // sondern wählt lediglich eine ihrer bestehenden Klassen als Ausgangspunkt.
+  // Landet danach gleich auf der Fach-Seite, um über "Teilnehmer/innen"
+  // Schüler/innen aus anderen Klassen dazuzuholen.
+  fastify.post('/kurse/neu', async (request, reply) => {
+    const klasseId = parseInt(request.body?.klasse_id, 10);
+    if (!klasseId || !userHatKlassenZugriff(request.user, klasseId)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const name = String(request.body?.name || '').trim();
+    if (!name) {
+      request.flash?.('error', 'Bitte einen Namen für den Kurs angeben.');
+      return reply.redirect('/teacher/klassen');
+    }
+    try {
+      const info = getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)')
+        .run(klasseId, name);
+      getDb().prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
+        .run(request.user.id, info.lastInsertRowid);
+      seedeTeilnehmerAusKlasse(info.lastInsertRowid, klasseId);
+      return reply.redirect(`/teacher/fach/${info.lastInsertRowid}?tab=teilnehmer`);
+    } catch (e) {
+      request.flash?.('error', 'Ein Fach mit diesem Namen existiert in dieser Klasse bereits.');
+      return reply.redirect('/teacher/klassen');
+    }
   });
 
   fastify.post('/faecher/:id/loeschen', async (request, reply) => {

@@ -561,6 +561,16 @@
   }
   document.querySelectorAll('.reiter').forEach(initReiterGruppe);
 
+  // Direkt auf einen bestimmten Reiter springen (?tab=teilnehmer), z. B. nach
+  // dem Anlegen eines klassenübergreifenden Kurses -- überschreibt für diesen
+  // einen Seitenaufruf den sonst aus localStorage gemerkten Reiter.
+  (function() {
+    const gewuenschterTab = new URLSearchParams(location.search).get('tab');
+    if (!gewuenschterTab) return;
+    const btn = document.querySelector('.reiter > button[data-target="panel-' + gewuenschterTab + '"]');
+    if (btn) btn.click();
+  })();
+
   // Live-Update via JSON-API: aktualisiert Punkt-Noten UND die Notenübersicht oben
   const API_URL = '/teacher/fach/<%= fach.id %>/noten?hj=' + encodeURIComponent('<%= halbjahr %>');
   async function refresh() {

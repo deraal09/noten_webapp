@@ -83,6 +83,38 @@
   <% } %>
 </details>
 
+<details>
+  <summary>Neuen Kurs anlegen</summary>
+  <% if (!klassen.length) { %>
+    <p class="hint">
+      Für einen Kurs wird zunächst mindestens eine eigene Klasse gebraucht (siehe oben) -- der Kurs
+      startet mit deren Schüler:innen, weitere lassen sich danach aus jeder anderen Klasse desselben
+      Schuljahres dazuholen.
+    </p>
+  <% } else { %>
+    <p class="hint">
+      Ein Kurs ist ein Fach, dessen Teilnehmerliste sich frei aus mehreren Klassen desselben
+      Schuljahres zusammenstellen lässt (Reiter „Teilnehmer/innen" auf der Fach-Seite) -- praktisch,
+      wenn ein Kurs nur einen Teil mehrerer Klassen umfasst. Dafür wird keine eigene Klasse
+      angelegt: eine bestehende reicht als Ausgangspunkt, ihre Schüler:innen stehen danach schon
+      in der Teilnehmerliste und lassen sich dort bei Bedarf auch wieder entfernen.
+    </p>
+    <form method="post" action="/teacher/kurse/neu">
+      <label>Kursname
+        <input type="text" name="name" placeholder="z. B. Spanisch AG" required>
+      </label>
+      <label>Ausgangsklasse
+        <select name="klasse_id">
+          <% klassen.forEach(function(k) { %>
+            <option value="<%= k.id %>"><%= k.name %> (<%= k.schuljahr_bezeichnung %>)</option>
+          <% }); %>
+        </select>
+      </label>
+      <button type="submit">+ Kurs anlegen</button>
+    </form>
+  <% } %>
+</details>
+
 <h2>Vorhandene Klassen</h2>
 <% if (!schuljahreReiter.length) { %>
   <p>Noch kein Schuljahr angelegt.</p>
