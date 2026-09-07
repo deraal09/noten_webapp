@@ -88,7 +88,7 @@ test('Vorbereitung: Admin, Lehrkraft, drei Schuljahre (das älteste zuletzt/"nac
 
 test('"Neue Klasse anlegen" ist aufklappbar (<details>/<summary>)', async () => {
   const html = await (await lehrerA('/teacher/klassen')).text();
-  assert.match(html, /<details>\s*<summary>Neue Klasse anlegen<\/summary>/);
+  assert.match(html, /<details>\s*<summary>\+ Neue Klasse anlegen<\/summary>/);
 });
 
 test('Klasse anlegen: Register "Vorhandene Klasse wählen" (Select mit bekannten Namen) vor "Neue Klasse anlegen"', async () => {

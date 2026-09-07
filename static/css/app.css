@@ -383,3 +383,19 @@ table.fz input[type=text] { width: 100%; min-width: 100px; }
 
 code.token { background: var(--bg-header); color: var(--text); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85rem; }
 details summary { cursor: pointer; padding: 0.3rem 0; font-weight: 500; }
+
+/* Große, gut sichtbare Buttons für Aktionen wie "Neue Klasse"/"Neuen Kurs"
+   anlegen -- <details>/<summary> bleiben technisch unverändert (natives
+   Auf-/Zuklappen ohne JS), nur die Kopfzeile bekommt die Optik eines echten
+   Buttons statt der sonst leicht zu übersehenden Standarddarstellung. */
+.knopf-reihe { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0; }
+.knopf-reihe > details { margin: 0; }
+.knopf-reihe > details > summary {
+  list-style: none; display: inline-block; padding: 0.6rem 1.2rem;
+  background: var(--primary); color: var(--on-dark); border-radius: 4px;
+  cursor: pointer; font-weight: 600; font-size: 1rem;
+}
+.knopf-reihe > details > summary::-webkit-details-marker { display: none; }
+.knopf-reihe > details > summary:hover { background: var(--primary-hover); }
+.knopf-reihe > details[open] > summary { background: var(--primary-hover); }
+.knopf-reihe > details[open] { flex-basis: 100%; }
