@@ -11,7 +11,7 @@ import {
   getLdapSettingsRow, saveLdapSettings, clearLdapBindPassword, resolveLdapConfig,
 } from '../auth/ldap-settings.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
-import { pruefeNotenschluesselWechsel } from '../fach-teilnehmer.js';
+import { pruefeNotenschluesselWechsel, seedeTeilnehmerAusKlasse } from '../fach-teilnehmer.js';
 import {
   istGueltigesSchuljahrFormat, sortiereSchuljahreAbsteigend, aktuellesStartjahr, parseSchuljahr,
 } from '../schuljahr-utils.js';
@@ -166,8 +166,13 @@ export default async function adminRoutes(fastify) {
     const name = String(request.body?.name || '').trim();
     if (name) {
       try {
-        getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)')
+        const info = getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)')
           .run(request.params.id, name);
+        // Teilnehmerliste startet mit allen Schüler/innen der Klasse -- ohne
+        // das bliebe die Notentafel leer, bis der nächste Serverneustart die
+        // fehlende Teilnehmerliste über die Migration nachträglich auffüllt
+        // (siehe fuelleFachTeilnehmerAuf() in db.js).
+        seedeTeilnehmerAusKlasse(info.lastInsertRowid, request.params.id);
       } catch (e) {
         request.flash?.('error', 'Fach existiert bereits in dieser Klasse.');
       }
