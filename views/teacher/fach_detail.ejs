@@ -188,7 +188,7 @@
                 <tr>
                   <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
                   <td>
-                    <input type="number" name="note_<%= s.id %>" step="0.1"
+                    <input type="number" name="note_<%= s.id %>" class="note-historisch" step="0.1"
                            min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>"
                            value="<%= hh.noten.get(s.id) === undefined ? '' : hh.noten.get(s.id) %>">
                   </td>
@@ -629,6 +629,33 @@
       refresh();
     }, 400));
   });
+
+  // Pfeiltasten hoch/runter und Enter springen in derselben Spalte (also
+  // z. B. derselben Aufgabe/demselben Termin) zur vorherigen/nächsten
+  // Person, statt bei Pfeiltasten den Zahlenwert eines <input type="number">
+  // hoch-/runterzuzählen (Standardverhalten des Browsers, wird deshalb
+  // bewusst unterdrückt) bzw. bei Enter ein umgebendes <form> abzuschicken.
+  function aktiviereSpaltenNavigation(selector, gruppierungsAttribut) {
+    document.querySelectorAll(selector).forEach(function(inp) {
+      inp.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        const tabelle = inp.closest('table');
+        if (!tabelle) return;
+        let spalte = Array.from(tabelle.querySelectorAll(selector));
+        if (gruppierungsAttribut) {
+          const wert = inp.dataset[gruppierungsAttribut];
+          spalte = spalte.filter(function(el) { return el.dataset[gruppierungsAttribut] === wert; });
+        }
+        const idx = spalte.indexOf(inp);
+        const ziel = e.key === 'ArrowUp' ? spalte[idx - 1] : spalte[idx + 1];
+        if (ziel) { ziel.focus(); ziel.select(); }
+      });
+    });
+  }
+  aktiviereSpaltenNavigation('input.punkt', 'idx');
+  aktiviereSpaltenNavigation('input.note-datum', 'termin');
+  aktiviereSpaltenNavigation('input.note-historisch', null);
 
   // Teilnehmer/innen-Suche: Ergebnisse werden bewusst per DOM-API statt
   // innerHTML eingefügt (Nachname/Vorname/Klassenname kommen aus der
