@@ -4,12 +4,11 @@
 <h2>Klassen</h2>
 <form method="post" action="/admin/schuljahre/<%= schuljahr.id %>/klassen/neu" class="inline">
   <input type="text" name="name" placeholder="z. B. 12BFI1" required>
-  <select name="notenschluessel">
-    <option value="IHK">IHK (1–6)</option>
-    <option value="BG">BG (0–15)</option>
-  </select>
   <button type="submit">+ Klasse anlegen</button>
 </form>
+<p class="hint">
+  Notenschlüssel: IHK (Standard) — bei Bedarf danach in der Klasse selbst auf BG änderbar.
+</p>
 <ul class="klasse-liste">
   <% klassen.forEach(function(k) { %>
     <li>
