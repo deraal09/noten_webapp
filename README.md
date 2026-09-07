@@ -371,20 +371,31 @@ Jede Klassenleitung sieht und verwaltet dabei nur ihre **eigenen**
 erzeugten Einladungen (`created_by_id`) — der Admin sieht weiterhin alle
 unter `/admin/einladungen`.
 
-### Verknüpfungsanfrage bei Namenskollisionen
+### Namenskollisionen: automatischer Beitritt statt Verknüpfungsanfrage
 
 Legt jemand eine Klasse mit einem Namen an, der in diesem Schuljahr schon
-vergeben ist, entsteht **keine zweite, doppelte Klasse**. Stattdessen:
+vergeben ist, entsteht **keine zweite, doppelte Klasse**. Stattdessen
+(`src/klassen-verknuepfung.js`, `POST /teacher/klassen/:id/verknuepfen`):
 
 - Ist die bestehende Klasse noch mit niemandem verbunden (z. B. eine leere,
   vom Admin angelegte Hülle), bekommt die anfragende Person sofort Zugriff
-  mit dem von ihr genannten Fach.
-- Ist die Klasse bereits mit Personen verbunden (Ersteller/in,
-  Klassenleitung, zugewiesene Lehrkräfte), wird eine **Verknüpfungsanfrage**
-  gestellt: Alle diese Personen sehen sie unter „Meine Klassen" und müssen
-  zustimmen. Lehnt auch nur eine Person ab, ist die Anfrage beendet. Stimmen
-  alle zu, wird das von der anfragenden Person genannte Fach angelegt
-  (falls es das noch nicht gibt) und sie diesem Fach zugewiesen.
+  mit dem von ihr genannten Fach — unabhängig vom Freigabe-Haken.
+- Ist die Klasse bereits mit Personen verbunden UND beim Anlegen für
+  **„Automatisch für andere Lehrkräfte freigeben"** markiert
+  (`klassen.offen_fuer_beitritt`, per Checkbox beim Anlegen gesetzt, danach
+  auf der Klassenseite als Klassenleitung jederzeit umschaltbar), bekommt
+  die anfragende Person ebenfalls sofort Zugriff — ohne dass jemand
+  zustimmen muss. Das genannte Fach wird angelegt (falls es das noch nicht
+  gibt) und ihr zugewiesen; existiert es in dieser Klasse schon, wird sie
+  stattdessen diesem bestehenden Fach hinzugefügt (kein doppeltes Fach).
+- Ist die Klasse verbunden und NICHT freigegeben, wird der Beitritt
+  abgelehnt — mit dem Hinweis, die Klassenleitung oder den Admin um eine
+  Zuweisung zu bitten.
+
+Ersetzt eine frühere Verknüpfungsanfrage mit Einstimmigkeitszwang aller
+bereits verbundenen Personen (siehe Git-Historie) — die brauchte für den
+eigentlich häufigen Fall (dieselbe Klasse, ein zweites Fach von einer
+anderen Lehrkraft) unnötig lange.
 
 ### Klasse anlegen: vorhandenen Namen wählen oder neu anlegen
 
@@ -411,6 +422,47 @@ Liste. Dieser eine Endpunkt akzeptiert bewusst `multipart/form-data` in
 einem eigenen, gekapselten Fastify-Plugin-Scope (`@fastify/busboy` statt
 eines global registrierten Multipart-Plugins) — alle übrigen Formulare der
 App bleiben unverändert bei `application/x-www-form-urlencoded`.
+
+### Klassenübergreifende Kurse (Teilnehmerliste statt eigener Fake-Klasse)
+
+Manche Fächer/Kurse setzen sich aus Schüler/innen **mehrerer Klassen**
+zusammen, jeweils nur mit einem Teil davon (z. B. ein Wahlkurs mit
+Teilnehmenden aus 10A und 10B). Damit die Kurslehrkraft dafür **keine**
+eigene Klasse anlegen muss und die jeweils **eigene** Klassenleitung die
+Note trotzdem synchronisiert sieht, hat jedes Fach eine explizite
+Teilnehmerliste (`fach_teilnehmer`, `src/fach-teilnehmer.js`) statt implizit
+"alle Schüler/innen der Klasse":
+
+- Ein Fach bleibt an eine **Heimat-Klasse** gebunden (Anlegerecht,
+  Notenschlüssel-Vorschlag). Beim Anlegen wird die Teilnehmerliste
+  automatisch mit allen aktuellen (und später neu hinzukommenden)
+  Schüler/innen dieser Klasse vorbefüllt — für ein normales Fach ändert
+  sich dadurch nichts.
+- Auf der Fach-Seite (Reiter „Teilnehmer/innen") lässt sich die Liste
+  anpassen: einzelne Personen entfernen, oder über **Suche** (Name ODER
+  Klassenname, über alle Klassen desselben Schuljahres) weitere
+  hinzufügen.
+- **Absicherung gegen gemischten Notenschlüssel:** Eine Person aus einer
+  Klasse mit abweichendem Notenschlüssel (IHK/BG) lässt sich nicht
+  hinzufügen — die Fehlermeldung sagt das explizit, statt Klausurpunkte
+  inkompatibel zu mischen.
+- **Manuelles Anlegen** (zweites Register, für Personen, die noch gar
+  nicht im System sind): Nachname, Vorname und **Klasse sind alle drei
+  Pflicht**. Existiert die angegebene Klasse im Schuljahr des Fachs noch
+  nicht, wird sie automatisch als leere Hülle mit demselben
+  Notenschlüssel wie das Fach angelegt (ein Notenschlüssel-Konflikt kann
+  dadurch gar nicht erst entstehen) — findet später die tatsächliche
+  Klassenleitung zu dieser Klasse, kann sie sich dort direkt als
+  Klassenleitung eintragen und muss nur noch die übrigen Schüler/innen
+  ergänzen, statt bei null anzufangen.
+- Die Klassenleitungs-Halbjahresübersicht, der Konferenzmodus, der
+  Sync-Mechanismus und die Fachabschlussnote richten sich alle nach dieser
+  Teilnehmerliste statt nach der Heimat-Klasse (`ladeFaecherFuerKlassenleitung`/
+  `ladeFaecherFuerSchueler` in `src/noten-service.js`) — die **eigene**
+  Klassenleitung jeder teilnehmenden Person sieht die synchronisierte Note
+  also unabhängig davon, welche Klasse das Fach administrativ „besitzt".
+  Ebenso richtet sich eine Notensperre (Notenkonferenz) immer nach der
+  **eigenen** Klasse einer Person, nicht nach der Heimat-Klasse des Fachs.
 
 ### Noten-Sync statt Live-Zugriff für die Klassenleitung
 

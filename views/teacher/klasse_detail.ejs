@@ -19,6 +19,25 @@
     · <a href="/teacher/klassen/<%= klasse.id %>/abschluss">→ Abschluss-/Abgangsübersicht</a>
   </p>
 
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/offen-fuer-beitritt" class="inline" id="offen-beitritt-form">
+    <input type="hidden" name="offen" id="offen-beitritt-wert" value="<%= klasse.offen_fuer_beitritt ? '1' : '0' %>">
+    <label>
+      <input type="checkbox" id="offen-beitritt-checkbox" <%= klasse.offen_fuer_beitritt ? 'checked' : '' %>>
+      Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben Klassennamen anlegt, bekommt sofort Zugriff, ohne Rückfrage)
+    </label>
+  </form>
+  <script>
+    (function() {
+      var cb = document.getElementById('offen-beitritt-checkbox');
+      var hidden = document.getElementById('offen-beitritt-wert');
+      var form = document.getElementById('offen-beitritt-form');
+      cb.addEventListener('change', function() {
+        hidden.value = cb.checked ? '1' : '0';
+        form.submit();
+      });
+    })();
+  </script>
+
   <details class="card">
     <summary>Klassenleitung (<%= klassenleitungListe.length %>)</summary>
     <p class="hint">

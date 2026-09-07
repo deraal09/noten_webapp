@@ -234,7 +234,7 @@ test('Mehrere Klausuren/Zusatzleistungen erscheinen als Unter-Reiter, nicht gest
   assert.equal(klausurAktivTreffer.length, 1, 'nur die erste Klausur ist initial aktiv, nicht alle');
 
   const ulPanelStart = html.indexOf('id="panel-uls"');
-  const ulPanel = html.slice(ulPanelStart, html.indexOf('<script>', ulPanelStart));
+  const ulPanel = html.slice(ulPanelStart, html.indexOf('id="panel-teilnehmer"', ulPanelStart));
   const ulAktivTreffer = ulPanel.match(/reiter-panel unter-panel card active/g) || [];
   assert.equal(ulAktivTreffer.length, 1, 'nur ein UL-Register ist initial aktiv, nicht mehrere');
 

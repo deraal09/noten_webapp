@@ -41,7 +41,11 @@ export function schliesseFachAb(fachId, userId) {
   const db = getDb();
   const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
   if (!fach) throw new Error('Fach nicht gefunden');
-  const schuelerListe = db.prepare('SELECT id FROM schueler WHERE klasse_id = ?').all(fach.klasse_id);
+  // Teilnehmerliste statt "alle Schüler/innen der Klasse" -- siehe
+  // berechneGesamtnoten in noten-service.js.
+  const schuelerListe = db.prepare(
+    'SELECT s.id FROM fach_teilnehmer ft JOIN schueler s ON s.id = ft.schueler_id WHERE ft.fach_id = ?'
+  ).all(fachId);
 
   const hjNotenMaps = HALBJAHRE.map((hj) => berechneGesamtnoten(fachId, hj));
   const historischeHalbjahre = ladeHistorischeHalbjahre(fachId);

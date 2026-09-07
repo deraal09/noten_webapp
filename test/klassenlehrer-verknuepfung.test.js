@@ -146,34 +146,73 @@ test('Klassenleitung: Selbstregistrierung nur für Ersteller/in, KEIN Live-Zugri
   assert.equal(r.status, 403);
 });
 
-test('Verknüpfungsanfrage: Namenskollision löst Anfrage aus, alle Verbundenen müssen zustimmen', async () => {
-  // Lehrer C versucht dieselbe Klasse anzulegen → Redirect zur Verknüpfung
+test('Namenskollision bei einer NICHT freigegebenen Klasse: kein automatischer Beitritt', async () => {
+  // '12BFI1' wurde ohne offen_fuer_beitritt angelegt -> defaultet auf geschlossen.
+  assert.equal(getDb().prepare('SELECT offen_fuer_beitritt FROM klassen WHERE id = ?').get(klasseId).offen_fuer_beitritt, 0);
+
+  // Lehrer C versucht dieselbe Klasse anzulegen → Redirect zum Beitritts-Versuch
   const r = await form(lehrerC, '/teacher/klassen/neu', {
     schuljahr_id: String(sjId), name: '12BFI1', notenschluessel: 'IHK',
   });
   assert.equal(r.status, 302);
   assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}/verknuepfen`);
 
-  // Anfrage stellen
+  // Die Hinweisseite sagt klar, dass kein Beitritt möglich ist (kein Formular mehr).
+  const seite = await (await lehrerC(`/teacher/klassen/${klasseId}/verknuepfen`)).text();
+  assert.match(seite, /nicht für automatischen Beitritt freigegeben/);
+  assert.doesNotMatch(seite, /<form/);
+
+  // Ein POST-Versuch (z. B. direkt) wird trotzdem sauber abgelehnt, kein Fach entsteht.
   const r2 = await form(lehrerC, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Sport' });
   assert.equal(r2.status, 302);
-  const anfrage = getDb().prepare('SELECT * FROM klassen_verknuepfungsanfragen WHERE ziel_klasse_id = ?').get(klasseId);
-  assert.ok(anfrage);
-  assert.equal(anfrage.status, 'offen');
-
-  // Beide Verbundenen (A, B) müssen zustimmen — B stimmt zu, Status bleibt offen
-  let antwort = await form(lehrerB, `/teacher/verknuepfungen/${anfrage.id}/antwort`, { zustimmung: '1' });
-  assert.equal(antwort.status, 302);
-  assert.equal(getDb().prepare('SELECT status FROM klassen_verknuepfungsanfragen WHERE id = ?').get(anfrage.id).status, 'offen');
-
-  // A lehnt ab → Anfrage sofort abgelehnt, kein Zugriff für C
-  antwort = await form(lehrerA, `/teacher/verknuepfungen/${anfrage.id}/antwort`, { zustimmung: '0' });
-  assert.equal(antwort.status, 302);
-  assert.equal(getDb().prepare('SELECT status FROM klassen_verknuepfungsanfragen WHERE id = ?').get(anfrage.id).status, 'abgelehnt');
   const sportFach = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Sport'").get(klasseId);
   assert.equal(sportFach, undefined);
   const cZugriff = await lehrerC(`/teacher/klassen/${klasseId}`);
   assert.equal(cZugriff.status, 403);
+});
+
+test('Namenskollision bei einer freigegebenen Klasse: sofortiger Beitritt ohne Zustimmung', async () => {
+  // Lehrer A (Klassenleitung) gibt die Klasse nachträglich für Beitritt frei.
+  let r = await form(lehrerA, `/teacher/klassen/${klasseId}/offen-fuer-beitritt`, { offen: '1' });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT offen_fuer_beitritt FROM klassen WHERE id = ?').get(klasseId).offen_fuer_beitritt, 1);
+
+  r = await form(lehrerC, '/teacher/klassen/neu', {
+    schuljahr_id: String(sjId), name: '12BFI1', notenschluessel: 'IHK',
+  });
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}/verknuepfen`);
+
+  const seite = await (await lehrerC(`/teacher/klassen/${klasseId}/verknuepfen`)).text();
+  assert.match(seite, /<form/, 'bei einer offenen Klasse gibt es das Beitritts-Formular');
+
+  r = await form(lehrerC, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Sport' });
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}`);
+  const sportFach = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Sport'").get(klasseId);
+  assert.ok(sportFach, 'Fach wurde sofort angelegt, ohne dass A/B zustimmen mussten');
+  const zuweisung = getDb().prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
+    .get(userId('lehrerc'), sportFach.id);
+  assert.ok(zuweisung);
+  const cZugriff = await lehrerC(`/teacher/klassen/${klasseId}`);
+  assert.equal(cZugriff.status, 200);
+
+  // Ein zweiter Beitritt mit demselben Fachnamen dupliziert das Fach nicht,
+  // sondern hängt die anfragende Person an das bestehende Fach.
+  await form(admin, '/admin/einladungen/neu', { display_name: 'Lehrer D', ttl_days: '14' });
+  const invD = getDb().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
+  const lehrerD = client();
+  await form(lehrerD, `/einladung/${invD.token}`, {
+    username: 'lehrerd', display_name: 'Lehrer D', password: 'passwortD1', password2: 'passwortD1',
+  });
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrerd'").run();
+  r = await form(lehrerD, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Sport' });
+  assert.equal(r.status, 302);
+  const sportFaecher = getDb().prepare("SELECT * FROM faecher WHERE klasse_id = ? AND name = 'Sport'").all(klasseId);
+  assert.equal(sportFaecher.length, 1, 'kein zweites, doppeltes "Sport"-Fach');
+  const zuweisungD = getDb().prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
+    .get(userId('lehrerd'), sportFach.id);
+  assert.ok(zuweisungD, 'Lehrer D wird demselben Fach zugewiesen statt ein zweites anzulegen');
 });
 
 test('Verknüpfung: leere/unverbundene Klasse gewährt direkten Zugriff ohne Zustimmung', async () => {

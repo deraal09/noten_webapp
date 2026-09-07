@@ -9,6 +9,7 @@
  */
 
 import { getDb } from './db.js';
+import { seedeTeilnehmerAusKlasse } from './fach-teilnehmer.js';
 
 export function uebertrageKlasseInSchuljahr(klasseId, zielSchuljahrId, neuerName, mitFaechern, userId) {
   const db = getDb();
@@ -44,6 +45,7 @@ export function uebertrageKlasseInSchuljahr(klasseId, zielSchuljahrId, neuerName
       const zuweisungenStmt = db.prepare('SELECT user_id FROM fach_zuweisungen WHERE fach_id = ?');
       for (const f of faecherListe) {
         const neuesFach = insertFach.run(neueKlasseId, f.name);
+        seedeTeilnehmerAusKlasse(neuesFach.lastInsertRowid, neueKlasseId);
         for (const z of zuweisungenStmt.all(f.id)) {
           try { insertZuweisung.run(z.user_id, neuesFach.lastInsertRowid); } catch { /* bereits vorhanden */ }
         }

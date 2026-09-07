@@ -18,11 +18,18 @@ export function istGesperrt(klasseId, schuelerId, halbjahr) {
   return Boolean(holeSperre(klasseId, schuelerId, halbjahr));
 }
 
-/** Wie istGesperrt(), löst klasse_id aber selbst aus fach_id auf (Komfort für die Notentafel-Routen). */
+/**
+ * Wie istGesperrt(), löst klasse_id aber selbst über die/den Schüler:in
+ * auf (Komfort für die Notentafel-Routen) -- bewusst NICHT über das Fach:
+ * bei einem klassenübergreifenden Kurs (siehe fach_teilnehmer) kann eine
+ * teilnehmende Person aus einer anderen Klasse stammen als der
+ * Heimat-Klasse des Fachs, gesperrt wird aber immer über die EIGENE
+ * Klassenleitung dieser Person.
+ */
 export function istSchuelerGesperrtInFach(fachId, schuelerId, halbjahr) {
-  const fach = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
-  if (!fach) return false;
-  return istGesperrt(fach.klasse_id, schuelerId, halbjahr);
+  const schueler = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(schuelerId);
+  if (!schueler) return false;
+  return istGesperrt(schueler.klasse_id, schuelerId, halbjahr);
 }
 
 export function sperren(klasseId, schuelerId, halbjahr, userId) {
@@ -62,5 +69,24 @@ export function ladeSperrenFuerKlasse(klasseId, halbjahr) {
     LEFT JOIN users u2 ON u2.id = n.aufhebung_angefragt_von_id
     WHERE n.klasse_id = ? AND n.halbjahr = ?
   `).all(klasseId, halbjahr);
+  return new Map(rows.map((r) => [r.schueler_id, r]));
+}
+
+/**
+ * Wie ladeSperrenFuerKlasse(), aber für eine beliebige Liste von
+ * Schüler-IDs statt einer einzelnen Klasse -- für die Notentafel eines
+ * Fachs mit klassenübergreifenden Teilnehmer/innen (fach_teilnehmer),
+ * deren Sperren jeweils bei der eigenen Klasse liegen.
+ */
+export function ladeSperrenFuerSchueler(schuelerIds, halbjahr) {
+  if (!schuelerIds.length) return new Map();
+  const rows = getDb().prepare(`
+    SELECT n.*, u1.display_name AS gesperrt_von_name, u1.username AS gesperrt_von_username,
+           u2.display_name AS angefragt_von_name, u2.username AS angefragt_von_username
+    FROM notensperren n
+    LEFT JOIN users u1 ON u1.id = n.gesperrt_von_id
+    LEFT JOIN users u2 ON u2.id = n.aufhebung_angefragt_von_id
+    WHERE n.halbjahr = ? AND n.schueler_id IN (${schuelerIds.map(() => '?').join(',')})
+  `).all(halbjahr, ...schuelerIds);
   return new Map(rows.map((r) => [r.schueler_id, r]));
 }

@@ -10,54 +10,6 @@
   <% } %>
 </small></p>
 
-<% if (wartetAufMich.length) { %>
-  <h2>Verknüpfungsanfragen, die auf dich warten</h2>
-  <table class="data">
-    <thead><tr><th>Klasse</th><th>Schuljahr</th><th>Vorgeschlagenes Fach</th><th>Von</th><th>Aktion</th></tr></thead>
-    <tbody>
-      <% wartetAufMich.forEach(function(a) { %>
-        <tr>
-          <td><%= a.klasse_name %></td>
-          <td><%= a.schuljahr_bezeichnung %></td>
-          <td><%= a.vorgeschlagenes_fach %></td>
-          <td><%= a.angefragt_von_name || a.angefragt_von_username %></td>
-          <td>
-            <form method="post" action="/teacher/verknuepfungen/<%= a.id %>/antwort" class="inline">
-              <input type="hidden" name="zustimmung" value="1">
-              <button type="submit">✅ Zustimmen</button>
-            </form>
-            <form method="post" action="/teacher/verknuepfungen/<%= a.id %>/antwort" class="inline">
-              <input type="hidden" name="zustimmung" value="0">
-              <button type="submit" class="danger">❌ Ablehnen</button>
-            </form>
-          </td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
-<% } %>
-
-<% if (meineAnfragen.length) { %>
-  <h2>Meine Verknüpfungsanfragen</h2>
-  <table class="data">
-    <thead><tr><th>Klasse</th><th>Schuljahr</th><th>Fach</th><th>Status</th></tr></thead>
-    <tbody>
-      <% meineAnfragen.forEach(function(a) { %>
-        <tr>
-          <td><%= a.klasse_name %></td>
-          <td><%= a.schuljahr_bezeichnung %></td>
-          <td><%= a.vorgeschlagenes_fach %></td>
-          <td>
-            <% if (a.status === 'offen') { %>⏳ offen
-            <% } else if (a.status === 'angenommen') { %>✅ angenommen
-            <% } else { %>❌ abgelehnt<% } %>
-          </td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
-<% } %>
-
 <details>
   <summary>Neue Klasse anlegen</summary>
   <% if (!kannSelbstKlasseAnlegen) { %>
@@ -101,6 +53,11 @@
               <option value="BG">BG (0–15)</option>
             </select>
           </label>
+          <label>
+            <input type="checkbox" name="offen_fuer_beitritt" value="1" checked>
+            Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben
+            Klassennamen anlegt, bekommt sofort Zugriff, ohne Rückfrage)
+          </label>
           <button type="submit">+ Klasse anlegen</button>
         </form>
       </div>
@@ -124,6 +81,11 @@
             <option value="IHK">IHK (1–6)</option>
             <option value="BG">BG (0–15)</option>
           </select>
+        </label>
+        <label>
+          <input type="checkbox" name="offen_fuer_beitritt" value="1" checked>
+          Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben
+          Klassennamen anlegt, bekommt sofort Zugriff, ohne Rückfrage)
         </label>
         <button type="submit">+ Klasse anlegen</button>
       </form>

@@ -1,19 +1,23 @@
 /**
- * Verknüpfungsanfragen: Legt jemand eine Klasse an, deren Name in diesem
- * Schuljahr schon vergeben ist (siehe routes/teacher.js POST /klassen/neu),
- * entsteht statt einer zweiten, doppelten Klasse eine Anfrage an alle bereits
- * mit der Klasse verbundenen Personen. Erst wenn ALLE zustimmen, wird das
- * vorgeschlagene Fach angelegt (falls es das noch nicht gibt) und die
- * anfragende Person diesem Fach zugewiesen — eine einzige Ablehnung beendet
- * die Anfrage.
+ * Beitritt zu einer bereits bestehenden Klasse: Legt jemand eine Klasse mit
+ * einem Namen an, der in diesem Schuljahr schon vergeben ist (siehe
+ * routes/teacher.js POST /klassen/neu), entsteht statt einer zweiten,
+ * doppelten Klasse ein direkter Beitritt mit eigenem Fach — sofern
+ * entweder noch niemand mit der Klasse verbunden ist (z. B. eine leere,
+ * nur vom Admin angelegte Klassenhülle) ODER die Klasse beim Anlegen für
+ * automatischen Beitritt freigegeben wurde (klassen.offen_fuer_beitritt).
  *
- * Ist niemand mit der Klasse verbunden (z. B. eine leere, nur vom Admin
- * angelegte Klassenhülle), ist keine Zustimmung nötig — direkter Beitritt.
+ * Ersetzt die frühere Verknüpfungsanfrage mit Einstimmigkeitszwang aller
+ * bereits verbundenen Personen — die brauchte für den Normalfall (dieselbe
+ * Klasse, zweites Fach) unnötig lange, und Absicherung gegen ein doppelt
+ * angelegtes Fach übernimmt ohnehin schon fachAnlegenOderFinden() unten
+ * (UNIQUE(klasse_id, name) auf faecher).
  */
 
 import { getDb } from './db.js';
+import { seedeTeilnehmerAusKlasse } from './fach-teilnehmer.js';
 
-/** Alle User-IDs, die bereits mit der Klasse verbunden sind (müssen einer Verknüpfung zustimmen). */
+/** Alle User-IDs, die bereits mit der Klasse verbunden sind. */
 export function ermittleVerbundenePersonen(klasseId) {
   const db = getDb();
   const ids = new Set();
@@ -35,74 +39,31 @@ export function ermittleVerbundenePersonen(klasseId) {
 }
 
 /**
- * Startet eine Verknüpfungsanfrage oder gewährt direkten Zugriff, falls
- * niemand zustimmen muss. Gibt { direkterBeitritt: true, fachId } oder
- * { direkterBeitritt: false, anfrageId } zurück.
+ * Gewährt direkten Zugriff (neues Fach + Zuweisung), falls die Klasse leer
+ * oder für Beitritt freigegeben ist, sonst Ablehnung.
+ * Gibt { direkterBeitritt: true, fachId } oder { direkterBeitritt: false } zurück.
  */
 export function starteVerknuepfung({ klasseId, angefragtVonId, vorgeschlagenesFach }) {
   const db = getDb();
+  const klasse = db.prepare('SELECT offen_fuer_beitritt FROM klassen WHERE id = ?').get(klasseId);
   const verbundene = ermittleVerbundenePersonen(klasseId);
-  verbundene.delete(angefragtVonId); // falls die Person selbst schon verbunden ist, nichts zu klären
+  verbundene.delete(angefragtVonId); // falls die Person selbst schon verbunden ist, ohnehin kein Thema
 
-  if (verbundene.size === 0) {
+  if (verbundene.size === 0 || klasse?.offen_fuer_beitritt) {
     const fachId = fachAnlegenOderFinden(klasseId, vorgeschlagenesFach);
     db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
       .run(angefragtVonId, fachId);
     return { direkterBeitritt: true, fachId };
   }
 
-  const tx = db.transaction(() => {
-    const info = db.prepare(`
-      INSERT INTO klassen_verknuepfungsanfragen (ziel_klasse_id, angefragt_von_id, vorgeschlagenes_fach)
-      VALUES (?, ?, ?)
-    `).run(klasseId, angefragtVonId, vorgeschlagenesFach);
-    const insAntwort = db.prepare(
-      'INSERT INTO klassen_verknuepfungsantworten (anfrage_id, user_id) VALUES (?, ?)'
-    );
-    for (const userId of verbundene) insAntwort.run(info.lastInsertRowid, userId);
-    return info.lastInsertRowid;
-  });
-  return { direkterBeitritt: false, anfrageId: tx() };
+  return { direkterBeitritt: false };
 }
 
 function fachAnlegenOderFinden(klasseId, name) {
   const db = getDb();
   const bestehend = db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasseId, name);
   if (bestehend) return bestehend.id;
-  return db.prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(klasseId, name).lastInsertRowid;
-}
-
-/**
- * Trägt die Antwort einer zustimmungspflichtigen Person ein. Bei Ablehnung
- * wird die Anfrage sofort beendet; sind alle Antworten positiv, wird das
- * Fach angelegt/gefunden und die anfragende Person zugewiesen.
- */
-export function beantworteVerknuepfung({ anfrageId, userId, zustimmung }) {
-  const db = getDb();
-  const anfrage = db.prepare('SELECT * FROM klassen_verknuepfungsanfragen WHERE id = ?').get(anfrageId);
-  if (!anfrage || anfrage.status !== 'offen') return null;
-  const antwort = db.prepare('SELECT * FROM klassen_verknuepfungsantworten WHERE anfrage_id = ? AND user_id = ?')
-    .get(anfrageId, userId);
-  if (!antwort) return null; // diese Person muss dieser Anfrage gar nicht zustimmen
-
-  db.prepare(`UPDATE klassen_verknuepfungsantworten SET zustimmung = ?, entschieden_at = datetime('now')
-    WHERE id = ?`).run(zustimmung ? 1 : 0, antwort.id);
-
-  if (!zustimmung) {
-    db.prepare(`UPDATE klassen_verknuepfungsanfragen SET status = 'abgelehnt', entschieden_at = datetime('now')
-      WHERE id = ?`).run(anfrageId);
-    return { status: 'abgelehnt' };
-  }
-
-  const offene = db.prepare(
-    'SELECT COUNT(*) AS c FROM klassen_verknuepfungsantworten WHERE anfrage_id = ? AND zustimmung IS NULL'
-  ).get(anfrageId).c;
-  if (offene > 0) return { status: 'offen' };
-
-  const fachId = fachAnlegenOderFinden(anfrage.ziel_klasse_id, anfrage.vorgeschlagenes_fach);
-  db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
-    .run(anfrage.angefragt_von_id, fachId);
-  db.prepare(`UPDATE klassen_verknuepfungsanfragen SET status = 'angenommen', entschieden_at = datetime('now')
-    WHERE id = ?`).run(anfrageId);
-  return { status: 'angenommen', fachId };
+  const info = db.prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(klasseId, name);
+  seedeTeilnehmerAusKlasse(info.lastInsertRowid, klasseId);
+  return info.lastInsertRowid;
 }

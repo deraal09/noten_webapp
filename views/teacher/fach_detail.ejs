@@ -77,6 +77,7 @@
   <button type="button" class="active" data-target="panel-uebersicht">Notenübersicht</button>
   <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
   <button type="button" data-target="panel-klausuren">Klausuren</button>
+  <button type="button" data-target="panel-teilnehmer">Teilnehmer/innen</button>
 </div>
 
 <div id="panel-uebersicht" class="reiter-panel active">
@@ -99,6 +100,7 @@
         <tr data-schueler="<%= r.schueler_id %>">
           <td class="name">
             <%= r.nachname %>, <%= r.vorname %>
+            <% if (r.herkunftKlasse) { %><small class="hint">(<%= r.herkunftKlasse %>)</small><% } %>
             <% if (sperre) { %><span title="Noten für dieses Halbjahr gesperrt (Notenkonferenz)">🔒</span><% } %>
           </td>
           <td class="manuell-muendlich">
@@ -267,7 +269,7 @@
                var summe = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
                var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
             <tr>
-              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
                 <td><input type="number" class="punkt" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
@@ -344,7 +346,7 @@
           <% rows.forEach(function(r) {
                var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
             <tr>
-              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
               <% r.terminNoten.forEach(function(tn) { %>
                 <td>
                   <input type="number" class="note-datum" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
@@ -415,7 +417,7 @@
                var summeUl = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
                var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
             <tr>
-              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrt) { %> 🔒<% } %></td>
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
                 <td><input type="number" class="punkt" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
@@ -450,6 +452,72 @@
       </div>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       <button type="submit">+ Zusatzleistung anlegen</button>
+    </form>
+  </div>
+</div>
+
+<div id="panel-teilnehmer" class="reiter-panel">
+  <p class="hint">
+    Diese Liste bestimmt, wer in diesem Fach benotet wird — beim Anlegen
+    standardmäßig alle Schüler/innen von <%= fach.klasse_name %>. Für einen
+    klassenübergreifenden Kurs lassen sich hier zusätzlich Schüler/innen
+    aus anderen Klassen desselben Schuljahres aufnehmen (der
+    Notenschlüssel muss übereinstimmen), ohne dafür eine eigene Klasse
+    anzulegen.
+  </p>
+  <table class="data">
+    <thead><tr><th>Schüler/in</th><th>Klasse</th><th>Aktion</th></tr></thead>
+    <tbody>
+      <% teilnehmer.forEach(function(t) { %>
+        <tr>
+          <td class="name"><%= t.nachname %>, <%= t.vorname %></td>
+          <td><%= t.klasse_name %><% if (!t.fremd) { %> <small class="hint">(Heimat-Klasse)</small><% } %></td>
+          <td>
+            <form method="post" action="/teacher/fach/<%= fach.id %>/teilnehmer/entfernen" class="inline" onsubmit="return confirm('Aus diesem Fach entfernen?')">
+              <input type="hidden" name="schueler_id" value="<%= t.id %>">
+              <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+              <button type="submit" class="danger">🗑</button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <div class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-teilnehmer-<%= fach.id %>">
+    <button type="button" class="active" data-target="teilnehmer-suchen">Suchen</button>
+    <button type="button" data-target="teilnehmer-manuell">Manuell anlegen</button>
+  </div>
+
+  <div id="teilnehmer-suchen" class="reiter-panel unter-panel card active">
+    <label class="feld">Suche (Name oder Klasse)
+      <input type="text" id="teilnehmer-suche-eingabe" placeholder="z. B. Müller oder 10B" autocomplete="off">
+    </label>
+    <ul class="klasse-liste" id="teilnehmer-suche-ergebnisse"></ul>
+  </div>
+
+  <div id="teilnehmer-manuell" class="reiter-panel unter-panel card">
+    <p class="hint">
+      Für Schüler/innen, die noch gar nicht im System sind. Klasse ist
+      Pflicht: Existiert sie im Schuljahr dieses Fachs noch nicht, wird sie
+      automatisch als leere Klasse mit demselben Notenschlüssel angelegt —
+      eine später beitretende Klassenleitung findet sie dann schon vor und
+      muss nur noch die übrigen Schüler/innen ergänzen.
+    </p>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/teilnehmer/manuell">
+      <div class="erstellen-felder">
+        <label class="feld">Nachname
+          <input type="text" name="nachname" required>
+        </label>
+        <label class="feld">Vorname
+          <input type="text" name="vorname" required>
+        </label>
+        <label class="feld">Klasse
+          <input type="text" name="klasse" placeholder="z. B. 10B" required>
+        </label>
+      </div>
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <button type="submit">+ Hinzufügen</button>
     </form>
   </div>
 </div>
@@ -561,4 +629,46 @@
       refresh();
     }, 400));
   });
+
+  // Teilnehmer/innen-Suche: Ergebnisse werden bewusst per DOM-API statt
+  // innerHTML eingefügt (Nachname/Vorname/Klassenname kommen aus der
+  // Datenbank und sind nicht vertrauenswürdig genug für unmaskiertes HTML).
+  const teilnehmerSucheEingabe = document.getElementById('teilnehmer-suche-eingabe');
+  if (teilnehmerSucheEingabe) {
+    const ergebnisListe = document.getElementById('teilnehmer-suche-ergebnisse');
+    teilnehmerSucheEingabe.addEventListener('input', debounce(async function() {
+      const q = teilnehmerSucheEingabe.value.trim();
+      ergebnisListe.textContent = '';
+      if (!q) return;
+      const r = await fetch('/teacher/fach/<%= fach.id %>/teilnehmer/suche?q=' + encodeURIComponent(q));
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data.treffer.length) {
+        const li = document.createElement('li');
+        li.textContent = 'Keine Treffer.';
+        ergebnisListe.appendChild(li);
+        return;
+      }
+      data.treffer.forEach(function(t) {
+        const li = document.createElement('li');
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = '/teacher/fach/<%= fach.id %>/teilnehmer/hinzufuegen';
+        form.className = 'inline';
+        const sid = document.createElement('input');
+        sid.type = 'hidden'; sid.name = 'schueler_id'; sid.value = t.id;
+        const hj = document.createElement('input');
+        hj.type = 'hidden'; hj.name = 'halbjahr'; hj.value = '<%= halbjahr %>';
+        const btn = document.createElement('button');
+        btn.type = 'submit';
+        btn.textContent = '+ ' + t.nachname + ', ' + t.vorname + ' (' + t.klasse_name + ')'
+          + (t.notenschluessel !== '<%= fach.notenschluessel %>' ? ' — anderer Notenschlüssel' : '');
+        form.appendChild(sid);
+        form.appendChild(hj);
+        form.appendChild(btn);
+        li.appendChild(form);
+        ergebnisListe.appendChild(li);
+      });
+    }, 300));
+  }
 </script>

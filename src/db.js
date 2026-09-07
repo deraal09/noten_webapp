@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -112,6 +112,12 @@ CREATE TABLE IF NOT EXISTS klassen (
     -- unterrichtet (z. B. duales Modell) — Fehlzeiten-Erfassung bekommt
     -- dann zwei Spalten je Typ + Summe, siehe fehlzeiten_schule2.
     zwei_schulen INTEGER NOT NULL DEFAULT 0,
+    -- Erlaubt anderen Lehrkräften, bei einer Namenskollision beim
+    -- Selbst-Anlegen sofort ein eigenes Fach in dieser Klasse anzulegen,
+    -- ohne Zustimmung der bereits verbundenen Personen (siehe
+    -- src/klassen-verknuepfung.js). Ersetzt die frühere
+    -- Verknüpfungsanfrage mit Einstimmigkeitszwang.
+    offen_fuer_beitritt INTEGER NOT NULL DEFAULT 0,
     UNIQUE (schuljahr_id, name)
 );
 
@@ -135,6 +141,22 @@ CREATE TABLE IF NOT EXISTS faecher (
     abgeschlossen_am TEXT,
     abgeschlossen_von_id INTEGER REFERENCES users(id),
     UNIQUE (klasse_id, name)
+);
+
+-- Explizite Teilnehmerliste je Fach statt "alle Schüler/innen der Klasse":
+-- beim Anlegen eines Fachs mit der ganzen Heimat-Klasse (klasse_id oben)
+-- vorbefüllt, danach frei anpassbar (einzelne abwählen, oder Schüler/innen
+-- aus ANDEREN Klassen desselben Schuljahres hinzufügen) -- deckt
+-- klassenübergreifende Kurse mit nur einem Teil der Schüler/innen ab, ohne
+-- dass die Kurslehrkraft eine eigene Fake-Klasse anlegen muss. Die
+-- Fachabschlussnote, der Sync-Stand und die Klassenleitungs-Übersicht
+-- richten sich nach dieser Liste (siehe src/noten-service.js,
+-- src/fach-abschluss.js, routes/teacher.js Halbjahresübersicht).
+CREATE TABLE IF NOT EXISTS fach_teilnehmer (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    UNIQUE (fach_id, schueler_id)
 );
 
 -- Eingefrorene Fachabschlussnote je Schüler/in (Mittelwert aus allen
@@ -223,11 +245,14 @@ CREATE TABLE IF NOT EXISTS klassenleitung (
     UNIQUE (klasse_id, user_id)
 );
 
--- Verknüpfungsanfrage: Jemand möchte einer bereits bestehenden Klasse
--- beitreten (Namenskollision beim Selbst-Anlegen), statt eine zweite,
--- doppelte Klasse zu erzeugen. Alle bereits mit der Klasse verbundenen
--- Personen (Ersteller/in, Klassenleitung, zugewiesene Lehrkräfte) müssen
--- zustimmen, siehe klassen_verknuepfungsantworten.
+-- VERALTET, wird nicht mehr beschrieben: frühere Verknüpfungsanfrage bei
+-- Namenskollision mit Einstimmigkeitszwang aller bereits verbundenen
+-- Personen. Ersetzt durch klassen.offen_fuer_beitritt (siehe
+-- src/klassen-verknuepfung.js) -- schneller für den Normalfall (dieselbe
+-- Klasse, zweites Fach) und ohne Warten auf mehrere Zustimmungen. Die
+-- Tabellen bleiben stehen, damit eine bestehende Installation mit noch
+-- offenen Alt-Anfragen nicht durch eine DROP-TABLE-Migration Daten
+-- verliert; es werden nur keine neuen Zeilen mehr angelegt.
 CREATE TABLE IF NOT EXISTS klassen_verknuepfungsanfragen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ziel_klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
@@ -538,6 +563,22 @@ function stelleBenutzernamenEindeutigSicher(db) {
   }
 }
 
+// Befüllt fach_teilnehmer für jedes Fach, das noch KEINE einzige
+// Teilnehmer-Zeile hat, mit allen Schüler/innen seiner Heimat-Klasse --
+// deckt sowohl frisch migrierte Bestandsfächer (vor Einführung der Tabelle)
+// als auch den Normalfall neu angelegter Fächer ab. Ein Fach, dessen
+// Teilnehmerliste bereits (und sei es nur teilweise) gepflegt wurde, bleibt
+// unangetastet -- diese Abfrage überschreibt nie eine bewusst angepasste
+// Liste, sie füllt nur eine komplett leere auf.
+function fuelleFachTeilnehmerAuf(db) {
+  db.exec(`
+    INSERT INTO fach_teilnehmer (fach_id, schueler_id)
+    SELECT f.id, s.id FROM faecher f
+    JOIN schueler s ON s.klasse_id = f.klasse_id
+    WHERE NOT EXISTS (SELECT 1 FROM fach_teilnehmer ft WHERE ft.fach_id = f.id)
+  `);
+}
+
 function migrate(db) {
   ensureColumn(db, 'users', 'auth_source', "auth_source TEXT NOT NULL DEFAULT 'lokal'");
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
@@ -555,6 +596,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'abgeschlossen_von_id', 'abgeschlossen_von_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
   ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
+  ensureColumn(db, 'klassen', 'offen_fuer_beitritt', 'offen_fuer_beitritt INTEGER NOT NULL DEFAULT 0');
+  fuelleFachTeilnehmerAuf(db);
 }
 
 // SQL-String-Literal escapen (einfache Anführungszeichen verdoppeln) --

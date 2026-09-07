@@ -9,18 +9,25 @@ import {
   ladeMeineKlassen, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
-import { starteVerknuepfung, beantworteVerknuepfung } from '../klassen-verknuepfung.js';
-import { ladeFachMitUmfeld, ladeNotenuebersicht } from '../noten-service.js';
+import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
+import {
+  ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerKlassenleitung, ladeFaecherFuerSchueler,
+} from '../noten-service.js';
 import { syncFach, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
 import {
   ladeHistorischeHalbjahre, ladeHistorischeNoten, ladeAbschlussnoten, schliesseFachAb, oeffneFach,
 } from '../fach-abschluss.js';
 import {
-  istSchuelerGesperrtInFach, sperren, entsperren, aufhebungAnfragen, ladeSperrenFuerKlasse, holeSperre,
+  istSchuelerGesperrtInFach, sperren, entsperren, aufhebungAnfragen, ladeSperrenFuerKlasse,
+  ladeSperrenFuerSchueler, holeSperre,
 } from '../noten-sperre.js';
 import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
 import { parseSchuelerCsv } from '../csv-import.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
+import {
+  seedeTeilnehmerAusKlasse, ladeTeilnehmerMitHerkunft, fuegeTeilnehmerHinzu, entferneTeilnehmer,
+  sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
+} from '../fach-teilnehmer.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../schuljahr-utils.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
@@ -122,14 +129,18 @@ export default async function teacherRoutes(fastify) {
       ...hh, noten: ladeHistorischeNoten(hh.id),
     }));
     const abschlussnoten = fach.abgeschlossen ? ladeAbschlussnoten(fach.id) : new Map();
-    const sperren = ladeSperrenFuerKlasse(fach.klasse_id, halbjahr);
+    // Sperren über die Schüler-IDs statt "die eine Klasse" -- bei einem
+    // klassenübergreifenden Kurs liegt die Sperre bei der jeweils EIGENEN
+    // Klasse einer teilnehmenden Person (siehe fach_teilnehmer).
+    const sperren = ladeSperrenFuerSchueler(uebersicht.schueler.map((s) => s.id), halbjahr);
+    const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
     return reply.viewEjs('teacher/fach_detail.ejs', {
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
       termine: uebersicht.termine,
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
-      historischeHalbjahre, abschlussnoten, sperren,
+      historischeHalbjahre, abschlussnoten, sperren, teilnehmer,
       darfFachAbschliessen: userDarfFachBearbeiten(request.user, fach),
       darfHistorieAnlegen: userIstKlassenlehrer(request.user, fach.klasse_id),
     });
@@ -664,32 +675,6 @@ export default async function teacherRoutes(fastify) {
     for (const sj of schuljahreReiter) klassenNachSchuljahr.set(sj.id, []);
     for (const k of klassen) klassenNachSchuljahr.get(k.schuljahr_id)?.push(k);
 
-    // Verknüpfungsanfragen, auf deren Zustimmung ich noch warte
-    const wartetAufMich = db.prepare(`
-      SELECT a.id, a.vorgeschlagenes_fach, a.created_at,
-             k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung,
-             u.display_name AS angefragt_von_name, u.username AS angefragt_von_username
-      FROM klassen_verknuepfungsantworten ant
-      JOIN klassen_verknuepfungsanfragen a ON a.id = ant.anfrage_id
-      JOIN klassen k ON k.id = a.ziel_klasse_id
-      JOIN schuljahre s ON s.id = k.schuljahr_id
-      JOIN users u ON u.id = a.angefragt_von_id
-      WHERE ant.user_id = ? AND ant.zustimmung IS NULL AND a.status = 'offen'
-      ORDER BY a.created_at
-    `).all(request.user.id);
-
-    // Meine eigenen gestellten Anfragen (offen/entschieden)
-    const meineAnfragen = db.prepare(`
-      SELECT a.id, a.vorgeschlagenes_fach, a.status, a.created_at,
-             k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
-      FROM klassen_verknuepfungsanfragen a
-      JOIN klassen k ON k.id = a.ziel_klasse_id
-      JOIN schuljahre s ON s.id = k.schuljahr_id
-      WHERE a.angefragt_von_id = ?
-      ORDER BY a.created_at DESC
-      LIMIT 20
-    `).all(request.user.id);
-
     // Alle im System bereits verwendeten Klassennamen, schuljahresübergreifend
     // -- Vorschlagsliste beim Anlegen, damit dieselbe Klasse in einem neuen
     // Schuljahr konsistent geschrieben wird (z. B. immer "12BFI1"), statt sie
@@ -698,7 +683,7 @@ export default async function teacherRoutes(fastify) {
       .map((r) => r.name);
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
-      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, wartetAufMich, meineAnfragen,
+      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr,
       kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), bekannteKlassennamen,
     });
   });
@@ -712,19 +697,22 @@ export default async function teacherRoutes(fastify) {
     const name = String(request.body?.name || '').trim();
     let ns = String(request.body?.notenschluessel || 'IHK');
     if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
+    // Erlaubt anderen Lehrkräften später einen sofortigen Beitritt bei
+    // Namenskollision, ohne Zustimmung einzuholen (siehe klassen-verknuepfung.js).
+    const offenFuerBeitritt = request.body?.offen_fuer_beitritt === '1' ? 1 : 0;
     if (!schuljahrId || !name) {
       request.flash?.('error', 'Schuljahr und Name sind erforderlich.');
       return reply.redirect('/teacher/klassen');
     }
     try {
       const info = getDb().prepare(`
-        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns], request.user.id);
+        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id, offen_fuer_beitritt)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns], request.user.id, offenFuerBeitritt);
       return reply.redirect(`/teacher/klassen/${info.lastInsertRowid}`);
     } catch (e) {
-      // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zur
-      // Verknüpfungsanfrage weiterleiten, damit die Klasse nicht doppelt entsteht.
+      // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zum
+      // Beitritt weiterleiten, damit die Klasse nicht doppelt entsteht.
       const bestehend = getDb().prepare('SELECT id FROM klassen WHERE schuljahr_id = ? AND name = ?')
         .get(schuljahrId, name);
       if (bestehend) return reply.redirect(`/teacher/klassen/${bestehend.id}/verknuepfen`);
@@ -733,7 +721,7 @@ export default async function teacherRoutes(fastify) {
     }
   });
 
-  // ---------- Verknüpfungsanfrage für eine bereits bestehende Klasse ----------
+  // ---------- Beitritt zu einer bereits bestehenden Klasse (Namenskollision) ----------
   fastify.get('/klassen/:id/verknuepfen', async (request, reply) => {
     const klasse = getDb().prepare(`
       SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
@@ -746,7 +734,10 @@ export default async function teacherRoutes(fastify) {
         code: 403, message: 'Nur Lehrkräfte mit LDAP-Zugang können sich selbst einer Klasse zuordnen. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.',
       });
     }
-    return reply.viewEjs('teacher/klasse_verknuepfen.ejs', { user: request.user, klasse });
+    const verbundene = ermittleVerbundenePersonen(klasse.id);
+    verbundene.delete(request.user.id);
+    const kannBeitreten = verbundene.size === 0 || Boolean(klasse.offen_fuer_beitritt);
+    return reply.viewEjs('teacher/klasse_verknuepfen.ejs', { user: request.user, klasse, kannBeitreten });
   });
 
   fastify.post('/klassen/:id/verknuepfen', async (request, reply) => {
@@ -766,28 +757,21 @@ export default async function teacherRoutes(fastify) {
       klasseId: klasse.id, angefragtVonId: request.user.id, vorgeschlagenesFach: fach,
     });
     if (ergebnis.direkterBeitritt) {
-      request.flash?.('success', `Klasse war noch niemandem zugeordnet — du hast direkten Zugriff mit dem Fach „${fach}" erhalten.`);
+      request.flash?.('success', `Zugriff erhalten — dein Fach „${fach}" wurde angelegt.`);
       return reply.redirect(`/teacher/klassen/${klasse.id}`);
     }
-    request.flash?.('success', 'Verknüpfungsanfrage gestellt. Sobald alle bereits zugeordneten Personen zustimmen, erhältst du Zugriff.');
+    request.flash?.('error', 'Diese Klasse ist nicht für automatischen Beitritt freigegeben. Bitte die Klassenleitung oder den Admin um Zuweisung bitten.');
     return reply.redirect('/teacher/klassen');
   });
 
-  fastify.post('/verknuepfungen/:id/antwort', async (request, reply) => {
-    const zustimmung = request.body?.zustimmung === '1';
-    const ergebnis = beantworteVerknuepfung({
-      anfrageId: request.params.id, userId: request.user.id, zustimmung,
-    });
-    if (!ergebnis) {
-      request.flash?.('error', 'Diese Anfrage betrifft dich nicht (mehr).');
-    } else if (ergebnis.status === 'abgelehnt') {
-      request.flash?.('success', 'Anfrage abgelehnt.');
-    } else if (ergebnis.status === 'angenommen') {
-      request.flash?.('success', 'Anfrage angenommen — die Klasse ist jetzt verknüpft.');
-    } else {
-      request.flash?.('success', 'Deine Zustimmung wurde gespeichert — es fehlen noch andere.');
+  // ---------- Freigabe für automatischen Beitritt nachträglich umschalten ----------
+  fastify.post('/klassen/:id/offen-fuer-beitritt', async (request, reply) => {
+    if (!userIstKlassenlehrer(request.user, request.params.id)) {
+      return reply.code(403).send({ error: 'forbidden' });
     }
-    return reply.redirect('/teacher/klassen');
+    const offen = request.body?.offen === '1' ? 1 : 0;
+    getDb().prepare('UPDATE klassen SET offen_fuer_beitritt = ? WHERE id = ?').run(offen, request.params.id);
+    return reply.redirect(`/teacher/klassen/${request.params.id}`);
   });
 
   // ---------- Halbjahresübersicht (Klassenleitung/Admin) ----------
@@ -805,7 +789,7 @@ export default async function teacherRoutes(fastify) {
     const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
     const db = getDb();
     const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
-    const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+    const faecher = ladeFaecherFuerKlassenleitung(klasse.id);
     const syncMeta = new Map(faecher.map((f) => [f.id, holeSyncMeta(f.id, halbjahr)]));
     const standRows = faecher.length ? db.prepare(`
       SELECT fach_id, schueler_id, note, konferenz_note FROM fach_sync_stand
@@ -861,7 +845,7 @@ export default async function teacherRoutes(fastify) {
     }
     const db = getDb();
     const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
-    const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+    const faecher = ladeFaecherFuerKlassenleitung(klasse.id);
     const abschlussByFach = new Map(faecher.map((f) => [f.id, f.abgeschlossen ? ladeAbschlussnoten(f.id) : new Map()]));
 
     const zeilen = schueler.map((s) => {
@@ -896,7 +880,9 @@ export default async function teacherRoutes(fastify) {
     const idx = schuelerListe.findIndex((s) => s.id === Number(request.params.schuelerId));
     if (idx === -1) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in dieser Klasse.' });
     const schueler = schuelerListe[idx];
-    const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+    // Nur Fächer, an denen DIESE Person tatsächlich teilnimmt (kann bei
+    // klassenübergreifenden Kursen von "alle Fächer der Klasse" abweichen).
+    const faecher = ladeFaecherFuerSchueler(schueler.id);
     const standRows = faecher.length ? db.prepare(`
       SELECT * FROM fach_sync_stand
       WHERE halbjahr = ? AND schueler_id = ? AND fach_id IN (${faecher.map(() => '?').join(',')})
@@ -965,7 +951,15 @@ export default async function teacherRoutes(fastify) {
     }
     const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
     const fachId = parseInt(request.body?.fach_id, 10);
-    const fach = getDb().prepare('SELECT id FROM faecher WHERE id = ? AND klasse_id = ?').get(fachId, klasse.id);
+    // Nicht mehr "Fach gehört zu meiner Klasse" (bei klassenübergreifenden
+    // Kursen falsch), sondern "die Person ist mein eigener Schüler UND nimmt
+    // an diesem Fach teil".
+    const eigenerSchueler = getDb().prepare('SELECT id FROM schueler WHERE id = ? AND klasse_id = ?')
+      .get(request.params.schuelerId, klasse.id);
+    const fach = eigenerSchueler ? getDb().prepare(`
+      SELECT f.id FROM faecher f JOIN fach_teilnehmer ft ON ft.fach_id = f.id
+      WHERE f.id = ? AND ft.schueler_id = ?
+    `).get(fachId, request.params.schuelerId) : null;
     if (!Number.isFinite(fachId) || !fach) return reply.code(404).send({ error: 'fach not found' });
     const wertRaw = String(request.body?.note ?? '').trim().replace(',', '.');
     const wert = wertRaw === '' ? null : Number(wertRaw);
@@ -1250,6 +1244,9 @@ export default async function teacherRoutes(fastify) {
         // zusätzlich möglich, ist aber nicht Voraussetzung.
         getDb().prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
           .run(request.user.id, info.lastInsertRowid);
+        // Teilnehmerliste startet mit allen Schüler/innen der Klasse -- bei
+        // Bedarf später auf der Fach-Seite anpassbar (siehe "Teilnehmer/innen").
+        seedeTeilnehmerAusKlasse(info.lastInsertRowid, request.params.id);
       } catch (e) {
         request.flash?.('error', 'Fach existiert bereits in dieser Klasse.');
       }
@@ -1265,6 +1262,64 @@ export default async function teacherRoutes(fastify) {
     }
     getDb().prepare('DELETE FROM faecher WHERE id = ?').run(request.params.id);
     return reply.redirect(`/teacher/klassen/${f.klasse_id}`);
+  });
+
+  // ---------- Teilnehmer/innen eines Fachs (klassenübergreifende Kurse) ----------
+  // Ein Fach bleibt an eine Heimat-Klasse gebunden (Notenschlüssel, Anlegerecht),
+  // die tatsächliche Teilnehmerliste kann aber darüber hinausgehen -- siehe
+  // src/fach-teilnehmer.js.
+  fastify.get('/fach/:id/teilnehmer/suche', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).send({ error: 'not found' });
+    if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
+    const treffer = sucheSchuelerFuerFach(fach, request.query?.q);
+    return reply.send({ treffer });
+  });
+
+  fastify.post('/fach/:id/teilnehmer/hinzufuegen', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    const schuelerId = parseInt(request.body?.schueler_id, 10);
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const ergebnis = fuegeTeilnehmerHinzu(fach, schuelerId);
+    if (!ergebnis.ok) {
+      const meldungen = {
+        'nicht-gefunden': 'Schüler/in nicht gefunden.',
+        'anderes-schuljahr': 'Diese Person ist einem anderen Schuljahr zugeordnet.',
+        notenschluessel: 'Notenschlüssel der Klassen passen nicht zusammen (IHK/BG) — dieser Kurs kann nicht gemischt werden.',
+        'bereits-teilnehmer': 'Ist bereits Teilnehmer/in.',
+      };
+      request.flash?.('error', meldungen[ergebnis.fehler] || 'Hinzufügen fehlgeschlagen.');
+    }
+    return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
+  });
+
+  fastify.post('/fach/:id/teilnehmer/manuell', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const ergebnis = legeManuellenTeilnehmerAn(fach, {
+      nachname: request.body?.nachname, vorname: request.body?.vorname, klassenName: request.body?.klasse,
+    });
+    if (!ergebnis.ok) {
+      const meldungen = {
+        pflichtfelder: 'Nachname, Vorname und Klasse sind erforderlich.',
+        notenschluessel: 'Notenschlüssel der angegebenen Klasse passt nicht zu diesem Fach (IHK/BG) — dieser Kurs kann nicht gemischt werden.',
+        'bereits-teilnehmer': 'Ist bereits Teilnehmer/in.',
+      };
+      request.flash?.('error', meldungen[ergebnis.fehler] || 'Hinzufügen fehlgeschlagen.');
+    }
+    return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
+  });
+
+  fastify.post('/fach/:id/teilnehmer/entfernen', async (request, reply) => {
+    if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const schuelerId = parseInt(request.body?.schueler_id, 10);
+    entferneTeilnehmer(request.params.id, schuelerId);
+    return reply.redirect(`/teacher/fach/${request.params.id}?hj=${encodeURIComponent(halbjahr)}`);
   });
 
   // ---------- Einladungen für externe Lehrkräfte (nicht mehr nur Admin) ----------

@@ -55,6 +55,32 @@ export function ladeFachMitUmfeld(id) {
   `).get(id);
 }
 
+/**
+ * Fächer, an denen mindestens einer der Schüler/innen dieser Klasse
+ * teilnimmt -- für die Klassenleitungs-Übersicht/Abschlussübersicht.
+ * Deckt neben den Fächern der eigenen Klasse auch klassenübergreifende
+ * Kurse ab, an denen eigene Schüler/innen als Teilnehmer/innen eingetragen
+ * sind (siehe fach_teilnehmer), auch wenn deren Heimat-Klasse eine andere
+ * ist.
+ */
+export function ladeFaecherFuerKlassenleitung(klasseId) {
+  return getDb().prepare(`
+    SELECT DISTINCT f.* FROM faecher f
+    JOIN fach_teilnehmer ft ON ft.fach_id = f.id
+    JOIN schueler s ON s.id = ft.schueler_id
+    WHERE s.klasse_id = ?
+    ORDER BY f.name
+  `).all(klasseId);
+}
+
+/** Fächer, an denen eine bestimmte Person teilnimmt (für den Konferenzmodus). */
+export function ladeFaecherFuerSchueler(schuelerId) {
+  return getDb().prepare(`
+    SELECT f.* FROM faecher f JOIN fach_teilnehmer ft ON ft.fach_id = f.id
+    WHERE ft.schueler_id = ? ORDER BY f.name
+  `).all(schuelerId);
+}
+
 export function getNotenschluesselCsv(fach) {
   const k = getDb().prepare('SELECT notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
     .get(fach.klasse_id);
@@ -74,7 +100,13 @@ export function berechneGesamtnoten(fachId, halbjahr) {
   const ergebnis = new Map();
   if (!fach) return ergebnis;
   const db = getDb();
-  const schueler = db.prepare('SELECT id FROM schueler WHERE klasse_id = ?').all(fach.klasse_id);
+  // Teilnehmerliste statt "alle Schüler/innen der Klasse" -- deckt sowohl den
+  // Normalfall (beim Anlegen mit der ganzen Heimat-Klasse vorbefüllt) als
+  // auch klassenübergreifende Kurse mit nur einem Teil der Schüler/innen ab
+  // (siehe fach_teilnehmer, src/routes/teacher.js Abschnitt "Teilnehmer").
+  const schueler = db.prepare(
+    'SELECT s.id FROM fach_teilnehmer ft JOIN schueler s ON s.id = ft.schueler_id WHERE ft.fach_id = ?'
+  ).all(fachId);
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
   const csvStr = getNotenschluesselCsv(fach);
@@ -126,7 +158,18 @@ export function berechneGesamtnoten(fachId, halbjahr) {
  */
 export function ladeNotenuebersicht(fach, halbjahr) {
   const db = getDb();
-  const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(fach.klasse_id);
+  // Teilnehmerliste statt "alle Schüler/innen der Klasse" -- siehe
+  // berechneGesamtnoten oben. herkunft_klasse_name wird nur für Schüler/innen
+  // aus einer ANDEREN Klasse als der Heimat-Klasse des Fachs gebraucht (zur
+  // Unterscheidung in der Notenübersicht bei klassenübergreifenden Kursen).
+  const schueler = db.prepare(`
+    SELECT s.*, k.name AS herkunft_klasse_name
+    FROM fach_teilnehmer ft
+    JOIN schueler s ON s.id = ft.schueler_id
+    JOIN klassen k ON k.id = s.klasse_id
+    WHERE ft.fach_id = ?
+    ORDER BY s.nachname, s.vorname
+  `).all(fach.id);
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
   const csvStr = getNotenschluesselCsv(fach);
@@ -173,6 +216,9 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
     return {
       schueler_id: s.id, nachname: s.nachname, vorname: s.vorname,
+      // Nur gesetzt, wenn die Person aus einer ANDEREN Klasse als der
+      // Heimat-Klasse dieses Fachs stammt (klassenübergreifender Kurs).
+      herkunftKlasse: s.klasse_id === fach.klasse_id ? null : s.herkunft_klasse_name,
       klausuren: klausurData, uls: ulData, terminNoten: terminZeile,
       muendlich: manuelle.muendlich, schriftlich: manuelle.schriftlich,
       schriftlicheNote: teilNote(klausurData),
