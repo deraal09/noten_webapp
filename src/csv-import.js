@@ -1,9 +1,8 @@
 /**
  * Sehr einfacher CSV-Parser für den Schüler-Import per Datei-Upload (z. B.
- * eine aus Untis manuell exportierte Schülerliste — die WebUntis-API
- * verweigert vielen Lehrkraft-Konten den automatischen Abruf, siehe
- * routes/untis-import.js). Erkennt das Trennzeichen (Semikolon/Komma/Tab)
- * automatisch und ordnet Nachname/Vorname per Spaltenname zu, falls eine
+ * eine aus Untis manuell exportierte Schülerliste). Erkennt das
+ * Trennzeichen (Semikolon/Komma/Tab) automatisch und ordnet Nachname/
+ * Vorname per Spaltenname zu, falls eine
  * erkennbare Kopfzeile vorhanden ist — sonst werden die ersten beiden
  * Spalten als Nachname/Vorname angenommen (wie beim bestehenden
  * Sammel-Einfügen per Textfeld).

@@ -274,8 +274,8 @@ dem Schema **„YYYY/YY"**, wobei die zweite Zahl immer (YYYY + 1) modulo 100
 ist (z. B. `2025/26`, am Jahrhundertwechsel `2099/00`) — jedes andere
 Format wird abgelehnt (`src/schuljahr-utils.js`, `parseSchuljahr`/
 `istGueltigesSchuljahrFormat`). Das ist keine reine Formsache: alle Listen
-und Auswahlfelder (Admin-Dashboard, Klassen-Übersicht, Klassen-Übertragung,
-Untis-Import) sortieren Schuljahre über `sortiereSchuljahreAbsteigend` nach
+und Auswahlfelder (Admin-Dashboard, Klassen-Übersicht, Klassen-Übertragung)
+sortieren Schuljahre über `sortiereSchuljahreAbsteigend` nach
 dem **tatsächlichen Startjahr**, nicht nach der Reihenfolge, in der sie
 angelegt wurden. Wird ein vergangenes Schuljahr nachträglich erfasst (z. B.
 weil es beim Ersteinrichten vergessen wurde), landet es dadurch immer an
@@ -299,10 +299,10 @@ Selbstbedienungsrecht bewusst NICHT** (`userDarfSelbstKlasseAnlegen` in
 `src/auth.js`, geprüft anhand `auth_source`: `'ldap'` vs. `'lokal'`) — sie
 sehen an derselben Stelle nur einen Hinweis, sich von einer Klassenleitung
 oder dem Admin einem Fach zuweisen zu lassen. Das gilt für `POST
-/teacher/klassen/neu`, die Verknüpfungsanfrage bei Namenskollisionen
-(`/teacher/klassen/:id/verknuepfen`) und den Untis-Import gleichermaßen —
-alle drei sind letztlich Wege, sich selbst Zugriff auf ein Fach zu
-verschaffen, ohne dass jemand anders das explizit entschieden hat.
+/teacher/klassen/neu` und die Verknüpfungsanfrage bei Namenskollisionen
+(`/teacher/klassen/:id/verknuepfen`) gleichermaßen — beide sind letztlich
+Wege, sich selbst Zugriff auf ein Fach zu verschaffen, ohne dass jemand
+anders das explizit entschieden hat.
 
 Schuljahre selbst legt weiterhin nur der Admin an (Admin → Dashboard). Auf
 „Meine Klassen" werden die vorhandenen Klassen in **Reitern je Schuljahr**
@@ -313,7 +313,7 @@ in `src/schuljahr-utils.js`). Ein nachträglich erfasstes, vergangenes
 Schuljahr landet dadurch am Ende der Reiter statt ganz vorne.
 
 **Keine doppelten Schüler-Einträge:** Egal ob per Einzeleingabe,
-Sammel-Einfügen, CSV-Upload oder Untis-Import — vor jedem Anlegen prüft
+Sammel-Einfügen oder CSV-Upload — vor jedem Anlegen prüft
 `src/schueler-utils.js` (`fuegeSchuelerHinzuFallsNeu`), ob in der Klasse
 bereits jemand mit demselben Nachnamen/Vornamen existiert (Groß-/
 Kleinschreibung und Leerzeichen am Rand spielen dabei keine Rolle). Ein
@@ -386,79 +386,31 @@ vergeben ist, entsteht **keine zweite, doppelte Klasse**. Stattdessen:
   alle zu, wird das von der anfragenden Person genannte Fach angelegt
   (falls es das noch nicht gibt) und sie diesem Fach zugewiesen.
 
-### Import aus Untis (`/teacher/untis-import`)
+### Klasse anlegen: vorhandenen Namen wählen oder neu anlegen
 
-Klassen (und optional Schüler/innen) lassen sich aus WebUntis importieren,
-ohne die Klasse vorher manuell anzulegen. **Wichtig, bitte lesen:**
+Das Formular „Neue Klasse anlegen" ist als **Register** aufgeteilt:
+„Vorhandene Klasse wählen" (ein `<select>` mit allen bereits im System
+verwendeten Klassennamen, schuljahresübergreifend — für konsistente
+Schreibweise, z. B. immer „12BFI1" statt mal „12 BFI 1") und, als jeweils
+letztes Register, „Neue Klasse anlegen" mit freiem Textfeld für einen
+Namen, der noch nirgends vorkommt. Beide Register senden an denselben
+Endpunkt (`POST /teacher/klassen/neu`) — der Name kommt nur aus
+unterschiedlichen Eingabefeldern.
 
-- Es gibt **keine offizielle, dokumentierte Programmierschnittstelle** für
-  einen einzelnen Lehrkraft-Login. Untis selbst bietet nur eine
-  Partner-API mit schulweiten OAuth-Client-Credentials an (Einrichtung
-  durch einen Untis-Admin, kein Login mit persönlichen Zugangsdaten). Diese
-  Anbindung nutzt stattdessen die seit Jahren von der Community
-  reverse-engineerte JSON-RPC-Schnittstelle (`/WebUntis/jsonrpc.do`), die
-  auch der offizielle Untis-Login im Browser verwendet — inoffiziell, ohne
-  Zusicherung, dass sie dauerhaft funktioniert oder mit den Untis-AGB
-  vereinbar ist.
-- **Zwei Anmeldearten** (`src/untis-client.js`): Benutzername+Passwort
-  (Methode `authenticate`) funktioniert nur, wenn am Untis-Konto **keine
-  Zwei-Faktor-Authentifizierung** erzwungen wird. Ist 2FA aktiv (wie am
-  BBZ RD-Eck), muss stattdessen ein **Secret** verwendet werden — das
-  Untis-Profil zeigt es unter „Freigaben"/„Mobile-Zugriff" → „QR-Code
-  anzeigen" (Secret steht meist als Klartext neben dem QR-Code). Daraus
-  wird ein 6-stelliger TOTP-Code berechnet (Methode `getUserData2017`,
-  Endpunkt `/WebUntis/jsonrpc_intern.do`) — derselbe Mechanismus, den
-  Untis Mobile selbst nutzt. **Achtung:** ein neu erzeugter QR-Code kann
-  eine bereits auf dem Handy gekoppelte Untis-Mobile-Anmeldung ungültig
-  machen.
-- **Kein Passwort/Secret wird gespeichert.** Jede Lehrkraft meldet sich bei
-  jeder Verbindung neu mit den eigenen Untis-Zugangsdaten an;
-  die Sitzung liegt nur kurz im Server-Session-Speicher und wird nach dem
-  Import (oder per „Verbindung trennen") sofort beendet.
-- **`getKlassen()` liefert ausnahmslos ALLE Klassen der ganzen Schule**,
-  nicht nur die der anmeldenden Lehrkraft — es gibt keine dokumentierte
-  Methode, die das serverseitig einschränkt. Nach der Anmeldung wird
-  deshalb zusätzlich versucht, über den eigenen Stundenplan der Person
-  (`getTimetable`, Element-Typ „Lehrkraft", ±14 Tage um heute; personId/
-  personType kommen vom dokumentierten REST-Endpunkt `/WebUntis/api/app/
-  config`, der mit derselben Session unabhängig von der Anmeldeart
-  funktioniert) einzugrenzen, welche Klassen tatsächlich unterrichtet
-  werden — diese sind auf der Auswahlseite vorausgewählt, der Rest steht
-  hinter „Alle Klassen der Schule anzeigen". Da nur der Abfragezeitraum
-  betrachtet wird, kann eine Klasse ohne Unterricht in diesen zwei Wochen
-  fehlen (z. B. bei Randstunden-Fächern) — deshalb bleibt die volle Liste
-  immer erreichbar. Schlägt der Versuch komplett fehl (z. B. weil
-  `app/config` oder `getTimetable` auf einer Untis-Instanz nicht wie
-  erwartet funktionieren), wird ohne Fehlermeldung auf die ungefilterte
-  Liste zurückgefallen — das bisherige Verhalten.
-- **Schülerlisten je Klasse sind über die API nicht zuverlässig abrufbar —
-  am BBZ RD-Eck sogar gar nicht.** Die WebUntis-API liefert zwar
-  `getKlassen()` (Klassenliste) zuverlässig, aber es gibt keine
-  dokumentierte Methode für „Schüler/innen einer Klasse":
-  `getStudentGroupMembers(klasseId)` existiert auf dieser Untis-Instanz
-  nicht (`-32601: Method not found`), und der schulweite Fallback
-  `getStudents()` scheitert am fehlenden Recht „masterdata students read
-  for all" (`-8509: no right for getStudents()`) — auch mit einem
-  zusätzlich versuchten, undokumentierten `klasseId`-Filter pro Klasse.
-  Beide bekannten API-Wege sind damit für ein normales Lehrkraft-Konto
-  ohne erweiterte Rechte am BBZ RD-Eck ausgeschlossen (Details/Codepfade
-  in `src/untis-client.js` und `routes/untis-import.js`, falls sich die
-  Rechte am Konto später ändern und ein neuer Versuch sich lohnt).
-  Klassen werden trotzdem angelegt; Schüler/innen lassen sich danach auf
-  der Klassenseite ergänzen — entweder per Hand, per Sammel-Einfügen
-  (Textfeld, eine Zeile je Person) oder per **CSV-Datei-Upload**
-  (`POST /teacher/klassen/:id/schueler/csv`, `src/csv-import.js`): eine
-  Spalte Nachname und eine Vorname, mit oder ohne Kopfzeile, Semikolon/
-  Komma/Tab als Trennzeichen wird automatisch erkannt — z. B. für eine
-  von Hand aus WebUntis oder einer anderen Schulverwaltungssoftware
-  exportierte Liste. Dieser eine Endpunkt akzeptiert bewusst
-  `multipart/form-data` in einem eigenen, gekapselten Fastify-Plugin-Scope
-  (`@fastify/busboy` statt eines global registrierten Multipart-Plugins) —
-  alle übrigen Formulare der App bleiben unverändert bei
-  `application/x-www-form-urlencoded`.
-- Klassen, die im Ziel-Schuljahr bereits existieren (Namenskollision),
-  werden beim Import übersprungen statt dupliziert — bei Bedarf über die
-  bestehende Verknüpfungsanfrage manuell verbinden.
+Ein früherer Import direkt aus WebUntis wurde wieder entfernt: die
+inoffizielle API lieferte am BBZ RD-Eck keine Schülerlisten (siehe
+Git-Historie für Details) und war absehbar nicht zuverlässig genug für den
+produktiven Einsatz. Klassen und Schüler/innen anlegen läuft daher
+ausschließlich über die Formulare auf dieser Seite: Einzeleingabe,
+Sammel-Einfügen (Textfeld, eine Zeile je Person) oder **CSV-Datei-Upload**
+(`POST /teacher/klassen/:id/schueler/csv`, `src/csv-import.js`) — eine
+Spalte Nachname und eine Vorname, mit oder ohne Kopfzeile, Semikolon/
+Komma/Tab als Trennzeichen wird automatisch erkannt, z. B. für eine von
+Hand aus WebUntis oder einer anderen Schulverwaltungssoftware exportierte
+Liste. Dieser eine Endpunkt akzeptiert bewusst `multipart/form-data` in
+einem eigenen, gekapselten Fastify-Plugin-Scope (`@fastify/busboy` statt
+eines global registrierten Multipart-Plugins) — alle übrigen Formulare der
+App bleiben unverändert bei `application/x-www-form-urlencoded`.
 
 ### Noten-Sync statt Live-Zugriff für die Klassenleitung
 

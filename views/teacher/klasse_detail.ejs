@@ -93,33 +93,45 @@
 <% } %>
 
 <h2>Schüler/innen (<%= schueler.length %>)</h2>
-<form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/neu" class="inline">
-  <input type="text" name="nachname" placeholder="Nachname" required>
-  <input type="text" name="vorname" placeholder="Vorname" required>
-  <button type="submit">+ Hinzufügen</button>
-</form>
-<details>
-  <summary>Mehrere Schüler/innen auf einmal (eine Zeile je Person, Format: <code>Nachname, Vorname</code>)</summary>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/bulk" class="card">
+<div class="reiter unter-reiter" data-storage-key="klasse-<%= klasse.id %>-schueler-hinzufuegen">
+  <button type="button" class="active" data-target="schueler-einzeln">Einzeln</button>
+  <button type="button" data-target="schueler-mehrere">Mehrere auf einmal</button>
+  <button type="button" data-target="schueler-csv">CSV-Import</button>
+</div>
+
+<div id="schueler-einzeln" class="reiter-panel unter-panel card active">
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/neu" class="inline">
+    <input type="text" name="nachname" placeholder="Nachname" required>
+    <input type="text" name="vorname" placeholder="Vorname" required>
+    <button type="submit">+ Hinzufügen</button>
+  </form>
+</div>
+
+<div id="schueler-mehrere" class="reiter-panel unter-panel card">
+  <p class="hint">Eine Zeile je Person, Format: <code>Nachname, Vorname</code></p>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/bulk">
     <textarea name="text" rows="6" placeholder="Müller, Anna
 Schmidt, Bernd
 Meier, Carla"></textarea>
     <button type="submit">Alle anlegen</button>
   </form>
-</details>
-<details>
-  <summary>Schülerliste aus einer CSV-Datei importieren (z. B. ein manueller Untis-Export)</summary>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/csv" enctype="multipart/form-data" class="card">
-    <p class="hint">
-      Erwartet eine Spalte für Nachname und eine für Vorname — mit Kopfzeile
-      (z. B. „Nachname"/„Vorname" oder englisch „Name"/„Forename") oder
-      ohne (dann werden die ersten beiden Spalten verwendet). Semikolon,
-      Komma oder Tab als Trennzeichen werden automatisch erkannt.
-    </p>
+</div>
+
+<div id="schueler-csv" class="reiter-panel unter-panel card">
+  <p class="hint">
+    Erwartet eine Spalte für Nachname und eine für Vorname — mit Kopfzeile
+    (z. B. „Nachname"/„Vorname" oder englisch „Name"/„Forename") oder
+    ohne (dann werden die ersten beiden Spalten verwendet). Semikolon,
+    Komma oder Tab als Trennzeichen werden automatisch erkannt (z. B. für
+    eine von Hand aus Untis oder einer anderen Schulverwaltungssoftware
+    exportierte Liste).
+  </p>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/csv" enctype="multipart/form-data">
     <input type="file" name="datei" accept=".csv,text/csv" required>
     <button type="submit">Datei importieren</button>
   </form>
-</details>
+</div>
+
 <table class="data">
   <thead><tr><th>Nachname</th><th>Vorname</th><th>Aktion</th></tr></thead>
   <tbody>
@@ -200,3 +212,34 @@ Meier, Carla"></textarea>
     </tbody>
   </table>
 <% } %>
+
+<script>
+  // Register (Einzeln/Mehrere auf einmal/CSV-Import) umschalten, gewählter
+  // Reiter bleibt über localStorage auch nach einem vollen Reload erhalten
+  // (z. B. nach dem Anlegen eines Schülers oder einem CSV-Upload).
+  document.querySelectorAll('.reiter').forEach(function(gruppe) {
+    var buttons = Array.from(gruppe.querySelectorAll(':scope > button'));
+    var storageKey = gruppe.dataset.storageKey;
+    function setzeReiter(targetId) {
+      buttons.forEach(function(b) {
+        b.classList.toggle('active', b.dataset.target === targetId);
+        var panel = document.getElementById(b.dataset.target);
+        if (panel) panel.classList.toggle('active', b.dataset.target === targetId);
+      });
+    }
+    buttons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        setzeReiter(btn.dataset.target);
+        if (storageKey) {
+          try { localStorage.setItem(storageKey, btn.dataset.target); } catch (e) { /* z. B. privater Modus */ }
+        }
+      });
+    });
+    if (storageKey) {
+      try {
+        var gemerkterReiter = localStorage.getItem(storageKey);
+        if (gemerkterReiter && document.getElementById(gemerkterReiter)) setzeReiter(gemerkterReiter);
+      } catch (e) { /* z. B. privater Modus */ }
+    }
+  });
+</script>

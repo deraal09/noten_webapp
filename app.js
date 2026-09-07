@@ -39,7 +39,6 @@ import teacherRoutes from './src/routes/teacher.js';
 import klassenlehrerRoutes from './src/routes/klassenlehrer.js';
 import exportRoutes from './src/routes/export.js';
 import sitzplanRoutes from './src/routes/sitzplan.js';
-import untisImportRoutes from './src/routes/untis-import.js';
 import startRoutes from './src/routes/start.js';
 import ssoRoutes from './src/routes/sso.js';
 import apiExternRoutes from './src/routes/api-extern.js';
@@ -178,7 +177,6 @@ export async function buildApp(opts = {}) {
   await app.register(startRoutes, { prefix: '/start' });
   await app.register(teacherRoutes, { prefix: '/teacher' });
   await app.register(sitzplanRoutes, { prefix: '/teacher' });
-  await app.register(untisImportRoutes, { prefix: '/teacher' });
   await app.register(klassenlehrerRoutes, { prefix: '/klassenlehrer' });
   await app.register(exportRoutes, { prefix: '/export' });
   // Single Sign-on + Lese-Schnittstelle für den Lehrerkalender (src/sso.js).

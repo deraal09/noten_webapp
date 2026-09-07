@@ -91,6 +91,35 @@ test('"Neue Klasse anlegen" ist aufklappbar (<details>/<summary>)', async () => 
   assert.match(html, /<details>\s*<summary>Neue Klasse anlegen<\/summary>/);
 });
 
+test('Klasse anlegen: Register "Vorhandene Klasse wählen" (Select mit bekannten Namen) vor "Neue Klasse anlegen"', async () => {
+  // Aus der Vorbereitung existieren bereits die Klassen "9A" und "5B".
+  const html = await (await lehrerA('/teacher/klassen')).text();
+  const anlegenBlock = html.slice(html.indexOf('data-storage-key="klassen-anlegen-modus"'), html.indexOf('<h2>Vorhandene Klassen</h2>'));
+
+  const buttonZiele = Array.from(anlegenBlock.matchAll(/data-target="([^"]+)"/g)).map((m) => m[1]);
+  assert.deepEqual(buttonZiele, ['klasse-anlegen-vorhanden', 'klasse-anlegen-neu'],
+    '"Vorhandene Klasse wählen" muss vor "Neue Klasse anlegen" stehen');
+  assert.match(anlegenBlock, /id="klasse-anlegen-vorhanden" class="reiter-panel unter-panel card active"/,
+    'das Register mit den bekannten Namen ist initial aktiv');
+  assert.match(anlegenBlock, /id="klasse-anlegen-neu" class="reiter-panel unter-panel card"/);
+
+  // Select im ersten Register enthält beide bereits bekannten Klassennamen.
+  const selectStart = anlegenBlock.indexOf('id="klasse-anlegen-vorhanden"');
+  const selectEnde = anlegenBlock.indexOf('id="klasse-anlegen-neu"');
+  const selectBlock = anlegenBlock.slice(selectStart, selectEnde);
+  assert.match(selectBlock, /<option value="9A">9A<\/option>/);
+  assert.match(selectBlock, /<option value="5B">5B<\/option>/);
+
+  // Freies Textfeld für einen neuen Namen bleibt im zweiten Register erhalten.
+  const neuBlock = anlegenBlock.slice(selectEnde);
+  assert.match(neuBlock, /<input type="text" name="name" placeholder="z\. B\. 12BFI1" required>/);
+});
+
+test('Der Untis-Import wurde entfernt (Route existiert nicht mehr)', async () => {
+  const r = await lehrerA('/teacher/untis-import');
+  assert.equal(r.status, 404);
+});
+
 test('Schuljahr-Reiter: aktuelles Schuljahr steht vorne, das nachgetragene ganz hinten', async () => {
   const html = await (await lehrerA('/teacher/klassen')).text();
   const reiterBlock = html.slice(html.indexOf('class="reiter"'), html.indexOf('</div>', html.indexOf('class="reiter"')));

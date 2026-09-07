@@ -1,9 +1,9 @@
 /**
  * CSV-Datei-Upload für Schüler/innen einer Klasse (POST
- * /teacher/klassen/:id/schueler/csv) — Alternative zum automatischen
- * Untis-Import für Lehrkraft-Konten ohne die dafür nötigen API-Rechte
- * (siehe routes/untis-import.js). Einziger Endpunkt der App, der
- * multipart/form-data statt application/x-www-form-urlencoded annimmt.
+ * /teacher/klassen/:id/schueler/csv) — z. B. für eine von Hand aus Untis
+ * oder einer anderen Schulverwaltungssoftware exportierte Liste. Einziger
+ * Endpunkt der App, der multipart/form-data statt
+ * application/x-www-form-urlencoded annimmt.
  */
 
 import { test } from 'node:test';
@@ -83,6 +83,25 @@ test('Vorbereitung: Admin, Schuljahr, Lehrkraft, Klasse', async () => {
   r = await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '9A', notenschluessel: 'IHK' });
   assert.equal(r.status, 302);
   klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '9A'").get().id;
+});
+
+test('Schüler/innen hinzufügen erscheint als Register (Einzeln/Mehrere auf einmal/CSV-Import), nicht als gestapelte <details>', async () => {
+  const html = await (await lehrerA(`/teacher/klassen/${klasseId}`)).text();
+  const block = html.slice(html.indexOf('<h2>Schüler/innen'), html.indexOf('<h2>Fächer</h2>'));
+
+  const buttonZiele = Array.from(block.matchAll(/data-target="([^"]+)"/g)).map((m) => m[1]);
+  assert.deepEqual(buttonZiele, ['schueler-einzeln', 'schueler-mehrere', 'schueler-csv']);
+  assert.match(block, /id="schueler-einzeln" class="reiter-panel unter-panel card active"/,
+    '"Einzeln" ist das initial aktive Register');
+  assert.match(block, /id="schueler-mehrere" class="reiter-panel unter-panel card"/);
+  assert.match(block, /id="schueler-csv" class="reiter-panel unter-panel card"/);
+
+  // Alle drei bisherigen Formulare bleiben inhaltlich erhalten, nur als eigene Register statt gestapelt.
+  assert.match(block, /action="\/teacher\/klassen\/\d+\/schueler\/neu"/);
+  assert.match(block, /action="\/teacher\/klassen\/\d+\/schueler\/bulk"/);
+  assert.match(block, /action="\/teacher\/klassen\/\d+\/schueler\/csv" enctype="multipart\/form-data"/);
+  assert.doesNotMatch(block, /<details>\s*<summary>Mehrere Schüler/,
+    'Sammel-Einfügen darf nicht mehr als gestapeltes <details> gerendert werden');
 });
 
 test('CSV-Upload: Semikolon-getrennt mit Kopfzeile legt Schüler/innen an', async () => {

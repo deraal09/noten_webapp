@@ -3,8 +3,8 @@
  * Rücksicht auf Groß-/Kleinschreibung oder Leerzeichen am Rand) darf
  * innerhalb derselben Klasse nur einmal vorkommen — egal ob per
  * Einzeleingabe, Sammel-Einfügen oder CSV-Upload angelegt (siehe
- * src/schueler-utils.js, verwendet von routes/teacher.js, routes/admin.js
- * und routes/untis-import.js).
+ * src/schueler-utils.js, verwendet von routes/teacher.js und
+ * routes/admin.js).
  */
 
 import { test } from 'node:test';

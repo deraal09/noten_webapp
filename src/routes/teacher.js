@@ -690,9 +690,16 @@ export default async function teacherRoutes(fastify) {
       LIMIT 20
     `).all(request.user.id);
 
+    // Alle im System bereits verwendeten Klassennamen, schuljahresübergreifend
+    // -- Vorschlagsliste beim Anlegen, damit dieselbe Klasse in einem neuen
+    // Schuljahr konsistent geschrieben wird (z. B. immer "12BFI1"), statt sie
+    // jedes Mal neu einzutippen.
+    const bekannteKlassennamen = db.prepare('SELECT DISTINCT name FROM klassen ORDER BY name').all()
+      .map((r) => r.name);
+
     return reply.viewEjs('teacher/klassen_liste.ejs', {
       user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, wartetAufMich, meineAnfragen,
-      kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user),
+      kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), bekannteKlassennamen,
     });
   });
 
@@ -1175,9 +1182,7 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
   });
 
-  // CSV-Datei-Upload (z. B. ein manueller Untis-Export) — Alternative zum
-  // automatischen Untis-Import, dem viele Lehrkraft-Konten die nötigen
-  // API-Rechte fehlen (siehe routes/untis-import.js). Eigener, gekapselter
+  // CSV-Datei-Upload (z. B. ein manueller Untis-Export). Eigener, gekapselter
   // Plugin-Scope: der multipart/form-data-Content-Type-Parser gilt dadurch
   // NUR für diese eine Route, alle übrigen Formulare/Routen der App bleiben
   // unverändert bei application/x-www-form-urlencoded (siehe Kommentar bei

@@ -216,7 +216,7 @@ export function userIstKlassenlehrer(user, klasseId) {
  * (auth_source 'lokal') haben dieses Selbstbedienungsrecht bewusst NICHT:
  * sie bekommen Zugriff ausschließlich über eine explizite Fach-Zuweisung
  * durch eine Klassenleitung oder den Admin (siehe routes/teacher.js,
- * POST /klassen/neu und POST /untis-import/importieren).
+ * POST /klassen/neu).
  */
 export function userDarfSelbstKlasseAnlegen(user) {
   return user.isAdmin || user.authSource === 'ldap';

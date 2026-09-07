@@ -1,10 +1,9 @@
 /**
  * Verhindert doppelte Schüler-Einträge in einer Klasse — wird beim
- * Einzeleingabe-Formular, Sammel-Einfügen, CSV-Upload, Untis-Import und der
+ * Einzeleingabe-Formular, Sammel-Einfügen, CSV-Upload und der
  * Klassen-Übertragung genutzt. Verglichen wird Nachname/Vorname
  * unabhängig von Groß-/Kleinschreibung und Leerzeichen am Rand, damit ein
- * mehrfacher Import (z. B. erneuter Untis-Import derselben Klasse oder ein
- * erneut hochgeladenes CSV) niemanden doppelt anlegt.
+ * erneut hochgeladenes CSV niemanden doppelt anlegt.
  */
 
 import { getDb } from './db.js';

@@ -66,12 +66,49 @@
       den Admin bitten, dich einem Fach zuzuweisen — sobald das geschehen ist, erscheint die
       passende Klasse hier automatisch.
     </p>
+  <% } else if (!schuljahre.length) { %>
+    <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
   <% } else { %>
-    <p><a href="/teacher/untis-import">📥 Aus Untis importieren</a> (Klassen und optional Schüler/innen)</p>
-    <% if (!schuljahre.length) { %>
-      <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
-    <% } else { %>
-      <form method="post" action="/teacher/klassen/neu" class="card">
+    <% var hatBekannteNamen = bekannteKlassennamen.length > 0; %>
+    <div class="reiter unter-reiter" data-storage-key="klassen-anlegen-modus">
+      <% if (hatBekannteNamen) { %>
+        <button type="button" class="active" data-target="klasse-anlegen-vorhanden">Vorhandene Klasse wählen</button>
+      <% } %>
+      <button type="button" class="<%= hatBekannteNamen ? '' : 'active' %>" data-target="klasse-anlegen-neu">Neue Klasse anlegen</button>
+    </div>
+
+    <% if (hatBekannteNamen) { %>
+      <div id="klasse-anlegen-vorhanden" class="reiter-panel unter-panel card active">
+        <form method="post" action="/teacher/klassen/neu">
+          <label>Schuljahr
+            <select name="schuljahr_id">
+              <% schuljahre.forEach(function(s) { %>
+                <option value="<%= s.id %>"><%= s.bezeichnung %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Klasse
+            <select name="name" required>
+              <option value="">— wählen —</option>
+              <% bekannteKlassennamen.forEach(function(n) { %>
+                <option value="<%= n %>"><%= n %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>Notenschlüssel
+            <select name="notenschluessel">
+              <option value="IHK">IHK (1–6)</option>
+              <option value="BG">BG (0–15)</option>
+            </select>
+          </label>
+          <button type="submit">+ Klasse anlegen</button>
+        </form>
+      </div>
+    <% } %>
+
+    <div id="klasse-anlegen-neu" class="reiter-panel unter-panel card<%= hatBekannteNamen ? '' : ' active' %>">
+      <p class="hint">Für einen Klassennamen, der noch nirgends im System vorkommt.</p>
+      <form method="post" action="/teacher/klassen/neu">
         <label>Schuljahr
           <select name="schuljahr_id">
             <% schuljahre.forEach(function(s) { %>
@@ -90,7 +127,7 @@
         </label>
         <button type="submit">+ Klasse anlegen</button>
       </form>
-    <% } %>
+    </div>
   <% } %>
 </details>
 
@@ -131,10 +168,19 @@
 <% } %>
 
 <script>
-  document.querySelectorAll('.reiter button').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.reiter button').forEach(function(b) { b.classList.toggle('active', b === btn); });
-      document.querySelectorAll('.reiter-panel').forEach(function(p) { p.classList.toggle('active', p.id === btn.dataset.target); });
+  // Jede .reiter-Gruppe schaltet nur ihre eigenen Buttons/Panels um --
+  // sonst würde z. B. ein Klick im Register "Neue Klasse anlegen" auch die
+  // Schuljahres-Reiter weiter unten auf der Seite umschalten.
+  document.querySelectorAll('.reiter').forEach(function(gruppe) {
+    var buttons = Array.from(gruppe.querySelectorAll(':scope > button'));
+    buttons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        buttons.forEach(function(b) {
+          b.classList.toggle('active', b === btn);
+          var panel = document.getElementById(b.dataset.target);
+          if (panel) panel.classList.toggle('active', b === btn);
+        });
+      });
     });
   });
 </script>
