@@ -1,8 +1,10 @@
 /**
- * Nachträgliche Änderung des Notenschlüssels einer Klasse
- * (POST /teacher/klassen/:id/notenschluessel, Klassenleitung) und die
- * Absicherung gegen einen dadurch entstehenden Notenschlüssel-Mix bei
- * klassenübergreifenden Kursen (fach_teilnehmer, src/fach-teilnehmer.js).
+ * Der Notenschlüssel einer Klasse wird beim Anlegen festgelegt und bleibt
+ * für Lehrkräfte (Klassenleitung) danach unveränderbar -- nur der Admin
+ * kann ihn über eine eigene Seite (/admin/klassen/:id/notenschluessel)
+ * nachträglich korrigieren. Dabei gilt die Absicherung gegen einen
+ * Notenschlüssel-Mix bei klassenübergreifenden Kursen (fach_teilnehmer,
+ * src/fach-teilnehmer.js) auch für den Admin.
  */
 
 import { test } from 'node:test';
@@ -91,57 +93,55 @@ test('Vorbereitung: zwei Klassen, ein Fach in A mit Teilnehmerin aus B', async (
   fachId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Kurs'").get(klasseAId).id;
 });
 
-test('Klassenleitung kann den Notenschlüssel einer unbeteiligten Klasse ändern', async () => {
-  const r = await form(lehrerB, `/teacher/klassen/${klasseBId}/notenschluessel`, { notenschluessel: 'BG' });
+test('Der Notenschlüssel steht bei Anlage fest -- keine Selbstbedienungs-Route für die Klassenleitung', async () => {
+  const r = await form(lehrerA, `/teacher/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'BG' });
+  assert.equal(r.status, 404, 'diese Route gibt es für Lehrkräfte nicht (mehr)');
+  assert.equal(getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseAId).notenschluessel, 'IHK');
+
+  const seite = await (await lehrerA(`/teacher/klassen/${klasseAId}`)).text();
+  assert.doesNotMatch(seite, /Notenschlüssel ändern/, 'auf der Klassenseite gibt es keine Bearbeitungsmöglichkeit mehr');
+});
+
+test('Admin kann den Notenschlüssel einer unbeteiligten Klasse nachträglich korrigieren', async () => {
+  const csvBg = '100,15;85,13;50,6;33,3;20,1;0,0';
+  const r = await form(admin, `/admin/klassen/${klasseBId}/notenschluessel`, { notenschluessel: 'BG', csv: csvBg });
   assert.equal(r.status, 302);
   const klasse = getDb().prepare('SELECT notenschluessel, notenschluessel_csv FROM klassen WHERE id = ?').get(klasseBId);
   assert.equal(klasse.notenschluessel, 'BG');
-  assert.ok(klasse.notenschluessel_csv.length > 0, 'Standard-CSV-Definition wird für den neuen Schlüssel gesetzt');
+  assert.equal(klasse.notenschluessel_csv, csvBg);
 
   // Zurücksetzen für die nachfolgenden Tests.
-  await form(lehrerB, `/teacher/klassen/${klasseBId}/notenschluessel`, { notenschluessel: 'IHK' });
+  const r2 = await form(admin, `/admin/klassen/${klasseBId}/notenschluessel`, { notenschluessel: 'IHK', csv: '100,1;95,1.3;90,1.6;50,4;0,6' });
+  assert.equal(r2.status, 302);
+  assert.equal(getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseBId).notenschluessel, 'IHK');
 });
 
-test('Fremde Lehrkraft (nicht Klassenleitung) darf den Notenschlüssel nicht ändern', async () => {
-  const r = await form(lehrerB, `/teacher/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'BG' });
-  assert.equal(r.status, 403);
-  assert.equal(getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseAId).notenschluessel, 'IHK');
-});
-
-test('Ohne klassenübergreifende Teilnahme: Notenschlüssel-Wechsel funktioniert normal', async () => {
-  const r = await form(lehrerA, `/teacher/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'BG' });
-  assert.equal(r.status, 302);
-  assert.equal(getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseAId).notenschluessel, 'BG');
-  // Zurücksetzen, bevor die Teilnehmerin aus 10B hinzukommt.
-  await form(lehrerA, `/teacher/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'IHK' });
-});
-
-test('Sobald ein klassenübergreifender Kurs existiert, wird ein inkompatibler Wechsel abgelehnt', async () => {
+test('Sobald ein klassenübergreifender Kurs existiert, wird ein inkompatibler Admin-Wechsel abgelehnt', async () => {
   const cara = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(klasseBId).id;
   await form(lehrerA, `/teacher/fach/${fachId}/teilnehmer/hinzufuegen`, { schueler_id: String(cara), halbjahr: '1. Halbjahr' });
   assert.ok(getDb().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(fachId, cara));
 
   // Klasse A (Heimat-Klasse des Kurses) auf BG umstellen -> Cara (10B, IHK) würde inkompatibel.
-  let r = await form(lehrerA, `/teacher/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'BG' });
+  let r = await form(admin, `/admin/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'BG' });
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseAId).notenschluessel, 'IHK',
     'Wechsel darf nicht angewendet werden, solange der Kurs eine fremde Teilnehmerin mit anderem Schlüssel hat');
-  const seite = await (await lehrerA(`/teacher/klassen/${klasseAId}`)).text();
+  const seite = await (await admin(`/admin/klassen/${klasseAId}/notenschluessel`)).text();
   assert.match(seite, /Notenschlüssel-Wechsel nicht möglich/);
 
   // Umgekehrte Richtung: Klasse B (Caras eigene Klasse) auf BG umstellen -> ebenfalls inkompatibel,
   // weil Cara an einem fremden (IHK-)Kurs teilnimmt.
-  r = await form(lehrerB, `/teacher/klassen/${klasseBId}/notenschluessel`, { notenschluessel: 'BG' });
+  r = await form(admin, `/admin/klassen/${klasseBId}/notenschluessel`, { notenschluessel: 'BG' });
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseBId).notenschluessel, 'IHK',
     'Wechsel darf nicht angewendet werden, solange eigene Schüler/innen an einem fremden Kurs mit anderem Schlüssel teilnehmen');
 });
 
-test('Nach Entfernen aus dem Kurs ist der Wechsel wieder möglich', async () => {
+test('Nach Entfernen aus dem Kurs ist der Admin-Wechsel wieder möglich', async () => {
   const cara = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(klasseBId).id;
   await form(lehrerA, `/teacher/fach/${fachId}/teilnehmer/entfernen`, { schueler_id: String(cara), halbjahr: '1. Halbjahr' });
 
-  const r = await form(lehrerA, `/teacher/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'BG' });
+  const r = await form(admin, `/admin/klassen/${klasseAId}/notenschluessel`, { notenschluessel: 'BG' });
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseAId).notenschluessel, 'BG');
 });

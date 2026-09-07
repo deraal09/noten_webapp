@@ -26,7 +26,7 @@ import { parseSchuelerCsv } from '../csv-import.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
 import {
   seedeTeilnehmerAusKlasse, ladeTeilnehmerMitHerkunft, fuegeTeilnehmerHinzu, entferneTeilnehmer,
-  sucheSchuelerFuerFach, legeManuellenTeilnehmerAn, pruefeNotenschluesselWechsel,
+  sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../schuljahr-utils.js';
 import Busboy from '@fastify/busboy';
@@ -771,25 +771,6 @@ export default async function teacherRoutes(fastify) {
     }
     const offen = request.body?.offen === '1' ? 1 : 0;
     getDb().prepare('UPDATE klassen SET offen_fuer_beitritt = ? WHERE id = ?').run(offen, request.params.id);
-    return reply.redirect(`/teacher/klassen/${request.params.id}`);
-  });
-
-  // ---------- Notenschlüssel nachträglich ändern (Klassenleitung) ----------
-  fastify.post('/klassen/:id/notenschluessel', async (request, reply) => {
-    if (!userIstKlassenlehrer(request.user, request.params.id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
-    }
-    let ns = String(request.body?.notenschluessel || 'IHK');
-    if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
-    const pruefung = pruefeNotenschluesselWechsel(request.params.id, ns);
-    if (!pruefung.ok) {
-      request.flash?.('error',
-        `Notenschlüssel-Wechsel nicht möglich, solange klassenübergreifende Kurse betroffen wären: ${pruefung.konflikte.join('; ')}. Erst die Teilnehmerlisten anpassen (Fach → „Teilnehmer/innen").`);
-      return reply.redirect(`/teacher/klassen/${request.params.id}`);
-    }
-    getDb().prepare('UPDATE klassen SET notenschluessel = ?, notenschluessel_csv = ? WHERE id = ?')
-      .run(ns, DEFAULT_NS_CSV[ns] || '', request.params.id);
-    request.flash?.('success', 'Notenschlüssel geändert. Achtung: bereits eingetragene Noten/Punkte werden künftig nach dem neuen Schlüssel berechnet.');
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
   });
 

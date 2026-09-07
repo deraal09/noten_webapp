@@ -294,6 +294,15 @@ zugewiesen (sieht es sofort in der eigenen Notentafel). Das Formular „Neue
 Klasse anlegen" ist standardmäßig eingeklappt (`<details>`), damit die
 Felder nur bei Bedarf erscheinen.
 
+**Der beim Anlegen gewählte Notenschlüssel (IHK/BG) steht danach fest** —
+für die Klassenleitung gibt es bewusst keine Möglichkeit, ihn nachträglich
+zu ändern (Fehleingaben würden sonst leicht unbemerkt die Berechnung
+bereits eingetragener Noten verfälschen). Nur der Admin kann ihn im
+Ausnahmefall über `/admin/klassen/:id/notenschluessel` korrigieren — dabei
+greift dieselbe Absicherung gegen einen Notenschlüssel-Mix bei
+klassenübergreifenden Kursen wie beim Hinzufügen von Teilnehmer/innen
+(siehe unten, `pruefeNotenschluesselWechsel` in `src/fach-teilnehmer.js`).
+
 **Über einen Einladungslink registrierte ("externe") Konten haben dieses
 Selbstbedienungsrecht bewusst NICHT** (`userDarfSelbstKlasseAnlegen` in
 `src/auth.js`, geprüft anhand `auth_source`: `'ldap'` vs. `'lokal'`) — sie
