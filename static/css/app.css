@@ -247,6 +247,21 @@ button.danger:hover { background: var(--danger-hover); }
 form.inline { display: inline-block; margin: 0; }
 form.inline input, form.inline select { width: auto; display: inline-block; margin-right: 0.5rem; }
 
+/* "Neuen Kurs anlegen": Kursname etwas breiter/höher, Ausgangsklasse-Auswahl
+   etwas höher -- ohne das griffen nur die Browser-Standardgrößen, weil
+   dieses (bewusst kompakte, inline aufgebaute) Formular nicht in eine
+   .card steckt. */
+#panel-kurs-anlegen input[type=text] {
+  padding: 0.55rem 0.75rem; width: 16rem; max-width: 100%;
+  border: 1px solid var(--border-strong); border-radius: 4px;
+  background: var(--bg-input); color: var(--text); font: inherit;
+}
+#panel-kurs-anlegen select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-strong); border-radius: 4px;
+  background: var(--bg-input); color: var(--text); font: inherit;
+}
+
 .right { float: right; }
 .hint { color: var(--text-muted); font-size: 0.9rem; }
 
