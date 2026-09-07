@@ -76,6 +76,25 @@
   </details>
 
   <details class="card">
+    <summary>Notenschlüssel ändern <small>(aktuell: <%= klasse.notenschluessel %>)</small></summary>
+    <p class="hint">
+      Wirkt sich auf alle Fächer dieser Klasse aus — bereits eingetragene Noten/Punkte werden
+      danach nach dem neuen Schlüssel berechnet, nicht automatisch umgerechnet. Bei
+      klassenübergreifenden Kursen (Reiter „Teilnehmer/innen" bei einem Fach) muss der
+      Notenschlüssel alle Beteiligten weiterhin gleich sein — ein Wechsel wird abgelehnt,
+      solange das nicht der Fall wäre.
+    </p>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/notenschluessel" class="inline"
+          onsubmit="return confirm('Notenschlüssel wirklich ändern? Betrifft die Berechnung aller Noten dieser Klasse.')">
+      <select name="notenschluessel">
+        <option value="IHK" <%= klasse.notenschluessel === 'IHK' ? 'selected' : '' %>>IHK (1–6)</option>
+        <option value="BG" <%= klasse.notenschluessel === 'BG' ? 'selected' : '' %>>BG (0–15)</option>
+      </select>
+      <button type="submit">Speichern</button>
+    </form>
+  </details>
+
+  <details class="card">
     <summary>Klasse ins nächste Schuljahr übertragen</summary>
     <% if (!andereSchuljahre.length) { %>
       <p class="hint">Es gibt noch kein weiteres Schuljahr — bitte den Admin bitten, zuerst eins anzulegen.</p>

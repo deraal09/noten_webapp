@@ -11,6 +11,7 @@ import {
   getLdapSettingsRow, saveLdapSettings, clearLdapBindPassword, resolveLdapConfig,
 } from '../auth/ldap-settings.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
+import { pruefeNotenschluesselWechsel } from '../fach-teilnehmer.js';
 import {
   istGueltigesSchuljahrFormat, sortiereSchuljahreAbsteigend, aktuellesStartjahr, parseSchuljahr,
 } from '../schuljahr-utils.js';
@@ -192,6 +193,12 @@ export default async function adminRoutes(fastify) {
     const csv = String(request.body?.csv || '').trim();
     let ns = String(request.body?.notenschluessel || 'IHK');
     if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
+    const pruefung = pruefeNotenschluesselWechsel(request.params.id, ns);
+    if (!pruefung.ok) {
+      request.flash?.('error',
+        `Notenschlüssel-Wechsel nicht möglich, solange klassenübergreifende Kurse betroffen wären: ${pruefung.konflikte.join('; ')}. Erst die Teilnehmerlisten anpassen.`);
+      return reply.redirect(`/admin/klassen/${request.params.id}/notenschluessel`);
+    }
     getDb().prepare('UPDATE klassen SET notenschluessel = ?, notenschluessel_csv = ? WHERE id = ?')
       .run(ns, csv, request.params.id);
     return reply.redirect(`/admin/klassen/${request.params.id}/notenschluessel`);

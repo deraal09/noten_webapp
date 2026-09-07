@@ -96,6 +96,50 @@ export function sucheSchuelerFuerFach(fach, suchtext) {
 }
 
 /**
+ * Prüft, ob eine Klasse gefahrlos auf einen anderen Notenschlüssel
+ * umgestellt werden kann -- d. h. ob das eine bestehende
+ * klassenübergreifende Teilnahme (fach_teilnehmer) inkompatibel machen
+ * würde. Zwei Richtungen sind möglich:
+ *  a) Ein eigenes Fach dieser Klasse hat Teilnehmer/innen aus einer
+ *     anderen Klasse mit dem BISHERIGEN (nicht dem neuen) Notenschlüssel.
+ *  b) Eigene Schüler/innen dieser Klasse nehmen an einem Fach einer
+ *     ANDEREN Klasse teil, deren Notenschlüssel dem neuen Wert nicht
+ *     entspräche.
+ * Gibt { ok: true } oder { ok: false, konflikte: string[] } zurück --
+ * die Konflikte sind für eine Fehlermeldung aufbereitete Klassen-/Fachnamen.
+ */
+export function pruefeNotenschluesselWechsel(klasseId, neuerNotenschluessel) {
+  const db = getDb();
+  const konflikte = [];
+
+  const fremdeInEigenenFaechern = db.prepare(`
+    SELECT DISTINCT f.name AS fach_name, k2.name AS klasse_name
+    FROM faecher f
+    JOIN fach_teilnehmer ft ON ft.fach_id = f.id
+    JOIN schueler s ON s.id = ft.schueler_id
+    JOIN klassen k2 ON k2.id = s.klasse_id
+    WHERE f.klasse_id = ? AND k2.id != ? AND k2.notenschluessel != ?
+  `).all(klasseId, klasseId, neuerNotenschluessel);
+  for (const r of fremdeInEigenenFaechern) {
+    konflikte.push(`„${r.fach_name}" hat Teilnehmer/innen aus „${r.klasse_name}"`);
+  }
+
+  const eigeneInFremdenFaechern = db.prepare(`
+    SELECT DISTINCT f.name AS fach_name, k2.name AS klasse_name
+    FROM fach_teilnehmer ft
+    JOIN schueler s ON s.id = ft.schueler_id
+    JOIN faecher f ON f.id = ft.fach_id
+    JOIN klassen k2 ON k2.id = f.klasse_id
+    WHERE s.klasse_id = ? AND k2.id != ? AND k2.notenschluessel != ?
+  `).all(klasseId, klasseId, neuerNotenschluessel);
+  for (const r of eigeneInFremdenFaechern) {
+    konflikte.push(`eigene Schüler/innen nehmen an „${r.fach_name}" (Klasse „${r.klasse_name}") teil`);
+  }
+
+  return konflikte.length ? { ok: false, konflikte } : { ok: true };
+}
+
+/**
  * Manuelles Hinzufügen: Nachname/Vorname/Klassenname. Existiert die Klasse
  * im Schuljahr des Fachs schon, wird sie (mit Notenschlüssel-Check)
  * verwendet; sonst wird sie als leere Hülle NEU angelegt (Notenschlüssel
