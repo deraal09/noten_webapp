@@ -60,7 +60,7 @@ test('Ohne bekannte Klassennamen gibt es nur das Register "Neue Klasse anlegen",
   await form(admin, '/admin/schuljahre/neu', { bezeichnung: '2025/26' });
 
   const html = await (await admin('/teacher/klassen')).text();
-  const anlegenBlock = html.slice(html.indexOf('<details>'), html.indexOf('<h2>Vorhandene Klassen</h2>'));
+  const anlegenBlock = html.slice(html.indexOf('id="panel-klasse-anlegen"'), html.indexOf('<h2>Vorhandene Klassen</h2>'));
 
   assert.doesNotMatch(anlegenBlock, /Vorhandene Klasse wählen/,
     'ohne bekannte Namen darf kein Auswahl-Register angeboten werden');

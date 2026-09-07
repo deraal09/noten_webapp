@@ -1,9 +1,9 @@
 /**
- * "Meine Klassen": "Neue Klasse anlegen" ist aufklappbar (<details>), und
- * die vorhandenen Klassen werden nach Schuljahr in Reitern (Tabs) sortiert
- * — das aktuelle Schuljahr (nach heutigem Datum) immer ganz vorne, auch
- * wenn ein vergangenes Schuljahr zuletzt/nachträglich angelegt wurde
- * (src/schuljahr-utils.js, sortiereSchuljahreFuerReiter).
+ * "Meine Klassen": "Neue Klasse anlegen" ist über einen Reiter-Button
+ * ein-/ausblendbar, und die vorhandenen Klassen werden nach Schuljahr in
+ * Reitern (Tabs) sortiert — das aktuelle Schuljahr (nach heutigem Datum)
+ * immer ganz vorne, auch wenn ein vergangenes Schuljahr zuletzt/nachträglich
+ * angelegt wurde (src/schuljahr-utils.js, sortiereSchuljahreFuerReiter).
  */
 
 import { test } from 'node:test';
@@ -86,9 +86,11 @@ test('Vorbereitung: Admin, Lehrkraft, drei Schuljahre (das älteste zuletzt/"nac
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjNachgetragenId), name: '5B', notenschluessel: 'IHK' });
 });
 
-test('"Neue Klasse anlegen" ist aufklappbar (<details>/<summary>)', async () => {
+test('"Neue Klasse anlegen" ist als Reiter-Button neben "Neuen Kurs anlegen" vorhanden', async () => {
   const html = await (await lehrerA('/teacher/klassen')).text();
-  assert.match(html, /<details>\s*<summary>\+ Neue Klasse anlegen<\/summary>/);
+  assert.match(html, /<button type="button" data-target="panel-klasse-anlegen">\+ Neue Klasse anlegen<\/button>/);
+  assert.match(html, /<button type="button" data-target="panel-kurs-anlegen">\+ Neuen Kurs anlegen<\/button>/);
+  assert.match(html, /<div id="panel-klasse-anlegen" class="reiter-panel">/);
 });
 
 test('Klasse anlegen: Register "Vorhandene Klasse wählen" (Select mit bekannten Namen) vor "Neue Klasse anlegen"', async () => {

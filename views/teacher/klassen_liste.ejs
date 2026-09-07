@@ -10,9 +10,12 @@
   <% } %>
 </small></p>
 
-<div class="knopf-reihe">
-<details>
-  <summary>+ Neue Klasse anlegen</summary>
+<div class="reiter knopf-reihe">
+  <button type="button" data-target="panel-klasse-anlegen">+ Neue Klasse anlegen</button>
+  <button type="button" data-target="panel-kurs-anlegen">+ Neuen Kurs anlegen</button>
+</div>
+
+<div id="panel-klasse-anlegen" class="reiter-panel">
   <% if (!kannSelbstKlasseAnlegen) { %>
     <p class="hint">
       Eigene Klassen anlegen können nur Lehrkräfte mit LDAP-Zugang. Bitte eine Klassenleitung oder
@@ -82,10 +85,9 @@
       </form>
     </div>
   <% } %>
-</details>
+</div>
 
-<details>
-  <summary>+ Neuen Kurs anlegen</summary>
+<div id="panel-kurs-anlegen" class="reiter-panel">
   <% if (!klassen.length) { %>
     <p class="hint">
       Für einen Kurs wird zunächst mindestens eine eigene Klasse gebraucht (siehe oben) -- der Kurs
@@ -114,7 +116,6 @@
       <button type="submit">+ Kurs anlegen</button>
     </form>
   <% } %>
-</details>
 </div>
 
 <h2>Vorhandene Klassen</h2>
