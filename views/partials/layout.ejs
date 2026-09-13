@@ -29,6 +29,7 @@
   <div class="topbar-inner">
     <a class="brand" href="/">📚 <%= appName %></a>
     <% if (typeof user !== 'undefined' && user) { %>
+      <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false">☰</button>
       <nav class="nav">
         <a href="/start">Start</a>
         <% if (user.isAdmin) { %>
@@ -80,6 +81,16 @@
 </footer>
 <% } %>
 <script>
+  (function () {
+    var toggle = document.querySelector('.nav-toggle');
+    var inner = document.querySelector('.topbar-inner');
+    if (toggle && inner) {
+      toggle.addEventListener('click', function () {
+        var offen = inner.classList.toggle('nav-open');
+        toggle.setAttribute('aria-expanded', offen ? 'true' : 'false');
+      });
+    }
+  })();
   (function () {
     var buttons = document.querySelectorAll('.theme-switch button');
     var pref = 'system';

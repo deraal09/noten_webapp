@@ -180,6 +180,33 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 .badge { display: inline-block; color: #fff; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.75rem; }
 .topbar .logout { font-size: 0.9rem; }
 
+/* Menü-Button (☰): nur sichtbar, sobald die Navigation nicht mehr in eine
+   Zeile passt (siehe Media Query unten) -- ohne Nutzerkonto (Login/Setup-
+   Seiten) gibt es weder Nav noch Button. */
+.nav-toggle {
+  display: none; background: transparent; border: none; color: var(--on-dark);
+  font-size: 1.3rem; line-height: 1; padding: 0.25rem 0.4rem; cursor: pointer; border-radius: 4px;
+}
+.nav-toggle:hover { background: rgba(255,255,255,0.12); }
+
+/* Die vollständige Nav (bis zu 10 Links für den Admin) plus Userbox braucht
+   in einer Zeile ca. 1570px -- deutlich mehr als ein Smartphone, aber auch
+   mehr als viele Laptop-Displays. Unterhalb der Grenze klappt ein
+   Menü-Button die Navigation auf, statt sie über den Bildschirmrand hinaus
+   laufen zu lassen (vorher: die ganze Seite bekam dadurch horizontales
+   Scrollen, nicht nur die Kopfzeile). */
+@media (max-width: 1600px) {
+  .topbar-inner { flex-wrap: wrap; height: auto; padding: 0.6rem 1rem; row-gap: 0.4rem; }
+  .nav-toggle { display: inline-block; }
+  .topbar .nav, .topbar .userbox { flex-basis: 100%; display: none; }
+  .topbar-inner.nav-open .nav, .topbar-inner.nav-open .userbox { display: flex; }
+  .topbar .nav { flex-direction: column; gap: 0; order: 3; }
+  .topbar .nav a { padding: 0.6rem 0.2rem; border-top: 1px solid rgba(255,255,255,0.15); }
+  .topbar .userbox {
+    order: 4; flex-wrap: wrap; padding-top: 0.6rem; border-top: 1px solid rgba(255,255,255,0.15);
+  }
+}
+
 .flash { padding: 0.75rem 1rem; border-radius: 4px; margin: 0.5rem 1rem; }
 .flash-success { background: var(--flash-success-bg); color: var(--flash-success-text); border: 1px solid var(--flash-success-border); }
 .flash-error, .err { background: var(--flash-error-bg); color: var(--flash-error-text); border: 1px solid var(--flash-error-border); padding: 0.5rem 0.75rem; border-radius: 4px; }
