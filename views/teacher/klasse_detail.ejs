@@ -1,14 +1,14 @@
 <h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
-<p>
-  <a href="/teacher/klassen">← Meine Klassen</a>
-  · <a href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
+  <a class="btn" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a>
   <% if (kannExportieren) { %>
-    · <a href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
+    <a class="btn" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
   <% } %>
   <% if (eigentuemer) { %>
-    · <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
-        <button type="submit" class="danger">🗑 Klasse löschen</button>
-      </form>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
+      <button type="submit" class="danger">🗑 Klasse löschen</button>
+    </form>
   <% } %>
 </p>
 

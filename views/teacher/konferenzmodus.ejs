@@ -1,5 +1,5 @@
 <h1>Konferenzmodus: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
-<p><a href="/teacher/klassen/<%= klasse.id %>/uebersicht?hj=<%= encodeURIComponent(halbjahr) %>">← Zur Halbjahresübersicht</a></p>
+<p class="kopf-aktionen"><a class="btn" href="/teacher/klassen/<%= klasse.id %>/uebersicht?hj=<%= encodeURIComponent(halbjahr) %>">← Zur Halbjahresübersicht</a></p>
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>

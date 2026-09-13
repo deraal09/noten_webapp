@@ -1,8 +1,8 @@
 <h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
-<p>
-  <a href="/admin/schuljahre/<%= klasse.schuljahr_id %>">← Schuljahr</a> ·
-  <a href="/admin/klassen/<%= klasse.id %>/notenschluessel">Notenschlüssel</a> ·
-  <a href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
+<p class="kopf-aktionen">
+  <a class="btn" href="/admin/schuljahre/<%= klasse.schuljahr_id %>">← Schuljahr</a>
+  <a class="btn" href="/admin/klassen/<%= klasse.id %>/notenschluessel">Notenschlüssel</a>
+  <a class="btn" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
 </p>
 
 <h2>Schüler/innen (<%= schueler.length %>)</h2>

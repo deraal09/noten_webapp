@@ -1,8 +1,8 @@
 <h1>Halbjahresübersicht: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
-<p>
-  <a href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
   <% if (zeilen.length) { %>
-    · <a href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= zeilen[0].schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">🎓 Konferenzmodus starten</a>
+    <a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= zeilen[0].schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">🎓 Konferenzmodus starten</a>
   <% } %>
 </p>
 

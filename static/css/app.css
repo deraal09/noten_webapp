@@ -247,6 +247,14 @@ button.danger:hover { background: var(--danger-hover); }
 form.inline { display: inline-block; margin: 0; }
 form.inline input, form.inline select { width: auto; display: inline-block; margin-right: 0.5rem; }
 
+/* Zeile mit Navigations-/Aktionslinks direkt unter der Überschrift (z. B.
+   "← Zurück", "Sitzplan", "Notenbesprechung starten") -- vorher reiner,
+   leicht zu übersehender Fließtext mit "·" als Trenner, jetzt Buttons
+   (.btn, wie an anderer Stelle in der App bereits für Links verwendet) in
+   einer Reihe mit Abstand statt Trennzeichen. */
+.kopf-aktionen { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 0.75rem 0; }
+.kopf-aktionen form.inline { margin: 0; }
+
 /* "Neuen Kurs anlegen": Kursname etwas breiter/höher, Ausgangsklasse-Auswahl
    etwas höher -- ohne das griffen nur die Browser-Standardgrößen, weil
    dieses (bewusst kompakte, inline aufgebaute) Formular nicht in eine

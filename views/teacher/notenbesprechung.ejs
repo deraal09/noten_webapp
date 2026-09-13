@@ -1,7 +1,7 @@
 <h1>Notenbesprechung: <%= fach.name %> – <%= fach.klasse_name %></h1>
-<p>
-  <a href="/teacher/fach/<%= fach.id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück zur Noteneingabe</a>
-  · <a href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/fach/<%= fach.id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück zur Noteneingabe</a>
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
 </p>
 
 <div class="hj-tabs">
