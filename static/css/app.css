@@ -221,6 +221,14 @@ table.data, table.tafel { width: 100%; border-collapse: collapse; background: va
 table.data th, table.data td,
 table.tafel th, table.tafel td { padding: 0.5rem 0.75rem; border: 1px solid var(--border); text-align: left; vertical-align: top; }
 table.data thead th, table.tafel thead th { background: var(--bg-header); font-weight: 600; }
+
+/* Breite Tabellen (viele Spalten, z. B. Notentafeln oder Fehlzeiten mit
+   zwei Schulen) laufen auf schmalen Bildschirmen sonst über den Bildschirm-
+   rand hinaus und reißen dabei die ganze Seite in die Breite. Die Tabelle
+   selbst scrollt jetzt seitlich (die Kopfzeile bleibt oben stehen, siehe
+   überall zusammen gehörende thead/tbody -- die bleiben trotz display:block
+   auf dem <table> intakt, weil sie selbst ihre table-*-Anzeige behalten). */
+table.data, table.tafel { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table.data tbody tr:nth-child(even) { background: var(--bg-subtle); }
 table.data .name, table.tafel .name { white-space: nowrap; }
 
