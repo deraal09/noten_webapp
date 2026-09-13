@@ -5,6 +5,38 @@
   <a class="btn" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
 </p>
 
+<h2>Klassenleitung</h2>
+<% if (!klassenleitungListe.length) { %>
+  <p class="hint">Noch keine Klassenleitung eingetragen.</p>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Lehrkraft</th><th>Aktion</th></tr></thead>
+    <tbody>
+      <% klassenleitungListe.forEach(function(kl) { %>
+        <tr>
+          <td><%= kl.display_name || kl.username %></td>
+          <td>
+            <form method="post" action="/admin/klassenleitung/<%= kl.id %>/entfernen" class="inline" onsubmit="return confirm('Klassenleitung entfernen?')">
+              <button type="submit" class="danger">🗑</button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+<% if (zuweisbareLehrkraefte.length) { %>
+  <form method="post" action="/admin/klassen/<%= klasse.id %>/klassenleitung/hinzufuegen" class="inline">
+    <select name="user_id" required>
+      <option value="">— Lehrkraft wählen —</option>
+      <% zuweisbareLehrkraefte.forEach(function(u) { %>
+        <option value="<%= u.id %>"><%= u.display_name || u.username %></option>
+      <% }); %>
+    </select>
+    <button type="submit">+ Als Klassenleitung eintragen</button>
+  </form>
+<% } %>
+
 <h2>Schüler/innen (<%= schueler.length %>)</h2>
 <form method="post" action="/admin/klassen/<%= klasse.id %>/schueler/neu" class="inline">
   <input type="text" name="nachname" placeholder="Nachname" required>

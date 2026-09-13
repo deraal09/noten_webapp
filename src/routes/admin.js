@@ -115,9 +115,39 @@ export default async function adminRoutes(fastify) {
       + '     FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id WHERE fz.fach_id = f.id) AS lehrer_liste '
       + 'FROM faecher f WHERE f.klasse_id = ? ORDER BY f.name'
     ).all(klasse.id);
+    const klassenleitungListe = getDb().prepare(`
+      SELECT kls.id, kls.user_id, u.display_name, u.username
+      FROM klassenleitung kls JOIN users u ON u.id = kls.user_id
+      WHERE kls.klasse_id = ?
+      ORDER BY u.username
+    `).all(klasse.id);
+    const zuweisbareLehrkraefte = getDb().prepare(
+      "SELECT id, username, display_name FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
+    ).all().filter((u) => !klassenleitungListe.some((kl) => kl.user_id === u.id));
     return reply.viewEjs('admin/klasse_detail.ejs', {
-      user: request.user, klasse, schueler, faecher,
+      user: request.user, klasse, schueler, faecher, klassenleitungListe, zuweisbareLehrkraefte,
     });
+  });
+
+  // ---------- Klassenleitung (Admin darf sie jederzeit setzen/ändern) ----------
+  fastify.post('/klassen/:id/klassenleitung/hinzufuegen', async (request, reply) => {
+    const userId = parseInt(request.body?.user_id, 10);
+    if (!userId) {
+      request.flash?.('error', 'Bitte eine Lehrkraft auswählen.');
+      return reply.redirect(`/admin/klassen/${request.params.id}`);
+    }
+    getDb().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)')
+      .run(request.params.id, userId);
+    request.flash?.('success', 'Als Klassenleitung eingetragen.');
+    return reply.redirect(`/admin/klassen/${request.params.id}`);
+  });
+
+  fastify.post('/klassenleitung/:id/entfernen', async (request, reply) => {
+    const eintrag = getDb().prepare('SELECT klasse_id FROM klassenleitung WHERE id = ?').get(request.params.id);
+    if (!eintrag) return reply.redirect('/admin');
+    getDb().prepare('DELETE FROM klassenleitung WHERE id = ?').run(request.params.id);
+    request.flash?.('success', 'Klassenleitung entfernt.');
+    return reply.redirect(`/admin/klassen/${eintrag.klasse_id}`);
   });
 
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {
