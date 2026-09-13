@@ -155,6 +155,22 @@ export async function buildApp(opts = {}) {
     // Link "Lehrerkalender" in der Navigation, sobald LEHRERKALENDER_URL gesetzt
     // ist — dank SSO ohne zweite Anmeldung (siehe src/sso.js).
     reply.locals.kalenderUrl = ssoConfig().kalenderUrl || null;
+    // Embed-Modus: laeuft diese Seite in einem <iframe> (z. B. im
+    // Lehrerkalender)? Erkennung ueber den Fetch-Metadata-Header
+    // Sec-Fetch-Dest, den Browser bei JEDER Navigation innerhalb eines
+    // Iframes automatisch mitschicken (auch bei internen Links, nicht nur
+    // beim ersten Laden) — kein Query-Parameter noetig, der bei jedem Link
+    // mitgefuehrt werden muesste, und nichts, das ueber die Session hinweg
+    // "kleben bleibt", wenn dieselbe Person die App spaeter normal in einem
+    // eigenen Tab oeffnet. Layout blendet damit Kopfzeile/Fusszeile aus, siehe
+    // views/partials/layout.ejs.
+    reply.locals.embed = request.headers['sec-fetch-dest'] === 'iframe';
+    // Nur den bekannten Lehrerkalender als Einbetter zulassen (statt wie
+    // bisher gar keine Einschraenkung) — sobald LEHRERKALENDER_URL gesetzt
+    // ist. Ohne die Variable bleibt das Verhalten unveraendert (offen).
+    if (reply.locals.kalenderUrl) {
+      reply.header('Content-Security-Policy', `frame-ancestors 'self' ${reply.locals.kalenderUrl}`);
+    }
     const pending = request.session?.flash;
     reply.locals.flash = pending && pending.length ? pending : null;
     if (pending && pending.length) request.session.flash = [];

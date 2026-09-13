@@ -20,6 +20,11 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E">
 </head>
 <body>
+<% /* Eingebettet im Lehrerkalender (siehe app.js, Erkennung ueber
+      Sec-Fetch-Dest): eigene Kopf-/Fusszeile ausblenden, damit die
+      Notenverwaltung wie ein Bereich der einbettenden App wirkt statt wie
+      eine zweite App darin. */ %>
+<% if (!(typeof embed !== 'undefined' && embed)) { %>
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="/">📚 <%= appName %></a>
@@ -60,6 +65,7 @@
     </div>
   </div>
 </header>
+<% } %>
 <% if (typeof flash !== 'undefined' && flash && flash.length) { %>
   <% flash.forEach(function (f) { %>
     <div class="flash flash-<%= f.type %>"><%= f.message %></div>
@@ -68,9 +74,11 @@
 <main class="container">
 <%- body %>
 </main>
+<% if (!(typeof embed !== 'undefined' && embed)) { %>
 <footer class="footer">
   <small>Notenverwaltung · <%= now.getFullYear() %></small>
 </footer>
+<% } %>
 <script>
   (function () {
     var buttons = document.querySelectorAll('.theme-switch button');
