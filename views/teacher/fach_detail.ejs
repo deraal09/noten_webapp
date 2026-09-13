@@ -1,71 +1,11 @@
 <h1><%= fach.name %> – <%= fach.klasse_name %> <small>(<%= fach.schuljahr_bezeichnung %>, <%= fach.notenschluessel %>)</small></h1>
-<p>
-  <a href="/teacher">← Meine Noteneingabe</a>
-  · <a href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher">← Meine Noteneingabe</a>
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
   <% if (schueler.length) { %>
-    · <a href="/teacher/fach/<%= fach.id %>/besprechung/<%= schueler[0].id %>?hj=<%= encodeURIComponent(halbjahr) %>">🗣 Notenbesprechung starten</a>
+    <a class="btn" href="/teacher/fach/<%= fach.id %>/besprechung/<%= schueler[0].id %>?hj=<%= encodeURIComponent(halbjahr) %>">🗣 Notenbesprechung starten</a>
   <% } %>
 </p>
-
-<div class="card">
-  <p>
-    <% if (syncMeta) { %>
-      Zuletzt mit der Klassenleitung synchronisiert:
-      <strong><%= formatZeitLokal(syncMeta.synced_at) %></strong>
-      (<%= syncMeta.display_name || syncMeta.username || 'unbekannt' %>)
-    <% } else { %>
-      <strong>Noch nicht synchronisiert</strong> — die Klassenleitung sieht für dieses Halbjahr noch keine Noten dieses Fachs.
-    <% } %>
-  </p>
-  <form method="post" action="/teacher/fach/<%= fach.id %>/sync" class="inline">
-    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-    <button type="submit">🔄 Jetzt synchronisieren</button>
-  </form>
-  <form method="post" action="/teacher/fach/<%= fach.id %>/auto-sync" class="inline" id="auto-sync-form">
-    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-    <input type="hidden" name="aktiv" id="auto-sync-aktiv" value="<%= autoSync ? '1' : '0' %>">
-    <label>
-      <input type="checkbox" id="auto-sync-checkbox" <%= autoSync ? 'checked' : '' %>>
-      automatisch mit Klassenleitung synchronisieren (bei jeder Notenänderung)
-    </label>
-  </form>
-  <script>
-    (function() {
-      var cb = document.getElementById('auto-sync-checkbox');
-      var hidden = document.getElementById('auto-sync-aktiv');
-      var form = document.getElementById('auto-sync-form');
-      cb.addEventListener('change', function() {
-        hidden.value = cb.checked ? '1' : '0';
-        form.submit();
-      });
-    })();
-  </script>
-</div>
-
-<% if (darfFachAbschliessen) { %>
-  <div class="card">
-    <% if (fach.abgeschlossen) { %>
-      <p>
-        ✅ Fach abgeschlossen am <strong><%= formatZeitLokal(fach.abgeschlossen_am) %></strong> —
-        die Fachabschlussnote (Mittelwert aus allen Halbjahren, siehe Notenübersicht) ist eingefroren.
-      </p>
-      <form method="post" action="/teacher/fach/<%= fach.id %>/oeffnen" class="inline"
-            onsubmit="return confirm('Fach wieder öffnen? Die Fachabschlussnote bleibt bis zum nächsten Abschließen unverändert sichtbar.')">
-        <button type="submit">🔓 Fach wieder öffnen</button>
-      </form>
-    <% } else { %>
-      <p class="hint">
-        Optional: Manche Fächer laufen über mehrere Schuljahre und werden nie abgeschlossen. Beim
-        Abschließen wird je Schüler/in eine Fachabschlussnote aus allen vorhandenen Halbjahren
-        (aktuelle + historische, siehe unten) berechnet.
-      </p>
-      <form method="post" action="/teacher/fach/<%= fach.id %>/abschliessen" class="inline"
-            onsubmit="return confirm('Fach abschließen? Für jede Schülerin/jeden Schüler wird eine Fachabschlussnote aus allen Halbjahren berechnet.')">
-        <button type="submit">✅ Fach abschließen</button>
-      </form>
-    <% } %>
-  </div>
-<% } %>
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
@@ -78,6 +18,10 @@
   <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
   <button type="button" data-target="panel-klausuren">Klausuren</button>
   <button type="button" data-target="panel-teilnehmer">Teilnehmer/innen</button>
+  <button type="button" data-target="panel-sync">Synchronisation</button>
+  <% if (darfFachAbschliessen) { %>
+    <button type="button" data-target="panel-abschluss">Fach abschließen</button>
+  <% } %>
 </div>
 
 <div id="panel-uebersicht" class="reiter-panel active">
@@ -521,6 +465,66 @@
     </form>
   </div>
 </div>
+
+<div id="panel-sync" class="reiter-panel card">
+  <p>
+    <% if (syncMeta) { %>
+      Zuletzt mit der Klassenleitung synchronisiert:
+      <strong><%= formatZeitLokal(syncMeta.synced_at) %></strong>
+      (<%= syncMeta.display_name || syncMeta.username || 'unbekannt' %>)
+    <% } else { %>
+      <strong>Noch nicht synchronisiert</strong> — die Klassenleitung sieht für dieses Halbjahr noch keine Noten dieses Fachs.
+    <% } %>
+  </p>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/sync" class="inline">
+    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+    <button type="submit">🔄 Jetzt synchronisieren</button>
+  </form>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/auto-sync" class="inline" id="auto-sync-form">
+    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+    <input type="hidden" name="aktiv" id="auto-sync-aktiv" value="<%= autoSync ? '1' : '0' %>">
+    <label>
+      <input type="checkbox" id="auto-sync-checkbox" <%= autoSync ? 'checked' : '' %>>
+      automatisch mit Klassenleitung synchronisieren (bei jeder Notenänderung)
+    </label>
+  </form>
+  <script>
+    (function() {
+      var cb = document.getElementById('auto-sync-checkbox');
+      var hidden = document.getElementById('auto-sync-aktiv');
+      var form = document.getElementById('auto-sync-form');
+      cb.addEventListener('change', function() {
+        hidden.value = cb.checked ? '1' : '0';
+        form.submit();
+      });
+    })();
+  </script>
+</div>
+
+<% if (darfFachAbschliessen) { %>
+  <div id="panel-abschluss" class="reiter-panel card">
+    <% if (fach.abgeschlossen) { %>
+      <p>
+        ✅ Fach abgeschlossen am <strong><%= formatZeitLokal(fach.abgeschlossen_am) %></strong> —
+        die Fachabschlussnote (Mittelwert aus allen Halbjahren, siehe Notenübersicht) ist eingefroren.
+      </p>
+      <form method="post" action="/teacher/fach/<%= fach.id %>/oeffnen" class="inline"
+            onsubmit="return confirm('Fach wieder öffnen? Die Fachabschlussnote bleibt bis zum nächsten Abschließen unverändert sichtbar.')">
+        <button type="submit">🔓 Fach wieder öffnen</button>
+      </form>
+    <% } else { %>
+      <p class="hint">
+        Optional: Manche Fächer laufen über mehrere Schuljahre und werden nie abgeschlossen. Beim
+        Abschließen wird je Schüler/in eine Fachabschlussnote aus allen vorhandenen Halbjahren
+        (aktuelle + historische, siehe unten) berechnet.
+      </p>
+      <form method="post" action="/teacher/fach/<%= fach.id %>/abschliessen" class="inline"
+            onsubmit="return confirm('Fach abschließen? Für jede Schülerin/jeden Schüler wird eine Fachabschlussnote aus allen Halbjahren berechnet.')">
+        <button type="submit">✅ Fach abschließen</button>
+      </form>
+    <% } %>
+  </div>
+<% } %>
 
 <script>
   // Reiter (Notenübersicht/Unterrichtsleistung/Klausuren, sowie die
