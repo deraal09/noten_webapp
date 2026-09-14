@@ -152,7 +152,16 @@ export async function authPreHandler(request, reply) {
 // warten → jede geschützte Route hängt.
 export async function requireAuth(request, reply) {
   if (!request.user) {
-    return reply.code(401).redirect('/login?next=' + encodeURIComponent(request.url));
+    // Bewusst OHNE vorheriges reply.code(401): Fastifys redirect() übernimmt
+    // sonst den zuvor gesetzten Statuscode für die Redirect-Antwort selbst
+    // (302 nur, wenn noch kein Code gesetzt wurde) -- eine Antwort mit
+    // Statuscode 401 UND Location-Header wird von Browsern bei normaler
+    // Navigation aber NICHT automatisch verfolgt (das gilt nur für
+    // 3xx-Codes). Ergebnis war "HTTP ERROR 401" statt der erwarteten
+    // Weiterleitung zur Login-Seite, z. B. wenn die Sitzung nach einem
+    // Deploy/Neustart nicht mehr erkannt wird, während noch eine
+    // /teacher/…-Seite offen ist.
+    return reply.redirect('/login?next=' + encodeURIComponent(request.url));
   }
 }
 

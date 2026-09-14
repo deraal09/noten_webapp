@@ -80,7 +80,11 @@ test('Vorbereitung: Admin, Schuljahr, Lehrkraft, Klasse', async () => {
 
 test('Nicht angemeldet: /start verweist auf den Login (wie jede andere geschützte Route)', async () => {
   const r = await client()('/start');
-  assert.equal(r.status, 401);
+  // 302, nicht 401 -- ein Statuscode 401 mit Location-Header wird von
+  // Browsern bei normaler Navigation NICHT automatisch verfolgt (nur 3xx
+  // löst das aus), das ergäbe "HTTP ERROR 401" statt der Weiterleitung zum
+  // Login (siehe requireAuth in src/auth.js).
+  assert.equal(r.status, 302);
   assert.match(r.headers.get('location'), /\/login/);
 });
 
