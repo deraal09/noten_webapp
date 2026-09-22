@@ -195,7 +195,7 @@ test('Mehrere Klausuren/Zusatzleistungen erscheinen als Unter-Reiter, nicht gest
   // Ein Unter-Reiter mit einem Button je Klausur, jeweils mit eigenem Panel.
   // "+ Klausur anlegen" ist dabei immer die letzte Registerkarte (nicht mehr
   // ein separates <details>-Formular oberhalb der Liste).
-  assert.match(html, /class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-klausuren-\d+"/);
+  assert.match(html, /class="reiter unter-reiter card" data-storage-key="noteneingabe-subreiter-klausuren-\d+"/);
   const klausurReiterHtml = html.slice(html.indexOf('data-storage-key="noteneingabe-subreiter-klausuren-'), html.indexOf('</div>', html.indexOf('data-storage-key="noteneingabe-subreiter-klausuren-')));
   const klausurButtonZiele = Array.from(klausurReiterHtml.matchAll(/data-target="([^"]+)"/g)).map((m) => m[1]);
   assert.equal(klausurButtonZiele[klausurButtonZiele.length - 1], 'klausur-panel-anlegen',
@@ -212,7 +212,7 @@ test('Mehrere Klausuren/Zusatzleistungen erscheinen als Unter-Reiter, nicht gest
   // Zusatzleistung sind eigene Register, "+ Zusatzleistung anlegen" bleibt
   // dabei immer die letzte Registerkarte (nicht mehr ein separates
   // <details>-Formular oberhalb der Liste).
-  assert.match(html, /class="reiter unter-reiter" data-storage-key="noteneingabe-subreiter-uls-\d+"/);
+  assert.match(html, /class="reiter unter-reiter card" data-storage-key="noteneingabe-subreiter-uls-\d+"/);
   const ulReiterHtml = html.slice(html.indexOf('data-storage-key="noteneingabe-subreiter-uls-'), html.indexOf('</div>', html.indexOf('data-storage-key="noteneingabe-subreiter-uls-')));
   const ulButtonZiele = Array.from(ulReiterHtml.matchAll(/data-target="([^"]+)"/g)).map((m) => m[1]);
   assert.equal(ulButtonZiele[0], 'ul-panel-datumstabelle', 'Datumstabelle ist das erste Register');
