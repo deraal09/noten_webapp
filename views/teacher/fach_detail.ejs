@@ -15,16 +15,20 @@
 
 <div class="reiter" data-storage-key="noteneingabe-reiter-<%= fach.id %>">
   <button type="button" class="active" data-target="panel-uebersicht">Notenübersicht</button>
-  <button type="button" class="reiter-mehr-toggle" aria-haspopup="true" aria-expanded="false">⋮ Mehr</button>
-  <button type="button" class="reiter-mehr" data-target="panel-uls">Unterrichtsleistung</button>
-  <button type="button" class="reiter-mehr" data-target="panel-klausuren">Klausuren</button>
-  <button type="button" class="reiter-mehr" data-target="panel-manuell">Manuelle Noten</button>
-  <button type="button" class="reiter-mehr" data-target="panel-historie">Historische Halbjahre</button>
-  <button type="button" class="reiter-mehr" data-target="panel-teilnehmer">Teilnehmer/innen</button>
-  <button type="button" class="reiter-mehr" data-target="panel-sync">Synchronisation</button>
-  <% if (darfFachAbschliessen) { %>
-    <button type="button" class="reiter-mehr" data-target="panel-abschluss">Fach abschließen</button>
-  <% } %>
+  <div class="reiter-mehr-wrapper">
+    <button type="button" class="reiter-mehr-toggle" aria-haspopup="true" aria-expanded="false">⋮ Mehr</button>
+    <div class="reiter-mehr-menu">
+      <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
+      <button type="button" data-target="panel-klausuren">Klausuren</button>
+      <button type="button" data-target="panel-manuell">Manuelle Noten</button>
+      <button type="button" data-target="panel-historie">Historische Halbjahre</button>
+      <button type="button" data-target="panel-teilnehmer">Teilnehmer/innen</button>
+      <button type="button" data-target="panel-sync">Synchronisation</button>
+      <% if (darfFachAbschliessen) { %>
+        <button type="button" data-target="panel-abschluss">Fach abschließen</button>
+      <% } %>
+    </div>
+  </div>
 </div>
 
 <%
@@ -562,17 +566,19 @@
   // Gewichtung/Max-Punkten — alles normale Form-POSTs mit vollem Reload)
   // erhalten bleibt, statt immer wieder auf den ersten Reiter zurückzuspringen.
   function initReiterGruppe(gruppe) {
-    // Nur direkte Reiter-Buttons (mit data-target) zählen -- der optionale
-    // "⋮ Mehr"-Umschalter (.reiter-mehr-toggle, siehe unten) sitzt zwar auch
-    // als :scope > button in der Gruppe, hat aber selbst kein Ziel-Panel und
-    // darf deshalb nicht wie ein Reiter behandelt werden.
-    const buttons = Array.from(gruppe.querySelectorAll(':scope > button[data-target]'));
+    // Buttons mit data-target zählen als Reiter, egal ob sie direkt in der
+    // Gruppe stehen oder (bei der obersten Reiter-Ebene) im aufklappbaren
+    // "⋮ Mehr"-Dropdown (.reiter-mehr-menu) versteckt sind -- der
+    // Umschalter-Button selbst (.reiter-mehr-toggle) hat kein Ziel-Panel und
+    // wird über das fehlende data-target automatisch ausgeschlossen.
+    const buttons = Array.from(gruppe.querySelectorAll('button[data-target]'));
     const storageKey = gruppe.dataset.storageKey;
-    const mehrToggle = gruppe.querySelector(':scope > .reiter-mehr-toggle');
-    function oeffneMehrMenue() {
-      if (!mehrToggle) return;
-      gruppe.classList.add('mehr-offen');
-      mehrToggle.setAttribute('aria-expanded', 'true');
+    const mehrWrapper = gruppe.querySelector('.reiter-mehr-wrapper');
+    const mehrToggle = gruppe.querySelector('.reiter-mehr-toggle');
+    function schliesseMehrMenue() {
+      if (!mehrWrapper) return;
+      mehrWrapper.classList.remove('offen');
+      if (mehrToggle) mehrToggle.setAttribute('aria-expanded', 'false');
     }
     function setzeReiter(targetId) {
       buttons.forEach(function(b) { b.classList.toggle('active', b.dataset.target === targetId); });
@@ -580,6 +586,14 @@
         const panel = document.getElementById(b.dataset.target);
         if (panel) panel.classList.toggle('active', b.dataset.target === targetId);
       });
+      // "⋮ Mehr" selbst hervorheben, wenn der aktive Reiter im Dropdown
+      // versteckt ist -- sonst wüsste man nach dem Schließen des Menüs
+      // nicht mehr, welcher (versteckte) Reiter gerade aktiv ist.
+      if (mehrToggle) {
+        const aktiverBtn = buttons.find(function(b) { return b.dataset.target === targetId; });
+        const imMenue = Boolean(aktiverBtn && aktiverBtn.closest('.reiter-mehr-menu'));
+        mehrToggle.classList.toggle('active', imMenue);
+      }
     }
     buttons.forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -587,12 +601,19 @@
         if (storageKey) {
           try { localStorage.setItem(storageKey, btn.dataset.target); } catch (e) { /* z. B. privater Modus */ }
         }
+        if (btn.closest('.reiter-mehr-menu')) schliesseMehrMenue();
       });
     });
-    if (mehrToggle) {
-      mehrToggle.addEventListener('click', function() {
-        const offen = gruppe.classList.toggle('mehr-offen');
+    if (mehrWrapper && mehrToggle) {
+      mehrToggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const offen = mehrWrapper.classList.toggle('offen');
         mehrToggle.setAttribute('aria-expanded', offen ? 'true' : 'false');
+      });
+      // Klick außerhalb des Dropdowns schließt es wieder (übliches
+      // Dropdown-Verhalten).
+      document.addEventListener('click', function(e) {
+        if (mehrWrapper.classList.contains('offen') && !mehrWrapper.contains(e.target)) schliesseMehrMenue();
       });
     }
     if (storageKey) {
@@ -600,8 +621,6 @@
         const gemerkterReiter = localStorage.getItem(storageKey);
         if (gemerkterReiter && document.getElementById(gemerkterReiter)) {
           setzeReiter(gemerkterReiter);
-          const aktiverBtn = buttons.find(function(b) { return b.dataset.target === gemerkterReiter; });
-          if (aktiverBtn && aktiverBtn.classList.contains('reiter-mehr')) oeffneMehrMenue();
         }
       } catch (e) { /* z. B. privater Modus */ }
     }
@@ -614,17 +633,8 @@
   (function() {
     const gewuenschterTab = new URLSearchParams(location.search).get('tab');
     if (!gewuenschterTab) return;
-    const btn = document.querySelector('.reiter > button[data-target="panel-' + gewuenschterTab + '"]');
-    if (!btn) return;
-    btn.click();
-    if (btn.classList.contains('reiter-mehr')) {
-      const gruppe = btn.closest('.reiter');
-      const toggle = gruppe && gruppe.querySelector('.reiter-mehr-toggle');
-      if (gruppe && toggle) {
-        gruppe.classList.add('mehr-offen');
-        toggle.setAttribute('aria-expanded', 'true');
-      }
-    }
+    const btn = document.querySelector('.reiter button[data-target="panel-' + gewuenschterTab + '"]');
+    if (btn) btn.click();
   })();
 
   // Live-Update via JSON-API: aktualisiert Punkt-Noten UND die Notenübersicht oben

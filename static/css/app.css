@@ -326,11 +326,22 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 
 /* Noteneingabe aufgeräumt: nur "Notenübersicht" bleibt in der obersten
    Reiter-Reihe immer sichtbar, die übrigen (selten gebrauchten) Reiter
-   erscheinen erst nach Klick auf "⋮ Mehr". */
-.reiter .reiter-mehr { display: none; }
-.reiter.mehr-offen .reiter-mehr { display: inline-block; }
+   stecken in einem Dropdown-Menü hinter "⋮ Mehr". */
+.reiter-mehr-wrapper { position: relative; display: inline-block; }
 .reiter-mehr-toggle { background: transparent; border: 1px dashed var(--primary); }
-.reiter.mehr-offen .reiter-mehr-toggle { background: var(--bg-tint); }
+.reiter-mehr-menu {
+  display: none; flex-direction: column; gap: 0.15rem;
+  position: absolute; top: 100%; left: 0; margin-top: 0.4rem; z-index: 20;
+  min-width: 220px; background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 6px; box-shadow: 0 4px 16px var(--shadow); padding: 0.4rem;
+}
+.reiter-mehr-wrapper.offen .reiter-mehr-menu { display: flex; }
+.reiter-mehr-menu button {
+  background: transparent; color: var(--text); border: none; text-align: left;
+  padding: 0.5rem 0.6rem; border-radius: 4px; width: 100%;
+}
+.reiter-mehr-menu button:hover { background: var(--bg-tint); }
+.reiter-mehr-menu button.active { background: var(--primary); color: var(--on-dark); }
 
 /* Notizen-Dialog (Klassenleitungsseite/Fehlzeiten): natives <dialog>, ein
    gemeinsames Notizbuch je Schüler/in. */
