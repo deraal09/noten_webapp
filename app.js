@@ -67,6 +67,18 @@ try {
   cssVersion = crypto.createHash('sha1').update(cssInhalt).digest('hex').slice(0, 10);
 } catch { /* static/css/app.css sollte immer vorhanden sein — Fallback bleibt 'dev' */ }
 
+// Versionsnummer für die Fußzeile (siehe views/partials/layout.ejs), aus
+// package.json ausgelesen -- das ist die einzige Stelle, an der die Version
+// gepflegt wird. Kein Automatismus aus der Commit-Historie (die folgt keiner
+// strikten feat:/fix:-Konvention): bei jeder Änderung von Hand hochzählen,
+// Minor bei einer neuen Fähigkeit (Patch zurück auf 0), Patch bei
+// Fixes/Anpassungen/Chores. 0.x.y, solange die App aktiv weiterwächst.
+let appVersion = null;
+try {
+  const pkg = JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+  appVersion = pkg.version || null;
+} catch { /* package.json sollte immer vorhanden sein — Fallback bleibt null (Footer blendet dann aus) */ }
+
 export async function buildApp(opts = {}) {
   const app = fastify({
     logger: opts.logger ?? (isProd
@@ -138,6 +150,7 @@ export async function buildApp(opts = {}) {
     reply.locals.now = new Date();
     reply.locals.PUBLIC_URL = PUBLIC_URL;
     reply.locals.cssVersion = cssVersion;
+    reply.locals.appVersion = appVersion;
     // Geteilte Anzeige-Konstanten/-Helfer für alle Templates verfügbar machen.
     reply.locals.HALBJAHRE = HALBJAHRE;
     reply.locals.NOTE_TYPEN = NOTE_TYPEN;

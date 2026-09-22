@@ -77,7 +77,7 @@
 </main>
 <% if (!(typeof embed !== 'undefined' && embed)) { %>
 <footer class="footer">
-  <small>Notenverwaltung · <%= now.getFullYear() %></small>
+  <small>Notenverwaltung · <%= now.getFullYear() %><% if (typeof appVersion !== 'undefined' && appVersion) { %> · v<%= appVersion %><% } %></small>
 </footer>
 <% } %>
 <script>
