@@ -24,6 +24,12 @@
   --primary: #1d3557;
   --primary-hover: #15243f;
   --topbar-link: #d8e3f0;
+  /* Wo --primary NICHT als Füllfarbe (mit hellem --on-dark-Text darauf),
+     sondern selbst als Schriftfarbe auf einer Karte/transparent verwendet
+     wird (z. B. unausgewählte Reiter-Buttons) -- im Hellmodus identisch zu
+     --primary, im Dunkelmodus (siehe unten) heller, weil das dunkle Blau
+     von --primary dort auf dunklem Hintergrund kaum lesbar ist. */
+  --primary-text: var(--primary);
 
   --accent: #0b66c2;
   --accent-hover: #084e96;
@@ -74,6 +80,7 @@
     --primary: #2c4a73;
     --primary-hover: #3a5c8c;
     --topbar-link: #c3d5e8;
+    --primary-text: var(--accent);
 
     --accent: #4a9eef;
     --accent-hover: #6cb2f4;
@@ -117,6 +124,7 @@
   --primary: #2c4a73;
   --primary-hover: #3a5c8c;
   --topbar-link: #c3d5e8;
+  --primary-text: var(--accent);
 
   --accent: #4a9eef;
   --accent-hover: #6cb2f4;
@@ -214,7 +222,7 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }
 .kpi { background: var(--bg-card); padding: 1rem; border-radius: 6px; box-shadow: 0 1px 3px var(--shadow); text-align: center; }
-.kpi-val { font-size: 1.8rem; font-weight: 600; color: var(--primary); }
+.kpi-val { font-size: 1.8rem; font-weight: 600; color: var(--primary-text); }
 .kpi-lbl { font-size: 0.85rem; color: var(--text-muted); }
 
 table.data, table.tafel { width: 100%; border-collapse: collapse; background: var(--bg-card); margin: 0.5rem 0 1rem; box-shadow: 0 1px 3px var(--shadow); }
@@ -313,7 +321,7 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .hj-tab.active { background: var(--primary); color: var(--on-dark); border-color: var(--primary); }
 
 .reiter { display: flex; gap: 0.75rem; margin: 1rem 0 0; flex-wrap: wrap; }
-.reiter button { background: var(--bg-card); color: var(--primary); border: 1px solid var(--primary); }
+.reiter button { background: var(--bg-card); color: var(--primary-text); border: 1px solid var(--primary-text); }
 .reiter button.active { background: var(--primary); color: var(--on-dark); }
 .reiter-panel { display: none; }
 .reiter-panel.active { display: block; }
@@ -328,7 +336,7 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
    Reiter-Reihe immer sichtbar, die übrigen (selten gebrauchten) Reiter
    stecken in einem Dropdown-Menü hinter "⋮ Mehr". */
 .reiter-mehr-wrapper { position: relative; display: inline-block; }
-.reiter-mehr-toggle { background: transparent; border: 1px dashed var(--primary); }
+.reiter-mehr-toggle { background: transparent; border: 1px dashed var(--primary-text); }
 .reiter-mehr-menu {
   display: none; flex-direction: column; gap: 0.15rem;
   position: absolute; top: 100%; left: 0; margin-top: 0.4rem; z-index: 20;
