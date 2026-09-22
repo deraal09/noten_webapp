@@ -196,20 +196,19 @@
       <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
-      <form method="post" action="/teacher/klausuren/<%= k.id %>/gewichtung" class="einstellungen">
+      <p class="hint">Änderungen werden automatisch gespeichert.</p>
+      <form method="post" action="/teacher/klausuren/<%= k.id %>/gewichtung" class="einstellungen auto-speichern">
         <label class="feld">Gewichtung
           <span class="feld-mit-einheit"><input type="number" name="gewichtung" value="<%= k.gewichtung %>" min="0" max="100" step="0.1">%</span>
         </label>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-        <button type="submit">💾</button>
       </form>
-      <form method="post" action="/teacher/klausuren/<%= k.id %>/datum" class="einstellungen">
+      <form method="post" action="/teacher/klausuren/<%= k.id %>/datum" class="einstellungen auto-speichern-sofort">
         <label class="feld">Datum
           <input type="date" name="datum" value="<%= k.datum || '' %>">
         </label>
-        <button type="submit">💾</button>
       </form>
-      <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="einstellungen">
+      <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="einstellungen auto-speichern">
         <label class="feld">Anzahl Aufgaben
           <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
         </label>
@@ -222,9 +221,6 @@
           <% }); %>
         </span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-        <div class="form-actions">
-          <button type="submit">💾 Speichern</button>
-        </div>
       </form>
       <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
       <table class="tafel">
@@ -344,20 +340,19 @@
       <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('Zusatzleistung löschen?')">
         <button type="submit" class="danger">🗑</button>
       </form>
-      <form method="post" action="/teacher/uls/<%= u.id %>/gewichtung" class="einstellungen">
+      <p class="hint">Änderungen werden automatisch gespeichert.</p>
+      <form method="post" action="/teacher/uls/<%= u.id %>/gewichtung" class="einstellungen auto-speichern">
         <label class="feld">Gewichtung (Anteil an der Unterrichtsleistung)
           <span class="feld-mit-einheit"><input type="number" name="gewichtung" value="<%= u.gewichtung %>" min="0" max="100" step="0.1">%</span>
         </label>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-        <button type="submit">💾</button>
       </form>
-      <form method="post" action="/teacher/uls/<%= u.id %>/datum" class="einstellungen">
+      <form method="post" action="/teacher/uls/<%= u.id %>/datum" class="einstellungen auto-speichern-sofort">
         <label class="feld">Datum
           <input type="date" name="datum" value="<%= u.datum || '' %>">
         </label>
-        <button type="submit">💾</button>
       </form>
-      <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" class="einstellungen">
+      <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" class="einstellungen auto-speichern">
         <label class="feld">Anzahl Aufgaben
           <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
         </label>
@@ -370,9 +365,6 @@
           <% }); %>
         </span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-        <div class="form-actions">
-          <button type="submit">💾 Speichern</button>
-        </div>
       </form>
       <% var maxSummeUl = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
       <table class="tafel">
@@ -710,6 +702,28 @@
       await fetch('/teacher/unterricht/termine/' + inp.dataset.termin + '/note', { method: 'POST', body });
       refresh();
     }, 400));
+  });
+
+  // Gewichtung/Datum/Max-Punkte bei Klausuren und Zusatzleistungen: kein
+  // eigener Speichern-Button mehr, stattdessen automatisches Absenden des
+  // ganzen (kleinen) Formulars -- per echtem form.submit() samt Seiten-
+  // Reload, wie beim Auto-Sync-Haken oben, statt per fetch(): eine Änderung
+  // der Aufgaben-Anzahl muss ohnehin die Notentafel-Spalten neu rendern,
+  // also lohnt sich hier kein AJAX-Sonderweg. Mit Verzögerung (.auto-speichern),
+  // damit z. B. das Tippen einer zweistelligen Gewichtung nicht nach der
+  // ersten Ziffer schon abschickt; Datum (.auto-speichern-sofort) speichert
+  // dagegen sofort bei "change", weil ein Datepicker ohnehin erst bei
+  // vollständiger Auswahl feuert.
+  document.querySelectorAll('form.auto-speichern').forEach(function(form) {
+    const absenden = debounce(function() { form.submit(); }, 600);
+    form.querySelectorAll('input').forEach(function(feld) {
+      feld.addEventListener('input', absenden);
+    });
+  });
+  document.querySelectorAll('form.auto-speichern-sofort').forEach(function(form) {
+    form.querySelectorAll('input').forEach(function(feld) {
+      feld.addEventListener('change', function() { form.submit(); });
+    });
   });
 
   // Pfeiltasten hoch/runter und Enter springen in derselben Spalte (also
