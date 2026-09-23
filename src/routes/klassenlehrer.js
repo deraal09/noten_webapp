@@ -23,6 +23,7 @@ export default async function klassenlehrerRoutes(fastify) {
       klassen = getDb().prepare(`
         SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
         FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+        WHERE k.ist_kurs_huelle = 0
         ORDER BY s.bezeichnung DESC, k.name
       `).all();
     } else {
@@ -38,7 +39,7 @@ export default async function klassenlehrerRoutes(fastify) {
         JOIN schuljahre s ON s.id = k.schuljahr_id
         LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
         LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
-        WHERE kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL
+        WHERE k.ist_kurs_huelle = 0 AND (kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL)
         ORDER BY s.bezeichnung DESC, k.name
       `).all(request.user.id, request.user.id);
     }

@@ -37,7 +37,7 @@ export default async function exportRoutes(fastify) {
     const alleKlassen = getDb().prepare(`
       SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
       FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
-      WHERE s.id = ? ORDER BY k.name
+      WHERE s.id = ? AND k.ist_kurs_huelle = 0 ORDER BY k.name
     `).all(sj.id);
     const klassen = alleKlassen.filter((k) => userDarfKlasseExportieren(request.user, k.id));
     if (!klassen.length) return reply.code(403).send('Keine Berechtigung');

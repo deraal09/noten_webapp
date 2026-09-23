@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -123,6 +123,16 @@ CREATE TABLE IF NOT EXISTS klassen (
     -- Gewichte gelten. Eine SPA-Klasse läuft durchgehend über 4 Halbjahre
     -- (2 Schuljahre) OHNE "Klasse ins nächste Schuljahr übertragen".
     spa_bildungsgang TEXT,
+    -- Interne, unsichtbare Hülle für einen Kurs OHNE Ausgangsklasse (siehe
+    -- routes/teacher.js /kurse/neu): ein Kurs bleibt technisch an eine
+    -- "Heimat-Klasse" gebunden (Schuljahr/Notenschlüssel, siehe
+    -- src/fach-teilnehmer.js), braucht dafür aber keine echte, für
+    -- Lehrkräfte sichtbare Klasse mit eigenen Schüler/innen -- eine solche
+    -- Hülle hat nie eigene Schüler/innen (die Teilnehmerliste des Kurses
+    -- kommt ausschließlich über fach_teilnehmer) und wird aus jeder
+    -- Klassen-Auflistung herausgefiltert (ladeMeineKlassen und alle Stellen,
+    -- die "echte" Klassen aufzählen).
+    ist_kurs_huelle INTEGER NOT NULL DEFAULT 0,
     UNIQUE (schuljahr_id, name)
 );
 
@@ -657,6 +667,7 @@ function migrate(db) {
   ensureColumn(db, 'klassen', 'spa_bildungsgang', 'spa_bildungsgang TEXT');
   ensureColumn(db, 'faecher', 'spa_fach_key', 'spa_fach_key TEXT');
   ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
+  ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   fuelleFachTeilnehmerAuf(db);
 }
 

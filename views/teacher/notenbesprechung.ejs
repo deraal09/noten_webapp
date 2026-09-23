@@ -1,4 +1,4 @@
-<h1>Notenbesprechung: <%= fach.name %> – <%= fach.klasse_name %></h1>
+<h1>Notenbesprechung: <%= fach.name %><% if (!fach.ist_kurs) { %> – <%= fach.klasse_name %><% } %></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/fach/<%= fach.id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück zur Noteneingabe</a>
   <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>

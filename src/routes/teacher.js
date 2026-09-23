@@ -6,6 +6,7 @@
 import { getDb } from '../db.js';
 import {
   requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
+  userDarfFachLoeschen,
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
@@ -131,9 +132,13 @@ export default async function teacherRoutes(fastify) {
       const schuljahre = sortiereSchuljahreAbsteigend(getDb().prepare('SELECT * FROM schuljahre').all());
       return reply.viewEjs('teacher/dashboard_admin.ejs', { user: request.user, schuljahre });
     }
-    // Faecher des Users, nach Klasse gruppiert
+    // Faecher des Users, nach Klasse gruppiert. Kurse (ist_kurs=1) bekommen
+    // eine eigene, klassenlose Rubrik statt unter ihrer unsichtbaren
+    // Kurs-Hülle zu erscheinen (siehe /kurse/neu, klassen.ist_kurs_huelle) --
+    // deren technischer Name (__kurshuelle_…) wäre als "Klassen"-Überschrift
+    // nur verwirrend.
     const rows = getDb().prepare(`
-      SELECT f.id, f.name, k.id AS klasse_id, k.name AS klasse_name, k.notenschluessel,
+      SELECT f.id, f.name, f.ist_kurs, k.id AS klasse_id, k.name AS klasse_name, k.notenschluessel,
              s.id AS schuljahr_id, s.bezeichnung AS schuljahr_bezeichnung,
              (SELECT COUNT(*) FROM klausuren kk WHERE kk.fach_id = f.id) AS anzahl_klausuren,
              (SELECT COUNT(*) FROM unterrichtsleistungen uu WHERE uu.fach_id = f.id) AS anzahl_uls
@@ -145,17 +150,21 @@ export default async function teacherRoutes(fastify) {
       ORDER BY s.bezeichnung DESC, k.name, f.name
     `).all(request.user.id);
     const byKlasse = new Map();
+    const kurse = [];
     for (const r of rows) {
+      const eintrag = { id: r.id, name: r.name, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls };
+      if (r.ist_kurs) {
+        kurse.push({ ...eintrag, notenschluessel: r.notenschluessel, schuljahr_bezeichnung: r.schuljahr_bezeichnung });
+        continue;
+      }
       if (!byKlasse.has(r.klasse_id)) byKlasse.set(r.klasse_id, {
         id: r.klasse_id, name: r.klasse_name, notenschluessel: r.notenschluessel,
         schuljahr_bezeichnung: r.schuljahr_bezeichnung, faecher: [],
       });
-      byKlasse.get(r.klasse_id).faecher.push({
-        id: r.id, name: r.name, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls,
-      });
+      byKlasse.get(r.klasse_id).faecher.push(eintrag);
     }
     return reply.viewEjs('teacher/dashboard.ejs', {
-      user: request.user, byKlasse: Array.from(byKlasse.values()),
+      user: request.user, byKlasse: Array.from(byKlasse.values()), kurse,
     });
   });
 
@@ -835,7 +844,8 @@ export default async function teacherRoutes(fastify) {
     // Kurse (siehe ladeMeineKurse) bekommen in "Meine Klassen" eine eigene
     // Rubrik neben den echten Klassen -- gleiches Gruppieren nach Schuljahr,
     // aber getrennte Map, damit die View beides unterscheidbar rendern kann.
-    const kurse = ladeMeineKurse(request.user.id);
+    const kurse = ladeMeineKurse(request.user.id)
+      .map((k) => ({ ...k, darfLoeschen: userDarfFachLoeschen(request.user, k) }));
     const kurseNachSchuljahr = new Map();
     for (const sj of schuljahreReiter) kurseNachSchuljahr.set(sj.id, []);
     for (const k of kurse) kurseNachSchuljahr.get(k.schuljahr_id)?.push(k);
@@ -843,8 +853,9 @@ export default async function teacherRoutes(fastify) {
     // Alle im System bereits verwendeten Klassennamen, schuljahresübergreifend
     // -- Vorschlagsliste beim Anlegen, damit dieselbe Klasse in einem neuen
     // Schuljahr konsistent geschrieben wird (z. B. immer "12BFI1"), statt sie
-    // jedes Mal neu einzutippen.
-    const bekannteKlassennamen = db.prepare('SELECT DISTINCT name FROM klassen ORDER BY name').all()
+    // jedes Mal neu einzutippen. Kurs-Hüllen (siehe /kurse/neu) sind keine
+    // echten Klassen und tauchen hier daher nicht auf.
+    const bekannteKlassennamen = db.prepare('SELECT DISTINCT name FROM klassen WHERE ist_kurs_huelle = 0 ORDER BY name').all()
       .map((r) => r.name);
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
@@ -1454,43 +1465,60 @@ export default async function teacherRoutes(fastify) {
   });
 
   // ---------- Neuen Kurs anlegen (Fach, dessen Teilnehmerliste sich aus
-  // mehreren Klassen zusammensetzt) -- technisch dasselbe wie ein Fach in
-  // einer Klasse (siehe Route oben), nur direkt von der Klassenübersicht aus
-  // erreichbar: die Kurslehrkraft muss dafür keine eigene Klasse anlegen,
-  // sondern wählt lediglich eine ihrer bestehenden Klassen als Ausgangspunkt.
-  // Landet danach gleich auf der Fach-Seite, um über "Teilnehmer/innen"
-  // Schüler/innen aus anderen Klassen dazuzuholen.
+  // mehreren Klassen zusammensetzt) -- braucht bewusst KEINE eigene
+  // Ausgangsklasse (mehr): der Kurs bekommt stattdessen eine unsichtbare,
+  // leere Klassen-Hülle als technischen Anker für Schuljahr/Notenschlüssel
+  // (klassen.ist_kurs_huelle -- wird aus jeder Klassen-Auflistung
+  // herausgefiltert, siehe ladeMeineKlassen). Teilnehmer/innen kommen
+  // ausschließlich über "Teilnehmer/innen hinzufügen" auf der Fach-Seite
+  // dazu -- aus bestehenden Klassen, oder manuell neu (legt bei Bedarf
+  // still eine neue, für alle offene Klasse an, siehe fach-teilnehmer.js
+  // legeManuellenTeilnehmerAn/src/klassen-verknuepfung.js). Landet danach
+  // gleich auf der Fach-Seite, im Teilnehmer/innen-Reiter.
   fastify.post('/kurse/neu', async (request, reply) => {
-    const klasseId = parseInt(request.body?.klasse_id, 10);
-    if (!klasseId || !userHatKlassenZugriff(request.user, klasseId)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
-    }
-    const name = String(request.body?.name || '').trim();
-    if (!name) {
-      request.flash?.('error', 'Bitte einen Namen für den Kurs angeben.');
+    if (!userDarfSelbstKlasseAnlegen(request.user)) {
+      request.flash?.('error', 'Nur Lehrkräfte mit LDAP-Zugang können eigene Kurse anlegen. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.');
       return reply.redirect('/teacher/klassen');
     }
+    const schuljahrId = parseInt(request.body?.schuljahr_id, 10);
+    const name = String(request.body?.name || '').trim();
+    let ns = String(request.body?.notenschluessel || 'IHK');
+    if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
+    if (!schuljahrId || !name) {
+      request.flash?.('error', 'Schuljahr und Name sind erforderlich.');
+      return reply.redirect('/teacher/klassen');
+    }
+    const db = getDb();
     try {
-      const info = getDb().prepare('INSERT INTO faecher (klasse_id, name, ist_kurs) VALUES (?, ?, 1)')
-        .run(klasseId, name);
-      getDb().prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
+      const huelle = db.prepare(`
+        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, ist_kurs_huelle)
+        VALUES (?, ?, ?, ?, 1)
+      `).run(schuljahrId, `__kurshuelle_${makeToken()}`, ns, DEFAULT_NS_CSV[ns] || '');
+      const info = db.prepare('INSERT INTO faecher (klasse_id, name, ist_kurs) VALUES (?, ?, 1)')
+        .run(huelle.lastInsertRowid, name);
+      db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
         .run(request.user.id, info.lastInsertRowid);
-      seedeTeilnehmerAusKlasse(info.lastInsertRowid, klasseId);
       return reply.redirect(`/teacher/fach/${info.lastInsertRowid}?tab=teilnehmer`);
     } catch (e) {
-      request.flash?.('error', 'Ein Fach mit diesem Namen existiert in dieser Klasse bereits.');
+      request.flash?.('error', 'Kurs konnte nicht angelegt werden -- bitte Schuljahr prüfen.');
       return reply.redirect('/teacher/klassen');
     }
   });
 
   fastify.post('/faecher/:id/loeschen', async (request, reply) => {
-    const f = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(request.params.id);
+    const f = getDb().prepare('SELECT id, klasse_id, ist_kurs FROM faecher WHERE id = ?').get(request.params.id);
     if (!f) return reply.redirect('/teacher/klassen');
-    if (!userHatKlassenZugriff(request.user, f.klasse_id)) {
+    if (!userDarfFachLoeschen(request.user, f)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     getDb().prepare('DELETE FROM faecher WHERE id = ?').run(request.params.id);
-    return reply.redirect(`/teacher/klassen/${f.klasse_id}`);
+    // Eine Kurs-Hülle (siehe /kurse/neu) gehört exakt einem Kurs -- mit ihm
+    // verschwindet auch sie, statt als leere Karteileiche liegen zu bleiben.
+    getDb().prepare("DELETE FROM klassen WHERE id = ? AND ist_kurs_huelle = 1").run(f.klasse_id);
+    // Ein Kurs hängt nur noch technisch an einer unsichtbaren Klassen-Hülle
+    // -- die gibt es dort nichts anzuschauen, zurück zur Kursliste statt zu
+    // dieser Hülle.
+    return reply.redirect(f.ist_kurs ? '/teacher/klassen' : `/teacher/klassen/${f.klasse_id}`);
   });
 
   // ---------- Teilnehmer/innen eines Fachs (klassenübergreifende Kurse) ----------

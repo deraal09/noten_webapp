@@ -89,7 +89,7 @@ export function sucheSchuelerFuerFach(fach, suchtext) {
     SELECT s.id, s.nachname, s.vorname, s.klasse_id, k.name AS klasse_name, k.notenschluessel
     FROM schueler s
     JOIN klassen k ON k.id = s.klasse_id
-    WHERE k.schuljahr_id = ?
+    WHERE k.schuljahr_id = ? AND k.ist_kurs_huelle = 0
       AND NOT EXISTS (SELECT 1 FROM fach_teilnehmer ft WHERE ft.fach_id = ? AND ft.schueler_id = s.id)
       AND (LOWER(s.nachname) LIKE ? OR LOWER(s.vorname) LIKE ? OR LOWER(k.name) LIKE ?)
     ORDER BY s.nachname, s.vorname

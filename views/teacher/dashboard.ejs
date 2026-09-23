@@ -1,6 +1,6 @@
 <h1>Noteneingabe</h1>
 
-<% if (!byKlasse.length) { %>
+<% if (!byKlasse.length && !kurse.length) { %>
   <p>Du bist noch keinen Fächern zugewiesen. Bitte wende dich an den Admin oder lege selbst eine <a href="/teacher/klassen">Klasse</a> an.</p>
 <% } %>
 
@@ -20,3 +20,23 @@
     <% }); %>
   </ul>
 <% }); %>
+
+<% if (kurse.length) { %>
+  <h2>Kurse</h2>
+  <ul class="klasse-liste">
+    <% kurse.forEach(function(f) { %>
+      <li>
+        <a href="/teacher/fach/<%= f.id %>">
+          <div class="kachel-zeile">
+            <span class="kachel-icon-klein">📘</span>
+            <span class="kachel-titel-klein"><%= f.name %></span>
+          </div>
+        </a>
+        <div class="kachel-sub">
+          <%= f.schuljahr_bezeichnung %>, Notenschlüssel: <%= f.notenschluessel %> ·
+          <%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)
+        </div>
+      </li>
+    <% }); %>
+  </ul>
+<% } %>

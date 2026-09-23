@@ -283,7 +283,8 @@ export function ladeMeineKlassen(userId) {
     LEFT JOIN fach_zuweisungen fz ON fz.fach_id = f.id AND fz.user_id = ?
     LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
     LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
-    WHERE k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL
+    WHERE k.ist_kurs_huelle = 0
+      AND (k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL)
     ORDER BY s.bezeichnung DESC, k.name
   `).all(userId, userId, userId, userId);
 }
@@ -298,7 +299,8 @@ export function ladeMeineKlassen(userId) {
  */
 export function ladeMeineKurse(userId) {
   return getDb().prepare(`
-    SELECT f.*, k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung,
+    SELECT f.*, k.name AS klasse_name, k.ist_kurs_huelle AS klasse_ist_huelle,
+      k.notenschluessel, s.bezeichnung AS schuljahr_bezeichnung,
       (SELECT COUNT(*) FROM fach_teilnehmer ft WHERE ft.fach_id = f.id) AS teilnehmer_anzahl
     FROM faecher f
     JOIN klassen k ON k.id = f.klasse_id
@@ -307,6 +309,23 @@ export function ladeMeineKurse(userId) {
     WHERE f.ist_kurs = 1
     ORDER BY s.bezeichnung DESC, f.name
   `).all(userId);
+}
+
+/**
+ * Darf dieses Fach gelöscht werden? Ein Kurs (ist_kurs=1) hängt seit der
+ * Loslösung von der Ausgangsklasse (siehe routes/teacher.js /kurse/neu) nur
+ * noch technisch an einer unsichtbaren, leeren Klassen-Hülle
+ * (klassen.ist_kurs_huelle) -- die eigene Fach-Zuweisung ist dort die
+ * richtige (und einzig sinnvolle) Berechtigung, nicht der Zugriff auf diese
+ * Hülle (userHatKlassenZugriff würde dort mangels Ersteller/in,
+ * Klassenleitung o. Ä. immer false liefern und den Kurs unlöschbar machen).
+ * Ein normales Fach bleibt bei der bisherigen Regel: Zugriff auf die ganze
+ * Heimat-Klasse.
+ */
+export function userDarfFachLoeschen(user, fach) {
+  if (user.isAdmin) return true;
+  if (fach.ist_kurs) return userHatFachZgriff(user, fach.id);
+  return userHatKlassenZugriff(user, fach.klasse_id);
 }
 
 /**

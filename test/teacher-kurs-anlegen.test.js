@@ -1,11 +1,17 @@
 /**
  * Neuen Kurs anlegen (POST /teacher/kurse/neu, src/routes/teacher.js): ein
- * eigener Einstiegspunkt neben "Neue Klasse anlegen" auf /teacher/klassen,
- * der -- ohne eine eigene Klasse dafür anzulegen -- ein Fach auf Basis einer
- * bestehenden Klasse der Lehrkraft erzeugt (technisch identisch zu POST
- * /teacher/klassen/:id/faecher/neu) und direkt auf den Reiter
- * "Teilnehmer/innen" der Fach-Seite weiterleitet, wo sich die Teilnehmerliste
- * um Schüler/innen aus anderen Klassen ergänzen lässt.
+ * Kurs braucht KEINE Ausgangsklasse (mehr) -- er bekommt beim Anlegen nur
+ * Name/Schuljahr/Notenschlüssel und eine unsichtbare, leere Klassen-Hülle
+ * als technischen Anker (klassen.ist_kurs_huelle), taucht also nirgends als
+ * "echte" Klasse auf. Teilnehmer/innen kommen erst danach explizit dazu
+ * (Reiter „Teilnehmer/innen" auf der Fach-Seite, siehe fach-teilnehmer.test.js).
+ * Das Anlegerecht folgt denselben Regeln wie bei "Klasse anlegen"
+ * (userDarfSelbstKlasseAnlegen: Admin oder LDAP-Konto).
+ *
+ * Deckt außerdem den Bugfix ab, dass ein Kurs sich bisher nicht mehr löschen
+ * ließ (die Löschberechtigung prüfte fälschlich Zugriff auf die -- bei einem
+ * Kurs oft fremde oder gar nicht mehr existierende -- Heimat-Klasse statt die
+ * eigene Fach-Zuweisung, siehe userDarfFachLoeschen in src/auth.js).
  */
 
 import { test } from 'node:test';
@@ -56,61 +62,130 @@ async function form(req, url, body) {
 }
 
 const admin = client();
-const lehrerA = client();
-const lehrerFremd = client();
-let klasseAId, schuelerA1, schuelerA2;
+const lehrerLdap = client();
+const lehrerLokal = client();
+let sjId;
+let klasseAId;
+let schuelerA1;
 
-test('Vorbereitung: Klasse 10A mit zwei Schüler:innen, Lehrer A als Klassenleitung', async () => {
+test('Vorbereitung: Schuljahr, Klasse 10A mit einer Person, ein LDAP- und ein lokales Lehrkraft-Konto', async () => {
   await form(admin, '/setup', {
     username: 'admin', display_name: 'Admin', password: 'adminpass123', password2: 'adminpass123',
   });
   await form(admin, '/admin/schuljahre/neu', { bezeichnung: '2025/26' });
-  const sjId = getDb().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id;
+  sjId = getDb().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id;
   await form(admin, `/admin/schuljahre/${sjId}/klassen/neu`, { name: '10A' });
   klasseAId = getDb().prepare("SELECT id FROM klassen WHERE name = '10A'").get().id;
   await form(admin, `/admin/klassen/${klasseAId}/schueler/neu`, { nachname: 'Adler', vorname: 'Anna' });
-  await form(admin, `/admin/klassen/${klasseAId}/schueler/neu`, { nachname: 'Berg', vorname: 'Ben' });
   schuelerA1 = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Adler'").get().id;
-  schuelerA2 = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Berg'").get().id;
 
-  for (const [name, uname] of [['Lehrer A', 'lehrera'], ['Lehrer Fremd', 'lehrerfremd']]) {
+  for (const [name, uname] of [['Lehrer LDAP', 'lehrerldap'], ['Lehrer Lokal', 'lehrerlokal']]) {
     await form(admin, '/admin/einladungen/neu', { display_name: name, ttl_days: '14' });
   }
   const invs = getDb().prepare('SELECT token, display_name FROM invitations ORDER BY id').all();
   for (const inv of invs) {
-    const client_ = inv.display_name === 'Lehrer A' ? lehrerA : lehrerFremd;
-    const uname = inv.display_name === 'Lehrer A' ? 'lehrera' : 'lehrerfremd';
+    const client_ = inv.display_name === 'Lehrer LDAP' ? lehrerLdap : lehrerLokal;
+    const uname = inv.display_name === 'Lehrer LDAP' ? 'lehrerldap' : 'lehrerlokal';
     await form(client_, `/einladung/${inv.token}`, {
       username: uname, password: 'lehrerpass123', password2: 'lehrerpass123',
     });
   }
-  await getDb().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, (SELECT id FROM users WHERE username = ?))')
-    .run(klasseAId, 'lehrera');
+  // Einladungslink-Konten sind per Default auth_source 'lokal' -- eines der
+  // beiden wird für diesen Test manuell auf 'ldap' umgestellt (siehe
+  // userDarfSelbstKlasseAnlegen), das andere bleibt bewusst 'lokal'.
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrerldap'").run();
 });
 
-test('Fremde Lehrkraft ohne Klassenzugriff darf keinen Kurs auf dieser Klasse anlegen', async () => {
-  const r = await form(lehrerFremd, '/teacher/kurse/neu', { klasse_id: String(klasseAId), name: 'Fremdkurs' });
-  assert.equal(r.status, 403);
+test('Lokales Konto ohne LDAP-Zugang darf keinen Kurs anlegen', async () => {
+  const r = await form(lehrerLokal, '/teacher/kurse/neu', {
+    schuljahr_id: String(sjId), name: 'Fremdkurs', notenschluessel: 'IHK',
+  });
+  assert.equal(r.status, 302); // Redirect mit Fehlermeldung, kein 403 (wie bei /klassen/neu)
   const fach = getDb().prepare("SELECT id FROM faecher WHERE name = 'Fremdkurs'").get();
   assert.equal(fach, undefined);
 });
 
-test('Klassenleitung legt über /teacher/kurse/neu einen Kurs an -- Teilnehmerliste sofort befüllt, Redirect auf Teilnehmer-Reiter', async () => {
-  const r = await form(lehrerA, '/teacher/kurse/neu', { klasse_id: String(klasseAId), name: 'Spanisch AG' });
-  assert.equal(r.status, 302);
-  const location = r.headers.get('location');
-  const fach = getDb().prepare("SELECT id, klasse_id FROM faecher WHERE name = 'Spanisch AG'").get();
-  assert.ok(fach, 'Fach wurde angelegt');
-  assert.equal(fach.klasse_id, klasseAId);
-  assert.equal(location, `/teacher/fach/${fach.id}?tab=teilnehmer`);
+let kursId;
+let huelleId;
 
-  const teilnehmer = getDb().prepare('SELECT schueler_id FROM fach_teilnehmer WHERE fach_id = ?').all(fach.id)
-    .map((r2) => r2.schueler_id).sort();
-  assert.deepEqual(teilnehmer, [schuelerA1, schuelerA2].sort());
+test('LDAP-Konto legt einen Kurs OHNE Ausgangsklasse an -- leere Teilnehmerliste, Redirect auf Teilnehmer-Reiter', async () => {
+  const r = await form(lehrerLdap, '/teacher/kurse/neu', {
+    schuljahr_id: String(sjId), name: 'Spanisch AG', notenschluessel: 'IHK',
+  });
+  assert.equal(r.status, 302);
+  const fach = getDb().prepare("SELECT id, klasse_id, ist_kurs FROM faecher WHERE name = 'Spanisch AG'").get();
+  assert.ok(fach, 'Fach wurde angelegt');
+  assert.equal(fach.ist_kurs, 1);
+  kursId = fach.id;
+  huelleId = fach.klasse_id;
+  assert.equal(r.headers.get('location'), `/teacher/fach/${fach.id}?tab=teilnehmer`);
+
+  const huelle = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(huelleId);
+  assert.equal(huelle.ist_kurs_huelle, 1);
+  assert.equal(huelle.schuljahr_id, sjId);
+  assert.equal(huelle.notenschluessel, 'IHK');
+
+  // Keine automatische Vorbefüllung mehr -- die Teilnehmerliste ist leer,
+  // bis explizit jemand hinzugefügt wird.
+  const teilnehmer = getDb().prepare('SELECT COUNT(*) AS c FROM fach_teilnehmer WHERE fach_id = ?').get(fach.id).c;
+  assert.equal(teilnehmer, 0);
 
   const zuweisung = getDb().prepare('SELECT * FROM fach_zuweisungen WHERE fach_id = ? AND user_id = (SELECT id FROM users WHERE username = ?)')
-    .get(fach.id, 'lehrera');
+    .get(fach.id, 'lehrerldap');
   assert.ok(zuweisung, 'Ersteller/in wird automatisch dem Kurs zugewiesen');
+});
+
+test('Die Kurs-Hülle erscheint nirgends als "echte" Klasse', async () => {
+  const html = await (await lehrerLdap('/teacher/klassen')).text();
+  assert.ok(html.includes('Spanisch AG')); // im Kurs-Bereich schon
+  assert.ok(!html.includes(getDb().prepare('SELECT name FROM klassen WHERE id = ?').get(huelleId).name));
+
+  const adminSjHtml = await (await admin(`/admin/schuljahre/${sjId}`)).text();
+  assert.ok(!adminSjHtml.includes('__kurshuelle_'));
+
+  const bekannt = getDb().prepare('SELECT DISTINCT name FROM klassen WHERE ist_kurs_huelle = 0').all().map((r) => r.name);
+  assert.ok(!bekannt.some((n) => n.startsWith('__kurshuelle_')));
+});
+
+test('Dashboard ("Noteneingabe") und Fach-Seite zeigen "Kurs" statt des technischen Hüllen-Namens', async () => {
+  const huelleName = getDb().prepare('SELECT name FROM klassen WHERE id = ?').get(huelleId).name;
+
+  const dashboardHtml = await (await lehrerLdap('/teacher')).text();
+  assert.ok(dashboardHtml.includes('Kurse'));
+  assert.ok(dashboardHtml.includes('Spanisch AG'));
+  assert.ok(!dashboardHtml.includes(huelleName));
+
+  const fachHtml = await (await lehrerLdap(`/teacher/fach/${kursId}`)).text();
+  assert.ok(fachHtml.includes('Spanisch AG'));
+  assert.ok(fachHtml.includes('Kurs'));
+  assert.ok(!fachHtml.includes(huelleName));
+  assert.ok(!fachHtml.includes('Sitzplan')); // ergibt für einen Kurs ohne Heimat-Klasse keinen Sinn
+});
+
+test('Aus bestehender Klasse hinzufügen funktioniert für den Kurs wie gehabt', async () => {
+  const r = await form(lehrerLdap, `/teacher/fach/${kursId}/teilnehmer/hinzufuegen`, { schueler_id: String(schuelerA1) });
+  assert.equal(r.status, 302);
+  assert.ok(getDb().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(kursId, schuelerA1));
+});
+
+test('Manuelles Hinzufügen legt bei Bedarf eine neue, für alle offene Klasse an', async () => {
+  const r = await form(lehrerLdap, `/teacher/fach/${kursId}/teilnehmer/manuell`, {
+    nachname: 'Neu', vorname: 'Nele', klasse: '10Z-Neu',
+  });
+  assert.equal(r.status, 302);
+  const neueKlasse = getDb().prepare("SELECT * FROM klassen WHERE name = '10Z-Neu'").get();
+  assert.ok(neueKlasse, 'Klasse wurde still angelegt');
+  assert.equal(neueKlasse.ist_kurs_huelle, 0, 'ist eine ganz normale, sichtbare Klasse -- keine Kurs-Hülle');
+  assert.equal(neueKlasse.created_by_id, null);
+});
+
+test('Kurs löschen funktioniert jetzt über die eigene Fach-Zuweisung -- keine Berechtigung auf die Hülle nötig', async () => {
+  const r = await form(lehrerLdap, `/teacher/faecher/${kursId}/loeschen`, {});
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), '/teacher/klassen');
+  assert.equal(getDb().prepare('SELECT id FROM faecher WHERE id = ?').get(kursId), undefined);
+  // Die Hülle gehörte exakt diesem Kurs und wird mit ihm aufgeräumt.
+  assert.equal(getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(huelleId), undefined);
 });
 
 test.after(async () => {

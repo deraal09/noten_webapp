@@ -27,7 +27,7 @@ export default async function adminRoutes(fastify) {
     const stats = {
       users: db.prepare('SELECT COUNT(*) AS c FROM users').get().c,
       schuljahre: db.prepare('SELECT COUNT(*) AS c FROM schuljahre').get().c,
-      klassen: db.prepare('SELECT COUNT(*) AS c FROM klassen').get().c,
+      klassen: db.prepare('SELECT COUNT(*) AS c FROM klassen WHERE ist_kurs_huelle = 0').get().c,
       schueler: db.prepare('SELECT COUNT(*) AS c FROM schueler').get().c,
       faecher: db.prepare('SELECT COUNT(*) AS c FROM faecher').get().c,
       offene_einladungen: db.prepare('SELECT COUNT(*) AS c FROM invitations WHERE used_at IS NULL').get().c,
@@ -84,7 +84,7 @@ export default async function adminRoutes(fastify) {
     const sj = getDb().prepare('SELECT * FROM schuljahre WHERE id = ?').get(request.params.id);
     if (!sj) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schuljahr nicht gefunden.' });
     const klassen = getDb().prepare(
-      'SELECT * FROM klassen WHERE schuljahr_id = ? ORDER BY name'
+      'SELECT * FROM klassen WHERE schuljahr_id = ? AND ist_kurs_huelle = 0 ORDER BY name'
     ).all(sj.id);
     return reply.viewEjs('admin/schuljahr_detail.ejs', { user: request.user, schuljahr: sj, klassen });
   });

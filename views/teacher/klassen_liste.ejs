@@ -122,31 +122,42 @@
 </div>
 
 <div id="panel-kurs-anlegen" class="reiter-panel">
-  <% if (!klassen.length) { %>
+  <% if (!kannSelbstKlasseAnlegen) { %>
     <p class="hint">
-      Für einen Kurs wird zunächst mindestens eine eigene Klasse gebraucht (siehe oben) -- der Kurs
-      startet mit deren Schüler:innen, weitere lassen sich danach aus jeder anderen Klasse desselben
-      Schuljahres dazuholen.
+      Eigene Kurse anlegen können nur Lehrkräfte mit LDAP-Zugang. Bitte eine Klassenleitung oder
+      den Admin bitten, dich einem Fach zuzuweisen.
     </p>
+  <% } else if (!schuljahre.length) { %>
+    <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
   <% } else { %>
     <p class="hint">
       Ein Kurs ist ein Fach, dessen Teilnehmerliste sich frei aus mehreren Klassen desselben
-      Schuljahres zusammenstellen lässt (Reiter „Teilnehmer/innen" auf der Fach-Seite) -- praktisch,
-      wenn ein Kurs nur einen Teil mehrerer Klassen umfasst. Dafür wird keine eigene Klasse
-      angelegt: eine bestehende reicht als Ausgangspunkt, ihre Schüler:innen stehen danach schon
-      in der Teilnehmerliste und lassen sich dort bei Bedarf auch wieder entfernen.
+      Schuljahres zusammenstellen lässt, statt an eine feste Klasse gebunden zu sein --
+      praktisch, wenn ein Kurs nur einen Teil mehrerer Klassen umfasst, oder klassenübergreifend
+      neu zusammengestellt wird (z. B. eine AG oder ein Wahlpflichtkurs). Schüler/innen kommen
+      erst danach dazu, auf der Fach-Seite im Reiter „Teilnehmer/innen": aus einer bestehenden
+      Klasse ausgewählt, oder manuell mit Namen und Klasse eingetragen -- gibt es diese Klasse
+      noch nicht, wird sie dabei still (ohne Klassenleitung) neu angelegt und steht danach jeder
+      Lehrkraft offen, die später selbst eine Klasse mit demselben Namen anlegt.
     </p>
     <form method="post" action="/teacher/kurse/neu">
       <label>Kursname
         <input type="text" name="name" placeholder="z. B. Spanisch AG" required>
       </label>
-      <label>Ausgangsklasse
-        <select name="klasse_id">
-          <% klassen.forEach(function(k) { %>
-            <option value="<%= k.id %>"><%= k.name %> (<%= k.schuljahr_bezeichnung %>)</option>
+      <label>Schuljahr
+        <select name="schuljahr_id">
+          <% schuljahre.forEach(function(s) { %>
+            <option value="<%= s.id %>"><%= s.bezeichnung %></option>
           <% }); %>
         </select>
       </label>
+      <label>Notenschlüssel
+        <select name="notenschluessel">
+          <option value="IHK" selected>IHK (1–6)</option>
+          <option value="BG">BG (0–15 Punkte)</option>
+        </select>
+      </label>
+      <p class="hint">Bei Bedarf kann der Admin den Notenschlüssel nachträglich ändern.</p>
       <button type="submit">+ Kurs anlegen</button>
     </form>
   <% } %>
@@ -201,11 +212,17 @@
                 </div>
               </a>
               <div class="kachel-sub">
-                Ausgangsklasse <%= k.klasse_name %> ·
+                <% if (!k.klasse_ist_huelle) { %>Ausgangsklasse <%= k.klasse_name %> · <% } %>
+                Notenschlüssel <%= k.notenschluessel %> ·
                 <%= k.teilnehmer_anzahl %> Teilnehmer/in<%= k.teilnehmer_anzahl === 1 ? '' : 'nen' %>
               </div>
               <div class="kachel-aktionen">
                 <a href="/teacher/fach/<%= k.id %>?tab=teilnehmer">👥 Teilnehmer/innen</a>
+                <% if (k.darfLoeschen) { %>
+                  <form method="post" action="/teacher/faecher/<%= k.id %>/loeschen" class="inline" onsubmit="return confirm('Kurs löschen?')">
+                    <button type="submit" class="danger">🗑 Löschen</button>
+                  </form>
+                <% } %>
               </div>
             </li>
           <% }); %>
