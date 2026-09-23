@@ -289,6 +289,27 @@ export function ladeMeineKlassen(userId) {
 }
 
 /**
+ * Kurse (faecher.ist_kurs = 1), auf die die Lehrkraft über eine Fach-
+ * Zuweisung Zugriff hat -- die Kurs-Variante von ladeMeineKlassen(), für
+ * die eigene Rubrik "Kurse" in "Meine Klassen" (siehe views/teacher/
+ * klassen_liste.ejs). Ein Kurs hat keine eigene Klassenleitung/kein
+ * Klassenlehrer-Konzept, daher reicht hier die Fach-Zuweisung als einziger
+ * Zugriffsweg (anders als bei ladeMeineKlassen).
+ */
+export function ladeMeineKurse(userId) {
+  return getDb().prepare(`
+    SELECT f.*, k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung,
+      (SELECT COUNT(*) FROM fach_teilnehmer ft WHERE ft.fach_id = f.id) AS teilnehmer_anzahl
+    FROM faecher f
+    JOIN klassen k ON k.id = f.klasse_id
+    JOIN schuljahre s ON s.id = k.schuljahr_id
+    JOIN fach_zuweisungen fz ON fz.fach_id = f.id AND fz.user_id = ?
+    WHERE f.ist_kurs = 1
+    ORDER BY s.bezeichnung DESC, f.name
+  `).all(userId);
+}
+
+/**
  * Darf der User die Klasse per CSV exportieren? CSV enthält Live-Werte —
  * bewusst KEIN Blanket-Export für die Klassenleitung (userIstKlassenlehrer):
  * die soll nur über den Sync-Stand Einblick bekommen (siehe noten-sync.js),

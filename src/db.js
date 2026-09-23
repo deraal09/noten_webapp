@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -126,7 +126,13 @@ CREATE TABLE IF NOT EXISTS schueler (
     klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
     nachname TEXT NOT NULL,
     vorname TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    -- 'aktiv' oder 'abgang' -- ein Abgang entfernt die Person aus allen
+    -- AKTUELLEN Notentafeln (siehe schueler-utils.js), ohne die Noten
+    -- vergangener Halbjahre zu löschen (die bleiben an die schueler_id
+    -- gebunden stehen, siehe Abgangszeugnis in fach-abschluss.js).
+    status TEXT NOT NULL DEFAULT 'aktiv',
+    abgang_am TEXT
 );
 
 CREATE TABLE IF NOT EXISTS faecher (
@@ -140,6 +146,11 @@ CREATE TABLE IF NOT EXISTS faecher (
     abgeschlossen INTEGER NOT NULL DEFAULT 0,
     abgeschlossen_am TEXT,
     abgeschlossen_von_id INTEGER REFERENCES users(id),
+    -- Ein Kurs ist strukturell ein ganz normales Fach (Klausuren, ULs,
+    -- Teilnehmerliste funktionieren identisch) -- die Markierung dient nur
+    -- der Anzeige (z. B. eigene Rubrik in "Meine Klassen", siehe
+    -- routes/teacher.js /kurse/neu) und schränkt nichts an der Notenlogik ein.
+    ist_kurs INTEGER NOT NULL DEFAULT 0,
     UNIQUE (klasse_id, name)
 );
 
@@ -597,6 +608,9 @@ function migrate(db) {
   ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
   ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
   ensureColumn(db, 'klassen', 'offen_fuer_beitritt', 'offen_fuer_beitritt INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'faecher', 'ist_kurs', 'ist_kurs INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'schueler', 'status', "status TEXT NOT NULL DEFAULT 'aktiv'");
+  ensureColumn(db, 'schueler', 'abgang_am', 'abgang_am TEXT');
   fuelleFachTeilnehmerAuf(db);
 }
 

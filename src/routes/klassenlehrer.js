@@ -10,6 +10,8 @@
 import { getDb } from '../db.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
 import { HALBJAHRE, FEHLZEIT_TYPEN } from '../grade-calc.js';
+import { ladeHalbjahresuebersicht } from '../noten-sync.js';
+import { ladeAbschlussuebersicht } from '../fach-abschluss.js';
 
 export default async function klassenlehrerRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -43,7 +45,14 @@ export default async function klassenlehrerRoutes(fastify) {
     return reply.viewEjs('klassenlehrer/dashboard.ejs', { user: request.user, klassen });
   });
 
-  // ---------- Klassen-Detail (Fehlzeiten) ----------
+  // ---------- Klassenleitungsübersicht ----------
+  // Bündelt alle Klassenleitungs-Funktionen auf einer Seite mit Reitern:
+  // 1. Übersicht (Kacheloptik/Kennzahlen), 2. Halbjahresübersicht (siehe
+  // ladeHalbjahresuebersicht), 3. Fehlzeiten (der ursprüngliche Inhalt
+  // dieser Seite), 4. Abschluss-/Abgangsübersicht (siehe ladeAbschluss-
+  // uebersicht) und 5. Weitere Klassenlehrkräfte (vormals ein eigener
+  // Abschnitt auf teacher/klasse_detail.ejs, siehe routes/teacher.js
+  // /klassen/:id/klassenleitung/hinzufuegen bzw. /klassenleitung/:id/entfernen).
   fastify.get('/klasse/:id', async (request, reply) => {
     const klasse = getDb().prepare(`
       SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
@@ -55,9 +64,13 @@ export default async function klassenlehrerRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
+    const gueltigeTabs = ['uebersicht', 'halbjahr', 'fehlzeiten', 'abschluss', 'klassenleitung'];
+    const aktiverTab = gueltigeTabs.includes(request.query?.tab) ? request.query.tab : 'uebersicht';
     const schueler = getDb().prepare(
-      'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
+      "SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname"
     ).all(klasse.id);
+
+    // ---- Tab 3: Fehlzeiten (unverändert übernommen) ----
     const fehlMap = {};
     const fehlMap2 = {};
     const notizenMap = {};
@@ -95,8 +108,32 @@ export default async function klassenlehrerRoutes(fastify) {
       `).all(...ids);
       for (const n of notizRows) notizenMap[n.schueler_id]?.push(n);
     }
+
+    // ---- Tab 2: Halbjahresübersicht ----
+    const halbjahresuebersicht = ladeHalbjahresuebersicht(klasse, halbjahr);
+
+    // ---- Tab 4: Abschluss-/Abgangsübersicht ----
+    const abschlussuebersicht = ladeAbschlussuebersicht(klasse.id);
+
+    // ---- Tab 5: Weitere Klassenlehrkräfte ----
+    const klassenleitungListe = getDb().prepare(`
+      SELECT kls.id, kls.user_id, u.display_name, u.username
+      FROM klassenleitung kls JOIN users u ON u.id = kls.user_id
+      WHERE kls.klasse_id = ?
+      ORDER BY u.username
+    `).all(klasse.id);
+    const zuweisbareLehrkraefte = getDb().prepare(
+      "SELECT id, username, display_name FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
+    ).all();
+
+    // ---- Tab 1: Übersicht (Kacheloptik/Kennzahlen) ----
+    const offeneEntsperrAnfragen = [...halbjahresuebersicht.sperren.values()]
+      .filter((s) => s.aufhebung_angefragt).length;
+
     return reply.viewEjs('klassenlehrer/klasse_detail.ejs', {
-      user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2, notizenMap,
+      user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
+      halbjahresuebersicht, abschlussuebersicht, klassenleitungListe, zuweisbareLehrkraefte,
+      offeneEntsperrAnfragen,
     });
   });
 
@@ -113,7 +150,7 @@ export default async function klassenlehrerRoutes(fastify) {
         .run(request.params.id, text, request.user.id);
     }
     const halbjahr = HALBJAHRE.includes(request.body?.hj) ? request.body.hj : HALBJAHRE[0];
-    return reply.redirect(`/klassenlehrer/klasse/${schueler.klasse_id}?hj=${encodeURIComponent(halbjahr)}`);
+    return reply.redirect(`/klassenlehrer/klasse/${schueler.klasse_id}?hj=${encodeURIComponent(halbjahr)}&tab=fehlzeiten`);
   });
 
   fastify.post('/klasse/:id/speichern', async (request, reply) => {
@@ -168,7 +205,7 @@ export default async function klassenlehrerRoutes(fastify) {
     });
     const count = tx();
     request.flash?.('success', `Fehlzeiten gespeichert (${count} Einträge).`);
-    return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?hj=${encodeURIComponent(halbjahr)}`);
+    return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?hj=${encodeURIComponent(halbjahr)}&tab=fehlzeiten`);
   });
 
   fastify.post('/klasse/:id/zwei-schulen', async (request, reply) => {
@@ -179,6 +216,6 @@ export default async function klassenlehrerRoutes(fastify) {
     }
     const aktiv = request.body?.aktiv === '1';
     getDb().prepare('UPDATE klassen SET zwei_schulen = ? WHERE id = ?').run(aktiv ? 1 : 0, klasse.id);
-    return reply.redirect(`/klassenlehrer/klasse/${klasse.id}`);
+    return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?tab=fehlzeiten`);
   });
 }

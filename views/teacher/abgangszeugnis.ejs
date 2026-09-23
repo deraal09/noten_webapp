@@ -1,0 +1,51 @@
+<h1>Abgangszeugnis: <%= schueler.nachname %>, <%= schueler.vorname %> <small>(<%= schueler.klasse_name %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= schueler.klasse_id %>">← Zur Klasse</a>
+  <button type="button" class="btn" onclick="window.print()">🖨 Drucken</button>
+</p>
+
+<% if (schueler.status === 'abgang') { %>
+  <p class="hint">Abgang aus der Klasse<% if (schueler.abgang_am) { %> am <%= formatZeitLokal(schueler.abgang_am) %><% } %>.</p>
+<% } %>
+
+<p class="hint">
+  Übersicht über alle Fächer, an denen diese Person teilnimmt oder teilgenommen hat — 1./2.
+  Halbjahr (live berechnet, Stand jetzt), historische Halbjahre (vor Einführung der App) und die
+  Abschlussnote, sofern das Fach bereits abgeschlossen wurde.
+</p>
+
+<% if (!zeilen.length) { %>
+  <p>Keine Fächer eingetragen.</p>
+<% } else { %>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Fach</th>
+        <% zeilen[0].hjNoten.forEach(function(h) { %><th><%= h.halbjahr %></th><% }); %>
+        <th>Historische Halbjahre</th>
+        <th>Abschlussnote</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% zeilen.forEach(function(z) { %>
+        <tr>
+          <td class="name"><%= z.fach.name %></td>
+          <% z.hjNoten.forEach(function(h) { %>
+            <td class="note-cell"><%= h.note === null ? '–' : formatNote(h.note) %></td>
+          <% }); %>
+          <td>
+            <% if (!z.historische.length) { %>–<% } else { %>
+              <% z.historische.forEach(function(hh) { %>
+                <div><%= hh.bezeichnung %>: <%= hh.note === null ? '–' : formatNote(hh.note) %></div>
+              <% }); %>
+            <% } %>
+          </td>
+          <td class="note-cell">
+            <% if (!z.fach.abgeschlossen) { %><span class="hint">läuft</span>
+            <% } else { %><%= z.abschlussnote === null ? '–' : formatNote(z.abschlussnote) %><% } %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>

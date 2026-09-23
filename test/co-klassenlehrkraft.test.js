@@ -105,7 +105,9 @@ test('Lehrer A (Klassenleitung) trägt Lehrer B als Co-Klassenlehrkraft ein', as
   const eintraege = getDb().prepare('SELECT user_id FROM klassenleitung WHERE klasse_id = ? ORDER BY user_id').all(klasseId);
   assert.equal(eintraege.length, 2);
 
-  const html = await (await lehrerA(`/teacher/klassen/${klasseId}`)).text();
+  // Die Liste der Co-Klassenlehrkräfte lebt auf der Klassenleitungsübersicht
+  // (Reiter "Weitere Klassenlehrkräfte"), nicht mehr auf der Klassenseite selbst.
+  const html = await (await lehrerA(`/klassenlehrer/klasse/${klasseId}`)).text();
   assert.match(html, /Lehrer B/);
 });
 

@@ -21,12 +21,16 @@
           <th><%= f.name %><br><small><%= f.abgeschlossen ? 'abgeschlossen' : 'läuft' %></small></th>
         <% }); %>
         <th>Ø Abschluss</th>
+        <th>Aktion</th>
       </tr>
     </thead>
     <tbody>
       <% zeilen.forEach(function(z) { %>
         <tr>
-          <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
+          <td class="name">
+            <%= z.schueler.nachname %>, <%= z.schueler.vorname %>
+            <% if (z.schueler.status === 'abgang') { %><small class="hint">(Abgang)</small><% } %>
+          </td>
           <% z.noten.forEach(function(n) { %>
             <td>
               <% if (!n.fach.abgeschlossen) { %><span class="hint">läuft</span>
@@ -34,6 +38,7 @@
             </td>
           <% }); %>
           <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+          <td><a href="/teacher/schueler/<%= z.schueler.id %>/abgangszeugnis">🎓 Abgangszeugnis</a></td>
         </tr>
       <% }); %>
     </tbody>

@@ -8,7 +8,7 @@
  */
 
 import { getDb } from './db.js';
-import { berechneGesamtnoten } from './noten-service.js';
+import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
 import { HALBJAHRE, gesamtnoteJahr } from './grade-calc.js';
 
 /** Historische Halbjahre eines Fachs, älteste zuerst. */
@@ -76,4 +76,66 @@ export function schliesseFachAb(fachId, userId) {
  * Abschlussnoten bleiben gespeichert, bis das Fach erneut abgeschlossen wird. */
 export function oeffneFach(fachId) {
   getDb().prepare('UPDATE faecher SET abgeschlossen = 0 WHERE id = ?').run(fachId);
+}
+
+/**
+ * Daten für die Abschluss-/Abgangsübersicht einer Klasse -- zeigt die
+ * Fachabschlussnote je Schüler/in und Fach (nur für bereits abgeschlossene
+ * Fächer) plus einen Notenschnitt. Ausgelagert aus routes/teacher.js, damit
+ * sowohl die eigenständige Seite (/teacher/klassen/:id/abschluss) als auch
+ * der gleichnamige Reiter auf der Klassenleitungsübersicht (routes/
+ * klassenlehrer.js) dieselbe Logik verwenden.
+ */
+export function ladeAbschlussuebersicht(klasseId) {
+  const db = getDb();
+  const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasseId);
+  const faecher = ladeFaecherFuerKlassenleitung(klasseId);
+  const abschlussByFach = new Map(faecher.map((f) => [f.id, f.abgeschlossen ? ladeAbschlussnoten(f.id) : new Map()]));
+
+  const zeilen = schueler.map((s) => {
+    const noten = faecher.map((f) => ({
+      fach: f, note: abschlussByFach.get(f.id).get(s.id) ?? null,
+    }));
+    const vorhanden = noten.filter((n) => n.fach.abgeschlossen).map((n) => n.note).filter((n) => n !== null && n !== undefined);
+    const schnitt = vorhanden.length ? Math.round((vorhanden.reduce((a, b) => a + b, 0) / vorhanden.length) * 100) / 100 : null;
+    return { schueler: s, noten, schnitt };
+  });
+
+  return { faecher, zeilen };
+}
+
+/**
+ * Alle Noten einer einzelnen Person über alle Fächer hinweg, in denen sie
+ * (aktuell oder ehemals) Teilnehmer/in ist -- Grundlage des Abgangszeugnisses
+ * (siehe routes/teacher.js /schueler/:id/abgangszeugnis). Bleibt bewusst
+ * unabhängig vom schueler.status: Noten verschwinden nie, auch nicht nach
+ * einem Abgang aus der Klasse (siehe schueler.status in src/db.js).
+ */
+export function ladeAbgangszeugnisDaten(schuelerIdParam) {
+  const db = getDb();
+  // Kommt üblicherweise als String aus request.params -- die Gesamtnoten-Maps
+  // unten sind aber mit dem numerischen schueler_id aus der DB geschlüsselt
+  // (Map.get() vergleicht strikt, "1" würde 1 dort NIE treffen).
+  const schuelerId = Number(schuelerIdParam);
+  const schueler = db.prepare('SELECT s.*, k.name AS klasse_name FROM schueler s JOIN klassen k ON k.id = s.klasse_id WHERE s.id = ?').get(schuelerId);
+  if (!schueler) return null;
+  const faecher = db.prepare(`
+    SELECT f.*, k.name AS klasse_name
+    FROM fach_teilnehmer ft
+    JOIN faecher f ON f.id = ft.fach_id
+    JOIN klassen k ON k.id = f.klasse_id
+    WHERE ft.schueler_id = ?
+    ORDER BY f.name
+  `).all(schuelerId);
+  const zeilen = faecher.map((fach) => {
+    const hjNoten = HALBJAHRE.map((hj) => ({
+      halbjahr: hj, note: berechneGesamtnoten(fach.id, hj).get(schuelerId) ?? null,
+    }));
+    const historische = ladeHistorischeHalbjahre(fach.id).map((hh) => ({
+      bezeichnung: hh.bezeichnung, note: ladeHistorischeNoten(hh.id).get(schuelerId) ?? null,
+    }));
+    const abschlussnote = fach.abgeschlossen ? (ladeAbschlussnoten(fach.id).get(schuelerId) ?? null) : null;
+    return { fach, hjNoten, historische, abschlussnote };
+  });
+  return { schueler, zeilen };
 }

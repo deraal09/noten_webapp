@@ -128,8 +128,10 @@
     <% }); %>
   </div>
   <% schuljahreReiter.forEach(function(sj, i) {
-       var sjKlassen = klassenNachSchuljahr.get(sj.id) || []; %>
+       var sjKlassen = klassenNachSchuljahr.get(sj.id) || [];
+       var sjKurse = kurseNachSchuljahr.get(sj.id) || []; %>
     <div id="sj-panel-<%= sj.id %>" class="reiter-panel <%= i === 0 ? 'active' : '' %>">
+      <h3>Klassen</h3>
       <% if (!sjKlassen.length) { %>
         <p>Keine Klassen im Schuljahr <%= sj.bezeichnung %> — leg oben eine an oder warte auf eine Zuweisung.</p>
       <% } else { %>
@@ -145,6 +147,31 @@
               <div class="kachel-sub">Notenschlüssel: <%= k.notenschluessel %></div>
               <div class="kachel-aktionen">
                 <a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a>
+              </div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <h3>Kurse</h3>
+      <% if (!sjKurse.length) { %>
+        <p class="hint">Keine Kurse im Schuljahr <%= sj.bezeichnung %> — siehe oben „+ Neuen Kurs anlegen".</p>
+      <% } else { %>
+        <ul class="klasse-liste">
+          <% sjKurse.forEach(function(k) { %>
+            <li>
+              <a href="/teacher/fach/<%= k.id %>">
+                <div class="kachel-zeile">
+                  <span class="kachel-icon-klein">📘</span>
+                  <span class="kachel-titel-klein"><%= k.name %></span>
+                </div>
+              </a>
+              <div class="kachel-sub">
+                Ausgangsklasse <%= k.klasse_name %> ·
+                <%= k.teilnehmer_anzahl %> Teilnehmer/in<%= k.teilnehmer_anzahl === 1 ? '' : 'nen' %>
+              </div>
+              <div class="kachel-aktionen">
+                <a href="/teacher/fach/<%= k.id %>?tab=teilnehmer">👥 Teilnehmer/innen</a>
               </div>
             </li>
           <% }); %>

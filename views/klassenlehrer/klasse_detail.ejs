@@ -1,96 +1,285 @@
-<h1>Fehlzeiten: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
-<p class="kopf-aktionen"><a class="btn" href="/klassenlehrer">← Klassenleitung</a></p>
+<h1>Klassenleitung: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/klassenlehrer">← Klassenleitung</a>
+  <a class="btn" href="/teacher/klassen/<%= klasse.id %>">Zur Klasse</a>
+</p>
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
-    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=<%= aktiverTab %>"><%= h %></a>
   <% }); %>
 </div>
 
-<form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/zwei-schulen" class="inline">
-  <input type="hidden" name="aktiv" value="<%= klasse.zwei_schulen ? '0' : '1' %>">
-  <button type="submit">
-    <%= klasse.zwei_schulen ? '☑' : '☐' %> Schüler/innen werden an zwei Schulen unterrichtet
-    (zwei Spalten je Fehlzeitenart + Summe)
-  </button>
-</form>
+<div class="reiter" data-storage-key="klassenleitung-reiter-<%= klasse.id %>">
+  <button type="button" class="<%= aktiverTab === 'uebersicht' ? 'active' : '' %>" data-target="panel-uebersicht">Übersicht</button>
+  <button type="button" class="<%= aktiverTab === 'halbjahr' ? 'active' : '' %>" data-target="panel-halbjahr">Halbjahresübersicht</button>
+  <button type="button" class="<%= aktiverTab === 'fehlzeiten' ? 'active' : '' %>" data-target="panel-fehlzeiten">Fehlzeiten</button>
+  <button type="button" class="<%= aktiverTab === 'abschluss' ? 'active' : '' %>" data-target="panel-abschluss">Abschluss-/Abgangsübersicht</button>
+  <button type="button" class="<%= aktiverTab === 'klassenleitung' ? 'active' : '' %>" data-target="panel-klassenleitung">Weitere Klassenlehrkräfte</button>
+</div>
 
-<form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/speichern">
-  <input type="hidden" name="hj" value="<%= halbjahr %>">
-  <table class="data fz">
-    <thead>
-      <tr>
-        <th rowspan="2">Schüler/in</th>
-        <th rowspan="2">Notizen</th>
-        <% FEHLZEIT_TYPEN.forEach(function(typ) { %>
-          <th colspan="<%= klasse.zwei_schulen ? 3 : 1 %>"><%= typ %></th>
-        <% }); %>
-      </tr>
-      <tr>
-        <% FEHLZEIT_TYPEN.forEach(function() { %>
-          <% if (klasse.zwei_schulen) { %>
-            <th>Schule 1 (h)</th><th>Schule 2 (h)</th><th>Summe</th>
-          <% } else { %>
-            <th>h</th>
-          <% } %>
-        <% }); %>
-      </tr>
-    </thead>
-    <tbody>
-      <% schueler.forEach(function(s) { %>
+<div id="panel-uebersicht" class="reiter-panel <%= aktiverTab === 'uebersicht' ? 'active' : '' %>">
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-val"><%= schueler.length %></div><div class="kpi-lbl">Schüler/innen</div></div>
+    <div class="kpi"><div class="kpi-val"><%= halbjahresuebersicht.faecher.length %></div><div class="kpi-lbl">Fächer</div></div>
+    <div class="kpi"><div class="kpi-val"><%= offeneEntsperrAnfragen %></div><div class="kpi-lbl">Offene Entsperr-Anfragen</div></div>
+    <div class="kpi"><div class="kpi-val"><%= klassenleitungListe.length %></div><div class="kpi-lbl">Weitere Klassenlehrkräfte</div></div>
+  </div>
+</div>
+
+<div id="panel-halbjahr" class="reiter-panel <%= aktiverTab === 'halbjahr' ? 'active' : '' %>">
+  <h2>Halbjahresübersicht</h2>
+  <p class="kopf-aktionen">
+    <% if (halbjahresuebersicht.zeilen.length) { %>
+      <a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= halbjahresuebersicht.zeilen[0].schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">🎓 Konferenzmodus starten</a>
+    <% } %>
+  </p>
+  <p><small>
+    Zeigt den zuletzt <strong>synchronisierten</strong> Stand je Fach — nicht die Live-Notentafel der
+    Fachlehrkräfte. Eine Lehrkraft synchronisiert selbst per Knopfdruck oder automatisch (siehe
+    Fachseite). Fehlt eine Spalte „zuletzt synchronisiert", wurde für dieses Fach/Halbjahr noch nie
+    synchronisiert.
+  </small></p>
+  <% if (!halbjahresuebersicht.faecher.length) { %>
+    <p>Diese Klasse hat noch keine Fächer.</p>
+  <% } else { %>
+    <table class="data">
+      <thead>
         <tr>
-          <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
-          <td>
-            <button type="button" onclick="document.getElementById('notiz-dialog-<%= s.id %>').showModal()">
-              📝 Notizen<% if (notizenMap[s.id].length) { %> (<%= notizenMap[s.id].length %>)<% } %>
-            </button>
-          </td>
-          <% FEHLZEIT_TYPEN.forEach(function(typ) {
-               var fz = fehlMap[s.id][typ];
-               var fz2 = fehlMap2[s.id][typ]; %>
-            <td><input type="number" name="stunden_<%= s.id %>_<%= typ %>" value="<%= fz.stunden || 0 %>" min="0" step="0.5" size="5" class="fz-s1" data-sid="<%= s.id %>" data-typ="<%= typ %>"></td>
+          <th>Schüler/in</th>
+          <% halbjahresuebersicht.faecher.forEach(function(f) { %>
+            <th>
+              <%= f.name %><br>
+              <small>
+                <% var m = halbjahresuebersicht.syncMeta.get(f.id); %>
+                <% if (m) { %>zuletzt sync.: <%= formatZeitLokal(m.synced_at) %><% } else { %>noch nie synchronisiert<% } %>
+              </small>
+            </th>
+          <% }); %>
+          <th>Ø Notenschnitt</th>
+          <th>Status</th>
+          <th>Notizen</th>
+          <th>Konferenz</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% halbjahresuebersicht.zeilen.forEach(function(z) { %>
+          <tr>
+            <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
+            <% z.noten.forEach(function(n) { %>
+              <td>
+                <%= n.note === null ? '–' : formatNote(n.note) %>
+                <% if (n.ueberschrieben) { %><small class="hint" title="Konferenzentscheidung">🎓</small><% } %>
+              </td>
+            <% }); %>
+            <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+            <td>
+              <% var sperre = halbjahresuebersicht.sperren.get(z.schueler.id); %>
+              <% if (sperre) { %>
+                🔒 gesperrt
+                <% if (sperre.aufhebung_angefragt) { %>
+                  <br><small class="hint" title="<%= sperre.aufhebung_grund || '' %>">
+                    Entsperrung angefragt von <%= sperre.angefragt_von_name || sperre.angefragt_von_username || '—' %>
+                  </small>
+                <% } %>
+              <% } else { %>—<% } %>
+            </td>
+            <td>
+              <% if (!z.notizen.length) { %>
+                —
+              <% } else { %>
+                <details>
+                  <summary>📝 <%= z.notizen.length %></summary>
+                  <ul>
+                    <% z.notizen.forEach(function(n) { %>
+                      <li>
+                        <small>
+                          <%= formatZeitLokal(n.created_at) %> ·
+                          <%= n.typ === 'konferenz' ? 'Notenkonferenz' : ('Besprechung' + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %> ·
+                          <%= n.display_name || n.username || '—' %>
+                        </small><br>
+                        <%= n.text %>
+                      </li>
+                    <% }); %>
+                  </ul>
+                </details>
+              <% } %>
+            </td>
+            <td><a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= z.schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">Öffnen</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<div id="panel-fehlzeiten" class="reiter-panel <%= aktiverTab === 'fehlzeiten' ? 'active' : '' %>">
+  <h2>Fehlzeiten</h2>
+  <form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/zwei-schulen" class="inline">
+    <input type="hidden" name="aktiv" value="<%= klasse.zwei_schulen ? '0' : '1' %>">
+    <button type="submit">
+      <%= klasse.zwei_schulen ? '☑' : '☐' %> Schüler/innen werden an zwei Schulen unterrichtet
+      (zwei Spalten je Fehlzeitenart + Summe)
+    </button>
+  </form>
+
+  <form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/speichern">
+    <input type="hidden" name="hj" value="<%= halbjahr %>">
+    <table class="data fz">
+      <thead>
+        <tr>
+          <th rowspan="2">Schüler/in</th>
+          <th rowspan="2">Notizen</th>
+          <% FEHLZEIT_TYPEN.forEach(function(typ) { %>
+            <th colspan="<%= klasse.zwei_schulen ? 3 : 1 %>"><%= typ %></th>
+          <% }); %>
+        </tr>
+        <tr>
+          <% FEHLZEIT_TYPEN.forEach(function() { %>
             <% if (klasse.zwei_schulen) { %>
-              <td><input type="number" name="stunden2_<%= s.id %>_<%= typ %>" value="<%= fz2.stunden || 0 %>" min="0" step="0.5" size="5" class="fz-s2" data-sid="<%= s.id %>" data-typ="<%= typ %>"></td>
-              <td><output class="fz-summe" data-sid="<%= s.id %>" data-typ="<%= typ %>"><%= (Number(fz.stunden)||0) + (Number(fz2.stunden)||0) %></output></td>
+              <th>Schule 1 (h)</th><th>Schule 2 (h)</th><th>Summe</th>
+            <% } else { %>
+              <th>h</th>
             <% } %>
           <% }); %>
+        </tr>
+      </thead>
+      <tbody>
+        <% schueler.forEach(function(s) { %>
+          <tr>
+            <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
+            <td>
+              <button type="button" onclick="document.getElementById('notiz-dialog-<%= s.id %>').showModal()">
+                📝 Notizen<% if (notizenMap[s.id].length) { %> (<%= notizenMap[s.id].length %>)<% } %>
+              </button>
+            </td>
+            <% FEHLZEIT_TYPEN.forEach(function(typ) {
+                 var fz = fehlMap[s.id][typ];
+                 var fz2 = fehlMap2[s.id][typ]; %>
+              <td><input type="number" name="stunden_<%= s.id %>_<%= typ %>" value="<%= fz.stunden || 0 %>" min="0" step="0.5" size="5" class="fz-s1" data-sid="<%= s.id %>" data-typ="<%= typ %>"></td>
+              <% if (klasse.zwei_schulen) { %>
+                <td><input type="number" name="stunden2_<%= s.id %>_<%= typ %>" value="<%= fz2.stunden || 0 %>" min="0" step="0.5" size="5" class="fz-s2" data-sid="<%= s.id %>" data-typ="<%= typ %>"></td>
+                <td><output class="fz-summe" data-sid="<%= s.id %>" data-typ="<%= typ %>"><%= (Number(fz.stunden)||0) + (Number(fz2.stunden)||0) %></output></td>
+              <% } %>
+            <% }); %>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <p><button type="submit">💾 Fehlzeiten speichern</button></p>
+  </form>
+
+  <% schueler.forEach(function(s) { %>
+    <dialog id="notiz-dialog-<%= s.id %>" class="notiz-dialog">
+      <h2>Notizen: <%= s.nachname %>, <%= s.vorname %></h2>
+      <p class="hint">
+        Gemeinsames Notizbuch aller Klassenlehrkräfte dieser Klasse — unabhängig von Notizen,
+        die bei den Noten (Notenbesprechung) eingetragen werden. Ältere Einträge bleiben
+        erhalten, es wird nichts überschrieben.
+      </p>
+      <% if (!notizenMap[s.id].length) { %>
+        <p class="hint">Noch keine Notizen.</p>
+      <% } else { %>
+        <ul class="notiz-liste">
+          <% notizenMap[s.id].forEach(function(n) { %>
+            <li>
+              <div class="notiz-text"><%= n.text %></div>
+              <div class="notiz-meta hint"><%= n.display_name || n.username || 'unbekannt' %> · <%= formatZeitLokal(n.created_at) %></div>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+      <form method="post" action="/klassenlehrer/schueler/<%= s.id %>/notiz">
+        <input type="hidden" name="hj" value="<%= halbjahr %>">
+        <textarea name="text" rows="3" placeholder="Neue Notiz hinzufügen…" required></textarea>
+        <div class="form-actions">
+          <button type="submit">+ Notiz hinzufügen</button>
+          <button type="button" onclick="document.getElementById('notiz-dialog-<%= s.id %>').close()">Schließen</button>
+        </div>
+      </form>
+    </dialog>
+  <% }); %>
+</div>
+
+<div id="panel-abschluss" class="reiter-panel <%= aktiverTab === 'abschluss' ? 'active' : '' %>">
+  <h2>Abschluss-/Abgangsübersicht</h2>
+  <p class="hint">
+    Zeigt die Fachabschlussnote je Fach — nur für Fächer, die die Fachlehrkraft (oder du als
+    Klassenleitung) über "Fach abschließen" auf der Noteneingabe-Seite abgeschlossen hat. Nicht
+    abgeschlossene Fächer zeigen "läuft", da sie (noch) keine Abschlussnote haben.
+  </p>
+  <% if (!abschlussuebersicht.faecher.length) { %>
+    <p>Diese Klasse hat noch keine Fächer.</p>
+  <% } else { %>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Schüler/in</th>
+          <% abschlussuebersicht.faecher.forEach(function(f) { %>
+            <th><%= f.name %><br><small><%= f.abgeschlossen ? 'abgeschlossen' : 'läuft' %></small></th>
+          <% }); %>
+          <th>Ø Abschluss</th>
+          <th>Aktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% abschlussuebersicht.zeilen.forEach(function(z) { %>
+          <tr>
+            <td class="name">
+              <%= z.schueler.nachname %>, <%= z.schueler.vorname %>
+              <% if (z.schueler.status === 'abgang') { %><small class="hint">(Abgang)</small><% } %>
+            </td>
+            <% z.noten.forEach(function(n) { %>
+              <td>
+                <% if (!n.fach.abgeschlossen) { %><span class="hint">läuft</span>
+                <% } else { %><%= n.note === null ? '–' : formatNote(n.note) %><% } %>
+              </td>
+            <% }); %>
+            <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+            <td><a href="/teacher/schueler/<%= z.schueler.id %>/abgangszeugnis">🎓 Abgangszeugnis</a></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<div id="panel-klassenleitung" class="reiter-panel <%= aktiverTab === 'klassenleitung' ? 'active' : '' %>">
+  <h2>Weitere Klassenlehrkräfte</h2>
+  <p class="hint">
+    Alle hier eingetragenen Personen sind gleichberechtigte Klassenleitung — sie sehen alle Noten
+    der Klasse und können hier Fehlzeiten eintragen.
+  </p>
+  <table class="data">
+    <thead><tr><th>Lehrkraft</th><th>Aktion</th></tr></thead>
+    <tbody>
+      <% klassenleitungListe.forEach(function(kl) { %>
+        <tr>
+          <td><%= kl.display_name || kl.username %></td>
+          <td>
+            <form method="post" action="/teacher/klassenleitung/<%= kl.id %>/entfernen" class="inline" onsubmit="return confirm('Klassenleitung entfernen?')">
+              <button type="submit" class="danger">🗑</button>
+            </form>
+          </td>
         </tr>
       <% }); %>
     </tbody>
   </table>
-  <p><button type="submit">💾 Fehlzeiten speichern</button></p>
-</form>
-
-<% schueler.forEach(function(s) { %>
-  <dialog id="notiz-dialog-<%= s.id %>" class="notiz-dialog">
-    <h2>Notizen: <%= s.nachname %>, <%= s.vorname %></h2>
-    <p class="hint">
-      Gemeinsames Notizbuch aller Klassenlehrkräfte dieser Klasse — unabhängig von Notizen,
-      die bei den Noten (Notenbesprechung) eingetragen werden. Ältere Einträge bleiben
-      erhalten, es wird nichts überschrieben.
-    </p>
-    <% if (!notizenMap[s.id].length) { %>
-      <p class="hint">Noch keine Notizen.</p>
-    <% } else { %>
-      <ul class="notiz-liste">
-        <% notizenMap[s.id].forEach(function(n) { %>
-          <li>
-            <div class="notiz-text"><%= n.text %></div>
-            <div class="notiz-meta hint"><%= n.display_name || n.username || 'unbekannt' %> · <%= formatZeitLokal(n.created_at) %></div>
-          </li>
+  <% var moeglicheCoLehrkraefte = zuweisbareLehrkraefte.filter(function(u) {
+       return !klassenleitungListe.some(function(kl) { return kl.user_id === u.id; });
+     }); %>
+  <% if (moeglicheCoLehrkraefte.length) { %>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenleitung/hinzufuegen" class="inline">
+      <select name="user_id" required>
+        <option value="">— Co-Klassenlehrkraft wählen —</option>
+        <% moeglicheCoLehrkraefte.forEach(function(u) { %>
+          <option value="<%= u.id %>"><%= u.display_name || u.username %></option>
         <% }); %>
-      </ul>
-    <% } %>
-    <form method="post" action="/klassenlehrer/schueler/<%= s.id %>/notiz">
-      <input type="hidden" name="hj" value="<%= halbjahr %>">
-      <textarea name="text" rows="3" placeholder="Neue Notiz hinzufügen…" required></textarea>
-      <div class="form-actions">
-        <button type="submit">+ Notiz hinzufügen</button>
-        <button type="button" onclick="document.getElementById('notiz-dialog-<%= s.id %>').close()">Schließen</button>
-      </div>
+      </select>
+      <button type="submit">+ Als Co-Klassenlehrkraft eintragen</button>
     </form>
-  </dialog>
-<% }); %>
+  <% } %>
+</div>
 
 <% if (klasse.zwei_schulen) { %>
 <script>
@@ -108,3 +297,43 @@
   });
 </script>
 <% } %>
+
+<script>
+  // Reiter-Umschaltung wie an anderer Stelle in der App (siehe fach_detail.ejs):
+  // je Gruppe eigene Buttons/Panels, gewählter Reiter wird in localStorage
+  // gemerkt UND kann per ?tab= (z. B. nach dem Speichern der Fehlzeiten oder
+  // dem Eintragen einer Co-Klassenlehrkraft) gezielt angesprungen werden.
+  function initReiterGruppe(gruppe) {
+    const buttons = Array.from(gruppe.querySelectorAll('button[data-target]'));
+    const storageKey = gruppe.dataset.storageKey;
+    function setzeReiter(targetId) {
+      buttons.forEach(function(b) { b.classList.toggle('active', b.dataset.target === targetId); });
+      buttons.forEach(function(b) {
+        const panel = document.getElementById(b.dataset.target);
+        if (panel) panel.classList.toggle('active', b.dataset.target === targetId);
+      });
+    }
+    buttons.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        setzeReiter(btn.dataset.target);
+        if (storageKey) {
+          try { localStorage.setItem(storageKey, btn.dataset.target); } catch (e) { /* z. B. privater Modus */ }
+        }
+      });
+    });
+    if (storageKey) {
+      try {
+        const gemerkterReiter = localStorage.getItem(storageKey);
+        if (gemerkterReiter && document.getElementById(gemerkterReiter)) setzeReiter(gemerkterReiter);
+      } catch (e) { /* z. B. privater Modus */ }
+    }
+  }
+  document.querySelectorAll('.reiter').forEach(initReiterGruppe);
+
+  (function() {
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (!tab) return;
+    const btn = document.querySelector('.reiter button[data-target="panel-' + tab + '"]');
+    if (btn) btn.click();
+  })();
+</script>

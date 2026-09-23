@@ -414,6 +414,9 @@
         <label class="feld">Anzahl der Aufgaben (Teilpunktzahlen)
           <input type="number" name="aufgaben" min="1" value="1">
         </label>
+        <label class="feld">Gewichtung (optional)
+          <span class="feld-mit-einheit"><input type="number" name="gewichtung" min="0" max="100" step="0.1" value="0">%</span>
+        </label>
       </div>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       <button type="submit">+ Zusatzleistung anlegen</button>
@@ -432,7 +435,7 @@
   </p>
   <table class="data">
     <thead><tr><th>Schüler/in</th><th>Klasse</th><th>Aktion</th></tr></thead>
-    <tbody>
+    <tbody id="teilnehmer-tabelle-body">
       <% teilnehmer.forEach(function(t) { %>
         <tr>
           <td class="name"><%= t.nachname %>, <%= t.vorname %></td>
@@ -621,12 +624,22 @@
 
   // Direkt auf einen bestimmten Reiter springen (?tab=teilnehmer), z. B. nach
   // dem Anlegen eines klassenübergreifenden Kurses -- überschreibt für diesen
-  // einen Seitenaufruf den sonst aus localStorage gemerkten Reiter.
+  // einen Seitenaufruf den sonst aus localStorage gemerkten Reiter. Zusätzlich
+  // ?open=klausur-panel-<id>/ul-panel-<id>, um nach dem Anlegen einer Klausur
+  // oder Zusatzleistung direkt deren Unter-Reiter zu öffnen (Fokus liegt dann
+  // sofort auf der Punkteeingabe, statt erst wieder dorthin klicken zu müssen).
   (function() {
-    const gewuenschterTab = new URLSearchParams(location.search).get('tab');
-    if (!gewuenschterTab) return;
-    const btn = document.querySelector('.reiter button[data-target="panel-' + gewuenschterTab + '"]');
-    if (btn) btn.click();
+    const params = new URLSearchParams(location.search);
+    const gewuenschterTab = params.get('tab');
+    if (gewuenschterTab) {
+      const btn = document.querySelector('.reiter button[data-target="panel-' + gewuenschterTab + '"]');
+      if (btn) btn.click();
+    }
+    const zuOeffnen = params.get('open');
+    if (zuOeffnen) {
+      const unterBtn = document.querySelector('.unter-reiter button[data-target="' + CSS.escape(zuOeffnen) + '"]');
+      if (unterBtn) unterBtn.click();
+    }
   })();
 
   // Live-Update via JSON-API: aktualisiert Punkt-Noten UND die Notenübersicht oben
@@ -756,9 +769,49 @@
   // Teilnehmer/innen-Suche: Ergebnisse werden bewusst per DOM-API statt
   // innerHTML eingefügt (Nachname/Vorname/Klassenname kommen aus der
   // Datenbank und sind nicht vertrauenswürdig genug für unmaskiertes HTML).
+  //
+  // Hinzufügen läuft per fetch() statt als normaler Form-POST: ein echter
+  // Seiten-Reload hätte die Trefferliste UND die Eingabe im Suchfeld
+  // gelöscht -- bei einer ganzen Klasse musste man dann nach jeder einzelnen
+  // Person neu "10B" eintippen. Jetzt bleibt die Liste stehen, nur der
+  // angeklickte Treffer wird als "✓ hinzugefügt" markiert, damit mehrere
+  // Personen nacheinander angeklickt werden können.
   const teilnehmerSucheEingabe = document.getElementById('teilnehmer-suche-eingabe');
   if (teilnehmerSucheEingabe) {
     const ergebnisListe = document.getElementById('teilnehmer-suche-ergebnisse');
+    const teilnehmerTabelle = document.getElementById('teilnehmer-tabelle-body');
+
+    function fuegeTeilnehmerZeileHinzu(t) {
+      const tr = document.createElement('tr');
+      const nameZelle = document.createElement('td');
+      nameZelle.className = 'name';
+      nameZelle.textContent = t.nachname + ', ' + t.vorname;
+      const klasseZelle = document.createElement('td');
+      klasseZelle.textContent = t.klasse_name;
+      if (!t.fremd) {
+        const hinweis = document.createElement('small');
+        hinweis.className = 'hint';
+        hinweis.textContent = ' (Heimat-Klasse)';
+        klasseZelle.appendChild(hinweis);
+      }
+      const aktionZelle = document.createElement('td');
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.action = '/teacher/fach/<%= fach.id %>/teilnehmer/entfernen';
+      form.className = 'inline';
+      form.addEventListener('submit', function(e) { if (!confirm('Aus diesem Fach entfernen?')) e.preventDefault(); });
+      const sid = document.createElement('input');
+      sid.type = 'hidden'; sid.name = 'schueler_id'; sid.value = t.id;
+      const hj = document.createElement('input');
+      hj.type = 'hidden'; hj.name = 'halbjahr'; hj.value = '<%= halbjahr %>';
+      const delBtn = document.createElement('button');
+      delBtn.type = 'submit'; delBtn.className = 'danger'; delBtn.textContent = '🗑';
+      form.appendChild(sid); form.appendChild(hj); form.appendChild(delBtn);
+      aktionZelle.appendChild(form);
+      tr.appendChild(nameZelle); tr.appendChild(klasseZelle); tr.appendChild(aktionZelle);
+      teilnehmerTabelle.appendChild(tr);
+    }
+
     teilnehmerSucheEingabe.addEventListener('input', debounce(async function() {
       const q = teilnehmerSucheEingabe.value.trim();
       ergebnisListe.textContent = '';
@@ -774,22 +827,34 @@
       }
       data.treffer.forEach(function(t) {
         const li = document.createElement('li');
-        const form = document.createElement('form');
-        form.method = 'post';
-        form.action = '/teacher/fach/<%= fach.id %>/teilnehmer/hinzufuegen';
-        form.className = 'inline';
-        const sid = document.createElement('input');
-        sid.type = 'hidden'; sid.name = 'schueler_id'; sid.value = t.id;
-        const hj = document.createElement('input');
-        hj.type = 'hidden'; hj.name = 'halbjahr'; hj.value = '<%= halbjahr %>';
         const btn = document.createElement('button');
-        btn.type = 'submit';
+        btn.type = 'button';
         btn.textContent = '+ ' + t.nachname + ', ' + t.vorname + ' (' + t.klasse_name + ')'
           + (t.notenschluessel !== '<%= fach.notenschluessel %>' ? ' — anderer Notenschlüssel' : '');
-        form.appendChild(sid);
-        form.appendChild(hj);
-        form.appendChild(btn);
-        li.appendChild(form);
+        btn.addEventListener('click', async function() {
+          btn.disabled = true;
+          const body = new URLSearchParams();
+          body.append('schueler_id', t.id);
+          body.append('halbjahr', '<%= halbjahr %>');
+          const res = await fetch('/teacher/fach/<%= fach.id %>/teilnehmer/hinzufuegen', {
+            method: 'POST', headers: { Accept: 'application/json' }, body,
+          });
+          const resData = await res.json().catch(function() { return {}; });
+          if (res.ok && resData.ok) {
+            btn.textContent = '✓ ' + t.nachname + ', ' + t.vorname + ' hinzugefügt';
+            fuegeTeilnehmerZeileHinzu(resData.teilnehmer);
+          } else {
+            btn.disabled = false;
+            let fehler = li.querySelector('.err');
+            if (!fehler) {
+              fehler = document.createElement('div');
+              fehler.className = 'err';
+              li.appendChild(fehler);
+            }
+            fehler.textContent = resData.error || 'Hinzufügen fehlgeschlagen.';
+          }
+        });
+        li.appendChild(btn);
         ergebnisListe.appendChild(li);
       });
     }, 300));

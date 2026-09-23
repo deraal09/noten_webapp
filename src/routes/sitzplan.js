@@ -61,7 +61,8 @@ export default async function sitzplanRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const db = getDb();
-    const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
+    // Abgegangene Personen (siehe schueler.status) brauchen keinen Sitzplatz mehr.
+    const schueler = db.prepare("SELECT * FROM schueler WHERE klasse_id = ? AND status != 'abgang' ORDER BY nachname, vorname").all(klasse.id);
     const eigener = db.prepare('SELECT * FROM sitzplaene WHERE klasse_id = ? AND owner_id = ?')
       .get(klasse.id, request.user.id);
     const geteilt = db.prepare(`

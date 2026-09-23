@@ -19,7 +19,9 @@ import { findeOderLegeSchuelerAn } from './schueler-utils.js';
 /** Befüllt die Teilnehmerliste eines frisch angelegten Fachs mit allen Schüler/innen seiner Heimat-Klasse. */
 export function seedeTeilnehmerAusKlasse(fachId, klasseId) {
   const db = getDb();
-  const schuelerIds = db.prepare('SELECT id FROM schueler WHERE klasse_id = ?').all(klasseId).map((r) => r.id);
+  // Abgegangene Personen (siehe schueler.status, src/db.js) werden bei neu
+  // angelegten Fächern/Kursen bewusst nicht mehr automatisch übernommen.
+  const schuelerIds = db.prepare("SELECT id FROM schueler WHERE klasse_id = ? AND status != 'abgang'").all(klasseId).map((r) => r.id);
   const ins = db.prepare('INSERT OR IGNORE INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)');
   for (const id of schuelerIds) ins.run(fachId, id);
 }

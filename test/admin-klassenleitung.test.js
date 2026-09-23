@@ -91,9 +91,10 @@ test('Admin trägt eine Lehrkraft als Klassenleitung ein', async () => {
   assert.match(html, /Lehrer A/);
   assert.doesNotMatch(html, /Noch keine Klassenleitung eingetragen/);
 
-  // Die Lehrkraft hat dadurch auch tatsächlich Klassenleitungs-Rechte.
+  // Die Lehrkraft hat dadurch auch tatsächlich Klassenleitungs-Rechte
+  // (sichtbar am "🎓 Klassenleitung"-Button, der zur Klassenleitungsübersicht führt).
   const klasseHtml = await (await lehrerA(`/teacher/klassen/${klasseId}`)).text();
-  assert.match(klasseHtml, /Du bist Klassenleitung dieser Klasse/);
+  assert.match(klasseHtml, /href="\/klassenlehrer\/klasse\/\d+">🎓 Klassenleitung/);
 });
 
 test('Admin kann die Klassenleitung wieder entfernen', async () => {

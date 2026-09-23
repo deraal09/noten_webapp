@@ -5,6 +5,9 @@
   <% if (kannExportieren) { %>
     <a class="btn" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
   <% } %>
+  <% if (istKlassenlehrer) { %>
+    <a class="btn" href="/klassenlehrer/klasse/<%= klasse.id %>">🎓 Klassenleitung</a>
+  <% } %>
   <% if (eigentuemer) { %>
     <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
       <button type="submit" class="danger">🗑 Klasse löschen</button>
@@ -13,12 +16,6 @@
 </p>
 
 <% if (istKlassenlehrer) { %>
-  <p class="flash flash-info">
-    Du bist Klassenleitung dieser Klasse.
-    <a href="/teacher/klassen/<%= klasse.id %>/uebersicht">→ Halbjahresübersicht (synchronisierte Noten, Notenschnitt)</a>
-    · <a href="/teacher/klassen/<%= klasse.id %>/abschluss">→ Abschluss-/Abgangsübersicht</a>
-  </p>
-
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/offen-fuer-beitritt" class="inline" id="offen-beitritt-form">
     <input type="hidden" name="offen" id="offen-beitritt-wert" value="<%= klasse.offen_fuer_beitritt ? '1' : '0' %>">
     <label>
@@ -37,43 +34,6 @@
       });
     })();
   </script>
-
-  <details class="card">
-    <summary>Klassenleitung (<%= klassenleitungListe.length %>)</summary>
-    <p class="hint">
-      Alle hier eingetragenen Personen sind gleichberechtigte Klassenleitung — sie sehen alle Noten
-      der Klasse und können auf der Klassenleitungsseite Fehlzeiten eintragen.
-    </p>
-    <table class="data">
-      <thead><tr><th>Lehrkraft</th><th>Aktion</th></tr></thead>
-      <tbody>
-        <% klassenleitungListe.forEach(function(kl) { %>
-          <tr>
-            <td><%= kl.display_name || kl.username %></td>
-            <td>
-              <form method="post" action="/teacher/klassenleitung/<%= kl.id %>/entfernen" class="inline" onsubmit="return confirm('Klassenleitung entfernen?')">
-                <button type="submit" class="danger">🗑</button>
-              </form>
-            </td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
-    <% var moeglicheCoLehrkraefte = zuweisbareLehrkraefte.filter(function(u) {
-         return !klassenleitungListe.some(function(kl) { return kl.user_id === u.id; });
-       }); %>
-    <% if (moeglicheCoLehrkraefte.length) { %>
-      <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenleitung/hinzufuegen" class="inline">
-        <select name="user_id" required>
-          <option value="">— Co-Klassenlehrkraft wählen —</option>
-          <% moeglicheCoLehrkraefte.forEach(function(u) { %>
-            <option value="<%= u.id %>"><%= u.display_name || u.username %></option>
-          <% }); %>
-        </select>
-        <button type="submit">+ Als Co-Klassenlehrkraft eintragen</button>
-      </form>
-    <% } %>
-  </details>
 
   <details class="card">
     <summary>Klasse ins nächste Schuljahr übertragen</summary>
@@ -151,22 +111,54 @@ Meier, Carla"></textarea>
   </form>
 </div>
 
+<% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
+   var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
 <table class="data">
   <thead><tr><th>Nachname</th><th>Vorname</th><th>Aktion</th></tr></thead>
   <tbody>
-    <% schueler.forEach(function(s) { %>
+    <% schuelerAktiv.forEach(function(s) { %>
       <tr>
         <td><%= s.nachname %></td>
         <td><%= s.vorname %></td>
         <td>
-          <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in löschen?')">
-            <button type="submit" class="danger">🗑</button>
+          <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" class="inline" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
+            <button type="submit" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
+          </form>
+          <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren. Für einen normalen Abgang stattdessen den Button „🚪 Abgang" nutzen.')">
+            <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
           </form>
         </td>
       </tr>
     <% }); %>
   </tbody>
 </table>
+
+<% if (schuelerAbgang.length) { %>
+  <details class="card">
+    <summary>Ehemalige Schüler/innen (Abgang, <%= schuelerAbgang.length %>)</summary>
+    <table class="data">
+      <thead><tr><th>Nachname</th><th>Vorname</th><th>Abgang am</th><th>Aktion</th></tr></thead>
+      <tbody>
+        <% schuelerAbgang.forEach(function(s) { %>
+          <tr>
+            <td><%= s.nachname %></td>
+            <td><%= s.vorname %></td>
+            <td><%= s.abgang_am ? formatZeitLokal(s.abgang_am) : '–' %></td>
+            <td>
+              <a class="btn" href="/teacher/schueler/<%= s.id %>/abgangszeugnis">🎓 Abgangszeugnis</a>
+              <form method="post" action="/teacher/schueler/<%= s.id %>/reaktivieren" class="inline">
+                <button type="submit" title="Abgang rückgängig machen">↩ Reaktivieren</button>
+              </form>
+              <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren.')">
+                <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </details>
+<% } %>
 
 <h2>Fächer</h2>
 <p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen.
