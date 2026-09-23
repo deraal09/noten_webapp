@@ -16,6 +16,13 @@
           </div>
         </a>
         <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)</div>
+        <% if (f.darfLoeschen) { %>
+          <div class="kachel-aktionen">
+            <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen? Klausuren/ULs und Noten gehen verloren.')">
+              <button type="submit" class="danger">🗑 Löschen</button>
+            </form>
+          </div>
+        <% } %>
       </li>
     <% }); %>
   </ul>
@@ -36,6 +43,13 @@
           <%= f.schuljahr_bezeichnung %>, Notenschlüssel: <%= f.notenschluessel %> ·
           <%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)
         </div>
+        <% if (f.darfLoeschen) { %>
+          <div class="kachel-aktionen">
+            <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Kurs löschen?')">
+              <button type="submit" class="danger">🗑 Löschen</button>
+            </form>
+          </div>
+        <% } %>
       </li>
     <% }); %>
   </ul>

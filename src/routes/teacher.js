@@ -159,7 +159,10 @@ export default async function teacherRoutes(fastify) {
     const byKlasse = new Map();
     const kurse = [];
     for (const r of rows) {
-      const eintrag = { id: r.id, name: r.name, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls };
+      const eintrag = {
+        id: r.id, name: r.name, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls,
+        darfLoeschen: userDarfFachLoeschen(request.user, { id: r.id, klasse_id: r.klasse_id, ist_kurs: r.ist_kurs }),
+      };
       if (r.ist_kurs) {
         kurse.push({ ...eintrag, notenschluessel: r.notenschluessel, schuljahr_bezeichnung: r.schuljahr_bezeichnung });
         continue;
