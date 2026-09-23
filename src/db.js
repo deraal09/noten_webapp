@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -118,6 +118,11 @@ CREATE TABLE IF NOT EXISTS klassen (
     -- src/klassen-verknuepfung.js). Ersetzt die frühere
     -- Verknüpfungsanfrage mit Einstimmigkeitszwang.
     offen_fuer_beitritt INTEGER NOT NULL DEFAULT 0,
+    -- Nur gesetzt bei notenschluessel = 'SPA': 'SPA_REGULAR' oder 'SPA_PIA'
+    -- (siehe src/spa-schema.js) -- bestimmt, welche Fächer/Komponenten/
+    -- Gewichte gelten. Eine SPA-Klasse läuft durchgehend über 4 Halbjahre
+    -- (2 Schuljahre) OHNE "Klasse ins nächste Schuljahr übertragen".
+    spa_bildungsgang TEXT,
     UNIQUE (schuljahr_id, name)
 );
 
@@ -151,7 +156,45 @@ CREATE TABLE IF NOT EXISTS faecher (
     -- der Anzeige (z. B. eigene Rubrik in "Meine Klassen", siehe
     -- routes/teacher.js /kurse/neu) und schränkt nichts an der Notenlogik ein.
     ist_kurs INTEGER NOT NULL DEFAULT 0,
+    -- Nur bei SPA-Klassen gesetzt: Schlüssel in src/spa-schema.js (z. B.
+    -- 'LF2', 'PRAXIS', 'WPK'), bestimmt das feste Bewertungsschema dieses
+    -- Fachs. spa_wpk_kurs ist nur beim WPK-Fach genutzt (Name des gewählten
+    -- Wahlpflichtkurses, siehe WPK_KURSE).
+    spa_fach_key TEXT,
+    spa_wpk_kurs TEXT,
     UNIQUE (klasse_id, name)
+);
+
+-- Eingaben je (Fach × Schüler:in × Halbjahr) für SPA-Fächer: der
+-- Direktwert (halbjahrModus 'direkt'), eine optionale Prüfungsnote (nur
+-- angezeigt bzw. bei Englisch/Mathematik 4. Hj. über pruefungswert in die
+-- Endnote verrechnet, siehe src/spa-noten-service.js) sowie eine importierte
+-- (historische) Endnote, die die Berechnung überschreibt. Komponentenwerte
+-- (halbjahrModus 'komponenten_gewichtet') stehen separat in
+-- spa_komponenten_noten.
+CREATE TABLE IF NOT EXISTS spa_eingaben (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    halbjahr INTEGER NOT NULL,
+    ist_na INTEGER NOT NULL DEFAULT 0,
+    direktwert REAL,
+    pruefungswert REAL,
+    importierte_endnote REAL,
+    UNIQUE (fach_id, schueler_id, halbjahr)
+);
+
+-- Komponentenwerte je (Fach × Schüler:in × Halbjahr × Komponente) für SPA-
+-- Fächer mit halbjahrModus 'komponenten_gewichtet' (z. B. LF2: gesundheit/
+-- erziehung/entwicklung).
+CREATE TABLE IF NOT EXISTS spa_komponenten_noten (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    halbjahr INTEGER NOT NULL,
+    komponente_schluessel TEXT NOT NULL,
+    punkte REAL,
+    UNIQUE (fach_id, schueler_id, halbjahr, komponente_schluessel)
 );
 
 -- Explizite Teilnehmerliste je Fach statt "alle Schüler/innen der Klasse":
@@ -611,6 +654,9 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'ist_kurs', 'ist_kurs INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'schueler', 'status', "status TEXT NOT NULL DEFAULT 'aktiv'");
   ensureColumn(db, 'schueler', 'abgang_am', 'abgang_am TEXT');
+  ensureColumn(db, 'klassen', 'spa_bildungsgang', 'spa_bildungsgang TEXT');
+  ensureColumn(db, 'faecher', 'spa_fach_key', 'spa_fach_key TEXT');
+  ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
   fuelleFachTeilnehmerAuf(db);
 }
 

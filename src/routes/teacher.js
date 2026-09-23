@@ -30,6 +30,7 @@ import {
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../schuljahr-utils.js';
+import { BILDUNGSGAENGE, spaFaecherFuerBildungsgang } from '../spa-schema.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -701,7 +702,7 @@ export default async function teacherRoutes(fastify) {
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
       user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen,
-      kurseNachSchuljahr,
+      kurseNachSchuljahr, bildungsgaenge: BILDUNGSGAENGE,
       kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), bekannteKlassennamen,
     });
   });
@@ -714,7 +715,20 @@ export default async function teacherRoutes(fastify) {
     const schuljahrId = parseInt(request.body?.schuljahr_id, 10);
     const name = String(request.body?.name || '').trim();
     let ns = String(request.body?.notenschluessel || 'IHK');
-    if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
+    if (!['IHK', 'BG', 'SPA'].includes(ns)) ns = 'IHK';
+    // SPA-Klassen (Sozialpädagogische Assistenz) brauchen zusätzlich den
+    // Bildungsgang -- der bestimmt, welche festen Fächer/Komponenten/
+    // Gewichte gelten (siehe src/spa-schema.js) und wird beim Anlegen
+    // einmalig festgelegt (nicht nachträglich änderbar, da er die gesamte
+    // Fächerstruktur bestimmt).
+    let spaBildungsgang = null;
+    if (ns === 'SPA') {
+      spaBildungsgang = String(request.body?.spa_bildungsgang || '');
+      if (!BILDUNGSGAENGE.some((b) => b.schluessel === spaBildungsgang)) {
+        request.flash?.('error', 'Bitte einen Bildungsgang für die SPA-Klasse auswählen.');
+        return reply.redirect('/teacher/klassen');
+      }
+    }
     // Erlaubt anderen Lehrkräften später einen sofortigen Beitritt bei
     // Namenskollision, ohne Zustimmung einzuholen (siehe klassen-verknuepfung.js).
     const offenFuerBeitritt = request.body?.offen_fuer_beitritt === '1' ? 1 : 0;
@@ -724,10 +738,12 @@ export default async function teacherRoutes(fastify) {
     }
     try {
       const info = getDb().prepare(`
-        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id, offen_fuer_beitritt)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns], request.user.id, offenFuerBeitritt);
-      return reply.redirect(`/teacher/klassen/${info.lastInsertRowid}`);
+        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id, offen_fuer_beitritt, spa_bildungsgang)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns] || '', request.user.id, offenFuerBeitritt, spaBildungsgang);
+      const klasseId = info.lastInsertRowid;
+      if (ns === 'SPA') seedeSpaFaecher(klasseId, spaBildungsgang, request.user.id);
+      return reply.redirect(`/teacher/klassen/${klasseId}`);
     } catch (e) {
       // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zum
       // Beitritt weiterleiten, damit die Klasse nicht doppelt entsteht.
@@ -1441,6 +1457,23 @@ export default async function teacherRoutes(fastify) {
 // sichtbar falsch verteilte Prozente lassen sich sofort im Formular
 // korrigieren, eine unsichtbar bei 0 hängende Klausur (fehlende Note in der
 // Übersicht) nicht.
+// Legt beim Anlegen einer SPA-Klasse sofort alle für den Bildungsgang
+// vorgesehenen Fächer/Lernfelder an (siehe src/spa-schema.js) -- SPA-Klassen
+// haben eine feste, vorkonfigurierte Fächerstruktur, es gibt dafür kein
+// manuelles "Fach anlegen" wie bei IHK/BG-Klassen.
+function seedeSpaFaecher(klasseId, bildungsgang, userId) {
+  const db = getDb();
+  const insert = db.prepare('INSERT INTO faecher (klasse_id, name, spa_fach_key) VALUES (?, ?, ?)');
+  const zuweisen = db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)');
+  const tx = db.transaction(() => {
+    for (const fach of spaFaecherFuerBildungsgang(bildungsgang)) {
+      const info = insert.run(klasseId, fach.name, fach.schluessel);
+      zuweisen.run(userId, info.lastInsertRowid);
+    }
+  });
+  tx();
+}
+
 function autoVerteileKlausuren(fachId, halbjahr, { erzwingen = false } = {}) {
   const klausuren = getDb().prepare(
     'SELECT id, gewichtung FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'

@@ -51,7 +51,24 @@
               <% }); %>
             </select>
           </label>
-          <p class="hint">Notenschlüssel: IHK (Standard) — bei Bedarf kann der Admin ihn nachträglich ändern.</p>
+          <label>Notenschlüssel
+            <select name="notenschluessel" class="ns-auswahl">
+              <option value="IHK" selected>IHK (1–6)</option>
+              <option value="BG">BG (0–15 Punkte)</option>
+              <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
+            </select>
+          </label>
+          <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>
+          <div class="spa-bildungsgang-auswahl" style="display:none;">
+            <p class="hint">
+              SPA-Klassen laufen durchgehend über 4 Halbjahre (2 Schuljahre) mit fest vorgegebenen
+              Lernfeldern/Fächern — der Bildungsgang bestimmt, welche Fächer/Gewichte gelten, und
+              lässt sich danach nicht mehr ändern.
+            </p>
+            <% bildungsgaenge.forEach(function(bg) { %>
+              <label><input type="radio" name="spa_bildungsgang" value="<%= bg.schluessel %>"> <%= bg.bezeichnung %></label>
+            <% }); %>
+          </div>
           <label>
             <input type="checkbox" name="offen_fuer_beitritt" value="1" checked>
             Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben
@@ -75,7 +92,24 @@
         <label>Klassenname
           <input type="text" name="name" placeholder="z. B. 12BFI1" required>
         </label>
-        <p class="hint">Notenschlüssel: IHK (Standard) — bei Bedarf kann der Admin ihn nachträglich ändern.</p>
+        <label>Notenschlüssel
+          <select name="notenschluessel" class="ns-auswahl">
+            <option value="IHK" selected>IHK (1–6)</option>
+            <option value="BG">BG (0–15 Punkte)</option>
+            <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
+          </select>
+        </label>
+        <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>
+        <div class="spa-bildungsgang-auswahl" style="display:none;">
+          <p class="hint">
+            SPA-Klassen laufen durchgehend über 4 Halbjahre (2 Schuljahre) mit fest vorgegebenen
+            Lernfeldern/Fächern — der Bildungsgang bestimmt, welche Fächer/Gewichte gelten, und
+            lässt sich danach nicht mehr ändern.
+          </p>
+          <% bildungsgaenge.forEach(function(bg) { %>
+            <label><input type="radio" name="spa_bildungsgang" value="<%= bg.schluessel %>"> <%= bg.bezeichnung %></label>
+          <% }); %>
+        </div>
         <label>
           <input type="checkbox" name="offen_fuer_beitritt" value="1" checked>
           Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben
@@ -196,5 +230,17 @@
         });
       });
     });
+  });
+
+  // Bildungsgang-Auswahl nur einblenden, solange "SPA" als Notenschlüssel gewählt ist.
+  document.querySelectorAll('.ns-auswahl').forEach(function(select) {
+    var form = select.closest('form');
+    var block = form && form.querySelector('.spa-bildungsgang-auswahl');
+    if (!block) return;
+    var aktualisieren = function() {
+      block.style.display = select.value === 'SPA' ? '' : 'none';
+    };
+    select.addEventListener('change', aktualisieren);
+    aktualisieren();
   });
 </script>
