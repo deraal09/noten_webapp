@@ -9,6 +9,16 @@
  * Bewertungsschemata, siehe Klärung mit dem Nutzer -- daher entfällt hier
  * insbesondere die separate "importierte_endnote"-Injektion: die liegt
  * schon direkt auf der spa_eingaben-Zeile).
+ *
+ * Einzige Ausnahme von "feste Konfiguration": Rest-Anteil-Komponenten
+ * einzelner Lernfelder (z. B. LF3: Kunst/Spiel/Musik/Bewegung) lassen sich
+ * je Klasse ein-/ausschalten (spaKomponentenKonfig/spaSetzeKomponenteAktiv,
+ * Tabelle spa_deaktivierte_komponenten) -- angelehnt an
+ * packages/server/src/db/komponenten.ts im Original. spaSchemaFuerFach()
+ * ist die einzige Stelle, die diese Deaktivierung anwendet; jede Berechnung
+ * und jede Anzeige des Schemas muss darüber laufen (nicht direkt
+ * spaSchemaFuer() aus spa-schema.js), sonst sehen Eingabemaske und
+ * Berechnung unterschiedliche Komponenten.
  */
 
 import { spaSchemaFuer, spaFachName, spaFaecherFuerBildungsgang } from './spa-schema.js';
@@ -26,6 +36,94 @@ function bildungsgangVonKlasse(db, klasseId) {
 function fachIdInKlasse(db, klasseId, fachSchluessel) {
   return db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND spa_fach_key = ?')
     .get(klasseId, fachSchluessel)?.id ?? null;
+}
+
+/** Je (Halbjahr, Komponente) deaktivierte Rest-Komponenten eines Fachs, als Menge "halbjahr:schluessel". */
+function ladeDeaktivierteKomponenten(db, fachId) {
+  const rows = db.prepare('SELECT halbjahr, komponente_schluessel FROM spa_deaktivierte_komponenten WHERE fach_id = ?')
+    .all(fachId);
+  return new Set(rows.map((r) => `${r.halbjahr}:${r.komponente_schluessel}`));
+}
+
+/**
+ * Bewertungsschema eines konkreten SPA-Fachs (Klasse × Fach), mit den für
+ * DIESE Klasse deaktivierten Rest-Komponenten (spa_deaktivierte_komponenten)
+ * bereits herausgefiltert -- die einzig korrekte Quelle sowohl für die
+ * Berechnung als auch für die Eingabemaske, damit beide immer dieselben
+ * Komponenten sehen. Nur Komponenten mit restAnteil=true können überhaupt
+ * deaktiviert sein (feste Gewichte bleiben unberührt, siehe
+ * spaKomponentenKonfig/spaSetzeKomponenteAktiv).
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} fachId
+ * @returns {{ fach: {id: number, klasse_id: number, spa_fach_key: string}|null, bildungsgang: string|null, schema: import('./spa-grade-calc.js').SchemaHalbjahr[] }}
+ */
+export function spaSchemaFuerFach(db, fachId) {
+  const fach = db.prepare('SELECT id, klasse_id, spa_fach_key FROM faecher WHERE id = ?').get(fachId);
+  if (!fach || !fach.spa_fach_key) return { fach: null, bildungsgang: null, schema: [] };
+  const bildungsgang = bildungsgangVonKlasse(db, fach.klasse_id);
+  if (!bildungsgang) return { fach, bildungsgang: null, schema: [] };
+  const basisSchema = spaSchemaFuer(fach.spa_fach_key, bildungsgang);
+  const deaktiviert = ladeDeaktivierteKomponenten(db, fachId);
+  const schema = deaktiviert.size === 0 ? basisSchema : basisSchema.map((s) => ({
+    ...s,
+    komponenten: s.komponenten.filter((k) => !(k.restAnteil && deaktiviert.has(`${s.halbjahr}:${k.schluessel}`))),
+  }));
+  return { fach, bildungsgang, schema };
+}
+
+/**
+ * Schaltbare (Rest-Anteil-)Komponenten eines SPA-Fachs für ein Halbjahr, mit
+ * aktuellem Aktiv-Status -- Grundlage für die Klassenleitungs-Einstellung
+ * "Zusammensetzung der Fächer" (nur Komponenten mit restAnteil=true, z. B.
+ * bei LF3: Kunst/Spiel/Musik/Bewegung, sind überhaupt schaltbar; feste
+ * Gewichte wie Pädagogik/Bericht bleiben immer aktiv). Leer, wenn das Fach/
+ * Halbjahr keine Rest-Komponenten hat (z. B. Direktwert-Fächer, LF2).
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} fachId
+ * @param {import('./spa-grade-calc.js').Halbjahr} halbjahr
+ * @returns {Array<{schluessel: string, aktiv: boolean}>}
+ */
+export function spaKomponentenKonfig(db, fachId, halbjahr) {
+  const fach = db.prepare('SELECT id, klasse_id, spa_fach_key FROM faecher WHERE id = ?').get(fachId);
+  if (!fach || !fach.spa_fach_key) return [];
+  const bildungsgang = bildungsgangVonKlasse(db, fach.klasse_id);
+  if (!bildungsgang) return [];
+  const schemaHj = spaSchemaFuer(fach.spa_fach_key, bildungsgang).find((s) => s.halbjahr === halbjahr);
+  const restKomponenten = (schemaHj?.komponenten ?? []).filter((k) => k.restAnteil);
+  if (restKomponenten.length === 0) return [];
+  const deaktiviert = ladeDeaktivierteKomponenten(db, fachId);
+  return restKomponenten.map((k) => ({
+    schluessel: k.schluessel,
+    aktiv: !deaktiviert.has(`${halbjahr}:${k.schluessel}`),
+  }));
+}
+
+/**
+ * Schaltet eine Rest-Komponente für ein SPA-Fach/Halbjahr an oder aus.
+ * Lehnt eine unbekannte oder nicht schaltbare (feste) Komponente ab, statt
+ * sie stillschweigend zu ignorieren. Wirkt sofort auf alle künftigen
+ * Berechnungen dieses Fachs (siehe spaSchemaFuerFach).
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} fachId
+ * @param {import('./spa-grade-calc.js').Halbjahr} halbjahr
+ * @param {string} komponenteSchluessel
+ * @param {boolean} aktiv
+ * @returns {boolean} true bei Erfolg, false bei unbekannter/nicht schaltbarer Komponente
+ */
+export function spaSetzeKomponenteAktiv(db, fachId, halbjahr, komponenteSchluessel, aktiv) {
+  const gueltig = spaKomponentenKonfig(db, fachId, halbjahr).some((k) => k.schluessel === komponenteSchluessel);
+  if (!gueltig) return false;
+  if (aktiv) {
+    db.prepare('DELETE FROM spa_deaktivierte_komponenten WHERE fach_id = ? AND halbjahr = ? AND komponente_schluessel = ?')
+      .run(fachId, halbjahr, komponenteSchluessel);
+  } else {
+    db.prepare(`
+      INSERT INTO spa_deaktivierte_komponenten (fach_id, halbjahr, komponente_schluessel)
+      VALUES (?, ?, ?)
+      ON CONFLICT(fach_id, halbjahr, komponente_schluessel) DO NOTHING
+    `).run(fachId, halbjahr, komponenteSchluessel);
+  }
+  return true;
 }
 
 /**
@@ -142,12 +240,8 @@ function injiziereExterneWerte(db, fach, bildungsgang, schuelerId, schema, einga
  * @returns {ErgebnisHalbjahr[]}
  */
 export function berechneFachFuerSchueler(db, fachId, schuelerId) {
-  const fach = db.prepare('SELECT id, klasse_id, spa_fach_key FROM faecher WHERE id = ?').get(fachId);
-  if (!fach || !fach.spa_fach_key) return [];
-  const bildungsgang = bildungsgangVonKlasse(db, fach.klasse_id);
-  if (!bildungsgang) return [];
-  const schema = spaSchemaFuer(fach.spa_fach_key, bildungsgang);
-  if (schema.length === 0) return [];
+  const { fach, bildungsgang, schema } = spaSchemaFuerFach(db, fachId);
+  if (!fach || !bildungsgang || schema.length === 0) return [];
 
   const eingaben = ladeEingaben(db, fachId, schuelerId, schema);
   injiziereExterneWerte(db, fach, bildungsgang, schuelerId, schema, eingaben);

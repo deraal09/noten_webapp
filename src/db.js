@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -205,6 +205,23 @@ CREATE TABLE IF NOT EXISTS spa_komponenten_noten (
     komponente_schluessel TEXT NOT NULL,
     punkte REAL,
     UNIQUE (fach_id, schueler_id, halbjahr, komponente_schluessel)
+);
+
+-- Je Klasse (genauer: je SPA-Fach, das schon eindeutig zu einer Klasse
+-- gehört) abgeschaltete Rest-Anteil-Komponenten eines Lernfelds (z. B. LF3:
+-- Kunst/Spiel/Musik/Bewegung) -- eine Zeile bedeutet "deaktiviert", ihr
+-- Fehlen "aktiv" (Default). Nur Komponenten mit restAnteil=true in
+-- src/spa-schema.js sind schaltbar (feste Gewichte wie Pädagogik/Bericht
+-- bleiben immer aktiv); die Berechnung verteilt das Restbudget dann auf die
+-- verbleibenden aktiven Rest-Komponenten (siehe spa-grade-calc.js,
+-- berechneZwischennote). Von der Klassenleitung änderbar, siehe
+-- spaSchemaFuerFach()/spaSetzeKomponenteAktiv() in spa-noten-service.js.
+CREATE TABLE IF NOT EXISTS spa_deaktivierte_komponenten (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    halbjahr INTEGER NOT NULL,
+    komponente_schluessel TEXT NOT NULL,
+    UNIQUE (fach_id, halbjahr, komponente_schluessel)
 );
 
 -- Explizite Teilnehmerliste je Fach statt "alle Schüler/innen der Klasse":

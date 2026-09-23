@@ -480,3 +480,7 @@ details summary { cursor: pointer; padding: 0.3rem 0; font-weight: 500; }
   padding: 0.6rem 1.2rem; font-weight: 600; font-size: 1rem;
 }
 .knopf-reihe > button:hover, .knopf-reihe > button.active { background: var(--primary-hover); }
+
+/* Deaktivierte SPA-Komponente (siehe fach_detail_spa.ejs): bleibt anklickbar
+   (zum Wieder-Aktivieren), soll aber optisch klar "aus" wirken. */
+.komponente-inaktiv { opacity: 0.5; }

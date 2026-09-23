@@ -31,6 +31,39 @@
   <p class="hint">Vorwert: <%= vorwertLabel %> (ausgegraut in der Spalte „Vorwert" unten).</p>
 <% } %>
 
+<% if (komponentenKonfig.length) { %>
+  <div class="card" id="komponenten-einstellungen">
+    <% if (darfKomponentenSchalten) { %>
+      <p><strong>Zusammensetzung für diese Klasse (<%= halbjahr %>. Hj.)</strong></p>
+      <p class="hint">
+        Rest-Anteil-Komponenten ein-/ausschalten -- das Restbudget verteilt sich automatisch
+        gleichmäßig auf die verbleibenden aktiven Komponenten. Wirkt sofort auf die ganze Klasse
+        und alle künftigen Berechnungen dieses Halbjahres.
+      </p>
+      <p class="knopf-reihe">
+        <% komponentenKonfig.forEach(function(k) { %>
+          <form method="post" action="/teacher/fach/<%= fach.id %>/spa/komponente" class="inline">
+            <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+            <input type="hidden" name="komponente" value="<%= k.schluessel %>">
+            <input type="hidden" name="aktiv" value="<%= k.aktiv ? '0' : '1' %>">
+            <button type="submit" class="<%= k.aktiv ? '' : 'komponente-inaktiv' %>">
+              <%= k.aktiv ? '✅' : '⬜' %> <%= komponentenNamen[k.schluessel] || k.schluessel %>
+            </button>
+          </form>
+        <% }); %>
+      </p>
+    <% } else { %>
+      <% var inaktive = komponentenKonfig.filter(function(k) { return !k.aktiv; }); %>
+      <% if (inaktive.length) { %>
+        <p class="hint">
+          Für dieses Halbjahr deaktiviert (nur die Klassenleitung kann das ändern):
+          <%= inaktive.map(function(k) { return komponentenNamen[k.schluessel] || k.schluessel; }).join(', ') %>.
+        </p>
+      <% } %>
+    <% } %>
+  </div>
+<% } %>
+
 <table class="data" id="spa-tabelle" data-fach="<%= fach.id %>" data-hj="<%= halbjahr %>">
   <thead>
     <tr>

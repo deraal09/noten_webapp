@@ -31,11 +31,11 @@ import {
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../schuljahr-utils.js';
-import { BILDUNGSGAENGE, spaSchemaFuer, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
+import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
 import {
   berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer,
   ladeEingabeAnzeige as ladeSpaEingabeAnzeige, zeugnisFuerKlasse as spaZeugnisFuerKlasse,
-  seedeSpaFaecher,
+  seedeSpaFaecher, spaSchemaFuerFach, spaKomponentenKonfig, spaSetzeKomponenteAktiv,
 } from '../spa-noten-service.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
@@ -99,13 +99,14 @@ function spaZeilenFuerHalbjahr(fach, teilnehmer, halbjahr) {
 
 /** Rendert die Eingabemaske eines SPA-Fachs (eigenes Bewertungsmodell, siehe spa-schema.js/spa-noten-service.js). */
 function renderSpaFachDetail(request, reply, fach) {
-  const schema = spaSchemaFuer(fach.spa_fach_key, fach.spa_bildungsgang);
+  const db = getDb();
+  const { schema } = spaSchemaFuerFach(db, fach.id);
   const halbjahr = spaAktivesHalbjahr(schema, request.query);
   const schemaHj = schema.find((s) => s.halbjahr === halbjahr);
   const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
   const { zeilen, vorwertLabel } = spaZeilenFuerHalbjahr(fach, teilnehmer, halbjahr);
   const eingaben = new Map(zeilen.map((z) => [
-    z.schueler.id, ladeSpaEingabeAnzeige(getDb(), fach.id, z.schueler.id, halbjahr, schemaHj),
+    z.schueler.id, ladeSpaEingabeAnzeige(db, fach.id, z.schueler.id, halbjahr, schemaHj),
   ]));
   const sperren = ladeSperrenFuerSchueler(teilnehmer.map((t) => t.id), String(halbjahr));
   return reply.viewEjs('teacher/fach_detail_spa.ejs', {
@@ -114,6 +115,12 @@ function renderSpaFachDetail(request, reply, fach) {
     zeilen, vorwertLabel, eingaben, sperren,
     komponentenNamen: KOMPONENTEN_NAMEN, wpkKurse: WPK_KURSE,
     darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
+    // Die Zusammensetzung der Fächer (welche Rest-Komponenten aktiv sind,
+    // z. B. bei LF3) darf nur die Klassenleitung ändern -- enger als
+    // darfBearbeiten (das reicht für die Noteneingabe, aber nicht dafür,
+    // die Bewertungsgrundlage der ganzen Klasse zu verändern).
+    darfKomponentenSchalten: userIstKlassenlehrer(request.user, fach.klasse_id),
+    komponentenKonfig: spaKomponentenKonfig(db, fach.id, halbjahr),
   });
 }
 
@@ -211,7 +218,7 @@ export default async function teacherRoutes(fastify) {
     const fach = ladeFachMitUmfeld(request.params.id);
     if (!fach || !fach.spa_fach_key) return reply.code(404).send({ error: 'not found' });
     if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
-    const schema = spaSchemaFuer(fach.spa_fach_key, fach.spa_bildungsgang);
+    const { schema } = spaSchemaFuerFach(getDb(), fach.id);
     const halbjahr = spaAktivesHalbjahr(schema, request.query);
     const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
     const { zeilen, vorwertLabel } = spaZeilenFuerHalbjahr(fach, teilnehmer, halbjahr);
@@ -235,7 +242,7 @@ export default async function teacherRoutes(fastify) {
 
     const schuelerId = parseInt(request.body?.schueler_id, 10);
     const halbjahr = parseInt(request.body?.halbjahr, 10);
-    const schema = spaSchemaFuer(fach.spa_fach_key, fach.spa_bildungsgang);
+    const { schema } = spaSchemaFuerFach(getDb(), fach.id);
     if (!Number.isFinite(schuelerId) || !schema.some((s) => s.halbjahr === halbjahr)) {
       return reply.code(400).send({ ok: false, error: 'bad params' });
     }
@@ -301,6 +308,24 @@ export default async function teacherRoutes(fastify) {
     if (!userDarfFachBearbeiten(request.user, fach)) return reply.code(403).send({ ok: false, error: 'forbidden' });
     const kurs = String(request.body?.kurs || '').trim().slice(0, 100);
     getDb().prepare('UPDATE faecher SET spa_wpk_kurs = ? WHERE id = ?').run(kurs || null, fach.id);
+    return reply.send({ ok: true });
+  });
+
+  // Zusammensetzung der Fächer: einzelne Rest-Anteil-Komponenten eines
+  // Lernfelds (z. B. LF3: Kunst/Spiel/Musik/Bewegung) je Klasse/Halbjahr
+  // ein-/ausschalten -- enger gefasst als die normale Noteneingabe-
+  // Berechtigung, da das die Bewertungsgrundlage der ganzen Klasse ändert,
+  // nicht nur eine einzelne Note (siehe spaSetzeKomponenteAktiv).
+  fastify.post('/fach/:id/spa/komponente', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach || !fach.spa_fach_key) return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    const halbjahr = parseInt(request.body?.halbjahr, 10);
+    const komponente = String(request.body?.komponente || '');
+    const aktiv = request.body?.aktiv === '1';
+    if (!Number.isFinite(halbjahr) || !komponente) return reply.code(400).send({ ok: false, error: 'bad params' });
+    const erfolg = spaSetzeKomponenteAktiv(getDb(), fach.id, halbjahr, komponente, aktiv);
+    if (!erfolg) return reply.code(400).send({ ok: false, error: 'unbekannte oder nicht schaltbare Komponente' });
     return reply.send({ ok: true });
   });
 
