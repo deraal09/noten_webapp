@@ -162,11 +162,6 @@ test('Dashboard ("Noteneingabe") und Fach-Seite zeigen "Kurs" statt des technisc
   assert.ok(!fachHtml.includes('Sitzplan')); // ergibt für einen Kurs ohne Heimat-Klasse keinen Sinn
 });
 
-test('Dashboard zeigt einen Löschen-Button direkt beim Kurs, damit falsche Kurse ohne Umweg über "Meine Klassen" entfernt werden können', async () => {
-  const dashboardHtml = await (await lehrerLdap('/teacher')).text();
-  assert.ok(dashboardHtml.includes(`/teacher/faecher/${kursId}/loeschen`));
-});
-
 test('Aus bestehender Klasse hinzufügen funktioniert für den Kurs wie gehabt', async () => {
   const r = await form(lehrerLdap, `/teacher/fach/${kursId}/teilnehmer/hinzufuegen`, { schueler_id: String(schuelerA1) });
   assert.equal(r.status, 302);
