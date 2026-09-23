@@ -46,7 +46,7 @@ function datumsWerteFuerSchueler(schuelerId, termine, notenMap) {
 
 export function ladeFachMitUmfeld(id) {
   return getDb().prepare(`
-    SELECT f.*, k.name AS klasse_name, k.schuljahr_id, k.notenschluessel,
+    SELECT f.*, k.name AS klasse_name, k.schuljahr_id, k.notenschluessel, k.spa_bildungsgang,
            s.bezeichnung AS schuljahr_bezeichnung
     FROM faecher f
     JOIN klassen k ON k.id = f.klasse_id

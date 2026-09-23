@@ -1,0 +1,176 @@
+<h1><%= fach.name %> – <%= fach.klasse_name %> <small>(SPA<%= fach.spa_bildungsgang === 'SPA_PIA' ? ' PiA' : '' %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher">← Meine Noteneingabe</a>
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
+</p>
+<p class="hint">
+  SPA-Fach mit festem Bewertungsschema über 4 Halbjahre (siehe src/spa-schema.js) --
+  Punktwerte 0–15, die Endnote wird automatisch aus Zwischennoten und ggf. vorherigen
+  Halbjahren berechnet.
+</p>
+
+<% if (fach.spa_fach_key === 'WPK') { %>
+  <form id="wpk-kurs-form" class="inline">
+    <label>Gewählter Kurs
+      <input type="text" id="wpk-kurs-input" list="wpk-kurse-liste" value="<%= fach.spa_wpk_kurs || '' %>"
+             placeholder="z. B. Krippe (U3)" <%= darfBearbeiten ? '' : 'disabled' %>>
+    </label>
+    <datalist id="wpk-kurse-liste">
+      <% wpkKurse.forEach(function(k) { %><option value="<%= k %>"><% }); %>
+    </datalist>
+  </form>
+<% } %>
+
+<div class="hj-tabs">
+  <% aktiveHalbjahre.forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= h %>"><%= h %>. Halbjahr</a>
+  <% }); %>
+</div>
+
+<% if (vorwertLabel) { %>
+  <p class="hint">Vorwert: <%= vorwertLabel %> (ausgegraut in der Spalte „Vorwert" unten).</p>
+<% } %>
+
+<table class="data" id="spa-tabelle" data-fach="<%= fach.id %>" data-hj="<%= halbjahr %>">
+  <thead>
+    <tr>
+      <th>Schüler/in</th>
+      <% if (schemaHj.halbjahrModus === 'komponenten_gewichtet') { %>
+        <% schemaHj.komponenten.forEach(function(k) { %>
+          <th><%= komponentenNamen[k.schluessel] || k.schluessel %></th>
+        <% }); %>
+      <% } else { %>
+        <th>Punkte</th>
+      <% } %>
+      <% if (schemaHj.pruefung) { %><th>Prüfung</th><% } %>
+      <% if (schemaHj.deaktivierbar) { %><th>n/a</th><% } %>
+      <th title="Überschreibt die Berechnung -- für übernommene Altnoten (z. B. vor Einführung dieser App)">Altnote (importiert)</th>
+      <% if (vorwertLabel) { %><th>Vorwert</th><% } %>
+      <th>Zwischennote</th>
+      <th>Endpunkte</th>
+      <th>Tendenz</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% zeilen.forEach(function(z) {
+         var s = z.schueler;
+         var eingabe = eingaben.get(s.id);
+         var sperre = sperren.get(s.id); %>
+      <tr data-schueler="<%= s.id %>">
+        <td class="name">
+          <%= s.nachname %>, <%= s.vorname %>
+          <% if (s.fremd) { %><small class="hint">(<%= s.klasse_name %>)</small><% } %>
+          <% if (sperre) { %><span title="Noten für dieses Halbjahr gesperrt (Notenkonferenz)">🔒</span><% } %>
+        </td>
+        <% if (schemaHj.halbjahrModus === 'komponenten_gewichtet') { %>
+          <% schemaHj.komponenten.forEach(function(k) { %>
+            <td>
+              <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
+                     data-sid="<%= s.id %>" data-feld="komponente:<%= k.schluessel %>"
+                     value="<%= eingabe.komponenten[k.schluessel] === null ? '' : eingabe.komponenten[k.schluessel] %>"
+                     <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
+            </td>
+          <% }); %>
+        <% } else { %>
+          <td>
+            <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
+                   data-sid="<%= s.id %>" data-feld="direktwert"
+                   value="<%= eingabe.direktwert === null ? '' : eingabe.direktwert %>"
+                   <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
+          </td>
+        <% } %>
+        <% if (schemaHj.pruefung) { %>
+          <td>
+            <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
+                   data-sid="<%= s.id %>" data-feld="pruefungswert"
+                   value="<%= eingabe.pruefungswert === null ? '' : eingabe.pruefungswert %>"
+                   <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
+          </td>
+        <% } %>
+        <% if (schemaHj.deaktivierbar) { %>
+          <td>
+            <input type="checkbox" class="spa-eingabe" data-sid="<%= s.id %>" data-feld="ist_na"
+                   <%= eingabe.istNa ? 'checked' : '' %> <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
+          </td>
+        <% } %>
+        <td>
+          <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
+                 data-sid="<%= s.id %>" data-feld="importierte_endnote"
+                 value="<%= eingabe.importierteEndnote === null ? '' : eingabe.importierteEndnote %>"
+                 <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
+        </td>
+        <% if (vorwertLabel) { %>
+          <td class="hint vorwert-cell" data-sid="<%= s.id %>">
+            <%= z.vorwert && z.vorwert.endpunkte !== null ? z.vorwert.endpunkte + ' (' + z.vorwert.tendenz + ')' : '–' %>
+          </td>
+        <% } %>
+        <td class="zwischennote-cell" data-sid="<%= s.id %>">
+          <%= z.ergebnis && z.ergebnis.zwischennote !== null ? z.ergebnis.zwischennote : '–' %>
+        </td>
+        <td class="endpunkte-cell" data-sid="<%= s.id %>">
+          <%= z.ergebnis && z.ergebnis.endpunkte !== null ? z.ergebnis.endpunkte.toFixed(2) : '–' %>
+        </td>
+        <td class="tendenz-cell" data-sid="<%= s.id %>">
+          <%= z.ergebnis ? (z.ergebnis.tendenz || '–') : '–' %>
+        </td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<script>
+(function() {
+  var tabelle = document.getElementById('spa-tabelle');
+  if (!tabelle) return;
+  var fachId = tabelle.dataset.fach;
+  var halbjahr = tabelle.dataset.hj;
+
+  function debounce(fn, ms) { var t; return function() { var a = arguments; clearTimeout(t); t = setTimeout(function() { fn.apply(null, a); }, ms); }; }
+
+  async function refresh() {
+    try {
+      var r = await fetch('/teacher/fach/' + fachId + '/spa/daten?hj=' + encodeURIComponent(halbjahr));
+      if (!r.ok) return;
+      var data = await r.json();
+      data.schueler.forEach(function(s) {
+        var zw = tabelle.querySelector('.zwischennote-cell[data-sid="' + s.schueler_id + '"]');
+        if (zw) zw.textContent = s.zwischennote !== null ? s.zwischennote : '–';
+        var ep = tabelle.querySelector('.endpunkte-cell[data-sid="' + s.schueler_id + '"]');
+        if (ep) ep.textContent = s.endpunkte !== null ? s.endpunkte.toFixed(2) : '–';
+        var td = tabelle.querySelector('.tendenz-cell[data-sid="' + s.schueler_id + '"]');
+        if (td) td.textContent = s.tendenz || '–';
+        var vw = tabelle.querySelector('.vorwert-cell[data-sid="' + s.schueler_id + '"]');
+        if (vw) vw.textContent = (s.vorwert && s.vorwert.endpunkte !== null) ? (s.vorwert.endpunkte + ' (' + s.vorwert.tendenz + ')') : '–';
+      });
+    } catch (e) { /* still shows the last saved server-rendered values */ }
+  }
+
+  async function speichereEingabe(inp) {
+    var body = new URLSearchParams();
+    body.append('schueler_id', inp.dataset.sid);
+    body.append('halbjahr', halbjahr);
+    body.append('feld', inp.dataset.feld);
+    body.append('wert', inp.type === 'checkbox' ? (inp.checked ? '1' : '0') : inp.value);
+    var r = await fetch('/teacher/fach/' + fachId + '/spa/eingabe', { method: 'POST', body: body });
+    if (r.ok) refresh();
+  }
+
+  var speichereVerzoegert = debounce(speichereEingabe, 400);
+  document.querySelectorAll('input.spa-eingabe').forEach(function(inp) {
+    if (inp.type === 'checkbox') {
+      inp.addEventListener('change', function() { speichereEingabe(inp); });
+    } else {
+      inp.addEventListener('input', function() { speichereVerzoegert(inp); });
+    }
+  });
+
+  var wpkInput = document.getElementById('wpk-kurs-input');
+  if (wpkInput) {
+    wpkInput.addEventListener('change', debounce(async function() {
+      var body = new URLSearchParams();
+      body.append('kurs', wpkInput.value);
+      await fetch('/teacher/fach/' + fachId + '/spa/wpk-kurs', { method: 'POST', body: body });
+    }, 400));
+  }
+})();
+</script>

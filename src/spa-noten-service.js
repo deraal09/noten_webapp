@@ -187,10 +187,14 @@ export function vorwerteFuer(db, klasseId, fachSchluessel, halbjahr) {
   const quellFachId = fachIdInKlasse(db, klasseId, quellFachSchluessel);
   if (!aktuellFachId || !quellFachId) return leer;
 
+  // Bewusst ohne status='aktiv'-Filter: die Teilnehmerliste (fach_teilnehmer)
+  // ist auch sonst in der App die maßgebliche Personenliste eines Fachs
+  // (siehe ladeTeilnehmerMitHerkunft in fach-teilnehmer.js), unabhängig vom
+  // Abgang-Status der Heimat-Klasse.
   const schueler = db.prepare(`
     SELECT s.id FROM schueler s
     JOIN fach_teilnehmer ft ON ft.schueler_id = s.id
-    WHERE ft.fach_id = ? AND s.status = 'aktiv'
+    WHERE ft.fach_id = ?
     ORDER BY s.nachname, s.vorname
   `).all(aktuellFachId);
 
@@ -200,4 +204,38 @@ export function vorwerteFuer(db, klasseId, fachSchluessel, halbjahr) {
     return { schuelerId: s.id, endpunkte: zelle?.endpunkte ?? null, tendenz: zelle?.tendenz ?? null };
   });
   return { label, werte };
+}
+
+/**
+ * Rohdaten einer Eingabe für die Anzeige/Vorbefüllung der Eingabemaske
+ * (im Unterschied zu berechneFachFuerSchueler, das nur das Rechenergebnis
+ * liefert). `schemaHalbjahr` (aus spaSchemaFuer) bestimmt, ob/welche
+ * Komponentenwerte mitgeladen werden.
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} fachId
+ * @param {number} schuelerId
+ * @param {import('./spa-grade-calc.js').Halbjahr} halbjahr
+ * @param {import('./spa-grade-calc.js').SchemaHalbjahr|undefined} schemaHalbjahr
+ */
+export function ladeEingabeAnzeige(db, fachId, schuelerId, halbjahr, schemaHalbjahr) {
+  const row = db.prepare('SELECT * FROM spa_eingaben WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ?')
+    .get(fachId, schuelerId, halbjahr);
+  const ergebnis = {
+    direktwert: row?.direktwert ?? null,
+    pruefungswert: row?.pruefungswert ?? null,
+    importierteEndnote: row?.importierte_endnote ?? null,
+    istNa: !!row?.ist_na,
+    komponenten: null,
+  };
+  if (schemaHalbjahr?.halbjahrModus === 'komponenten_gewichtet') {
+    const rows = db.prepare(`
+      SELECT komponente_schluessel, punkte FROM spa_komponenten_noten
+      WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ?
+    `).all(fachId, schuelerId, halbjahr);
+    const komponenten = {};
+    for (const k of schemaHalbjahr.komponenten) komponenten[k.schluessel] = null;
+    for (const r of rows) komponenten[r.komponente_schluessel] = r.punkte;
+    ergebnis.komponenten = komponenten;
+  }
+  return ergebnis;
 }

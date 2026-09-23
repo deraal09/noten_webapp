@@ -30,7 +30,8 @@ import {
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../schuljahr-utils.js';
-import { BILDUNGSGAENGE, spaFaecherFuerBildungsgang } from '../spa-schema.js';
+import { BILDUNGSGAENGE, spaFaecherFuerBildungsgang, spaSchemaFuer, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
+import { berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer, ladeEingabeAnzeige as ladeSpaEingabeAnzeige } from '../spa-noten-service.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -70,6 +71,45 @@ function leseMultipartDatei(buffer, contentType, feldname) {
 /** Fach-assignierte Lehrkraft ODER Klassenleitung darf die Notentafel/Historie eines Fachs bearbeiten. */
 function userDarfFachBearbeiten(user, fach) {
   return userHatFachZgriff(user, fach.id) || userIstKlassenlehrer(user, fach.klasse_id);
+}
+
+/** Aktives Halbjahr (laut Query oder erstes im Schema aktives) für eine SPA-Fachseite. */
+function spaAktivesHalbjahr(schema, query) {
+  const aktive = schema.filter((s) => s.aktiv).map((s) => s.halbjahr);
+  const hj = parseInt(query?.hj, 10);
+  return aktive.includes(hj) ? hj : (aktive[0] ?? 1);
+}
+
+/** Berechnete Ergebnisse + Vorwerte aller Fach-Teilnehmer/innen für ein Halbjahr, für Seite und JSON-Refresh gleich aufbereitet. */
+function spaZeilenFuerHalbjahr(fach, teilnehmer, halbjahr) {
+  const vorwert = spaVorwerteFuer(getDb(), fach.klasse_id, fach.spa_fach_key, halbjahr);
+  const vorwertBySchueler = new Map(vorwert.werte.map((w) => [w.schuelerId, w]));
+  const zeilen = teilnehmer.map((t) => {
+    const ergebnisse = berechneSpaFachFuerSchueler(getDb(), fach.id, t.id);
+    const ergebnis = ergebnisse.find((e) => e.halbjahr === halbjahr) ?? null;
+    return { schueler: t, ergebnis, vorwert: vorwertBySchueler.get(t.id) ?? null };
+  });
+  return { zeilen, vorwertLabel: vorwert.label };
+}
+
+/** Rendert die Eingabemaske eines SPA-Fachs (eigenes Bewertungsmodell, siehe spa-schema.js/spa-noten-service.js). */
+function renderSpaFachDetail(request, reply, fach) {
+  const schema = spaSchemaFuer(fach.spa_fach_key, fach.spa_bildungsgang);
+  const halbjahr = spaAktivesHalbjahr(schema, request.query);
+  const schemaHj = schema.find((s) => s.halbjahr === halbjahr);
+  const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
+  const { zeilen, vorwertLabel } = spaZeilenFuerHalbjahr(fach, teilnehmer, halbjahr);
+  const eingaben = new Map(zeilen.map((z) => [
+    z.schueler.id, ladeSpaEingabeAnzeige(getDb(), fach.id, z.schueler.id, halbjahr, schemaHj),
+  ]));
+  const sperren = ladeSperrenFuerSchueler(teilnehmer.map((t) => t.id), String(halbjahr));
+  return reply.viewEjs('teacher/fach_detail_spa.ejs', {
+    user: request.user, fach, schema, schemaHj, halbjahr,
+    aktiveHalbjahre: schema.filter((s) => s.aktiv).map((s) => s.halbjahr),
+    zeilen, vorwertLabel, eingaben, sperren,
+    komponentenNamen: KOMPONENTEN_NAMEN, wpkKurse: WPK_KURSE,
+    darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
+  });
 }
 
 /** Datum einer Klausur/Zusatzleistung: optional, aber wenn angegeben nur im validen YYYY-MM-DD-Format -- sonst null. */
@@ -122,6 +162,11 @@ export default async function teacherRoutes(fastify) {
     if (!userHatFachZgriff(request.user, fach.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
+    // SPA-Fächer haben ein völlig anderes Bewertungsmodell (4 Halbjahre,
+    // Komponenten-Gewichtung, Tendenznote) als die reguläre Klausuren/UL-
+    // Notentafel unten -- eigene Ansicht statt Verzweigungen quer durch
+    // fach_detail.ejs (siehe src/spa-noten-service.js, spa-schema.js).
+    if (fach.spa_fach_key) return renderSpaFachDetail(request, reply, fach);
     const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
     const uebersicht = ladeNotenuebersicht(fach, halbjahr);
     const zuweisung = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?')
@@ -146,6 +191,104 @@ export default async function teacherRoutes(fastify) {
       darfFachAbschliessen: userDarfFachBearbeiten(request.user, fach),
       darfHistorieAnlegen: userIstKlassenlehrer(request.user, fach.klasse_id),
     });
+  });
+
+  // ---------- SPA-Eingabemaske (eigenes Bewertungsmodell, siehe oben) ----------
+  fastify.get('/fach/:id/spa/daten', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach || !fach.spa_fach_key) return reply.code(404).send({ error: 'not found' });
+    if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
+    const schema = spaSchemaFuer(fach.spa_fach_key, fach.spa_bildungsgang);
+    const halbjahr = spaAktivesHalbjahr(schema, request.query);
+    const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
+    const { zeilen, vorwertLabel } = spaZeilenFuerHalbjahr(fach, teilnehmer, halbjahr);
+    return reply.send({
+      halbjahr,
+      vorwertLabel,
+      schueler: zeilen.map((z) => ({
+        schueler_id: z.schueler.id,
+        zwischennote: z.ergebnis?.zwischennote ?? null,
+        endpunkte: z.ergebnis?.endpunkte ?? null,
+        tendenz: z.ergebnis?.tendenz ?? null,
+        vorwert: z.vorwert ? { endpunkte: z.vorwert.endpunkte, tendenz: z.vorwert.tendenz } : null,
+      })),
+    });
+  });
+
+  fastify.post('/fach/:id/spa/eingabe', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach || !fach.spa_fach_key) return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userDarfFachBearbeiten(request.user, fach)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+
+    const schuelerId = parseInt(request.body?.schueler_id, 10);
+    const halbjahr = parseInt(request.body?.halbjahr, 10);
+    const schema = spaSchemaFuer(fach.spa_fach_key, fach.spa_bildungsgang);
+    if (!Number.isFinite(schuelerId) || !schema.some((s) => s.halbjahr === halbjahr)) {
+      return reply.code(400).send({ ok: false, error: 'bad params' });
+    }
+    if (istSchuelerGesperrtInFach(fach.id, schuelerId, String(halbjahr))) {
+      return reply.code(403).send({ ok: false, error: 'gesperrt' });
+    }
+
+    const feld = String(request.body?.feld || '');
+    const roh = request.body?.wert;
+    const parsePunktwert = () => {
+      if (roh === '' || roh === null || roh === undefined) return null;
+      const n = Number(roh);
+      return Number.isFinite(n) && n >= 0 && n <= 15 ? n : undefined; // undefined = ungültig
+    };
+    const db = getDb();
+    const sicherstellenZeile = () => db.prepare(`
+      INSERT INTO spa_eingaben (fach_id, schueler_id, halbjahr) VALUES (?, ?, ?)
+      ON CONFLICT(fach_id, schueler_id, halbjahr) DO NOTHING
+    `).run(fach.id, schuelerId, halbjahr);
+
+    if (feld === 'direktwert' || feld === 'pruefungswert' || feld === 'importierte_endnote') {
+      const wert = parsePunktwert();
+      if (wert === undefined) return reply.code(400).send({ ok: false, error: 'Punktwert außerhalb 0–15.' });
+      sicherstellenZeile();
+      db.prepare(`UPDATE spa_eingaben SET ${feld} = ? WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ?`)
+        .run(wert, fach.id, schuelerId, halbjahr);
+    } else if (feld === 'ist_na') {
+      sicherstellenZeile();
+      db.prepare('UPDATE spa_eingaben SET ist_na = ? WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ?')
+        .run(roh === '1' ? 1 : 0, fach.id, schuelerId, halbjahr);
+    } else if (feld.startsWith('komponente:')) {
+      const schluessel = feld.slice('komponente:'.length);
+      const schemaHj = schema.find((s) => s.halbjahr === halbjahr);
+      if (!schemaHj?.komponenten.some((k) => k.schluessel === schluessel)) {
+        return reply.code(400).send({ ok: false, error: 'unbekannte Komponente' });
+      }
+      const wert = parsePunktwert();
+      if (wert === undefined) return reply.code(400).send({ ok: false, error: 'Punktwert außerhalb 0–15.' });
+      if (wert === null) {
+        db.prepare(`
+          DELETE FROM spa_komponenten_noten
+          WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ? AND komponente_schluessel = ?
+        `).run(fach.id, schuelerId, halbjahr, schluessel);
+      } else {
+        db.prepare(`
+          INSERT INTO spa_komponenten_noten (fach_id, schueler_id, halbjahr, komponente_schluessel, punkte)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(fach_id, schueler_id, halbjahr, komponente_schluessel) DO UPDATE SET punkte = excluded.punkte
+        `).run(fach.id, schuelerId, halbjahr, schluessel, wert);
+      }
+    } else {
+      return reply.code(400).send({ ok: false, error: 'unbekanntes Feld' });
+    }
+    return reply.send({ ok: true });
+  });
+
+  // WPK-Kursname (z. B. "Krippe (U3)") ist eine Eigenschaft des ganzen Fachs,
+  // nicht je Schüler/in -- eigener, kleiner Endpunkt statt Überladung von
+  // /spa/eingabe.
+  fastify.post('/fach/:id/spa/wpk-kurs', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach || fach.spa_fach_key !== 'WPK') return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userDarfFachBearbeiten(request.user, fach)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    const kurs = String(request.body?.kurs || '').trim().slice(0, 100);
+    getDb().prepare('UPDATE faecher SET spa_wpk_kurs = ? WHERE id = ?').run(kurs || null, fach.id);
+    return reply.send({ ok: true });
   });
 
   // ---------- Sync mit Klassenleitung ----------

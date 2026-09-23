@@ -19,7 +19,8 @@ process.env.DB_PFAD = path.join(tempDir, 'test.sqlite3');
 process.env.NODE_ENV = 'test';
 
 const { getDb } = await import('../src/db.js');
-const { berechneFachFuerSchueler, vorwerteFuer } = await import('../src/spa-noten-service.js');
+const { berechneFachFuerSchueler, vorwerteFuer, ladeEingabeAnzeige } = await import('../src/spa-noten-service.js');
+const { spaSchemaFuer } = await import('../src/spa-schema.js');
 
 const db = getDb();
 
@@ -154,4 +155,31 @@ test('vorwerteFuer: WPK 2. Hj. zeigt 1. Hj. als Mittelwerts-Partner', () => {
 
 test('vorwerteFuer: 1. Hj. (kein Vorgänger) liefert leeres Ergebnis', () => {
   assert.deepEqual(vorwerteFuer(db, 1, 'LF1', 1), { label: null, werte: [] });
+});
+
+test('ladeEingabeAnzeige: Direktwert-Fach liefert Rohwerte ohne Komponenten', () => {
+  const schema = spaSchemaFuer('LF1', 'SPA_PIA').find((s) => s.halbjahr === 1);
+  const eingabe = ladeEingabeAnzeige(db, 1, 1, 1, schema);
+  assert.equal(eingabe.direktwert, 10);
+  assert.equal(eingabe.istNa, false);
+  assert.equal(eingabe.komponenten, null);
+});
+
+test('ladeEingabeAnzeige: Komponenten-Fach liefert alle Schema-Komponenten (unbelegte als null)', () => {
+  const schema = spaSchemaFuer('LF2', 'SPA_PIA').find((s) => s.halbjahr === 1);
+  const eingabe = ladeEingabeAnzeige(db, 2, 1, 1, schema);
+  assert.deepEqual(eingabe.komponenten, { gesundheit: 15, erziehung: 10, entwicklung: 10 });
+});
+
+test('ladeEingabeAnzeige: Prüfungswert einer FHR-Note wird mitgeliefert', () => {
+  const schema = spaSchemaFuer('ENGLISCH', 'SPA_PIA').find((s) => s.halbjahr === 4);
+  const eingabe = ladeEingabeAnzeige(db, 5, 1, 4, schema);
+  assert.equal(eingabe.direktwert, 10);
+  assert.equal(eingabe.pruefungswert, 14);
+});
+
+test('ladeEingabeAnzeige: fehlende Zeile liefert lauter null statt Fehler', () => {
+  const schema = spaSchemaFuer('LF1', 'SPA_PIA').find((s) => s.halbjahr === 3);
+  const eingabe = ladeEingabeAnzeige(db, 1, 1, 3, schema);
+  assert.deepEqual(eingabe, { direktwert: null, pruefungswert: null, importierteEndnote: null, istNa: false, komponenten: null });
 });
