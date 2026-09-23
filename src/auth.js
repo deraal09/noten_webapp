@@ -300,7 +300,7 @@ export function ladeMeineKlassen(userId) {
 export function ladeMeineKurse(userId) {
   return getDb().prepare(`
     SELECT f.*, k.name AS klasse_name, k.ist_kurs_huelle AS klasse_ist_huelle,
-      k.notenschluessel, s.bezeichnung AS schuljahr_bezeichnung,
+      k.notenschluessel, s.id AS schuljahr_id, s.bezeichnung AS schuljahr_bezeichnung,
       (SELECT COUNT(*) FROM fach_teilnehmer ft WHERE ft.fach_id = f.id) AS teilnehmer_anzahl
     FROM faecher f
     JOIN klassen k ON k.id = f.klasse_id

@@ -110,10 +110,10 @@ let huelleId;
 
 test('LDAP-Konto legt einen Kurs OHNE Ausgangsklasse an -- leere Teilnehmerliste, Redirect auf Teilnehmer-Reiter', async () => {
   const r = await form(lehrerLdap, '/teacher/kurse/neu', {
-    schuljahr_id: String(sjId), name: 'Spanisch AG', notenschluessel: 'IHK',
+    schuljahr_id: String(sjId), name: 'Musikkurs Test', notenschluessel: 'IHK',
   });
   assert.equal(r.status, 302);
-  const fach = getDb().prepare("SELECT id, klasse_id, ist_kurs FROM faecher WHERE name = 'Spanisch AG'").get();
+  const fach = getDb().prepare("SELECT id, klasse_id, ist_kurs FROM faecher WHERE name = 'Musikkurs Test'").get();
   assert.ok(fach, 'Fach wurde angelegt');
   assert.equal(fach.ist_kurs, 1);
   kursId = fach.id;
@@ -135,9 +135,15 @@ test('LDAP-Konto legt einen Kurs OHNE Ausgangsklasse an -- leere Teilnehmerliste
   assert.ok(zuweisung, 'Ersteller/in wird automatisch dem Kurs zugewiesen');
 });
 
-test('Die Kurs-Hülle erscheint nirgends als "echte" Klasse', async () => {
+test('Der Kurs erscheint in "Meine Klassen" unter Kurse (nicht nur als Platzhaltertext im Anlege-Formular)', async () => {
   const html = await (await lehrerLdap('/teacher/klassen')).text();
-  assert.ok(html.includes('Spanisch AG')); // im Kurs-Bereich schon
+  // Gezielt im Kurse-Listenpunkt suchen (Link zur Fach-Seite), nicht nur
+  // irgendwo auf der Seite -- das Anlege-Formular hat zufällig denselben
+  // Beispieltext "Spanisch AG" im placeholder stehen, das würde einen Bug
+  // in der Auflistung selbst sonst unbemerkt lassen.
+  assert.ok(html.includes(`/teacher/fach/${kursId}?tab=teilnehmer`), 'Kurs sollte als anklickbarer Listeneintrag erscheinen');
+  assert.ok(!html.includes('Keine Kurse im Schuljahr'), 'die Kurse-Liste sollte nicht mehr leer sein');
+  assert.ok(html.includes('Musikkurs Test'));
   assert.ok(!html.includes(getDb().prepare('SELECT name FROM klassen WHERE id = ?').get(huelleId).name));
 
   const adminSjHtml = await (await admin(`/admin/schuljahre/${sjId}`)).text();
@@ -152,11 +158,11 @@ test('Dashboard ("Noteneingabe") und Fach-Seite zeigen "Kurs" statt des technisc
 
   const dashboardHtml = await (await lehrerLdap('/teacher')).text();
   assert.ok(dashboardHtml.includes('Kurse'));
-  assert.ok(dashboardHtml.includes('Spanisch AG'));
+  assert.ok(dashboardHtml.includes('Musikkurs Test'));
   assert.ok(!dashboardHtml.includes(huelleName));
 
   const fachHtml = await (await lehrerLdap(`/teacher/fach/${kursId}`)).text();
-  assert.ok(fachHtml.includes('Spanisch AG'));
+  assert.ok(fachHtml.includes('Musikkurs Test'));
   assert.ok(fachHtml.includes('Kurs'));
   assert.ok(!fachHtml.includes(huelleName));
   assert.ok(!fachHtml.includes('Sitzplan')); // ergibt für einen Kurs ohne Heimat-Klasse keinen Sinn
