@@ -1,0 +1,64 @@
+<h1>Zeugnisübersicht: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>, SPA<%= klasse.spa_bildungsgang === 'SPA_PIA' ? ' PiA' : '' %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
+</p>
+<p class="hint">
+  Live berechnete Endnoten/Tendenzen (siehe src/spa-noten-service.js) -- keine gespeicherte
+  Momentaufnahme wie bei der Halbjahresübersicht der IHK/BG-Klassen.
+  <% if (halbjahr === 4) { %>
+    Das 4. Halbjahr zeigt das <strong>Abschlusszeugnis</strong>: alle im Bildungsgang als
+    Zeugnisposition markierten Fächer (manche, z. B. Praxis, mit mehreren Positionen aus
+    früheren Halbjahren) sowie den separaten Prüfungsblock.
+  <% } %>
+</p>
+
+<div class="hj-tabs">
+  <% [1, 2, 3, 4].forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= h %>"><%= h %>. Halbjahr</a>
+  <% }); %>
+</div>
+
+<% if (!zeilen.length) { %>
+  <p>Diese Klasse hat noch keine Schüler/innen.</p>
+<% } else if (!zeilen[0].faecher.length) { %>
+  <p>Für dieses Halbjahr sind in dieser Klasse keine Fächer aktiv.</p>
+<% } else { %>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>Schüler/in</th>
+        <% zeilen[0].faecher.forEach(function(f) { %><th><%= f.label %></th><% }); %>
+        <% if (halbjahr === 4 && zeilen[0].pruefungen.length) { %>
+          <% zeilen[0].pruefungen.forEach(function(p) { %><th><%= p.label %></th><% }); %>
+        <% } %>
+      </tr>
+    </thead>
+    <tbody>
+      <% zeilen.forEach(function(z) { %>
+        <tr>
+          <td class="name"><%= z.nachname %>, <%= z.vorname %></td>
+          <% z.faecher.forEach(function(f) { %>
+            <td>
+              <% if (f.endpunkte === null) { %>
+                –
+              <% } else { %>
+                <%= f.endpunkte.toFixed(2) %> <strong>(<%= f.tendenz %>)</strong>
+              <% } %>
+            </td>
+          <% }); %>
+          <% if (halbjahr === 4) { %>
+            <% z.pruefungen.forEach(function(p) { %>
+              <td>
+                <% if (p.endpunkte === null) { %>
+                  –
+                <% } else { %>
+                  <%= p.endpunkte.toFixed(2) %> <strong>(<%= p.tendenz %>)</strong>
+                <% } %>
+              </td>
+            <% }); %>
+          <% } %>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>

@@ -19,7 +19,9 @@ process.env.DB_PFAD = path.join(tempDir, 'test.sqlite3');
 process.env.NODE_ENV = 'test';
 
 const { getDb } = await import('../src/db.js');
-const { berechneFachFuerSchueler, vorwerteFuer, ladeEingabeAnzeige } = await import('../src/spa-noten-service.js');
+const {
+  berechneFachFuerSchueler, vorwerteFuer, ladeEingabeAnzeige, zeugnisFuerKlasse,
+} = await import('../src/spa-noten-service.js');
 const { spaSchemaFuer } = await import('../src/spa-schema.js');
 
 const db = getDb();
@@ -182,4 +184,69 @@ test('ladeEingabeAnzeige: fehlende Zeile liefert lauter null statt Fehler', () =
   const schema = spaSchemaFuer('LF1', 'SPA_PIA').find((s) => s.halbjahr === 3);
   const eingabe = ladeEingabeAnzeige(db, 1, 1, 3, schema);
   assert.deepEqual(eingabe, { direktwert: null, pruefungswert: null, importierteEndnote: null, istNa: false, komponenten: null });
+});
+
+test('zeugnisFuerKlasse: 2. Hj. zeigt nur die vorhandenen, für dieses Halbjahr aktiven Fächer in fester Reihenfolge', () => {
+  const zeilen = zeugnisFuerKlasse(db, 1, 2);
+  assert.equal(zeilen.length, 1);
+  const zeile = zeilen[0];
+  // Klasse 1 hat nur LF1/LF2/PRAXIS/BLOCKPRAXIS/ENGLISCH/WPK angelegt (siehe oben) --
+  // Blockpraxis ist im 2. Hj. nicht aktiv, alle anderen fünf schon.
+  assert.deepEqual(zeile.faecher.map((f) => f.fach), ['LF1', 'LF2', 'PRAXIS', 'ENGLISCH', 'WPK']);
+
+  assert.equal(zeile.faecher.find((f) => f.fach === 'LF1').endpunkte, 11); // 0,5*10 + 0,5*12
+  assert.equal(zeile.faecher.find((f) => f.fach === 'LF1').tendenz, '2');
+  assert.equal(zeile.faecher.find((f) => f.fach === 'LF2').endpunkte, null); // im 2. Hj. nichts eingetragen
+  assert.equal(zeile.faecher.find((f) => f.fach === 'PRAXIS').endpunkte, 12);
+  assert.equal(zeile.faecher.find((f) => f.fach === 'ENGLISCH').endpunkte, null); // erst ab 3. Hj. Werte
+
+  const wpk = zeile.faecher.find((f) => f.fach === 'WPK');
+  assert.equal(wpk.endpunkte, 10); // Ø(8, 12)
+  assert.equal(wpk.tendenz, '2,0'); // Komma-Note statt Tendenz (kommaNote-Schema-Flag)
+});
+
+test('zeugnisFuerKlasse: 4. Hj. liefert das Abschlusszeugnis mit Mehrfachpositionen, Hochziehen und Prüfungsblock', () => {
+  const zeilen = zeugnisFuerKlasse(db, 1, 4);
+  assert.equal(zeilen.length, 1);
+  const zeile = zeilen[0];
+
+  // Praxis erscheint zweimal (2./4. Hj., eigene Positionen), alle anderen einmal.
+  assert.deepEqual(
+    zeile.faecher.map((f) => f.fach),
+    ['LF1:4', 'LF2:4', 'PRAXIS:2', 'PRAXIS:4', 'BLOCKPRAXIS:3', 'ENGLISCH:4', 'WPK:2'],
+  );
+
+  // LF1/LF2 haben im 4. Hj. selbst keinen Wert -- Einzelposition, also wird
+  // die letzte vorhandene Note hochgezogen (LF1: 2. Hj. = 11, LF2: 1. Hj. = 12).
+  const lf1 = zeile.faecher.find((f) => f.fach === 'LF1:4');
+  assert.equal(lf1.label, 'Lernfeld 1');
+  assert.equal(lf1.endpunkte, 11);
+  const lf2 = zeile.faecher.find((f) => f.fach === 'LF2:4');
+  assert.equal(lf2.endpunkte, 12);
+
+  // Praxis: zwei eigene, unveränderte Positionen (keine Hochzieh-Logik bei Mehrfachpositionen).
+  const praxis2 = zeile.faecher.find((f) => f.fach === 'PRAXIS:2');
+  assert.equal(praxis2.label, 'Praxis (2. Hj.)');
+  assert.equal(praxis2.endpunkte, 12);
+  const praxis4 = zeile.faecher.find((f) => f.fach === 'PRAXIS:4');
+  assert.equal(praxis4.label, 'Praxis (4. Hj.)');
+  assert.equal(praxis4.endpunkte, 0.7 * 13 + 0.3 * 9);
+
+  const englisch = zeile.faecher.find((f) => f.fach === 'ENGLISCH:4');
+  assert.equal(englisch.endpunkte, 0.6 * 10 + 0.4 * 14);
+
+  const wpk = zeile.faecher.find((f) => f.fach === 'WPK:2');
+  assert.equal(wpk.tendenz, '2,0');
+
+  // Prüfungsblock: LF2 (eigenständig, nichts eingetragen) + Englisch-FHR (14 Punkte).
+  assert.deepEqual(zeile.pruefungen.map((p) => p.fach), ['PRUEF:LF2:4', 'PRUEF:ENGLISCH:4']);
+  assert.equal(zeile.pruefungen.find((p) => p.fach === 'PRUEF:LF2:4').endpunkte, null);
+  const pruefEnglisch = zeile.pruefungen.find((p) => p.fach === 'PRUEF:ENGLISCH:4');
+  assert.equal(pruefEnglisch.label, 'Englisch-FHR');
+  assert.equal(pruefEnglisch.endpunkte, 14);
+  assert.equal(pruefEnglisch.tendenz, '1');
+});
+
+test('zeugnisFuerKlasse: unbekannte/nicht-SPA-Klasse liefert leere Liste statt Fehler', () => {
+  assert.deepEqual(zeugnisFuerKlasse(db, 999, 1), []);
 });

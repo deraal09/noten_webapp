@@ -15,6 +15,8 @@ import { pruefeNotenschluesselWechsel, seedeTeilnehmerAusKlasse } from '../fach-
 import {
   istGueltigesSchuljahrFormat, sortiereSchuljahreAbsteigend, aktuellesStartjahr, parseSchuljahr,
 } from '../schuljahr-utils.js';
+import { BILDUNGSGAENGE } from '../spa-schema.js';
+import { seedeSpaFaecher } from '../spa-noten-service.js';
 
 export default async function adminRoutes(fastify) {
   fastify.addHook('preHandler', requireAdmin);
@@ -221,22 +223,60 @@ export default async function adminRoutes(fastify) {
   fastify.get('/klassen/:id/notenschluessel', async (request, reply) => {
     const klasse = getKlasseMitSchuljahr(request.params.id);
     if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
-    return reply.viewEjs('admin/notenschluessel.ejs', { user: request.user, klasse });
+    const anzahlFaecher = getDb().prepare('SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ?').get(klasse.id).c;
+    return reply.viewEjs('admin/notenschluessel.ejs', {
+      user: request.user, klasse, anzahlFaecher, bildungsgaenge: BILDUNGSGAENGE,
+    });
   });
 
   fastify.post('/klassen/:id/notenschluessel', async (request, reply) => {
-    const csv = String(request.body?.csv || '').trim();
+    const klasse = getKlasseMitSchuljahr(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+
+    // SPA ist beim Anlegen bewusst fest/unveränderlich (der Bildungsgang
+    // bestimmt die gesamte Fächerstruktur, siehe src/spa-schema.js) -- ein
+    // nachträglicher Wechsel WEG von SPA würde die schon eingetragenen
+    // SPA-Fächer/-Noten verwaist zurücklassen, ein Wechsel DES Bildungsgangs
+    // widerspräche derselben Klasse mit bereits anderslautender Struktur.
+    if (klasse.notenschluessel === 'SPA') {
+      request.flash?.('error', 'Der Notenschlüssel einer SPA-Klasse ist fest (Bildungsgang bei Anlage gewählt) und lässt sich nicht mehr ändern.');
+      return reply.redirect(`/admin/klassen/${klasse.id}/notenschluessel`);
+    }
+
     let ns = String(request.body?.notenschluessel || 'IHK');
-    if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
-    const pruefung = pruefeNotenschluesselWechsel(request.params.id, ns);
+    if (!['IHK', 'BG', 'SPA'].includes(ns)) ns = 'IHK';
+
+    if (ns === 'SPA') {
+      // Aus demselben Grund nur erlaubt, solange die Klasse noch keine
+      // eigenen (IHK/BG-)Fächer hat -- sonst müsste diese Umstellung
+      // bestehende Klausuren/ULs neben den neuen SPA-Fächern stehen lassen.
+      const anzahlFaecher = getDb().prepare('SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ?').get(klasse.id).c;
+      if (anzahlFaecher > 0) {
+        request.flash?.('error', 'SPA erfordert eine noch fächerlose Klasse -- bitte stattdessen eine neue Klasse anlegen.');
+        return reply.redirect(`/admin/klassen/${klasse.id}/notenschluessel`);
+      }
+      const spaBildungsgang = String(request.body?.spa_bildungsgang || '');
+      if (!BILDUNGSGAENGE.some((b) => b.schluessel === spaBildungsgang)) {
+        request.flash?.('error', 'Bitte einen Bildungsgang für die SPA-Klasse auswählen.');
+        return reply.redirect(`/admin/klassen/${klasse.id}/notenschluessel`);
+      }
+      getDb().prepare('UPDATE klassen SET notenschluessel = ?, notenschluessel_csv = ?, spa_bildungsgang = ? WHERE id = ?')
+        .run('SPA', '', spaBildungsgang, klasse.id);
+      seedeSpaFaecher(getDb(), klasse.id, spaBildungsgang, request.user.id);
+      request.flash?.('success', 'Notenschlüssel auf SPA gesetzt -- die festen Fächer wurden angelegt.');
+      return reply.redirect(`/admin/klassen/${klasse.id}`);
+    }
+
+    const csv = String(request.body?.csv || '').trim();
+    const pruefung = pruefeNotenschluesselWechsel(klasse.id, ns);
     if (!pruefung.ok) {
       request.flash?.('error',
         `Notenschlüssel-Wechsel nicht möglich, solange klassenübergreifende Kurse betroffen wären: ${pruefung.konflikte.join('; ')}. Erst die Teilnehmerlisten anpassen.`);
-      return reply.redirect(`/admin/klassen/${request.params.id}/notenschluessel`);
+      return reply.redirect(`/admin/klassen/${klasse.id}/notenschluessel`);
     }
     getDb().prepare('UPDATE klassen SET notenschluessel = ?, notenschluessel_csv = ? WHERE id = ?')
-      .run(ns, csv, request.params.id);
-    return reply.redirect(`/admin/klassen/${request.params.id}/notenschluessel`);
+      .run(ns, csv, klasse.id);
+    return reply.redirect(`/admin/klassen/${klasse.id}/notenschluessel`);
   });
 
   // ---------- User-Verwaltung ----------

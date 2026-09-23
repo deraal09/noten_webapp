@@ -11,8 +11,9 @@
  * schon direkt auf der spa_eingaben-Zeile).
  */
 
-import { spaSchemaFuer, spaFachName } from './spa-schema.js';
-import { berechneFach } from './spa-grade-calc.js';
+import { spaSchemaFuer, spaFachName, spaFaecherFuerBildungsgang } from './spa-schema.js';
+import { berechneFach, tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
+import { seedeTeilnehmerAusKlasse } from './fach-teilnehmer.js';
 
 /**
  * @typedef {import('./spa-grade-calc.js').ErgebnisHalbjahr} ErgebnisHalbjahr
@@ -25,6 +26,33 @@ function bildungsgangVonKlasse(db, klasseId) {
 function fachIdInKlasse(db, klasseId, fachSchluessel) {
   return db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND spa_fach_key = ?')
     .get(klasseId, fachSchluessel)?.id ?? null;
+}
+
+/**
+ * Legt für eine SPA-Klasse die feste Fächerstruktur ihres Bildungsgangs an
+ * (siehe spaFaecherFuerBildungsgang) und weist sie der anlegenden Person zu
+ * -- SPA-Klassen haben kein manuelles "Fach anlegen" wie IHK/BG-Klassen.
+ * Befüllt außerdem die Teilnehmerliste jedes neuen Fachs aus den zu diesem
+ * Zeitpunkt bereits vorhandenen Schüler/innen der Klasse (wichtig für den
+ * Fall, dass eine Klasse mit bereits vorhandenen Schüler/innen nachträglich
+ * per Admin auf SPA umgestellt wird -- beim Neuanlegen einer leeren Klasse
+ * ist diese Liste ohnehin leer).
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} klasseId
+ * @param {string} bildungsgang
+ * @param {number} userId
+ */
+export function seedeSpaFaecher(db, klasseId, bildungsgang, userId) {
+  const insert = db.prepare('INSERT INTO faecher (klasse_id, name, spa_fach_key) VALUES (?, ?, ?)');
+  const zuweisen = db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)');
+  const tx = db.transaction(() => {
+    for (const fach of spaFaecherFuerBildungsgang(bildungsgang)) {
+      const info = insert.run(klasseId, fach.name, fach.schluessel);
+      zuweisen.run(userId, info.lastInsertRowid);
+      seedeTeilnehmerAusKlasse(info.lastInsertRowid, klasseId);
+    }
+  });
+  tx();
 }
 
 /**
@@ -238,4 +266,166 @@ export function ladeEingabeAnzeige(db, fachId, schuelerId, halbjahr, schemaHalbj
     ergebnis.komponenten = komponenten;
   }
   return ergebnis;
+}
+
+/** Zeugnisnote als Anzeige-Tendenz: Fächer mit Schema-Flag `kommaNote` (WPK) als ganze Komma-Note ("3,0") statt Tendenz (3+/3/3-). */
+function ausweisTendenz(istKomma, tendenz) {
+  if (istKomma && tendenz) {
+    const n = parseInt(tendenz, 10);
+    if (Number.isFinite(n)) return `${n},0`;
+  }
+  return tendenz;
+}
+
+/** Alle SPA-Fächer einer Klasse, als Map Fach-Schlüssel -> faecher.id. */
+function fachIdsInKlasse(db, klasseId) {
+  const rows = db.prepare('SELECT id, spa_fach_key FROM faecher WHERE klasse_id = ? AND spa_fach_key IS NOT NULL')
+    .all(klasseId);
+  return new Map(rows.map((f) => [f.spa_fach_key, f.id]));
+}
+
+/** Schülerliste einer SPA-Klasse -- SPA-Fächer sind klasseneigen (kein klassenübergreifender Kurs, siehe seedeSpaFaecher), die eigene Klassenliste genügt daher. */
+function schuelerFuerKlasse(db, klasseId) {
+  return db.prepare('SELECT id, nachname, vorname FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasseId);
+}
+
+/**
+ * @typedef {Object} ZeugnisZelle
+ * @property {string} fach
+ * @property {string} label
+ * @property {number|null} endpunkte
+ * @property {string|null} tendenz
+ * @typedef {Object} ZeugnisZeile
+ * @property {number} schuelerId
+ * @property {string} nachname
+ * @property {string} vorname
+ * @property {ZeugnisZelle[]} faecher
+ * @property {ZeugnisZelle[]} [pruefungen] - nur im Abschlusszeugnis (4. Hj.)
+ */
+
+/**
+ * Zeugnisübersicht einer SPA-Klasse für ein Halbjahr: je Schüler/in für
+ * jedes in diesem Halbjahr aktive Fach die berechnete Endnote + Tendenz.
+ * Rechnet live (keine eigene Ergebnis-Cache-Tabelle, siehe berechneFachFuerSchueler).
+ * Das 4. Halbjahr liefert stattdessen das Abschlusszeugnis (siehe unten).
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} klasseId
+ * @param {import('./spa-grade-calc.js').Halbjahr} halbjahr
+ * @returns {ZeugnisZeile[]}
+ */
+export function zeugnisFuerKlasse(db, klasseId, halbjahr) {
+  const bildungsgang = bildungsgangVonKlasse(db, klasseId);
+  if (!bildungsgang) return [];
+  if (halbjahr === 4) return abschlusszeugnis(db, klasseId, bildungsgang);
+
+  const fachIdVon = fachIdsInKlasse(db, klasseId);
+  const aktiveFaecher = spaFaecherFuerBildungsgang(bildungsgang).filter((f) => {
+    if (!fachIdVon.has(f.schluessel)) return false;
+    const schemaHj = spaSchemaFuer(f.schluessel, bildungsgang).find((s) => s.halbjahr === halbjahr);
+    return schemaHj?.aktiv;
+  });
+
+  return schuelerFuerKlasse(db, klasseId).map((s) => ({
+    schuelerId: s.id,
+    nachname: s.nachname,
+    vorname: s.vorname,
+    faecher: aktiveFaecher.map((f) => {
+      const erg = berechneFachFuerSchueler(db, fachIdVon.get(f.schluessel), s.id);
+      const zelle = erg.find((e) => e.halbjahr === halbjahr);
+      const schemaHj = spaSchemaFuer(f.schluessel, bildungsgang).find((x) => x.halbjahr === halbjahr);
+      return {
+        fach: f.schluessel,
+        label: f.name,
+        endpunkte: zelle?.endpunkte ?? null,
+        tendenz: ausweisTendenz(schemaHj?.kommaNote, zelle?.tendenz ?? null),
+      };
+    }),
+  }));
+}
+
+/**
+ * Abschlusszeugnis (4. Hj.): pro Fach die finale Endnote an der/den
+ * konfigurierten Position(en) (`abschlussZeigen`, z. B. Praxis regulär: 2.
+ * UND 3. Hj. als zwei eigene Zeugniszeilen), inkl. früher abgeschlossener
+ * Fächer (WPK, Blockpraxis). Einzelpositions-Fächer ohne Wert an ihrer
+ * Position (z. B. weil dort nichts eingetragen wurde) ziehen die letzte
+ * vorhandene Note dieses Fachs hoch; Mehrfachpositionen (Praxis) bleiben
+ * exakt an ihrer Position stehen. Zusätzlich der Prüfungsblock (`pruefung`).
+ * @param {import('better-sqlite3').Database} db
+ * @param {number} klasseId
+ * @param {string} bildungsgang
+ * @returns {ZeugnisZeile[]}
+ */
+function abschlusszeugnis(db, klasseId, bildungsgang) {
+  const fachIdVon = fachIdsInKlasse(db, klasseId);
+  const faecherDesBildungsgangs = spaFaecherFuerBildungsgang(bildungsgang).filter((f) => fachIdVon.has(f.schluessel));
+
+  const positionen = [];
+  for (const f of faecherDesBildungsgangs) {
+    for (const s of spaSchemaFuer(f.schluessel, bildungsgang)) {
+      if (s.abschlussZeigen) positionen.push({ fach: f.schluessel, halbjahr: s.halbjahr });
+    }
+  }
+  const anzahlProFach = new Map();
+  for (const p of positionen) anzahlProFach.set(p.fach, (anzahlProFach.get(p.fach) ?? 0) + 1);
+  const posLabel = (p) => {
+    const name = spaFachName(p.fach);
+    return (anzahlProFach.get(p.fach) ?? 1) > 1 ? `${name} (${p.halbjahr}. Hj.)` : name;
+  };
+
+  const pruefPos = [];
+  for (const f of faecherDesBildungsgangs) {
+    for (const s of spaSchemaFuer(f.schluessel, bildungsgang)) {
+      if (s.pruefung) pruefPos.push({ fach: f.schluessel, halbjahr: s.halbjahr });
+    }
+  }
+  const pruefLabel = (fach) => (
+    fach === 'ENGLISCH' ? 'Englisch-FHR'
+      : fach === 'MATHEMATIK' ? 'Mathe-FHR'
+        : `${spaFachName(fach)} (Prüfung)`
+  );
+
+  const kommaNoteFaecher = new Set(
+    faecherDesBildungsgangs
+      .filter((f) => spaSchemaFuer(f.schluessel, bildungsgang).some((s) => s.kommaNote))
+      .map((f) => f.schluessel),
+  );
+
+  return schuelerFuerKlasse(db, klasseId).map((s) => {
+    const cache = new Map();
+    const ergebnisseVon = (fach) => {
+      if (!cache.has(fach)) cache.set(fach, berechneFachFuerSchueler(db, fachIdVon.get(fach), s.id));
+      return cache.get(fach);
+    };
+
+    const faecher = positionen.map((p) => {
+      const ergebnisse = ergebnisseVon(p.fach);
+      let z = ergebnisse.find((e) => e.halbjahr === p.halbjahr);
+      if ((z?.endpunkte ?? null) === null && (anzahlProFach.get(p.fach) ?? 1) === 1) {
+        for (let h = p.halbjahr - 1; h >= 1; h--) {
+          const e = ergebnisse.find((x) => x.halbjahr === h);
+          if (e && e.endpunkte != null) { z = e; break; }
+        }
+      }
+      return {
+        fach: `${p.fach}:${p.halbjahr}`,
+        label: posLabel(p),
+        endpunkte: z?.endpunkte ?? null,
+        tendenz: ausweisTendenz(kommaNoteFaecher.has(p.fach), z?.tendenz ?? null),
+      };
+    });
+
+    const pruefungen = pruefPos.map((p) => {
+      const wert = db.prepare('SELECT pruefungswert FROM spa_eingaben WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ?')
+        .get(fachIdVon.get(p.fach), s.id, p.halbjahr)?.pruefungswert ?? null;
+      return {
+        fach: `PRUEF:${p.fach}:${p.halbjahr}`,
+        label: pruefLabel(p.fach),
+        endpunkte: wert,
+        tendenz: wert == null ? null : tendenzAusEndpunkten(wert, STANDARD_NOTENSKALA),
+      };
+    });
+
+    return { schuelerId: s.id, nachname: s.nachname, vorname: s.vorname, faecher, pruefungen };
+  });
 }

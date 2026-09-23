@@ -30,8 +30,12 @@ import {
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../schuljahr-utils.js';
-import { BILDUNGSGAENGE, spaFaecherFuerBildungsgang, spaSchemaFuer, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
-import { berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer, ladeEingabeAnzeige as ladeSpaEingabeAnzeige } from '../spa-noten-service.js';
+import { BILDUNGSGAENGE, spaSchemaFuer, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
+import {
+  berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer,
+  ladeEingabeAnzeige as ladeSpaEingabeAnzeige, zeugnisFuerKlasse as spaZeugnisFuerKlasse,
+  seedeSpaFaecher,
+} from '../spa-noten-service.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -885,7 +889,7 @@ export default async function teacherRoutes(fastify) {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns] || '', request.user.id, offenFuerBeitritt, spaBildungsgang);
       const klasseId = info.lastInsertRowid;
-      if (ns === 'SPA') seedeSpaFaecher(klasseId, spaBildungsgang, request.user.id);
+      if (ns === 'SPA') seedeSpaFaecher(getDb(), klasseId, spaBildungsgang, request.user.id);
       return reply.redirect(`/teacher/klassen/${klasseId}`);
     } catch (e) {
       // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zum
@@ -968,6 +972,33 @@ export default async function teacherRoutes(fastify) {
 
     return reply.viewEjs('teacher/klasse_uebersicht.ejs', {
       user: request.user, klasse, halbjahr, faecher, zeilen, syncMeta, sperren,
+    });
+  });
+
+  // ---------- Zeugnisübersicht für SPA-Klassen (Klassenleitung/Admin) ----------
+  // Eigene, live berechnete Übersicht statt der obigen sync-basierten
+  // Halbjahresübersicht -- SPA hat weder Klausuren/ULs noch einen
+  // Sync-Mechanismus, dafür 4 statt 2 Halbjahre und (im 4. Hj.) das
+  // Abschlusszeugnis mit Prüfungsblock (siehe spa-noten-service.js).
+  fastify.get('/klassen/:id/zeugnis', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (klasse.notenschluessel !== 'SPA') {
+      return reply.code(404).viewEjs('error.ejs', {
+        code: 404, message: 'Die Zeugnisübersicht gibt es nur für SPA-Klassen -- für andere Notenschlüssel siehe die Halbjahresübersicht der Klassenleitung.',
+      });
+    }
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin haben Zugriff auf die Zeugnisübersicht.' });
+    }
+    let halbjahr = parseInt(request.query?.hj, 10);
+    if (![1, 2, 3, 4].includes(halbjahr)) halbjahr = 1;
+    const zeilen = spaZeugnisFuerKlasse(getDb(), klasse.id, halbjahr);
+    return reply.viewEjs('teacher/klasse_zeugnis_spa.ejs', {
+      user: request.user, klasse, halbjahr, zeilen,
     });
   });
 
@@ -1600,23 +1631,6 @@ export default async function teacherRoutes(fastify) {
 // sichtbar falsch verteilte Prozente lassen sich sofort im Formular
 // korrigieren, eine unsichtbar bei 0 hängende Klausur (fehlende Note in der
 // Übersicht) nicht.
-// Legt beim Anlegen einer SPA-Klasse sofort alle für den Bildungsgang
-// vorgesehenen Fächer/Lernfelder an (siehe src/spa-schema.js) -- SPA-Klassen
-// haben eine feste, vorkonfigurierte Fächerstruktur, es gibt dafür kein
-// manuelles "Fach anlegen" wie bei IHK/BG-Klassen.
-function seedeSpaFaecher(klasseId, bildungsgang, userId) {
-  const db = getDb();
-  const insert = db.prepare('INSERT INTO faecher (klasse_id, name, spa_fach_key) VALUES (?, ?, ?)');
-  const zuweisen = db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)');
-  const tx = db.transaction(() => {
-    for (const fach of spaFaecherFuerBildungsgang(bildungsgang)) {
-      const info = insert.run(klasseId, fach.name, fach.schluessel);
-      zuweisen.run(userId, info.lastInsertRowid);
-    }
-  });
-  tx();
-}
-
 function autoVerteileKlausuren(fachId, halbjahr, { erzwingen = false } = {}) {
   const klausuren = getDb().prepare(
     'SELECT id, gewichtung FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'

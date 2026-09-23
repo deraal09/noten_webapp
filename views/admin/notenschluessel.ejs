@@ -1,17 +1,64 @@
 <h1>Notenschlüssel für <%= klasse.name %></h1>
 <p class="kopf-aktionen"><a class="btn" href="/admin/klassen/<%= klasse.id %>">← Zurück</a></p>
 
-<form method="post" class="card">
-  <label>Schlüsseltyp
-    <select name="notenschluessel">
-      <option value="IHK" <%= klasse.notenschluessel === 'IHK' ? 'selected' : '' %>>IHK (1–6)</option>
-      <option value="BG"  <%= klasse.notenschluessel === 'BG'  ? 'selected' : '' %>>BG  (0–15)</option>
-    </select>
-  </label>
-  <label>CSV-Definition <small>(Prozent,Note;… absteigend)</small>
-    <textarea name="csv" rows="10"><%= klasse.notenschluessel_csv %></textarea>
-  </label>
-  <p class="hint">Beispiel IHK: <code>100,1;95,1.3;90,1.6;50,4;0,6</code></p>
-  <p class="hint">Beispiel BG:  <code>100,15;85,13;50,6;33,3;20,1;0,0</code></p>
-  <button type="submit">Speichern</button>
-</form>
+<% if (klasse.notenschluessel === 'SPA') { %>
+  <div class="card">
+    <p>
+      Notenschlüssel: <strong>SPA</strong>
+      (Bildungsgang: <strong><%= klasse.spa_bildungsgang === 'SPA_PIA' ? 'SPA PiA' : 'SPA (regulär)' %></strong>)
+    </p>
+    <p class="hint">
+      Bei SPA-Klassen bestimmt der bei Anlage gewählte Bildungsgang die gesamte, feste
+      Fächerstruktur (siehe src/spa-schema.js) -- Notenschlüssel und Bildungsgang lassen sich
+      danach nicht mehr ändern. Um eine SPA-Klasse mit falschem Bildungsgang zu korrigieren,
+      bitte die Klasse löschen (falls noch keine Noten eingetragen sind) und neu anlegen.
+    </p>
+  </div>
+<% } else { %>
+  <form method="post" class="card">
+    <label>Schlüsseltyp
+      <select name="notenschluessel" class="ns-auswahl">
+        <option value="IHK" <%= klasse.notenschluessel === 'IHK' ? 'selected' : '' %>>IHK (1–6)</option>
+        <option value="BG"  <%= klasse.notenschluessel === 'BG'  ? 'selected' : '' %>>BG  (0–15)</option>
+        <% if (anzahlFaecher === 0) { %>
+          <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
+        <% } %>
+      </select>
+    </label>
+    <label>CSV-Definition <small>(Prozent,Note;… absteigend)</small>
+      <textarea name="csv" rows="10"><%= klasse.notenschluessel_csv %></textarea>
+    </label>
+    <p class="hint">Beispiel IHK: <code>100,1;95,1.3;90,1.6;50,4;0,6</code></p>
+    <p class="hint">Beispiel BG:  <code>100,15;85,13;50,6;33,3;20,1;0,0</code></p>
+    <% if (anzahlFaecher === 0) { %>
+      <div class="spa-bildungsgang-auswahl" style="display:none;">
+        <p class="hint">
+          SPA-Klassen laufen durchgehend über 4 Halbjahre (2 Schuljahre) mit fest vorgegebenen
+          Lernfeldern/Fächern -- der Bildungsgang bestimmt, welche Fächer/Gewichte gelten, und
+          lässt sich danach nicht mehr ändern. Die festen Fächer werden beim Speichern automatisch
+          angelegt.
+        </p>
+        <% bildungsgaenge.forEach(function(bg) { %>
+          <label><input type="radio" name="spa_bildungsgang" value="<%= bg.schluessel %>"> <%= bg.bezeichnung %></label>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <p class="hint">
+        SPA steht hier nicht zur Wahl, solange diese Klasse bereits eigene Fächer hat -- bitte
+        stattdessen eine neue Klasse anlegen.
+      </p>
+    <% } %>
+    <button type="submit">Speichern</button>
+  </form>
+
+  <script>
+    (function() {
+      var select = document.querySelector('.ns-auswahl');
+      var block = document.querySelector('.spa-bildungsgang-auswahl');
+      if (!select || !block) return;
+      var aktualisieren = function() { block.style.display = select.value === 'SPA' ? '' : 'none'; };
+      select.addEventListener('change', aktualisieren);
+      aktualisieren();
+    })();
+  </script>
+<% } %>

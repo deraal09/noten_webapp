@@ -2,6 +2,9 @@
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
   <a class="btn" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a>
+  <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
+    <a class="btn" href="/teacher/klassen/<%= klasse.id %>/zeugnis">📋 Zeugnisübersicht</a>
+  <% } %>
   <% if (kannExportieren) { %>
     <a class="btn" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
   <% } %>
