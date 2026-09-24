@@ -152,17 +152,42 @@ export async function authPreHandler(request, reply) {
 // warten → jede geschützte Route hängt.
 export async function requireAuth(request, reply) {
   if (!request.user) {
-    // Bewusst OHNE vorheriges reply.code(401): Fastifys redirect() übernimmt
-    // sonst den zuvor gesetzten Statuscode für die Redirect-Antwort selbst
-    // (302 nur, wenn noch kein Code gesetzt wurde) -- eine Antwort mit
-    // Statuscode 401 UND Location-Header wird von Browsern bei normaler
-    // Navigation aber NICHT automatisch verfolgt (das gilt nur für
-    // 3xx-Codes). Ergebnis war "HTTP ERROR 401" statt der erwarteten
-    // Weiterleitung zur Login-Seite, z. B. wenn die Sitzung nach einem
-    // Deploy/Neustart nicht mehr erkannt wird, während noch eine
+    // Hintergrund-Aufrufe (fetch aus der Noteneingabe, dem Sitzplan, der
+    // SPA-Maske) bekommen 401 statt einer Umleitung: fetch() folgt einer
+    // 302 stillschweigend, erhält die Login-Seite mit Status 200, und das
+    // Skript hält `r.ok` für ein gelungenes Speichern -- nach Ablauf der
+    // Sitzung zeigte der Sitzplan so "gespeichert ✓", obwohl nichts
+    // gespeichert wurde.
+    if (!istSeitenaufruf(request)) {
+      return reply.code(401).send({ ok: false, error: 'nicht angemeldet' });
+    }
+    // Seitenaufruf: Bewusst OHNE vorheriges reply.code(401): Fastifys
+    // redirect() übernimmt sonst den zuvor gesetzten Statuscode für die
+    // Redirect-Antwort selbst (302 nur, wenn noch kein Code gesetzt wurde)
+    // -- eine Antwort mit Statuscode 401 UND Location-Header wird von
+    // Browsern bei normaler Navigation aber NICHT automatisch verfolgt (das
+    // gilt nur für 3xx-Codes). Ergebnis war "HTTP ERROR 401" statt der
+    // erwarteten Weiterleitung zur Login-Seite, z. B. wenn die Sitzung nach
+    // einem Deploy/Neustart nicht mehr erkannt wird, während noch eine
     // /teacher/…-Seite offen ist.
     return reply.redirect('/login?next=' + encodeURIComponent(request.url));
   }
+}
+
+/**
+ * Ist das ein Seitenaufruf des Browsers (Link, Formular, Adresszeile) — oder
+ * ein Hintergrund-Aufruf per fetch()/XHR aus einem Skript?
+ *
+ * Moderne Browser sagen das selbst über den Fetch-Metadata-Header
+ * Sec-Fetch-Mode: "navigate" nur bei Seitenaufrufen, sonst "cors",
+ * "same-origin" o. Ä. Ältere Browser ohne diesen Header verlangen bei einem
+ * Seitenaufruf immer HTML (Accept: text/html,…), ein fetch() dagegen
+ * standardmäßig nur den Platzhalter für beliebige Typen.
+ */
+export function istSeitenaufruf(request) {
+  const modus = request.headers['sec-fetch-mode'];
+  if (modus) return modus === 'navigate';
+  return String(request.headers.accept || '').includes('text/html');
 }
 
 /**

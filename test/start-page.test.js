@@ -79,13 +79,19 @@ test('Vorbereitung: Admin, Schuljahr, Lehrkraft, Klasse', async () => {
 });
 
 test('Nicht angemeldet: /start verweist auf den Login (wie jede andere geschützte Route)', async () => {
-  const r = await client()('/start');
+  // Als Seitenaufruf, wie ihn ein Browser schickt -- ein fetch() bekäme
+  // bewusst 401 statt einer Umleitung (siehe requireAuth in src/auth.js).
+  // Per inject(), weil fetch den geschützten Header Sec-Fetch-Mode immer
+  // selbst auf "cors" setzt.
+  const r = await fastify.inject({
+    method: 'GET', url: '/start', headers: { 'sec-fetch-mode': 'navigate', accept: 'text/html' },
+  });
   // 302, nicht 401 -- ein Statuscode 401 mit Location-Header wird von
   // Browsern bei normaler Navigation NICHT automatisch verfolgt (nur 3xx
   // löst das aus), das ergäbe "HTTP ERROR 401" statt der Weiterleitung zum
   // Login (siehe requireAuth in src/auth.js).
-  assert.equal(r.status, 302);
-  assert.match(r.headers.get('location'), /\/login/);
+  assert.equal(r.statusCode, 302);
+  assert.match(r.headers.location, /\/login/);
 });
 
 test('Nach dem Anmelden leitet / eine Lehrkraft auf /start um (nicht mehr direkt auf /teacher)', async () => {

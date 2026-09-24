@@ -178,21 +178,46 @@
     } catch (e) { /* still shows the last saved server-rendered values */ }
   }
 
+  // Ein fehlgeschlagenes Speichern muss am Feld sichtbar sein -- sonst steht
+  // der Wert im Eingabefeld, ist aber nach dem Neuladen weg, ohne dass es
+  // jemand merkt (z. B. nach Ablauf der Sitzung: 401, siehe requireAuth).
+  function markiereSpeicherstand(inp, r) {
+    if (r && r.ok) {
+      inp.classList.remove('speicherfehler');
+      inp.removeAttribute('title');
+      return;
+    }
+    inp.classList.add('speicherfehler');
+    inp.title = !r ? 'Nicht gespeichert: Server nicht erreichbar.'
+      : r.status === 401 ? 'Nicht gespeichert: Sitzung abgelaufen – bitte neu anmelden.'
+      : r.status === 403 ? 'Nicht gespeichert: keine Berechtigung oder Noten gesperrt.'
+      : 'Nicht gespeichert (Fehler ' + r.status + ').';
+  }
+
   async function speichereEingabe(inp) {
     var body = new URLSearchParams();
     body.append('schueler_id', inp.dataset.sid);
     body.append('halbjahr', halbjahr);
     body.append('feld', inp.dataset.feld);
     body.append('wert', inp.type === 'checkbox' ? (inp.checked ? '1' : '0') : inp.value);
-    var r = await fetch('/teacher/fach/' + fachId + '/spa/eingabe', { method: 'POST', body: body });
-    if (r.ok) refresh();
+    var r = null;
+    try {
+      r = await fetch('/teacher/fach/' + fachId + '/spa/eingabe', { method: 'POST', body: body });
+    } catch (e) { /* Netzwerkfehler -- r bleibt null und wird unten markiert */ }
+    markiereSpeicherstand(inp, r);
+    if (r && r.ok) refresh();
   }
 
-  var speichereVerzoegert = debounce(speichereEingabe, 400);
   document.querySelectorAll('input.spa-eingabe').forEach(function(inp) {
     if (inp.type === 'checkbox') {
       inp.addEventListener('change', function() { speichereEingabe(inp); });
     } else {
+      // Ein EIGENER Timer je Feld: Mit einem gemeinsamen Timer für alle
+      // Felder brach clearTimeout() das noch ausstehende Speichern des
+      // vorigen Feldes ab, sobald innerhalb von 400 ms im nächsten getippt
+      // wurde (Tab + Weitertippen) -- der Wert stand im Feld, wurde aber nie
+      // gespeichert.
+      var speichereVerzoegert = debounce(speichereEingabe, 400);
       inp.addEventListener('input', function() { speichereVerzoegert(inp); });
     }
   });

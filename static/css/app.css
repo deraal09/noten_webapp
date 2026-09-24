@@ -218,6 +218,8 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 .flash { padding: 0.75rem 1rem; border-radius: 4px; margin: 0.5rem 1rem; }
 .flash-success { background: var(--flash-success-bg); color: var(--flash-success-text); border: 1px solid var(--flash-success-border); }
 .flash-error, .err { background: var(--flash-error-bg); color: var(--flash-error-text); border: 1px solid var(--flash-error-border); padding: 0.5rem 0.75rem; border-radius: 4px; }
+/* Eingabefeld, dessen automatisches Speichern fehlgeschlagen ist (Grund im title). */
+input.speicherfehler { background: var(--flash-error-bg); outline: 2px solid var(--flash-error-border); }
 .flash-info { background: var(--flash-info-bg); color: var(--flash-info-text); border: 1px solid var(--flash-info-border); }
 
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }

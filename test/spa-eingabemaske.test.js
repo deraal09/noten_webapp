@@ -166,6 +166,23 @@ test('WPK-Kursname lässt sich am Fach speichern', async () => {
   assert.equal(getDb().prepare('SELECT spa_wpk_kurs FROM faecher WHERE id = ?').get(wpkId).spa_wpk_kurs, 'Krippe (U3)');
 });
 
+test('Eingabemaske: jedes Feld hat seinen eigenen Speicher-Timer', () => {
+  // Mit EINEM gemeinsamen Debounce-Timer für alle Felder brach
+  // clearTimeout() das ausstehende Speichern des vorigen Feldes ab, sobald
+  // innerhalb von 400 ms im nächsten getippt wurde (Tab + Weitertippen) --
+  // der Wert stand im Feld, war nach dem Neuladen aber weg. Im Browser
+  // nachgestellt und behoben; die Testsuite hat keinen Browser, deshalb
+  // prüft das hier den Aufbau: der verzögerte Speicheraufruf muss INNERHALB
+  // der Schleife über die Felder entstehen, nicht einmal davor.
+  const vorlage = fs.readFileSync(new URL('../views/teacher/fach_detail_spa.ejs', import.meta.url), 'utf8');
+  const schleife = vorlage.indexOf("querySelectorAll('input.spa-eingabe').forEach");
+  const debounceAufruf = vorlage.indexOf('debounce(speichereEingabe');
+  assert.ok(schleife !== -1 && debounceAufruf !== -1, 'Testannahme: Schleife und Debounce-Aufruf sind in der Vorlage');
+  assert.ok(debounceAufruf > schleife,
+    'debounce(speichereEingabe, …) muss je Feld innerhalb der forEach-Schleife erzeugt werden');
+  assert.equal(vorlage.split('debounce(speichereEingabe').length - 1, 1);
+});
+
 test.after(async () => {
   await fastify.close();
 });
