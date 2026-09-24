@@ -443,9 +443,12 @@ table.fz input[type=text] { width: 100%; min-width: 100px; }
 }
 .platz {
   position: absolute;
+  /* Kein max-width: Der Platz muss mit dem Namensfeld mitwachsen, das sich
+     per Skript an den Namen anpasst (views/teacher/sitzplan.ejs). Mit einem
+     festen Deckel lief ein langer Name über den Rand des Platzes hinaus und
+     schob den Entfernen-Knopf nach draußen. */
   width: max-content;
   min-width: 2.5rem;
-  max-width: 220px;
   min-height: 40px;
   background: var(--bg-tint-2);
   border: 1px solid var(--border-strong);
@@ -460,11 +463,27 @@ table.fz input[type=text] { width: 100%; min-width: 100px; }
 .platz-griff:active { cursor: grabbing; }
 .platz-name { flex: none; min-width: 30px; border: none; background: transparent; color: var(--text); padding: 0.2rem; font: inherit; }
 .platz-name:focus { outline: 1px solid var(--accent); border-radius: 3px; }
+/* Chrome/Safari zeigen in Feldern mit Vorschlagsliste (list=…) einen
+   Aufklapp-Pfeil INNERHALB des Feldes, sobald die Liste Einträge hat — der
+   nahm rund 16–20 px vom ohnehin knapp bemessenen Namensfeld weg und schnitt
+   den Namen ab. Die Vorschläge erscheinen beim Tippen trotzdem. */
+.platz-name::-webkit-calendar-picker-indicator { display: none !important; }
+.platz-name::-webkit-list-button { display: none !important; }
 .platz-loeschen { background: transparent; color: var(--text-muted); padding: 0 0.2rem; line-height: 1; }
 .platz-loeschen:hover { background: var(--danger); color: var(--on-dark); border-radius: 3px; }
 
 .sitzplan-vorschau { max-width: 700px; margin: 0.5rem 0; }
-.sitzplan-vorschau .platz { align-items: center; justify-content: center; text-align: center; font-size: 0.85rem; }
+/* Raum-Auswahl über dem Sitzplan: Reiter als Links (je Raum eine eigene URL),
+   im selben Stil wie die Reiter-Buttons. */
+.raum-reiter { margin: 0 0 0.75rem; }
+.raum-reiter a.btn { background: var(--bg-card); color: var(--primary-text); border: 1px solid var(--primary-text); }
+.raum-reiter a.btn.active { background: var(--primary); color: var(--on-dark); }
+.sitzplan-raeume .raum-neu input[type=text], .sitzplan-raeume .raum-bearbeiten input[type=text] { width: 16rem; max-width: 100%; }
+.sitzplan-raeume .raum-aktiv { margin: 0.75rem 0 0.25rem; }
+
+/* In der reinen Anzeige darf ein langer Name umbrechen, statt die kleinere
+   Vorschau mit breiten Kästen zuzustellen. */
+.sitzplan-vorschau .platz { align-items: center; justify-content: center; text-align: center; font-size: 0.85rem; max-width: 220px; }
 
 .footer { text-align: center; color: var(--text-muted); padding: 1rem; font-size: 0.85rem; }
 
