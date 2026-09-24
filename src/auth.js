@@ -349,8 +349,43 @@ export function ladeMeineKurse(userId) {
  */
 export function userDarfFachLoeschen(user, fach) {
   if (user.isAdmin) return true;
-  if (fach.ist_kurs) return userHatFachZgriff(user, fach.id);
-  return userHatKlassenZugriff(user, fach.klasse_id);
+  if (fach.ist_kurs) return istEinzigeLehrkraftImFach(user, fach.id);
+  return userDarfKlasseVerwalten(user, fach.klasse_id);
+}
+
+/**
+ * Darf der User die Klasse als Ganzes verwalten — also Dinge tun, die über
+ * das eigene Fach hinaus Daten anderer Lehrkräfte betreffen: Fächer oder
+ * Schüler/innen löschen (samt aller Noten, per ON DELETE CASCADE), einen
+ * Abgang eintragen/rückgängig machen, das Abgangszeugnis mit den Noten ALLER
+ * Fächer einsehen? Nur Admin, Ersteller/in der Klasse und Klassenleitung.
+ *
+ * Bewusst enger als userHatKlassenZugriff(): Dafür reicht schon eine
+ * einzige Fach-Zuweisung — und die bekommt seit dem Beitritt per
+ * Freigabe-Flag (klassen.offen_fuer_beitritt, siehe
+ * klassen-verknuepfung.js) jede LDAP-Lehrkraft ohne Rückfrage. Mit dem
+ * weiteren Recht konnte so jemand, der einer Klasse gerade erst
+ * beigetreten war, sofort Fächer und Schüler/innen anderer Lehrkräfte
+ * samt aller Noten löschen.
+ */
+export function userDarfKlasseVerwalten(user, klasseId) {
+  if (user.isAdmin) return true;
+  const klasse = getDb().prepare('SELECT created_by_id FROM klassen WHERE id = ?').get(klasseId);
+  if (klasse && klasse.created_by_id === user.id) return true;
+  return userIstKlassenlehrer(user, klasseId);
+}
+
+/**
+ * Ist der User die einzige diesem Fach zugewiesene Lehrkraft? Maßstab fürs
+ * Löschen eines Kurses: Ein Kurs hängt an einer unsichtbaren Klassen-Hülle
+ * ohne Ersteller/in und Klassenleitung (siehe /kurse/neu), die übliche
+ * Verwaltungsregel greift dort also nicht. Mit mehreren Lehrkräften würde
+ * das Löschen durch eine von ihnen die Noten der anderen mitnehmen — dann
+ * bleibt es beim Admin.
+ */
+export function istEinzigeLehrkraftImFach(user, fachId) {
+  const zugewiesen = getDb().prepare('SELECT user_id FROM fach_zuweisungen WHERE fach_id = ?').all(fachId);
+  return zugewiesen.length === 1 && zugewiesen[0].user_id === user.id;
 }
 
 /**
