@@ -152,17 +152,42 @@ export async function authPreHandler(request, reply) {
 // warten → jede geschützte Route hängt.
 export async function requireAuth(request, reply) {
   if (!request.user) {
-    // Bewusst OHNE vorheriges reply.code(401): Fastifys redirect() übernimmt
-    // sonst den zuvor gesetzten Statuscode für die Redirect-Antwort selbst
-    // (302 nur, wenn noch kein Code gesetzt wurde) -- eine Antwort mit
-    // Statuscode 401 UND Location-Header wird von Browsern bei normaler
-    // Navigation aber NICHT automatisch verfolgt (das gilt nur für
-    // 3xx-Codes). Ergebnis war "HTTP ERROR 401" statt der erwarteten
-    // Weiterleitung zur Login-Seite, z. B. wenn die Sitzung nach einem
-    // Deploy/Neustart nicht mehr erkannt wird, während noch eine
+    // Hintergrund-Aufrufe (fetch aus der Noteneingabe, dem Sitzplan, der
+    // SPA-Maske) bekommen 401 statt einer Umleitung: fetch() folgt einer
+    // 302 stillschweigend, erhält die Login-Seite mit Status 200, und das
+    // Skript hält `r.ok` für ein gelungenes Speichern -- nach Ablauf der
+    // Sitzung zeigte der Sitzplan so "gespeichert ✓", obwohl nichts
+    // gespeichert wurde.
+    if (!istSeitenaufruf(request)) {
+      return reply.code(401).send({ ok: false, error: 'nicht angemeldet' });
+    }
+    // Seitenaufruf: Bewusst OHNE vorheriges reply.code(401): Fastifys
+    // redirect() übernimmt sonst den zuvor gesetzten Statuscode für die
+    // Redirect-Antwort selbst (302 nur, wenn noch kein Code gesetzt wurde)
+    // -- eine Antwort mit Statuscode 401 UND Location-Header wird von
+    // Browsern bei normaler Navigation aber NICHT automatisch verfolgt (das
+    // gilt nur für 3xx-Codes). Ergebnis war "HTTP ERROR 401" statt der
+    // erwarteten Weiterleitung zur Login-Seite, z. B. wenn die Sitzung nach
+    // einem Deploy/Neustart nicht mehr erkannt wird, während noch eine
     // /teacher/…-Seite offen ist.
     return reply.redirect('/login?next=' + encodeURIComponent(request.url));
   }
+}
+
+/**
+ * Ist das ein Seitenaufruf des Browsers (Link, Formular, Adresszeile) — oder
+ * ein Hintergrund-Aufruf per fetch()/XHR aus einem Skript?
+ *
+ * Moderne Browser sagen das selbst über den Fetch-Metadata-Header
+ * Sec-Fetch-Mode: "navigate" nur bei Seitenaufrufen, sonst "cors",
+ * "same-origin" o. Ä. Ältere Browser ohne diesen Header verlangen bei einem
+ * Seitenaufruf immer HTML (Accept: text/html,…), ein fetch() dagegen
+ * standardmäßig nur den Platzhalter für beliebige Typen.
+ */
+export function istSeitenaufruf(request) {
+  const modus = request.headers['sec-fetch-mode'];
+  if (modus) return modus === 'navigate';
+  return String(request.headers.accept || '').includes('text/html');
 }
 
 /**
@@ -312,20 +337,58 @@ export function ladeMeineKurse(userId) {
 }
 
 /**
- * Darf dieses Fach gelöscht werden? Ein Kurs (ist_kurs=1) hängt seit der
- * Loslösung von der Ausgangsklasse (siehe routes/teacher.js /kurse/neu) nur
- * noch technisch an einer unsichtbaren, leeren Klassen-Hülle
- * (klassen.ist_kurs_huelle) -- die eigene Fach-Zuweisung ist dort die
- * richtige (und einzig sinnvolle) Berechtigung, nicht der Zugriff auf diese
- * Hülle (userHatKlassenZugriff würde dort mangels Ersteller/in,
- * Klassenleitung o. Ä. immer false liefern und den Kurs unlöschbar machen).
- * Ein normales Fach bleibt bei der bisherigen Regel: Zugriff auf die ganze
- * Heimat-Klasse.
+ * Darf dieses Fach gelöscht werden? Löschen entfernt per ON DELETE CASCADE
+ * alle Klausuren und Noten des Fachs — auch die anderer Lehrkräfte.
+ *   - Admin: immer.
+ *   - Kurs (ist_kurs=1): nur, wer die EINZIGE zugeordnete Lehrkraft ist
+ *     (istEinzigeLehrkraftImFach), sonst nur der Admin. Ein Kurs hängt nur
+ *     technisch an einer unsichtbaren Klassen-Hülle (klassen.ist_kurs_huelle)
+ *     ohne Ersteller/in oder Klassenleitung, die Klassenrechte greifen dort
+ *     also nicht.
+ *   - Normales Fach: wer die Heimat-Klasse verwalten darf
+ *     (userDarfKlasseVerwalten: Ersteller/in, Klassenleitung, Admin). Bloßer
+ *     Zugriff auf die Klasse — z. B. nach einem Beitritt — reicht nicht,
+ *     und die eigene Fach-Zuweisung auch nicht.
  */
 export function userDarfFachLoeschen(user, fach) {
   if (user.isAdmin) return true;
-  if (fach.ist_kurs) return userHatFachZgriff(user, fach.id);
-  return userHatKlassenZugriff(user, fach.klasse_id);
+  if (fach.ist_kurs) return istEinzigeLehrkraftImFach(user, fach.id);
+  return userDarfKlasseVerwalten(user, fach.klasse_id);
+}
+
+/**
+ * Darf der User die Klasse als Ganzes verwalten — also Dinge tun, die über
+ * das eigene Fach hinaus Daten anderer Lehrkräfte betreffen: Fächer oder
+ * Schüler/innen löschen (samt aller Noten, per ON DELETE CASCADE), einen
+ * Abgang eintragen/rückgängig machen, das Abgangszeugnis mit den Noten ALLER
+ * Fächer einsehen? Nur Admin, Ersteller/in der Klasse und Klassenleitung.
+ *
+ * Bewusst enger als userHatKlassenZugriff(): Dafür reicht schon eine
+ * einzige Fach-Zuweisung — und die bekommt seit dem Beitritt per
+ * Freigabe-Flag (klassen.offen_fuer_beitritt, siehe
+ * klassen-verknuepfung.js) jede LDAP-Lehrkraft ohne Rückfrage. Mit dem
+ * weiteren Recht konnte so jemand, der einer Klasse gerade erst
+ * beigetreten war, sofort Fächer und Schüler/innen anderer Lehrkräfte
+ * samt aller Noten löschen.
+ */
+export function userDarfKlasseVerwalten(user, klasseId) {
+  if (user.isAdmin) return true;
+  const klasse = getDb().prepare('SELECT created_by_id FROM klassen WHERE id = ?').get(klasseId);
+  if (klasse && klasse.created_by_id === user.id) return true;
+  return userIstKlassenlehrer(user, klasseId);
+}
+
+/**
+ * Ist der User die einzige diesem Fach zugewiesene Lehrkraft? Maßstab fürs
+ * Löschen eines Kurses: Ein Kurs hängt an einer unsichtbaren Klassen-Hülle
+ * ohne Ersteller/in und Klassenleitung (siehe /kurse/neu), die übliche
+ * Verwaltungsregel greift dort also nicht. Mit mehreren Lehrkräften würde
+ * das Löschen durch eine von ihnen die Noten der anderen mitnehmen — dann
+ * bleibt es beim Admin.
+ */
+export function istEinzigeLehrkraftImFach(user, fachId) {
+  const zugewiesen = getDb().prepare('SELECT user_id FROM fach_zuweisungen WHERE fach_id = ?').all(fachId);
+  return zugewiesen.length === 1 && zugewiesen[0].user_id === user.id;
 }
 
 /**

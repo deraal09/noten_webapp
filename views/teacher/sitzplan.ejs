@@ -2,10 +2,48 @@
 <p class="kopf-aktionen"><a class="btn" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a></p>
 
 <p class="hint">
-  Plätze frei auf dem Blatt anordnen (beliebige Raumform möglich) und Namen eintragen.
-  Der Entwurf ist zunächst nur für dich sichtbar und wird automatisch gespeichert — erst der Button
-  "An andere Lehrkräfte übertragen" gibt ihn für alle Lehrkräfte dieser Klasse frei.
+  Plätze frei auf dem Blatt anordnen (beliebige Raumform möglich) und Namen eintragen — für jeden Raum,
+  in dem die Klasse sitzt, ein eigener Plan. Der Entwurf ist zunächst nur für dich sichtbar und wird
+  automatisch gespeichert — erst der Button "An andere Lehrkräfte übertragen" gibt ihn für alle
+  Lehrkräfte dieser Klasse frei.
 </p>
+
+<%# ---------- Raum-Auswahl ---------- %>
+<div class="card sitzplan-raeume">
+  <div class="reiter raum-reiter">
+    <% raeume.forEach(function(r) { %>
+      <a class="btn<%= r.raum.toLowerCase() === raum.toLowerCase() ? ' active' : '' %>" href="<%= raumUrl(r.raum) %>"
+         title="<%= r.eigener ? 'Eigener Entwurf' : '' %><%= r.eigener && r.geteilt ? ' · ' : '' %><%= r.geteilt ? 'Geteilter Plan vorhanden' : '' %>"><%= r.raum || 'ohne Raumangabe' %><%= r.geteilt && !r.eigener ? ' 📥' : '' %></a>
+    <% }); %>
+    <% if (raumIstNeu) { %>
+      <a class="btn active" href="<%= raumUrl(raum) %>"><%= raum || 'ohne Raumangabe' %> <small>(neu)</small></a>
+    <% } %>
+  </div>
+  <form method="get" action="/teacher/klassen/<%= klasse.id %>/sitzplan" class="inline raum-neu">
+    <input type="text" name="raum" placeholder="z. B. A 204 oder Computerraum" maxlength="40" required aria-label="Neuer Raum">
+    <button type="submit">+ Raum</button>
+  </form>
+
+  <p class="raum-aktiv">
+    Raum: <strong><%= raum || 'ohne Raumangabe' %></strong>
+    <% if (!raum) { %><span class="hint"> — bitte angeben, damit der Plan einem Raum zugeordnet ist.</span><% } %>
+  </p>
+  <details class="raum-bearbeiten"<%= !raum ? ' open' : '' %>>
+    <summary><%= raum ? '✏️ Raum umbenennen' : '✏️ Raum angeben' %></summary>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/sitzplan/raum-umbenennen" class="inline">
+      <input type="hidden" name="raum" value="<%= raum %>">
+      <input type="text" name="neuer_raum" value="<%= raum %>" maxlength="40" required aria-label="Raum">
+      <button type="submit">Speichern</button>
+    </form>
+  </details>
+  <% if (hatEigenen || (geteilt && geteilt.vonMir)) { %>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/sitzplan/raum-loeschen" class="inline"
+          onsubmit="return confirm('Deinen Sitzplan für diesen Raum löschen?<%= geteilt && geteilt.vonMir ? ' Auch der von dir geteilte Stand wird entfernt.' : '' %>')">
+      <input type="hidden" name="raum" value="<%= raum %>">
+      <button type="submit" class="danger">🗑 Plan für diesen Raum löschen</button>
+    </form>
+  <% } %>
+</div>
 
 <% if (geteilt) { %>
   <div class="card">
@@ -23,18 +61,20 @@
       </div>
     </details>
     <form method="post" action="/teacher/klassen/<%= klasse.id %>/sitzplan/uebernehmen" class="inline"
-          onsubmit="return confirm('Den geteilten Sitzplan als eigenen Entwurf übernehmen? Dein aktueller Entwurf wird dabei überschrieben.')">
+          onsubmit="return confirm('Den geteilten Sitzplan als eigenen Entwurf übernehmen? Dein aktueller Entwurf für diesen Raum wird dabei überschrieben.')">
+      <input type="hidden" name="raum" value="<%= raum %>">
       <button type="submit">📥 Geteilten Sitzplan übernehmen</button>
     </form>
   </div>
 <% } else { %>
-  <p class="hint">Noch kein Sitzplan an andere Lehrkräfte dieser Klasse übertragen.</p>
+  <p class="hint">Noch kein Sitzplan an andere Lehrkräfte dieser Klasse übertragen (für diesen Raum).</p>
 <% } %>
 
 <div class="card">
   <button type="button" id="platz-hinzufuegen">+ Platz hinzufügen</button>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/sitzplan/uebertragen" class="inline"
         onsubmit="return confirm('Diesen Sitzplan jetzt an alle Lehrkräfte dieser Klasse übertragen?')">
+    <input type="hidden" name="raum" value="<%= raum %>">
     <button type="submit">📤 An andere Lehrkräfte übertragen</button>
   </form>
   <span id="speicher-status" class="hint"></span>
@@ -53,6 +93,7 @@
   const blatt = document.getElementById('sitzplan-blatt');
   const status = document.getElementById('speicher-status');
   const SPEICHER_URL = '/teacher/klassen/<%= klasse.id %>/sitzplan/speichern';
+  const RAUM = <%- jsonFuerSkript(raum) %>;
   let plaetze = <%- jsonFuerSkript(plaetze) %>;
   let naechsteId = plaetze.length;
 
@@ -68,17 +109,33 @@
   messSpan.style.left = '-9999px';
   document.body.appendChild(messSpan);
 
+  // Nur aufrufen, wenn das Feld schon im Dokument hängt: an einem noch
+  // nicht eingehängten Element liefert getComputedStyle() leere Werte, und
+  // gemessen würde dann in der falschen Schrift. Die Schrift wird über die
+  // Einzel-Eigenschaften übernommen statt über das Kürzel `font`, das nicht
+  // jeder Browser aus getComputedStyle() zurückgibt.
   function groesseAnpassen(input) {
     const text = input.value || input.placeholder || '';
     const stil = window.getComputedStyle(input);
-    messSpan.style.font = stil.font;
+    ['fontStyle', 'fontVariant', 'fontWeight', 'fontSize', 'fontFamily', 'letterSpacing'].forEach(function(e) {
+      messSpan.style[e] = stil[e];
+    });
     messSpan.textContent = text;
-    input.style.width = Math.max(30, messSpan.offsetWidth + 16) + 'px';
+    const innenabstand = parseFloat(stil.paddingLeft) + parseFloat(stil.paddingRight);
+    // +4 px Luft für den Cursor am Textende.
+    const breite = Math.max(30, Math.ceil(messSpan.getBoundingClientRect().width + innenabstand + 4));
+    input.style.width = breite + 'px';
+    // Gegenprobe am echten Feld: Belegt der Browser innen zusätzlichen Platz
+    // (z. B. ein Aufklapp-Pfeil der Vorschlagsliste), läuft der Text trotz
+    // korrekter Messung über — dann um genau diesen Überhang verbreitern.
+    const ueberhang = input.scrollWidth - input.clientWidth;
+    if (ueberhang > 0) input.style.width = (breite + ueberhang) + 'px';
   }
 
   async function speichern() {
     status.textContent = 'speichert …';
     const body = new URLSearchParams();
+    body.append('raum', RAUM);
     body.append('plaetze', JSON.stringify(plaetze));
     try {
       const r = await fetch(SPEICHER_URL, { method: 'POST', body });
@@ -120,7 +177,6 @@
       input.setAttribute('list', 'schueler-liste');
       input.placeholder = 'Name';
       input.value = p.text;
-      groesseAnpassen(input);
       input.addEventListener('input', function() {
         p.text = input.value;
         groesseAnpassen(input);
@@ -151,11 +207,15 @@
       el.appendChild(input);
       el.appendChild(entfernen);
       blatt.appendChild(el);
+      groesseAnpassen(input); // erst jetzt, eingehängt, stimmt die gemessene Schrift
     });
   }
 
   document.getElementById('platz-hinzufuegen').addEventListener('click', function() {
-    plaetze.push({ id: 'p' + (naechsteId++) + '-' + Date.now(), x: 4, y: 4, text: '' });
+    // Leicht versetzt statt immer an derselben Stelle -- sonst lagen mehrere
+    // neue Plätze deckungsgleich übereinander und nur der oberste war sichtbar.
+    const versatz = plaetze.length % 10;
+    plaetze.push({ id: 'p' + (naechsteId++) + '-' + Date.now(), x: 4 + versatz * 2, y: 4 + versatz * 7, text: '' });
     render();
     speichernVerzoegert();
   });

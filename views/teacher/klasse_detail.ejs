@@ -117,12 +117,13 @@ Meier, Carla"></textarea>
 <% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
    var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
 <table class="data">
-  <thead><tr><th>Nachname</th><th>Vorname</th><th>Aktion</th></tr></thead>
+  <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
   <tbody>
     <% schuelerAktiv.forEach(function(s) { %>
       <tr>
         <td><%= s.nachname %></td>
         <td><%= s.vorname %></td>
+        <% if (darfVerwalten) { %>
         <td>
           <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" class="inline" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
             <button type="submit" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
@@ -131,6 +132,7 @@ Meier, Carla"></textarea>
             <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
           </form>
         </td>
+        <% } %>
       </tr>
     <% }); %>
   </tbody>
@@ -140,13 +142,14 @@ Meier, Carla"></textarea>
   <details class="card">
     <summary>Ehemalige Schüler/innen (Abgang, <%= schuelerAbgang.length %>)</summary>
     <table class="data">
-      <thead><tr><th>Nachname</th><th>Vorname</th><th>Abgang am</th><th>Aktion</th></tr></thead>
+      <thead><tr><th>Nachname</th><th>Vorname</th><th>Abgang am</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
       <tbody>
         <% schuelerAbgang.forEach(function(s) { %>
           <tr>
             <td><%= s.nachname %></td>
             <td><%= s.vorname %></td>
             <td><%= s.abgang_am ? formatZeitLokal(s.abgang_am) : '–' %></td>
+            <% if (darfVerwalten) { %>
             <td>
               <a class="btn" href="/teacher/schueler/<%= s.id %>/abgangszeugnis">🎓 Abgangszeugnis</a>
               <form method="post" action="/teacher/schueler/<%= s.id %>/reaktivieren" class="inline">
@@ -156,6 +159,7 @@ Meier, Carla"></textarea>
                 <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
               </form>
             </td>
+            <% } %>
           </tr>
         <% }); %>
       </tbody>
@@ -172,17 +176,19 @@ Meier, Carla"></textarea>
   <button type="submit">+ Fach anlegen</button>
 </form>
 <table class="data">
-  <thead><tr><th>Name</th><th>Lehrkräfte</th><th>Aktion</th></tr></thead>
+  <thead><tr><th>Name</th><th>Lehrkräfte</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
   <tbody>
     <% faecher.forEach(function(f) { %>
       <tr>
         <td><a href="/teacher/fach/<%= f.id %>"><%= f.name %></a></td>
         <td><%= f.lehrer_liste || '—' %></td>
+        <% if (darfVerwalten) { %>
         <td>
-          <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen?')">
+          <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen? Alle Noten dieses Fachs gehen dabei verloren.')">
             <button type="submit" class="danger">🗑</button>
           </form>
         </td>
+        <% } %>
       </tr>
     <% }); %>
   </tbody>

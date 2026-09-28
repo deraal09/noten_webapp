@@ -6,7 +6,7 @@
 import { getDb } from '../db.js';
 import {
   requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
-  userDarfFachLoeschen,
+  userDarfFachLoeschen, userDarfKlasseVerwalten,
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
@@ -129,6 +129,10 @@ function alsGueltigesDatumOderNull(wert) {
   const s = String(wert || '').trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
+
+// Meldung für alles, was userDarfKlasseVerwalten() verlangt (siehe src/auth.js).
+const KLASSE_VERWALTEN_NUR = 'Das darf nur die Klassenleitung, die Lehrkraft, die die Klasse angelegt hat, oder der Admin — '
+  + 'es betrifft auch Fächer und Noten anderer Lehrkräfte.';
 
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -974,8 +978,15 @@ export default async function teacherRoutes(fastify) {
       klasseId: klasse.id, angefragtVonId: request.user.id, vorgeschlagenesFach: fach,
     });
     if (ergebnis.direkterBeitritt) {
-      request.flash?.('success', `Zugriff erhalten — dein Fach „${fach}" wurde angelegt.`);
+      request.flash?.('success', `Zugriff erhalten — dein Fach „${fach}".`);
       return reply.redirect(`/teacher/klassen/${klasse.id}`);
+    }
+    if (ergebnis.fachExistiert) {
+      request.flash?.('error', `Das Fach „${fach}" gibt es in dieser Klasse schon und gehört einer anderen Lehrkraft. Bitte die Klassenleitung oder den Admin, dich zuzuordnen — oder einen anderen Fachnamen wählen.`);
+      // Wer schon (über ein anderes Fach) dabei ist, landet auf der Klassenseite
+      // -- die Beitrittsseite würde ohnehin dorthin weiterleiten.
+      return reply.redirect(userHatKlassenZugriff(request.user, klasse.id)
+        ? `/teacher/klassen/${klasse.id}` : `/teacher/klassen/${klasse.id}/verknuepfen`);
     }
     request.flash?.('error', 'Diese Klasse ist nicht für automatischen Beitritt freigegeben. Bitte die Klassenleitung oder den Admin um Zuweisung bitten.');
     return reply.redirect('/teacher/klassen');
@@ -1218,6 +1229,9 @@ export default async function teacherRoutes(fastify) {
       FROM faecher f WHERE f.klasse_id = ? ORDER BY f.name
     `).all(klasse.id);
     const eigentuemer = klasse.created_by_id === request.user.id || request.user.isAdmin;
+    // Löschen/Abgang/Abgangszeugnis nur anzeigen, wenn die Aktion auch
+    // durchgeht (dieselbe Regel wie in den Routen, siehe userDarfKlasseVerwalten).
+    const darfVerwalten = userDarfKlasseVerwalten(request.user, klasse.id);
     const istKlassenlehrer = userIstKlassenlehrer(request.user, klasse.id);
     const kannExportieren = userDarfKlasseExportieren(request.user, klasse.id);
     const kannSelbstAlsKlassenlehrerEintragen = !istKlassenlehrer
@@ -1244,7 +1258,7 @@ export default async function teacherRoutes(fastify) {
       : [];
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      user: request.user, klasse, schueler, faecher, eigentuemer, kannExportieren,
+      user: request.user, klasse, schueler, faecher, eigentuemer, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
       andereSchuljahre,
     });
@@ -1416,8 +1430,8 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/schueler/:id/loeschen', async (request, reply) => {
     const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
     if (!s) return reply.redirect('/teacher/klassen');
-    if (!userHatKlassenZugriff(request.user, s.klasse_id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
     getDb().prepare('DELETE FROM schueler WHERE id = ?').run(request.params.id);
     return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
@@ -1431,8 +1445,8 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/schueler/:id/abgang', async (request, reply) => {
     const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
     if (!s) return reply.redirect('/teacher/klassen');
-    if (!userHatKlassenZugriff(request.user, s.klasse_id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
     getDb().prepare("UPDATE schueler SET status = 'abgang', abgang_am = datetime('now') WHERE id = ?")
       .run(request.params.id);
@@ -1443,8 +1457,8 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/schueler/:id/reaktivieren', async (request, reply) => {
     const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
     if (!s) return reply.redirect('/teacher/klassen');
-    if (!userHatKlassenZugriff(request.user, s.klasse_id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
     getDb().prepare("UPDATE schueler SET status = 'aktiv', abgang_am = NULL WHERE id = ?").run(request.params.id);
     return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
@@ -1457,8 +1471,8 @@ export default async function teacherRoutes(fastify) {
   fastify.get('/schueler/:id/abgangszeugnis', async (request, reply) => {
     const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
     if (!s) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht gefunden.' });
-    if (!userHatKlassenZugriff(request.user, s.klasse_id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
     const daten = ladeAbgangszeugnisDaten(request.params.id);
     if (!daten) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht gefunden.' });
@@ -1534,7 +1548,13 @@ export default async function teacherRoutes(fastify) {
     const f = getDb().prepare('SELECT id, klasse_id, ist_kurs FROM faecher WHERE id = ?').get(request.params.id);
     if (!f) return reply.redirect('/teacher/klassen');
     if (!userDarfFachLoeschen(request.user, f)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+      return reply.code(403).viewEjs('error.ejs', {
+        code: 403,
+        message: !f.ist_kurs ? KLASSE_VERWALTEN_NUR
+          : userHatFachZgriff(request.user, f.id)
+            ? 'Diesem Kurs sind weitere Lehrkräfte zugeordnet — löschen würde auch deren Noten entfernen. Das kann nur der Admin.'
+            : 'Keine Berechtigung.',
+      });
     }
     getDb().prepare('DELETE FROM faecher WHERE id = ?').run(request.params.id);
     // Eine Kurs-Hülle (siehe /kurse/neu) gehört exakt einem Kurs -- mit ihm

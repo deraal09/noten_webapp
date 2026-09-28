@@ -197,8 +197,10 @@ test('Namenskollision bei einer freigegebenen Klasse: sofortiger Beitritt ohne Z
   const cZugriff = await lehrerC(`/teacher/klassen/${klasseId}`);
   assert.equal(cZugriff.status, 200);
 
-  // Ein zweiter Beitritt mit demselben Fachnamen dupliziert das Fach nicht,
-  // sondern hängt die anfragende Person an das bestehende Fach.
+  // Ein zweiter Beitritt mit demselben Fachnamen dupliziert das Fach nicht —
+  // hängt die anfragende Person aber auch NICHT an das bestehende Fach von
+  // Lehrer C (sonst voller Zugriff auf dessen Klausuren und Noten allein
+  // über den Fachnamen). Die Zuordnung bleibt Sache von Klassenleitung/Admin.
   await form(admin, '/admin/einladungen/neu', { display_name: 'Lehrer D', ttl_days: '14' });
   const invD = getDb().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
   const lehrerD = client();
@@ -208,11 +210,12 @@ test('Namenskollision bei einer freigegebenen Klasse: sofortiger Beitritt ohne Z
   getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrerd'").run();
   r = await form(lehrerD, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Sport' });
   assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}/verknuepfen`);
   const sportFaecher = getDb().prepare("SELECT * FROM faecher WHERE klasse_id = ? AND name = 'Sport'").all(klasseId);
   assert.equal(sportFaecher.length, 1, 'kein zweites, doppeltes "Sport"-Fach');
   const zuweisungD = getDb().prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
     .get(userId('lehrerd'), sportFach.id);
-  assert.ok(zuweisungD, 'Lehrer D wird demselben Fach zugewiesen statt ein zweites anzulegen');
+  assert.equal(zuweisungD, undefined, 'Lehrer D wird nicht dem Fach von Lehrer C zugewiesen');
 });
 
 test('Verknüpfung: leere/unverbundene Klasse gewährt direkten Zugriff ohne Zustimmung', async () => {
