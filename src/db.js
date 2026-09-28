@@ -676,13 +676,19 @@ function stelleBenutzernamenEindeutigSicher(db) {
 // als auch den Normalfall neu angelegter Fächer ab. Ein Fach, dessen
 // Teilnehmerliste bereits (und sei es nur teilweise) gepflegt wurde, bleibt
 // unangetastet -- diese Abfrage überschreibt nie eine bewusst angepasste
-// Liste, sie füllt nur eine komplett leere auf.
+// Liste, sie füllt nur eine komplett leere auf. Rein historische Fächer
+// (nur_historisch) werden bewusst ausgenommen -- sie brauchen keine
+// Teilnehmerliste (historische Noten hängen direkt an den aktuellen
+// Schüler/innen der Klasse, siehe fach-abschluss.js), und eine automatisch
+// aufgefüllte Liste hat sie bislang fälschlich wie ein aktuelles Fach in der
+// Halbjahresübersicht auftauchen lassen (siehe ladeFaecherFuerKlassenleitung
+// in noten-service.js).
 function fuelleFachTeilnehmerAuf(db) {
   db.exec(`
     INSERT INTO fach_teilnehmer (fach_id, schueler_id)
     SELECT f.id, s.id FROM faecher f
     JOIN schueler s ON s.klasse_id = f.klasse_id
-    WHERE NOT EXISTS (SELECT 1 FROM fach_teilnehmer ft WHERE ft.fach_id = f.id)
+    WHERE f.nur_historisch = 0 AND NOT EXISTS (SELECT 1 FROM fach_teilnehmer ft WHERE ft.fach_id = f.id)
   `);
 }
 
@@ -740,6 +746,16 @@ function migrate(db) {
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'historische_halbjahre', 'erstellt_als_fachlehrkraft', 'erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'faecher', 'nur_historisch', 'nur_historisch INTEGER NOT NULL DEFAULT 0');
+  // Einmalige Bereinigung: auf Bestandsdatenbanken kann ein rein historisches
+  // Fach schon VOR obigem nur_historisch-Fix von fuelleFachTeilnehmerAuf
+  // fälschlich mit einer Teilnehmerliste versehen worden sein, wodurch es
+  // wie ein aktuelles Fach in der Halbjahresübersicht auftauchte (siehe
+  // ladeFaecherFuerKlassenleitung in noten-service.js). Entfernen ist
+  // gefahrlos -- historische Noten hängen nicht an fach_teilnehmer.
+  db.exec(`
+    DELETE FROM fach_teilnehmer
+    WHERE fach_id IN (SELECT id FROM faecher WHERE nur_historisch = 1)
+  `);
   migriereSitzplanRaeume(db);
   fuelleFachTeilnehmerAuf(db);
 }

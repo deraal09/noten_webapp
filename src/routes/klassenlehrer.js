@@ -14,10 +14,10 @@ import { ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
   ladeAbschlussuebersicht, ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu,
   ladeHistorischeHalbjahre, ladeHistorischeNoten, userDarfHistorischeNotenBearbeiten,
-  importiereHistorischeNoten,
+  importiereHistorischeNoten, ladeHistorischeHalbjahresuebersicht,
 } from '../fach-abschluss.js';
 import { ladeFachMitUmfeld } from '../noten-service.js';
-import { parseSchuljahr } from '../schuljahr-utils.js';
+import { parseSchuljahr, sortiereSchuljahreAbsteigend } from '../schuljahr-utils.js';
 import { parseNotenTabelle } from '../csv-import.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
@@ -166,6 +166,29 @@ export default async function klassenlehrerRoutes(fastify) {
     // ---- Tab 2: Halbjahresübersicht (inkl. "Vergangene Schuljahre") ----
     const halbjahresuebersicht = ladeHalbjahresuebersicht(klasse, halbjahr);
     const vergangeneSchuljahre = ladeVergangeneSchuljahre(klasse.id);
+    // Schuljahr-Auswahl: Standard ist "aktuelles Schuljahr" (leer) -- die
+    // Halbjahresübersicht zeigt dann wie bisher den Live-Sync-Stand. Erst
+    // bei explizit ausgewähltem vergangenen Schuljahr wird stattdessen
+    // dessen historischer Stand geladen (siehe ladeHistorischeHalbjahresuebersicht) --
+    // sonst würden rein historische Fächer sonst im laufenden Schuljahr
+    // auftauchen (siehe ladeFaecherFuerKlassenleitung in noten-service.js).
+    const verfuegbareSchuljahre = sortiereSchuljahreAbsteigend(
+      vergangeneSchuljahre.map((sj) => ({ bezeichnung: sj.schuljahr }))
+    ).map((s) => s.bezeichnung);
+    const gewaehltesSchuljahr = verfuegbareSchuljahre.includes(request.query?.schuljahr) ? request.query.schuljahr : '';
+    const historischeHalbjahresuebersicht = gewaehltesSchuljahr
+      ? ladeHistorischeHalbjahresuebersicht(klasse.id, gewaehltesSchuljahr, halbjahr)
+      : null;
+
+    // Fächer ohne zugewiesene Lehrkraft -- die Klassenleitung darf sie
+    // aufräumen (siehe POST /fach/:id/loeschen), z. B. versehentlich oder
+    // mit falschem Namen angelegte rein historische Fächer.
+    const faecherOhneLehrkraft = getDb().prepare(`
+      SELECT f.id, f.name, f.nur_historisch
+      FROM faecher f
+      WHERE f.klasse_id = ? AND NOT EXISTS (SELECT 1 FROM fach_zuweisungen fz WHERE fz.fach_id = f.id)
+      ORDER BY f.name
+    `).all(klasse.id);
 
     // ---- Tab 4: Abschluss-/Abgangsübersicht ----
     const abschlussuebersicht = ladeAbschlussuebersicht(klasse.id);
@@ -189,6 +212,7 @@ export default async function klassenlehrerRoutes(fastify) {
       user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
       halbjahresuebersicht, abschlussuebersicht, klassenleitungListe, zuweisbareLehrkraefte,
       offeneEntsperrAnfragen, vergangeneSchuljahre,
+      verfuegbareSchuljahre, gewaehltesSchuljahr, historischeHalbjahresuebersicht, faecherOhneLehrkraft,
     });
   });
 
@@ -447,6 +471,32 @@ export default async function klassenlehrerRoutes(fastify) {
     }
     getDb().prepare('DELETE FROM fach_zuweisungen WHERE id = ?').run(z.id);
     return reply.redirect(`/klassenlehrer/fach/${z.fach_id}/historie`);
+  });
+
+  // ---------- Fach ohne Lehrkraft löschen (Aufräumen, z. B. versehentlich ----------
+  // angelegte oder nicht mehr benötigte rein historische Fächer). Bewusst
+  // enger gefasst als die allgemeine Fach-Löschung in routes/teacher.js
+  // (userDarfFachLoeschen): hier darf die Klassenleitung NUR löschen, wenn
+  // wirklich niemand dem Fach zugewiesen ist -- sonst könnte sie versehentlich
+  // die laufende Arbeit einer Fachlehrkraft entfernen.
+  fastify.post('/fach/:id/loeschen', async (request, reply) => {
+    const fach = getDb().prepare('SELECT id, klasse_id, name, ist_kurs FROM faecher WHERE id = ?').get(request.params.id);
+    if (!fach) return reply.redirect('/klassenlehrer');
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Fächer löschen.' });
+    }
+    const zielRedirect = `/klassenlehrer/klasse/${fach.klasse_id}?tab=halbjahr`;
+    const anzahlZuweisungen = getDb().prepare('SELECT COUNT(*) AS c FROM fach_zuweisungen WHERE fach_id = ?').get(fach.id).c;
+    if (anzahlZuweisungen > 0) {
+      request.flash?.('error', `„${fach.name}" ist noch einer Lehrkraft zugewiesen -- bitte zuerst die Zuweisung entfernen.`);
+      return reply.redirect(zielRedirect);
+    }
+    getDb().prepare('DELETE FROM faecher WHERE id = ?').run(fach.id);
+    // Eine Kurs-Hülle (siehe /teacher/kurse/neu) gehört exakt einem Kurs --
+    // mit ihm verschwindet auch sie, statt als leere Karteileiche liegen zu bleiben.
+    getDb().prepare('DELETE FROM klassen WHERE id = ? AND ist_kurs_huelle = 1').run(fach.klasse_id);
+    request.flash?.('success', `„${fach.name}" wurde gelöscht.`);
+    return reply.redirect(zielRedirect);
   });
 
   // ---------- Freie Notizen je Schüler/in (unabhängig von Noten/Fehlzeiten) ----------

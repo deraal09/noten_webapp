@@ -6,7 +6,7 @@
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
-    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=<%= aktiverTab %>"><%= h %></a>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=<%= aktiverTab %><% if (gewaehltesSchuljahr) { %>&schuljahr=<%= encodeURIComponent(gewaehltesSchuljahr) %><% } %>"><%= h %></a>
   <% }); %>
 </div>
 
@@ -29,6 +29,17 @@
 
 <div id="panel-halbjahr" class="reiter-panel <%= aktiverTab === 'halbjahr' ? 'active' : '' %>">
   <h2>Halbjahresübersicht</h2>
+
+  <% if (verfuegbareSchuljahre.length) { %>
+    <div class="hj-tabs">
+      <a class="hj-tab <%= !gewaehltesSchuljahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(halbjahr) %>&tab=halbjahr">Aktuelles Schuljahr</a>
+      <% verfuegbareSchuljahre.forEach(function(sj) { %>
+        <a class="hj-tab <%= sj === gewaehltesSchuljahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(halbjahr) %>&tab=halbjahr&schuljahr=<%= encodeURIComponent(sj) %>"><%= sj %></a>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <% if (!gewaehltesSchuljahr) { %>
   <p class="kopf-aktionen">
     <% if (halbjahresuebersicht.zeilen.length) { %>
       <a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= halbjahresuebersicht.zeilen[0].schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">🎓 Konferenzmodus starten</a>
@@ -111,6 +122,64 @@
       </tbody>
     </table>
   <% } %>
+  <% } else { %>
+    <p class="hint">
+      Historischer Stand für <strong><%= halbjahr %> <%= gewaehltesSchuljahr %></strong> -- rein lesend,
+      kein Sync/Sperren/Notizen/Konferenzmodus für vergangene Halbjahre. Noten trägst du je Fach auf
+      dessen Seite im Reiter „Historische Halbjahre" bzw. über
+      „<a href="#vergangene-schuljahre">Vergangene Schuljahre</a>" unten ein.
+    </p>
+    <% if (!historischeHalbjahresuebersicht.faecher.length) { %>
+      <p>Für <%= gewaehltesSchuljahr %> sind noch keine Fächer/Noten hinterlegt.</p>
+    <% } else { %>
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Schüler/in</th>
+            <% historischeHalbjahresuebersicht.faecher.forEach(function(f) { %>
+              <th><%= f.name %></th>
+            <% }); %>
+            <th>Ø Notenschnitt</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% historischeHalbjahresuebersicht.zeilen.forEach(function(z) { %>
+            <tr>
+              <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
+              <% z.noten.forEach(function(n) { %>
+                <td><%= n.note === null ? '–' : formatNote(n.note) %></td>
+              <% }); %>
+              <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  <% } %>
+
+  <div class="card" id="fuer-loeschung">
+    <h3>Fächer ohne Lehrkraft</h3>
+    <p class="hint">
+      Fächer, denen aktuell niemand zugewiesen ist -- z. B. versehentlich oder mit falschem Namen
+      angelegte rein historische Fächer. Nur hier auflistbar und löschbar, solange keine Lehrkraft
+      zugeordnet ist.
+    </p>
+    <% if (!faecherOhneLehrkraft.length) { %>
+      <p class="hint">Keine Fächer ohne Lehrkraft.</p>
+    <% } else { %>
+      <ul>
+        <% faecherOhneLehrkraft.forEach(function(f) { %>
+          <li>
+            <%= f.name %><% if (f.nur_historisch) { %> <small class="hint">(rein historisch)</small><% } %>
+            <form method="post" action="/klassenlehrer/fach/<%= f.id %>/loeschen" class="inline"
+                  onsubmit="return confirm(<%- jsonFuerSkript(f.name + ' endgültig löschen? Alle zugehörigen Noten gehen dabei verloren.') %>)">
+              <button type="submit" class="danger">🗑 Löschen</button>
+            </form>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </div>
 
   <div class="card" id="vergangene-schuljahre">
     <h3>Vergangene Schuljahre</h3>

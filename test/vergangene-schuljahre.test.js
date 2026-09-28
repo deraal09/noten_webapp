@@ -30,7 +30,11 @@ delete process.env.LDAP_URL;
 
 const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
-const { ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu } = await import('../src/fach-abschluss.js');
+const {
+  ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu, ladeHistorischeHalbjahresuebersicht,
+} = await import('../src/fach-abschluss.js');
+const { ladeHalbjahresuebersicht } = await import('../src/noten-sync.js');
+const { HALBJAHRE } = await import('../src/grade-calc.js');
 
 const fastify = await buildApp({ logger: false });
 const base = await fastify.listen({ port: 0, host: '127.0.0.1' });
@@ -411,6 +415,71 @@ test('Klassenleitung entfernt die Zuweisung wieder -- Zugriff entfällt', async 
 
   const r2 = await lehrerUnbeteiligt(`/teacher/fach/${lf5.id}`);
   assert.equal(r2.status, 403);
+});
+
+test('ladeHalbjahresuebersicht (aktuelles Schuljahr) enthält KEINE rein historischen Fächer', () => {
+  const klasse = getDb().prepare(`
+    SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+    FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.id = ?
+  `).get(klasseId);
+  const { faecher } = ladeHalbjahresuebersicht(klasse, HALBJAHRE[0]);
+  const namen = faecher.map((f) => f.name);
+  assert.ok(namen.includes('Deutsch'));
+  assert.ok(namen.includes('Mathematik'));
+  for (const historisch of ['LF5 Fachpraxis Pflege', 'Religion', 'Sozialkunde', 'Sport']) {
+    assert.ok(!namen.includes(historisch), `"${historisch}" sollte nicht in der laufenden Halbjahresübersicht auftauchen`);
+  }
+});
+
+test('ladeHistorischeHalbjahresuebersicht liefert für ein vergangenes Schuljahr genau dessen Fächer/Noten', () => {
+  const { faecher, zeilen } = ladeHistorischeHalbjahresuebersicht(klasseId, '2021/22', '1. Halbjahr');
+  assert.deepEqual(faecher.map((f) => f.name).sort(), ['LF5 Fachpraxis Pflege', 'Religion']);
+  const anna = zeilen.find((z) => z.schueler.vorname === 'Anna');
+  const lf5Idx = faecher.findIndex((f) => f.name === 'LF5 Fachpraxis Pflege');
+  assert.equal(anna.noten[lf5Idx].note, 4); // zuletzt von der zugewiesenen Lehrkraft auf 4 gesetzt
+});
+
+test('Klassenleitungsübersicht (Halbjahresübersicht): Schuljahr-Auswahl zeigt aktuelle vs. historische Fächer/Noten', async () => {
+  const rAktuell = await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr`);
+  const htmlAktuell = await rAktuell.text();
+  assert.ok(htmlAktuell.includes('2021/22')); // Schuljahr-Auswahl selbst sichtbar
+  assert.ok(htmlAktuell.includes('Deutsch'));
+  // Als reguläre Fach-Spalte der laufenden Übersicht taucht LF5 nicht auf --
+  // wohl aber weiter unten in "Fächer ohne Lehrkraft" (separat getestet).
+
+  const rHistorisch = await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr&schuljahr=` + encodeURIComponent('2021/22'));
+  const htmlHistorisch = await rHistorisch.text();
+  assert.ok(htmlHistorisch.includes('LF5 Fachpraxis Pflege'));
+  assert.ok(htmlHistorisch.includes('Religion'));
+});
+
+test('Klassenleitungsübersicht listet Fächer ohne Lehrkraft -- Mathematik (zugewiesen) fehlt', async () => {
+  const html = await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr`)).text();
+  assert.ok(html.includes('Fächer ohne Lehrkraft'));
+  assert.ok(html.includes('LF5 Fachpraxis Pflege'));
+  assert.ok(html.includes('Deutsch'));
+});
+
+test('POST /klassenlehrer/fach/:id/loeschen: nur die Klassenleitung darf, und nur ohne zugewiesene Lehrkraft', async () => {
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+  const lf5Id = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId).id;
+
+  // Fremde Lehrkraft (keine Klassenleitung) darf nicht.
+  let r = await form(lehrerFremd, `/klassenlehrer/fach/${lf5Id}/loeschen`, {});
+  assert.equal(r.status, 403);
+  assert.ok(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(lf5Id));
+
+  // Mathematik ist noch zugewiesen (lehrerfremd) -- auch die Klassenleitung darf hier nicht löschen.
+  r = await form(lehrerA, `/klassenlehrer/fach/${mathId}/loeschen`, {});
+  assert.equal(r.status, 302);
+  assert.ok(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(mathId)); // weiterhin vorhanden
+
+  // LF5 ist unzugewiesen -- die Klassenleitung darf es löschen.
+  r = await form(lehrerA, `/klassenlehrer/fach/${lf5Id}/loeschen`, {});
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(lf5Id), undefined);
+  // Zugehörige historische Noten/Halbjahre verschwinden per ON DELETE CASCADE mit.
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(lf5Id).c, 0);
 });
 
 test.after(async () => {

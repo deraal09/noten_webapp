@@ -6,6 +6,23 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.37.0 - 2026-09-28
+
+- Fix: rein historische Fächer (z. B. für ein vergangenes Schuljahr mit
+  anderem Fächerkanon angelegt) konnten in der Halbjahresübersicht der
+  Klassenleitung fälschlich als aktuelles Fach ohne Teilnehmer/innen
+  auftauchen, u. a. nach einem Server-Neustart. Behoben an der Quelle
+  (`ladeFaecherFuerKlassenleitung`, `fuelleFachTeilnehmerAuf`) plus
+  einmalige Bereinigung bereits betroffener Bestandsdaten.
+- Klassenleitungsübersicht: Fächer ohne zugewiesene Lehrkraft können jetzt
+  von der Klassenleitung gelöscht werden (Aufräumen versehentlich oder
+  falsch angelegter Fächer) -- gesperrt, solange noch eine Lehrkraft
+  zugewiesen ist.
+- Klassenleitungsübersicht: neue Schuljahr-Auswahl in der
+  Halbjahresübersicht (Standard: aktuelles Schuljahr); bei Auswahl eines
+  vergangenen Schuljahres werden dessen historische Fächer/Noten
+  angezeigt statt des laufenden Sync-Standes.
+
 ## 0.36.0 - 2026-09-28
 
 - Klassenleitung: Lehrkräfte können den Fächern vergangener Halbjahre

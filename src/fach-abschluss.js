@@ -388,3 +388,50 @@ export function importiereHistorischeNoten(klasseId, schuljahrBezeichnung, halbj
     ungueltigeWerte,
   };
 }
+
+/**
+ * Historische Entsprechung von ladeHalbjahresuebersicht (noten-sync.js) für
+ * die Schuljahr-Auswahl in der Klassenleitungsübersicht: statt des
+ * synchronisierten Live-Standes zeigt sie die historischen Noten (siehe
+ * historische_halbjahre/-noten) für EIN konkretes vergangenes Halbjahr
+ * ("1./2. Halbjahr <Schuljahr>") -- über alle Fächer, die für dieses
+ * Halbjahr historische Daten haben (aktuelle wie rein historische, siehe
+ * faecher.nur_historisch). Rein lesend: Sync-Stand, Sperren, Notizen und
+ * Konferenzmodus gibt es für historische Halbjahre nicht, die Bearbeitung
+ * läuft weiterhin über die jeweilige Fach-Seite (Reiter "Historische
+ * Halbjahre" bzw. /klassenlehrer/fach/:id/historie).
+ */
+export function ladeHistorischeHalbjahresuebersicht(klasseId, schuljahrBezeichnung, halbjahrLabel) {
+  const db = getDb();
+  const bezeichnung = `${halbjahrLabel} ${schuljahrBezeichnung}`;
+  const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasseId);
+  const halbjahre = db.prepare(`
+    SELECT hh.id AS hh_id, f.id AS fach_id, f.name AS fach_name
+    FROM historische_halbjahre hh
+    JOIN faecher f ON f.id = hh.fach_id
+    WHERE f.klasse_id = ? AND hh.bezeichnung = ?
+    ORDER BY f.name
+  `).all(klasseId, bezeichnung);
+  const faecher = halbjahre.map((h) => ({ id: h.fach_id, name: h.fach_name }));
+
+  const notenByHh = new Map();
+  if (halbjahre.length) {
+    const rows = db.prepare(`
+      SELECT historisches_halbjahr_id, schueler_id, note FROM historische_noten
+      WHERE historisches_halbjahr_id IN (${halbjahre.map(() => '?').join(',')})
+    `).all(...halbjahre.map((h) => h.hh_id));
+    for (const r of rows) {
+      if (!notenByHh.has(r.historisches_halbjahr_id)) notenByHh.set(r.historisches_halbjahr_id, new Map());
+      notenByHh.get(r.historisches_halbjahr_id).set(r.schueler_id, r.note);
+    }
+  }
+
+  const zeilen = schueler.map((s) => {
+    const noten = halbjahre.map((h) => ({ note: notenByHh.get(h.hh_id)?.get(s.id) ?? null }));
+    const vorhanden = noten.map((n) => n.note).filter((n) => n !== null && n !== undefined);
+    const schnitt = vorhanden.length ? vorhanden.reduce((a, b) => a + b, 0) / vorhanden.length : null;
+    return { schueler: s, noten, schnitt };
+  });
+
+  return { faecher, zeilen };
+}

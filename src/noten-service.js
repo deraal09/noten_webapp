@@ -61,14 +61,20 @@ export function ladeFachMitUmfeld(id) {
  * Deckt neben den Fächern der eigenen Klasse auch klassenübergreifende
  * Kurse ab, an denen eigene Schüler/innen als Teilnehmer/innen eingetragen
  * sind (siehe fach_teilnehmer), auch wenn deren Heimat-Klasse eine andere
- * ist.
+ * ist. Rein historische Fächer (faecher.nur_historisch, siehe
+ * fuegeVergangenesSchuljahrHinzu/importiereHistorischeNoten in
+ * fach-abschluss.js) bleiben bewusst außen vor -- sie gehören zu einem
+ * vergangenen Schuljahr und würden sonst (z. B. nachdem ein
+ * Datenbank-Neustart fach_teilnehmer für sie nachträglich aufgefüllt hat,
+ * siehe fuelleFachTeilnehmerAuf in src/db.js) fälschlich als aktuelles Fach
+ * in der laufenden Halbjahresübersicht auftauchen.
  */
 export function ladeFaecherFuerKlassenleitung(klasseId) {
   return getDb().prepare(`
     SELECT DISTINCT f.* FROM faecher f
     JOIN fach_teilnehmer ft ON ft.fach_id = f.id
     JOIN schueler s ON s.id = ft.schueler_id
-    WHERE s.klasse_id = ?
+    WHERE s.klasse_id = ? AND f.nur_historisch = 0
     ORDER BY f.name
   `).all(klasseId);
 }
