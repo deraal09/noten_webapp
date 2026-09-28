@@ -111,21 +111,23 @@ test('Vorbereitung: Klasse, Fach, zwei Schüler/innen, Klausur mit Noten in beid
   }
 });
 
-test('Historische Halbjahre: nur Klassenleitung darf anlegen, zugewiesene Lehrkraft darf Noten pflegen', async () => {
-  // Lehrer C ist noch niemandem zugewiesen -> kein Zugriff.
+test('Historische Halbjahre: zugewiesene Lehrkraft darf eigenes Halbjahr selbst anlegen, ohne Zuweisung/Klassenleitung kein Zugriff', async () => {
+  // Lehrer C ist noch niemandem zugewiesen und keine Klassenleitung -> kein Zugriff.
   let r = await form(lehrerC, `/teacher/fach/${fachId}/historie/neu`, { bezeichnung: '1. Halbjahr 2024/25' });
   assert.equal(r.status, 403);
 
-  // Lehrer A ist nicht als Klassenleitung eingetragen (nur Ersteller) -> darf ebenfalls nicht.
-  r = await form(lehrerA, `/teacher/fach/${fachId}/historie/neu`, { bezeichnung: '1. Halbjahr 2024/25' });
-  assert.equal(r.status, 403);
-
-  await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
+  // Lehrer A ist dem Fach als Ersteller/in bereits zugewiesen -> darf für ihr
+  // eigenes Fach ein historisches Halbjahr selbst anlegen, auch ohne
+  // Klassenleitung zu sein (siehe userDarfHistorischeNotenBearbeiten).
   r = await form(lehrerA, `/teacher/fach/${fachId}/historie/neu`, { bezeichnung: '1. Halbjahr 2024/25' });
   assert.equal(r.status, 302);
   const hh = getDb().prepare('SELECT * FROM historische_halbjahre WHERE fach_id = ?').get(fachId);
   assert.ok(hh);
   assert.equal(hh.bezeichnung, '1. Halbjahr 2024/25');
+  assert.equal(hh.erstellt_als_fachlehrkraft, 1);
+
+  // Für die Zuweisung weiterer Lehrkräfte (unten) muss Lehrer A Klassenleitung sein.
+  await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
 
   // Lehrer C ist immer noch nicht zugewiesen -> darf keine Noten eintragen.
   r = await lehrerC(`/teacher/historie/${hh.id}/speichern`, {

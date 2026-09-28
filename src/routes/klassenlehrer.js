@@ -11,7 +11,11 @@ import { getDb } from '../db.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
 import { HALBJAHRE, FEHLZEIT_TYPEN } from '../grade-calc.js';
 import { ladeHalbjahresuebersicht } from '../noten-sync.js';
-import { ladeAbschlussuebersicht, ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu } from '../fach-abschluss.js';
+import {
+  ladeAbschlussuebersicht, ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu,
+  ladeHistorischeHalbjahre, ladeHistorischeNoten, userDarfHistorischeNotenBearbeiten,
+} from '../fach-abschluss.js';
+import { ladeFachMitUmfeld } from '../noten-service.js';
 import { parseSchuljahr } from '../schuljahr-utils.js';
 
 export default async function klassenlehrerRoutes(fastify) {
@@ -173,14 +177,43 @@ export default async function klassenlehrerRoutes(fastify) {
     const ergebnis = fuegeVergangenesSchuljahrHinzu(klasse.id, bezeichnung, request.user.id);
     if (!ergebnis.ok) {
       const meldungen = {
-        'bereits-vorhanden': `„${bezeichnung}" wurde für diese Klasse bereits hinzugefügt.`,
+        'bereits-vorhanden': `„${bezeichnung}" wurde für diese Klasse bereits für alle Fächer hinzugefügt.`,
         'keine-faecher': 'Diese Klasse hat noch keine Fächer.',
       };
       request.flash?.('error', meldungen[ergebnis.fehler] || 'Anlegen fehlgeschlagen.');
       return reply.redirect(zielRedirect);
     }
-    request.flash?.('success', `Schuljahr „${bezeichnung}" hinzugefügt -- Noten je Fach im Reiter „Historische Halbjahre" eintragen.`);
+    // Fächer, die eine Fachlehrkraft (oder eine frühere Anlage) schon
+    // hatten, werden übersprungen -- kurz erwähnen, damit nicht der
+    // Eindruck entsteht, dort sei versehentlich nichts passiert.
+    let meldung = `Schuljahr „${bezeichnung}" für ${ergebnis.angelegtFuer.join(', ')} hinzugefügt -- Noten je Fach im Reiter „Historische Halbjahre" eintragen.`;
+    if (ergebnis.uebersprungenFuer.length) {
+      meldung += ` Bereits vorhanden (übersprungen): ${ergebnis.uebersprungenFuer.join(', ')}.`;
+    }
+    request.flash?.('success', meldung);
     return reply.redirect(zielRedirect);
+  });
+
+  // ---------- Historische Halbjahre eines Fachs (für Klassenleitung ohne eigene Fach-Zuweisung) ----------
+  // Die normale Fach-Seite (GET /teacher/fach/:id) bleibt bewusst der
+  // zugewiesenen Lehrkraft vorbehalten (Live-Notentafel, siehe dort) --
+  // diese eigens dafür vorgesehene, schmale Seite gibt der Klassenleitung
+  // trotzdem Zugriff auf die "Vergangenes Schuljahr hinzufügen"-Funktion je
+  // Fach, ohne die laufende Notentafel offenzulegen.
+  fastify.get('/fach/:id/historie', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung hat hier Zugriff.' });
+    }
+    const schueler = getDb().prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(fach.klasse_id);
+    const historischeHalbjahre = ladeHistorischeHalbjahre(fach.id).map((hh) => ({
+      ...hh, noten: ladeHistorischeNoten(hh.id),
+      darfBearbeiten: userDarfHistorischeNotenBearbeiten(request.user, fach, hh),
+    }));
+    return reply.viewEjs('klassenlehrer/fach_historie.ejs', {
+      user: request.user, fach, schueler, historischeHalbjahre,
+    });
   });
 
   // ---------- Freie Notizen je Schüler/in (unabhängig von Noten/Fehlzeiten) ----------

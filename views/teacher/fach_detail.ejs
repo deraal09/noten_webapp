@@ -153,30 +153,46 @@
   <% } %>
   <% historischeHalbjahre.forEach(function(hh) { %>
     <details class="card" open>
-      <summary><%= hh.bezeichnung %></summary>
-      <% if (darfHistorieAnlegen) { %>
+      <summary><%= hh.bezeichnung %>
+      <% if (!hh.darfBearbeiten) { %> <small class="hint" title="Von der Fachlehrkraft angelegt -- nur sie kann die Noten eintragen">🔒 nur Ansicht</small><% } %>
+      </summary>
+      <% if (darfHistorieLoeschen) { %>
         <form method="post" action="/teacher/historie/<%= hh.id %>/loeschen" class="inline right" onsubmit="return confirm('Historisches Halbjahr entfernen?')">
           <button type="submit" class="danger">🗑</button>
         </form>
       <% } %>
-      <form method="post" action="/teacher/historie/<%= hh.id %>/speichern">
+      <% if (hh.darfBearbeiten) { %>
+        <form method="post" action="/teacher/historie/<%= hh.id %>/speichern">
+          <table class="data">
+            <thead><tr><th>Schüler/in</th><th>Note</th></tr></thead>
+            <tbody>
+              <% schueler.forEach(function(s) { %>
+                <tr>
+                  <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
+                  <td>
+                    <input type="number" name="note_<%= s.id %>" class="note-historisch" step="0.1"
+                           min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>"
+                           value="<%= hh.noten.get(s.id) === undefined ? '' : hh.noten.get(s.id) %>">
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+          <button type="submit">💾 Speichern</button>
+        </form>
+      <% } else { %>
         <table class="data">
           <thead><tr><th>Schüler/in</th><th>Note</th></tr></thead>
           <tbody>
             <% schueler.forEach(function(s) { %>
               <tr>
                 <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
-                <td>
-                  <input type="number" name="note_<%= s.id %>" class="note-historisch" step="0.1"
-                         min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>"
-                         value="<%= hh.noten.get(s.id) === undefined ? '' : hh.noten.get(s.id) %>">
-                </td>
+                <td><%= hh.noten.get(s.id) === undefined ? '–' : hh.noten.get(s.id) %></td>
               </tr>
             <% }); %>
           </tbody>
         </table>
-        <button type="submit">💾 Speichern</button>
-      </form>
+      <% } %>
     </details>
   <% }); %>
   <% if (darfHistorieAnlegen) { %>

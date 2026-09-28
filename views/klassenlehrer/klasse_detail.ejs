@@ -116,12 +116,13 @@
     <h3>Vergangene Schuljahre</h3>
     <p class="hint">
       Für ein noch nicht erfasstes vergangenes Schuljahr (z. B. weil die Klasse erst später in diese
-      App aufgenommen wurde) lässt sich hier auf einen Schlag für <strong>alle Fächer</strong> dieser
-      Klasse ein historisches Halbjahrespaar anlegen ("1./2. Halbjahr &lt;Schuljahr&gt;"). Die
+      App aufgenommen wurde) lässt sich hier auf einen Schlag für die <strong>noch fehlenden Fächer</strong>
+      dieser Klasse ein historisches Halbjahrespaar anlegen ("1./2. Halbjahr &lt;Schuljahr&gt;"). Die
       eigentlichen Noten trägst du danach je Fach auf dessen Seite im Reiter „Historische Halbjahre"
-      ein -- dort darfst du das als Klassenleitung schon immer, für jedes Fach. Ein bereits
-      hinzugefügtes Schuljahr lässt sich hier nicht erneut anlegen; für aktuelle Halbjahre gilt weiter
-      die normale Notentafel der Fachlehrkräfte.
+      ein. Hat eine Fachlehrkraft das für ihr Fach schon selbst angelegt, gehört es ihr -- du siehst
+      die Noten dann nur noch an, statt sie zu überschreiben; nur bei den Fächern, die du selbst (oder
+      eine andere Klassenleitung) klassenweit hinzugefügt hast, kannst du sie weiter bearbeiten. Für
+      aktuelle Halbjahre gilt weiter die normale Notentafel der Fachlehrkräfte.
     </p>
     <% if (vergangeneSchuljahre.length) { %>
       <ul>
@@ -129,7 +130,8 @@
           <li>
             <strong><%= sj.schuljahr %></strong> -- bereits vorhanden:
             <% sj.faecher.forEach(function(f, i) { %>
-              <% if (i > 0) { %>, <% } %><a href="/teacher/fach/<%= f.id %>?tab=historie"><%= f.name %></a>
+              <% if (i > 0) { %>, <% } %><a href="/klassenlehrer/fach/<%= f.id %>/historie"><%= f.name %></a><%
+                 if (f.erstelltAlsFachlehrkraft) { %> <small class="hint" title="Von der Fachlehrkraft selbst angelegt -- nur sie kann die Noten eintragen">🔒</small><% } %>
             <% }); %>
           </li>
         <% }); %>

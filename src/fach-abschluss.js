@@ -10,12 +10,28 @@
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
 import { HALBJAHRE, gesamtnoteJahr } from './grade-calc.js';
+import { userHatFachZgriff, userIstKlassenlehrer } from './auth.js';
 
 /** Historische Halbjahre eines Fachs, älteste zuerst. */
 export function ladeHistorischeHalbjahre(fachId) {
   return getDb().prepare(
     'SELECT * FROM historische_halbjahre WHERE fach_id = ? ORDER BY reihenfolge, id'
   ).all(fachId);
+}
+
+/**
+ * Darf diese Person die Noten EINES BESTIMMTEN historischen Halbjahres
+ * eintragen? Eine dem Fach zugewiesene Lehrkraft darf das immer. Die
+ * Klassenleitung nur, wenn sie dieses Halbjahr klassenweit angelegt hat
+ * ("Vergangenes Schuljahr hinzufügen", erstellt_als_fachlehrkraft = 0) --
+ * hat stattdessen eine Fachlehrkraft es für ihr eigenes Fach selbst
+ * angelegt, sieht die Klassenleitung es nur noch an, ändert aber nichts
+ * mehr daran (siehe historische_halbjahre in src/db.js).
+ */
+export function userDarfHistorischeNotenBearbeiten(user, fach, historischesHalbjahr) {
+  if (userHatFachZgriff(user, fach.id)) return true;
+  if (!userIstKlassenlehrer(user, fach.klasse_id)) return false;
+  return !historischesHalbjahr.erstellt_als_fachlehrkraft;
 }
 
 /** Historische Noten eines historischen Halbjahrs als Map<schueler_id, note>. */
@@ -41,11 +57,16 @@ function halbjahrBezeichnungen(schuljahrBezeichnung) {
  * Klassenleitungsübersicht (siehe fuegeVergangenesSchuljahrHinzu). Neueste
  * zuerst. Bezeichnungen, die nicht dem "1./2. Halbjahr <Schuljahr>"-Schema
  * folgen (z. B. manuell frei eingetragene Altdaten von vor dieser
- * Funktion), werden unverändert als eigener Eintrag geführt.
+ * Funktion), werden unverändert als eigener Eintrag geführt. Je Fach zeigt
+ * `erstelltAlsFachlehrkraft`, ob eine Fachlehrkraft es selbst angelegt hat
+ * (die Klassenleitung sieht die Noten dann nur noch an, siehe
+ * userDarfHistorischeNotenBearbeiten) -- oder ob es aus der klassenweiten
+ * "Vergangenes Schuljahr hinzufügen"-Aktion stammt (dann bleibt es für die
+ * Klassenleitung eintragbar).
  */
 export function ladeVergangeneSchuljahre(klasseId) {
   const rows = getDb().prepare(`
-    SELECT hh.bezeichnung, f.id AS fach_id, f.name AS fach_name
+    SELECT hh.bezeichnung, hh.erstellt_als_fachlehrkraft, f.id AS fach_id, f.name AS fach_name
     FROM historische_halbjahre hh
     JOIN faecher f ON f.id = hh.fach_id
     WHERE f.klasse_id = ?
@@ -57,46 +78,58 @@ export function ladeVergangeneSchuljahre(klasseId) {
     const treffer = /^[12]\. Halbjahr (.+)$/.exec(r.bezeichnung);
     const schuljahr = treffer ? treffer[1] : r.bezeichnung;
     if (!proSchuljahr.has(schuljahr)) proSchuljahr.set(schuljahr, new Map());
-    proSchuljahr.get(schuljahr).set(r.fach_id, r.fach_name); // Map dedupliziert über beide Halbjahre hinweg
+    const faecherMap = proSchuljahr.get(schuljahr);
+    // Ein Fach kann über beide Halbjahre hinweg vorkommen -- sobald EINES
+    // davon von einer Fachlehrkraft stammt, gilt das ganze Fach als von ihr
+    // verantwortet (beide Halbjahre werden ohnehin gemeinsam angelegt).
+    const bisher = faecherMap.get(r.fach_id);
+    faecherMap.set(r.fach_id, {
+      name: r.fach_name,
+      erstelltAlsFachlehrkraft: Boolean(bisher?.erstelltAlsFachlehrkraft) || Boolean(r.erstellt_als_fachlehrkraft),
+    });
   }
   return Array.from(proSchuljahr.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([schuljahr, faecherMap]) => ({
       schuljahr,
-      faecher: Array.from(faecherMap.entries()).map(([id, name]) => ({ id, name })),
+      faecher: Array.from(faecherMap.entries()).map(([id, info]) => ({ id, ...info })),
     }));
 }
 
 /**
- * Fügt für ALLE Fächer einer Klasse ein vergangenes Schuljahr auf einen
- * Schlag hinzu -- je Fach zwei historische Halbjahre ("1./2. Halbjahr
- * <Bezeichnung>"), bereit für die Noteneingabe auf der jeweiligen
- * Fach-Seite (Reiter "Historische Halbjahre"). Lehnt ab, wenn für diese
- * Klasse (bei irgendeinem ihrer Fächer) schon ein historisches Halbjahr mit
- * dieser Bezeichnung existiert, statt Duplikate oder eine inkonsistente
- * Teilabdeckung zu erzeugen.
- * @returns {{ok: true} | {ok: false, fehler: 'bereits-vorhanden'|'keine-faecher'}}
+ * Fügt für die Fächer einer Klasse ein vergangenes Schuljahr hinzu -- je
+ * Fach zwei historische Halbjahre ("1./2. Halbjahr <Bezeichnung>"), bereit
+ * für die Noteneingabe auf der jeweiligen Fach-Seite (Reiter "Historische
+ * Halbjahre"). Fächer, die dieses Schuljahr schon haben (z. B. weil eine
+ * Fachlehrkraft es zuvor selbst für ihr Fach angelegt hat, siehe
+ * userDarfHistorischeNotenBearbeiten), werden übersprungen statt Duplikate
+ * zu erzeugen -- die Klassenleitung ergänzt so gezielt nur die noch
+ * fehlenden Fächer. Lehnt nur ab, wenn es für WIRKLICH JEDES Fach schon
+ * existiert (nichts zu tun) oder die Klasse keine Fächer hat.
+ * @returns {{ok: true, angelegtFuer: string[], uebersprungenFuer: string[]} | {ok: false, fehler: 'bereits-vorhanden'|'keine-faecher'}}
  */
 export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, userId) {
   const db = getDb();
   const labels = halbjahrBezeichnungen(schuljahrBezeichnung);
 
-  const bereitsVorhanden = db.prepare(`
-    SELECT 1 FROM historische_halbjahre hh
-    JOIN faecher f ON f.id = hh.fach_id
-    WHERE f.klasse_id = ? AND hh.bezeichnung IN (?, ?)
-  `).get(klasseId, labels[0], labels[1]);
-  if (bereitsVorhanden) return { ok: false, fehler: 'bereits-vorhanden' };
-
-  const faecher = db.prepare('SELECT id FROM faecher WHERE klasse_id = ?').all(klasseId);
+  const faecher = db.prepare('SELECT id, name FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasseId);
   if (faecher.length === 0) return { ok: false, fehler: 'keine-faecher' };
 
+  const vorhandeneFachIds = new Set(db.prepare(`
+    SELECT DISTINCT hh.fach_id FROM historische_halbjahre hh
+    JOIN faecher f ON f.id = hh.fach_id
+    WHERE f.klasse_id = ? AND hh.bezeichnung IN (?, ?)
+  `).all(klasseId, labels[0], labels[1]).map((r) => r.fach_id));
+
+  const fehlendeFaecher = faecher.filter((f) => !vorhandeneFachIds.has(f.id));
+  if (fehlendeFaecher.length === 0) return { ok: false, fehler: 'bereits-vorhanden' };
+
   const insert = db.prepare(`
-    INSERT INTO historische_halbjahre (fach_id, bezeichnung, reihenfolge, erstellt_von_id)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO historische_halbjahre (fach_id, bezeichnung, reihenfolge, erstellt_von_id, erstellt_als_fachlehrkraft)
+    VALUES (?, ?, ?, ?, 0)
   `);
   const tx = db.transaction(() => {
-    for (const f of faecher) {
+    for (const f of fehlendeFaecher) {
       let reihenfolge = db.prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(f.id).c;
       for (const label of labels) {
         insert.run(f.id, label, reihenfolge, userId);
@@ -105,7 +138,11 @@ export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, u
     }
   });
   tx();
-  return { ok: true };
+  return {
+    ok: true,
+    angelegtFuer: fehlendeFaecher.map((f) => f.name),
+    uebersprungenFuer: faecher.filter((f) => vorhandeneFachIds.has(f.id)).map((f) => f.name),
+  };
 }
 
 /** Fachabschlussnoten (eingefroren) als Map<schueler_id, note>. */

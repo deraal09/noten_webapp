@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 // Spalten der beiden Sitzplan-Tabellen — einmal definiert, damit SCHEMA
 // (neue Datenbanken) und der Neuaufbau in migriereSitzplanRaeume()
@@ -286,7 +286,15 @@ CREATE TABLE IF NOT EXISTS historische_halbjahre (
     bezeichnung TEXT NOT NULL,
     reihenfolge INTEGER NOT NULL DEFAULT 0,
     erstellt_von_id INTEGER REFERENCES users(id),
-    erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
+    erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
+    -- 1, wenn eine dem Fach zugewiesene Lehrkraft (nicht die Klassenleitung
+    -- klassenweit) dieses Halbjahr selbst angelegt hat -- dann darf nur noch
+    -- diese Fachlehrkraft (bzw. jede andere dem Fach zugewiesene Person) die
+    -- Noten eintragen, die Klassenleitung sieht sie nur noch an (siehe
+    -- userDarfHistorischeNotenBearbeiten in fach-abschluss.js). Klassenweit
+    -- per "Vergangenes Schuljahr hinzufügen" angelegte Halbjahre (0) bleiben
+    -- wie bisher auch für die Klassenleitung eintragbar.
+    erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS historische_noten (
@@ -722,6 +730,7 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'spa_fach_key', 'spa_fach_key TEXT');
   ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'historische_halbjahre', 'erstellt_als_fachlehrkraft', 'erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0');
   migriereSitzplanRaeume(db);
   fuelleFachTeilnehmerAuf(db);
 }

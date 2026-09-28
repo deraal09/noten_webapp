@@ -63,6 +63,7 @@ async function form(req, url, body) {
 const admin = client();
 const lehrerA = client();
 const lehrerFremd = client();
+const lehrerUnbeteiligt = client();
 let klasseId;
 
 test('Vorbereitung: Klasse 12A mit zwei Fächern, Lehrer A als Klassenleitung, eine fachfremde Lehrkraft', async () => {
@@ -75,13 +76,15 @@ test('Vorbereitung: Klasse 12A mit zwei Fächern, Lehrer A als Klassenleitung, e
   await form(admin, `/admin/klassen/${klasseId}/faecher/neu`, { name: 'Mathematik' });
   await form(admin, `/admin/klassen/${klasseId}/schueler/neu`, { nachname: 'Adler', vorname: 'Anna' });
 
-  for (const [name, uname] of [['Lehrer A', 'lehrera'], ['Lehrer Fremd', 'lehrerfremd']]) {
+  for (const [name, uname] of [['Lehrer A', 'lehrera'], ['Lehrer Fremd', 'lehrerfremd'], ['Lehrer Unbeteiligt', 'lehrerunbeteiligt']]) {
     await form(admin, '/admin/einladungen/neu', { display_name: name, ttl_days: '14' });
   }
   const invs = getDb().prepare('SELECT token, display_name FROM invitations ORDER BY id').all();
+  const clients = { 'Lehrer A': lehrerA, 'Lehrer Fremd': lehrerFremd, 'Lehrer Unbeteiligt': lehrerUnbeteiligt };
+  const usernames = { 'Lehrer A': 'lehrera', 'Lehrer Fremd': 'lehrerfremd', 'Lehrer Unbeteiligt': 'lehrerunbeteiligt' };
   for (const inv of invs) {
-    const c = inv.display_name === 'Lehrer A' ? lehrerA : lehrerFremd;
-    const uname = inv.display_name === 'Lehrer A' ? 'lehrera' : 'lehrerfremd';
+    const c = clients[inv.display_name];
+    const uname = usernames[inv.display_name];
     await form(c, `/einladung/${inv.token}`, { username: uname, password: 'lehrerpass123', password2: 'lehrerpass123' });
   }
   getDb().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, (SELECT id FROM users WHERE username = ?))')
@@ -90,7 +93,9 @@ test('Vorbereitung: Klasse 12A mit zwei Fächern, Lehrer A als Klassenleitung, e
 
 test('fuegeVergangenesSchuljahrHinzu legt für ALLE Fächer der Klasse zwei historische Halbjahre an', () => {
   const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2024/25', 1);
-  assert.deepEqual(ergebnis, { ok: true });
+  assert.equal(ergebnis.ok, true);
+  assert.deepEqual(ergebnis.angelegtFuer.sort(), ['Deutsch', 'Mathematik']);
+  assert.deepEqual(ergebnis.uebersprungenFuer, []);
 
   const faecher = getDb().prepare('SELECT id, name FROM faecher WHERE klasse_id = ?').all(klasseId);
   assert.equal(faecher.length, 2);
@@ -154,7 +159,7 @@ test('Klassenleitungsübersicht zeigt die vergangenen Schuljahre mit Links zur F
   const html = await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr`)).text();
   assert.ok(html.includes('2023/24'));
   assert.ok(html.includes('2024/25'));
-  assert.ok(html.includes('?tab=historie'));
+  assert.ok(html.includes('/historie'));
 });
 
 test('Die eigentliche Noteneingabe läuft weiter über die bestehende Fach-Seite (Historische Halbjahre), für Klassenleitung UND Fachlehrkraft', async () => {
@@ -170,6 +175,84 @@ test('Die eigentliche Noteneingabe läuft weiter über die bestehende Fach-Seite
   r = await form(lehrerA, `/teacher/historie/${hh.id}/speichern`, { ['note_' + schuelerId]: '2' });
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT note FROM historische_noten WHERE historisches_halbjahr_id = ? AND schueler_id = ?').get(hh.id, schuelerId).note, 2);
+});
+
+test('Fachlehrkraft legt ein einzelnes vergangenes Halbjahr für ihr Fach selbst an (erstellt_als_fachlehrkraft=1)', async () => {
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+  getDb().prepare('INSERT INTO fach_zuweisungen (fach_id, user_id) VALUES (?, (SELECT id FROM users WHERE username = ?))')
+    .run(mathId, 'lehrerfremd');
+
+  // Ohne Fach-Zugriff und ohne Klassenleitung ist die eigene Anlage weiterhin verboten.
+  let r = await form(lehrerA, `/teacher/fach/${mathId}/historie/neu`, { bezeichnung: '1. Halbjahr 2022/23' });
+  assert.equal(r.status, 302); // Klassenleitung DARF (userDarfFachBearbeiten) -- separat unten geprüft.
+
+  r = await form(lehrerFremd, `/teacher/fach/${mathId}/historie/neu`, { bezeichnung: '2. Halbjahr 2022/23' });
+  assert.equal(r.status, 302);
+
+  const hh = getDb().prepare("SELECT * FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '2. Halbjahr 2022/23'").get(mathId);
+  assert.equal(hh.erstellt_als_fachlehrkraft, 1);
+
+  const hhKlassenleitung = getDb().prepare("SELECT * FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2022/23'").get(mathId);
+  assert.equal(hhKlassenleitung.erstellt_als_fachlehrkraft, 0);
+});
+
+test('Klassenleitung kann die Noten des von der Fachlehrkraft angelegten Halbjahres NICHT eintragen, ihr eigenes aber schon', async () => {
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+  const schuelerId = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(klasseId).id;
+  const hhFachlehrkraft = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '2. Halbjahr 2022/23'").get(mathId);
+  const hhKlassenleitung = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2022/23'").get(mathId);
+
+  let r = await form(lehrerA, `/teacher/historie/${hhFachlehrkraft.id}/speichern`, { ['note_' + schuelerId]: '3' });
+  assert.equal(r.status, 403);
+
+  r = await form(lehrerA, `/teacher/historie/${hhKlassenleitung.id}/speichern`, { ['note_' + schuelerId]: '3' });
+  assert.equal(r.status, 302);
+
+  r = await form(lehrerFremd, `/teacher/historie/${hhFachlehrkraft.id}/speichern`, { ['note_' + schuelerId]: '3' });
+  assert.equal(r.status, 302);
+});
+
+test('Klassenleitung sieht die normale Fach-Seite (Live-Notentafel) ohne eigene Zuweisung weiterhin NICHT', async () => {
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+  const r = await lehrerA(`/teacher/fach/${mathId}`);
+  assert.equal(r.status, 403);
+});
+
+test('Eigens vorgesehene Klassenleitungs-Seite zeigt das Fachlehrkraft-Halbjahr nur lesend an, das eigene aber bearbeitbar', async () => {
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+  const r = await lehrerA(`/klassenlehrer/fach/${mathId}/historie`);
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.ok(html.includes('nur Ansicht'));
+  assert.ok(html.includes('2. Halbjahr 2022/23')); // Fachlehrkraft-Eintrag wird trotzdem angezeigt
+  assert.ok(html.includes('1. Halbjahr 2022/23')); // eigener Eintrag bleibt sichtbar
+});
+
+test('Eigens vorgesehene Klassenleitungs-Seite ist einer unbeteiligten Lehrkraft (weder Klassenleitung noch Fach-Zugriff) verwehrt', async () => {
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+  const r = await lehrerUnbeteiligt(`/klassenlehrer/fach/${mathId}/historie`);
+  assert.equal(r.status, 403);
+});
+
+test('fuegeVergangenesSchuljahrHinzu überspringt Fächer, die von einer Fachlehrkraft bereits für dieses Schuljahr angelegt wurden', () => {
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+  const anzahlVorher = getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(mathId).c;
+
+  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2022/23', 1);
+  assert.equal(ergebnis.ok, true);
+  assert.deepEqual(ergebnis.angelegtFuer, ['Deutsch']);
+  assert.deepEqual(ergebnis.uebersprungenFuer, ['Mathematik']);
+
+  const anzahl = getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(mathId).c;
+  assert.equal(anzahl, anzahlVorher); // unverändert -- keine zusätzliche Zeile durch die Klassenleitung hinzugefügt.
+
+  const liste = ladeVergangeneSchuljahre(klasseId);
+  const sj2223 = liste.find((sj) => sj.schuljahr === '2022/23');
+  assert.deepEqual(sj2223.faecher.map((f) => f.name).sort(), ['Deutsch', 'Mathematik']);
+  const mathEintrag = sj2223.faecher.find((f) => f.name === 'Mathematik');
+  assert.equal(mathEintrag.erstelltAlsFachlehrkraft, true);
+  const deutschEintrag = sj2223.faecher.find((f) => f.name === 'Deutsch');
+  assert.equal(deutschEintrag.erstelltAlsFachlehrkraft, false);
 });
 
 test.after(async () => {
