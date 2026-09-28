@@ -1247,7 +1247,7 @@ export default async function teacherRoutes(fastify) {
       SELECT f.*,
         (SELECT GROUP_CONCAT(u.display_name || COALESCE(NULLIF(' / ' || u.username, ' / '), ''), ', ')
            FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id WHERE fz.fach_id = f.id) AS lehrer_liste
-      FROM faecher f WHERE f.klasse_id = ? ORDER BY f.name
+      FROM faecher f WHERE f.klasse_id = ? AND f.nur_historisch = 0 ORDER BY f.name
     `).all(klasse.id);
     const eigentuemer = klasse.created_by_id === request.user.id || request.user.isAdmin;
     // Löschen/Abgang/Abgangszeugnis nur anzeigen, wenn die Aktion auch

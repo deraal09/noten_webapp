@@ -53,7 +53,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 // Spalten der beiden Sitzplan-Tabellen — einmal definiert, damit SCHEMA
 // (neue Datenbanken) und der Neuaufbau in migriereSitzplanRaeume()
@@ -192,6 +192,14 @@ CREATE TABLE IF NOT EXISTS faecher (
     -- Wahlpflichtkurses, siehe WPK_KURSE).
     spa_fach_key TEXT,
     spa_wpk_kurs TEXT,
+    -- 1, wenn dieses Fach ausschließlich für ein vergangenes Schuljahr
+    -- angelegt wurde, in dem die Klasse ein Fach/Lernfeld hatte, das im
+    -- aktuellen Schuljahr nicht mehr existiert (siehe "Vergangenes
+    -- Schuljahr hinzufügen" in fach-abschluss.js). Kein Bestandteil der
+    -- laufenden Notentafel/Klausuren -- wird aus den "aktuellen Fächer"-
+    -- Listen (Klassenseite, CSV-Export, Klassenübertragung) ausgeblendet,
+    -- bleibt aber für historische Halbjahre/Noten nutzbar.
+    nur_historisch INTEGER NOT NULL DEFAULT 0,
     UNIQUE (klasse_id, name)
 );
 
@@ -731,6 +739,7 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'historische_halbjahre', 'erstellt_als_fachlehrkraft', 'erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'faecher', 'nur_historisch', 'nur_historisch INTEGER NOT NULL DEFAULT 0');
   migriereSitzplanRaeume(db);
   fuelleFachTeilnehmerAuf(db);
 }

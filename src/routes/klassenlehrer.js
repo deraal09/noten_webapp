@@ -174,11 +174,15 @@ export default async function klassenlehrerRoutes(fastify) {
       request.flash?.('error', `„${bezeichnung}" ist kein vergangenes Schuljahr -- die Klasse läuft aktuell in ${klasse.schuljahr_bezeichnung}.`);
       return reply.redirect(zielRedirect);
     }
-    const ergebnis = fuegeVergangenesSchuljahrHinzu(klasse.id, bezeichnung, request.user.id);
+    // Andere Fächer/Lernfelder als aktuell (z. B. ein inzwischen
+    // abgeschafftes Lernfeld) -- eine Zeile je Fach/Lernfeld.
+    const neueFaecherNamen = String(request.body?.neue_faecher || '')
+      .split('\n').map((n) => n.trim()).filter(Boolean);
+    const ergebnis = fuegeVergangenesSchuljahrHinzu(klasse.id, bezeichnung, request.user.id, neueFaecherNamen);
     if (!ergebnis.ok) {
       const meldungen = {
         'bereits-vorhanden': `„${bezeichnung}" wurde für diese Klasse bereits für alle Fächer hinzugefügt.`,
-        'keine-faecher': 'Diese Klasse hat noch keine Fächer.',
+        'keine-faecher': 'Diese Klasse hat noch keine Fächer -- ggf. zusätzlich Fach/Lernfeld-Namen für dieses Schuljahr angeben.',
       };
       request.flash?.('error', meldungen[ergebnis.fehler] || 'Anlegen fehlgeschlagen.');
       return reply.redirect(zielRedirect);
@@ -187,6 +191,9 @@ export default async function klassenlehrerRoutes(fastify) {
     // hatten, werden übersprungen -- kurz erwähnen, damit nicht der
     // Eindruck entsteht, dort sei versehentlich nichts passiert.
     let meldung = `Schuljahr „${bezeichnung}" für ${ergebnis.angelegtFuer.join(', ')} hinzugefügt -- Noten je Fach im Reiter „Historische Halbjahre" eintragen.`;
+    if (ergebnis.neuAngelegteFaecher.length) {
+      meldung += ` Neu angelegt (nur für dieses Schuljahr): ${ergebnis.neuAngelegteFaecher.join(', ')}.`;
+    }
     if (ergebnis.uebersprungenFuer.length) {
       meldung += ` Bereits vorhanden (übersprungen): ${ergebnis.uebersprungenFuer.join(', ')}.`;
     }

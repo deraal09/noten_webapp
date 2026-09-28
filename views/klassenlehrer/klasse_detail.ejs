@@ -122,7 +122,10 @@
       ein. Hat eine Fachlehrkraft das für ihr Fach schon selbst angelegt, gehört es ihr -- du siehst
       die Noten dann nur noch an, statt sie zu überschreiben; nur bei den Fächern, die du selbst (oder
       eine andere Klassenleitung) klassenweit hinzugefügt hast, kannst du sie weiter bearbeiten. Für
-      aktuelle Halbjahre gilt weiter die normale Notentafel der Fachlehrkräfte.
+      aktuelle Halbjahre gilt weiter die normale Notentafel der Fachlehrkräfte. Hatte die Klasse in
+      diesem Schuljahr ein Fach/Lernfeld, das es aktuell gar nicht mehr gibt, trage es unten bei
+      "Weitere Fächer/Lernfelder" ein -- es wird eigens dafür angelegt und taucht nicht in der
+      laufenden Fächerliste der Klasse auf.
     </p>
     <% if (vergangeneSchuljahre.length) { %>
       <ul>
@@ -139,9 +142,12 @@
     <% } else { %>
       <p class="hint">Noch keine vergangenen Schuljahre hinterlegt.</p>
     <% } %>
-    <form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/vergangenes-schuljahr/neu" class="inline">
+    <form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/vergangenes-schuljahr/neu">
       <label>Schuljahr
         <input type="text" name="bezeichnung" placeholder="z. B. 2022/23" required>
+      </label>
+      <label>Weitere Fächer/Lernfelder <small class="hint">(nur, falls damals andere als aktuell -- eine Zeile je Fach)</small>
+        <textarea name="neue_faecher" rows="3" placeholder="z. B.&#10;LF5 Fachpraxis Pflege&#10;Religion"></textarea>
       </label>
       <button type="submit">+ Vergangenes Schuljahr hinzufügen</button>
     </form>

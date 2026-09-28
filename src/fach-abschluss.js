@@ -97,23 +97,57 @@ export function ladeVergangeneSchuljahre(klasseId) {
 }
 
 /**
- * Fügt für die Fächer einer Klasse ein vergangenes Schuljahr hinzu -- je
- * Fach zwei historische Halbjahre ("1./2. Halbjahr <Bezeichnung>"), bereit
- * für die Noteneingabe auf der jeweiligen Fach-Seite (Reiter "Historische
- * Halbjahre"). Fächer, die dieses Schuljahr schon haben (z. B. weil eine
- * Fachlehrkraft es zuvor selbst für ihr Fach angelegt hat, siehe
- * userDarfHistorischeNotenBearbeiten), werden übersprungen statt Duplikate
- * zu erzeugen -- die Klassenleitung ergänzt so gezielt nur die noch
- * fehlenden Fächer. Lehnt nur ab, wenn es für WIRKLICH JEDES Fach schon
- * existiert (nichts zu tun) oder die Klasse keine Fächer hat.
- * @returns {{ok: true, angelegtFuer: string[], uebersprungenFuer: string[]} | {ok: false, fehler: 'bereits-vorhanden'|'keine-faecher'}}
+ * Fügt für die AKTUELLEN Fächer einer Klasse (nicht: bereits vorhandene rein
+ * historische Fächer aus früheren Aufrufen für ANDERE Schuljahre, siehe
+ * unten) ein vergangenes Schuljahr hinzu -- je Fach zwei historische
+ * Halbjahre ("1./2. Halbjahr <Bezeichnung>"), bereit für die Noteneingabe
+ * auf der jeweiligen Fach-Seite (Reiter "Historische Halbjahre"). Fächer,
+ * die dieses Schuljahr schon haben (z. B. weil eine Fachlehrkraft es zuvor
+ * selbst für ihr Fach angelegt hat, siehe userDarfHistorischeNotenBearbeiten),
+ * werden übersprungen statt Duplikate zu erzeugen -- die Klassenleitung
+ * ergänzt so gezielt nur die noch fehlenden Fächer.
+ *
+ * `neueFaecherNamen` deckt den Fall ab, dass die Klasse in diesem
+ * vergangenen Schuljahr andere Fächer/Lernfelder hatte als aktuell (z. B.
+ * ein inzwischen abgeschafftes Lernfeld) -- dafür werden bei Bedarf neue,
+ * rein historische Fächer angelegt (faecher.nur_historisch = 1, siehe
+ * src/db.js), die aus den "aktuellen Fächer"-Listen ausgeblendet bleiben.
+ * Ein Name, der einem bereits vorhandenen Fach der Klasse entspricht (egal
+ * ob aktuell oder rein historisch, z. B. weil dasselbe Lernfeld schon für
+ * ein anderes vergangenes Schuljahr angelegt wurde), legt kein Duplikat an,
+ * sondern verwendet dieses Fach für dieses Schuljahr mit weiter. Ein rein
+ * historisches Fach wird dabei bewusst NUR berücksichtigt, wenn es hier
+ * erneut per Name genannt wird -- sonst würde jeder weitere Aufruf (für ein
+ * völlig anderes Schuljahr) versehentlich auch längst abgeschlossene
+ * Lernfelder wieder aufgreifen.
+ *
+ * Lehnt nur ab, wenn es für WIRKLICH JEDES betroffene Fach schon existiert
+ * (nichts zu tun) oder die Klasse weder aktuelle noch neu zu benennende
+ * Fächer hat.
+ * @returns {{ok: true, angelegtFuer: string[], uebersprungenFuer: string[], neuAngelegteFaecher: string[]} | {ok: false, fehler: 'bereits-vorhanden'|'keine-faecher'}}
  */
-export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, userId) {
+export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, userId, neueFaecherNamen = []) {
   const db = getDb();
   const labels = halbjahrBezeichnungen(schuljahrBezeichnung);
 
-  const faecher = db.prepare('SELECT id, name FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasseId);
-  if (faecher.length === 0) return { ok: false, fehler: 'keine-faecher' };
+  const alleFaecher = db.prepare('SELECT id, name, nur_historisch FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasseId);
+  const aktuelleFaecher = alleFaecher.filter((f) => !f.nur_historisch);
+  const alleNamen = new Set(alleFaecher.map((f) => f.name));
+
+  const namenBereinigt = [...new Set((neueFaecherNamen || []).map((n) => String(n || '').trim()).filter(Boolean))];
+  const neueNamen = namenBereinigt.filter((n) => !alleNamen.has(n));
+  // Ein genannter Name, der zu einem bereits bestehenden rein historischen
+  // Fach passt, greift dieses gezielt für das aktuell angefragte Schuljahr
+  // wieder auf (z. B. dasselbe Lernfeld über mehrere vergangene Schuljahre
+  // hinweg) -- ein bereits aktuelles Fach mit diesem Namen braucht das
+  // nicht, das steckt ohnehin schon in aktuelleFaecher.
+  const wiederverwendeteHistorische = namenBereinigt
+    .filter((n) => !neueNamen.includes(n))
+    .map((n) => alleFaecher.find((f) => f.name === n && f.nur_historisch))
+    .filter(Boolean);
+
+  const kandidaten = [...aktuelleFaecher, ...wiederverwendeteHistorische];
+  if (kandidaten.length === 0 && neueNamen.length === 0) return { ok: false, fehler: 'keine-faecher' };
 
   const vorhandeneFachIds = new Set(db.prepare(`
     SELECT DISTINCT hh.fach_id FROM historische_halbjahre hh
@@ -121,27 +155,34 @@ export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, u
     WHERE f.klasse_id = ? AND hh.bezeichnung IN (?, ?)
   `).all(klasseId, labels[0], labels[1]).map((r) => r.fach_id));
 
-  const fehlendeFaecher = faecher.filter((f) => !vorhandeneFachIds.has(f.id));
-  if (fehlendeFaecher.length === 0) return { ok: false, fehler: 'bereits-vorhanden' };
+  const fehlendeKandidaten = kandidaten.filter((f) => !vorhandeneFachIds.has(f.id));
+  if (fehlendeKandidaten.length === 0 && neueNamen.length === 0) return { ok: false, fehler: 'bereits-vorhanden' };
 
-  const insert = db.prepare(`
+  const insertFach = db.prepare('INSERT INTO faecher (klasse_id, name, nur_historisch) VALUES (?, ?, 1)');
+  const insertHalbjahr = db.prepare(`
     INSERT INTO historische_halbjahre (fach_id, bezeichnung, reihenfolge, erstellt_von_id, erstellt_als_fachlehrkraft)
     VALUES (?, ?, ?, ?, 0)
   `);
+  const zaehleHalbjahre = db.prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?');
+
   const tx = db.transaction(() => {
-    for (const f of fehlendeFaecher) {
-      let reihenfolge = db.prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(f.id).c;
+    const neuAngelegteFaecher = neueNamen.map((name) => ({ id: insertFach.run(klasseId, name).lastInsertRowid, name }));
+    for (const f of [...fehlendeKandidaten, ...neuAngelegteFaecher]) {
+      let reihenfolge = zaehleHalbjahre.get(f.id).c;
       for (const label of labels) {
-        insert.run(f.id, label, reihenfolge, userId);
+        insertHalbjahr.run(f.id, label, reihenfolge, userId);
         reihenfolge += 1;
       }
     }
+    return neuAngelegteFaecher;
   });
-  tx();
+  const neuAngelegteFaecher = tx();
+
   return {
     ok: true,
-    angelegtFuer: fehlendeFaecher.map((f) => f.name),
-    uebersprungenFuer: faecher.filter((f) => vorhandeneFachIds.has(f.id)).map((f) => f.name),
+    angelegtFuer: [...fehlendeKandidaten.map((f) => f.name), ...neuAngelegteFaecher.map((f) => f.name)],
+    uebersprungenFuer: kandidaten.filter((f) => vorhandeneFachIds.has(f.id)).map((f) => f.name),
+    neuAngelegteFaecher: neuAngelegteFaecher.map((f) => f.name),
   };
 }
 

@@ -92,7 +92,7 @@ function bauReply(reply, csv, filename) {
 function baueKlasseCsv(klasse) {
   const db = getDb();
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
-  const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+  const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND nur_historisch = 0 ORDER BY name').all(klasse.id);
   const csv = klasse.notenschluessel_csv || '';
   const fzRows = db.prepare(`
     SELECT fz.schueler_id, fz.halbjahr, fz.typ, fz.stunden

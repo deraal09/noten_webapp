@@ -39,7 +39,10 @@ export function uebertrageKlasseInSchuljahr(klasseId, zielSchuljahrId, neuerName
     }
 
     if (mitFaechern) {
-      const faecherListe = db.prepare('SELECT * FROM faecher WHERE klasse_id = ?').all(klasseId);
+      // nur_historisch-Fächer sind reine Platzhalter für ein einzelnes
+      // vergangenes Schuljahr (siehe fuegeVergangenesSchuljahrHinzu) --
+      // die dürfen nicht ins neue Schuljahr mit übernommen werden.
+      const faecherListe = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND nur_historisch = 0').all(klasseId);
       const insertFach = db.prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)');
       const insertZuweisung = db.prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)');
       const zuweisungenStmt = db.prepare('SELECT user_id FROM fach_zuweisungen WHERE fach_id = ?');

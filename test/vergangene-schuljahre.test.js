@@ -255,6 +255,71 @@ test('fuegeVergangenesSchuljahrHinzu überspringt Fächer, die von einer Fachleh
   assert.equal(deutschEintrag.erstelltAlsFachlehrkraft, false);
 });
 
+test('fuegeVergangenesSchuljahrHinzu legt zusätzliche, im aktuellen Schuljahr nicht mehr existierende Fächer als "nur_historisch" an', () => {
+  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2021/22', 1, ['LF5 Fachpraxis Pflege', '  Religion  ']);
+  assert.equal(ergebnis.ok, true);
+  assert.deepEqual(ergebnis.angelegtFuer.sort(), ['Deutsch', 'LF5 Fachpraxis Pflege', 'Mathematik', 'Religion']);
+  assert.deepEqual(ergebnis.neuAngelegteFaecher.sort(), ['LF5 Fachpraxis Pflege', 'Religion']);
+
+  const lf5 = getDb().prepare("SELECT * FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId);
+  assert.ok(lf5);
+  assert.equal(lf5.nur_historisch, 1);
+  const hh = getDb().prepare('SELECT bezeichnung FROM historische_halbjahre WHERE fach_id = ? ORDER BY reihenfolge').all(lf5.id);
+  assert.deepEqual(hh.map((h) => h.bezeichnung), ['1. Halbjahr 2021/22', '2. Halbjahr 2021/22']);
+});
+
+test('Neu angelegtes historisches Fach taucht in der laufenden Fächerliste der Klasse NICHT auf, wohl aber bei den vergangenen Schuljahren', async () => {
+  const html = await (await lehrerA(`/teacher/klassen/${klasseId}`)).text();
+  assert.ok(!html.includes('LF5 Fachpraxis Pflege'));
+
+  const liste = ladeVergangeneSchuljahre(klasseId);
+  const sj2122 = liste.find((sj) => sj.schuljahr === '2021/22');
+  assert.deepEqual(sj2122.faecher.map((f) => f.name).sort(), ['Deutsch', 'LF5 Fachpraxis Pflege', 'Mathematik', 'Religion']);
+});
+
+test('Klassenleitung kann für das neu angelegte historische Fach über die eigens vorgesehene Seite Noten eintragen', async () => {
+  const lf5 = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId);
+  const schuelerId = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(klasseId).id;
+  const hh = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2021/22'").get(lf5.id);
+
+  const rSeite = await lehrerA(`/klassenlehrer/fach/${lf5.id}/historie`);
+  assert.equal(rSeite.status, 200);
+  const html = await rSeite.text();
+  assert.ok(html.includes('LF5 Fachpraxis Pflege'));
+
+  const r = await form(lehrerA, `/teacher/historie/${hh.id}/speichern`, { ['note_' + schuelerId]: '2' });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT note FROM historische_noten WHERE historisches_halbjahr_id = ? AND schueler_id = ?').get(hh.id, schuelerId).note, 2);
+});
+
+test('Ein als "neues Fach" angegebener Name, der bereits existiert, erzeugt kein Duplikat, sondern verwendet das bestehende Fach', () => {
+  const vorherAnzahl = getDb().prepare("SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ? AND name = 'Deutsch'").get(klasseId).c;
+  assert.equal(vorherAnzahl, 1);
+
+  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2020/21', 1, ['Deutsch']);
+  assert.equal(ergebnis.ok, true);
+  assert.deepEqual(ergebnis.neuAngelegteFaecher, []); // "Deutsch" existiert schon -- kein neues Fach angelegt
+  assert.ok(ergebnis.angelegtFuer.includes('Deutsch'));
+
+  const nachherAnzahl = getDb().prepare("SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ? AND name = 'Deutsch'").get(klasseId).c;
+  assert.equal(nachherAnzahl, 1); // weiterhin nur ein "Deutsch"
+});
+
+test('POST .../vergangenes-schuljahr/neu: Feld "Weitere Fächer" legt zusätzliche historische Fächer über die echte Route an', async () => {
+  const r = await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, {
+    bezeichnung: '2019/20', neue_faecher: 'Sozialkunde\nSport',
+  });
+  assert.equal(r.status, 302);
+
+  const liste = ladeVergangeneSchuljahre(klasseId);
+  const sj1920 = liste.find((sj) => sj.schuljahr === '2019/20');
+  assert.ok(sj1920);
+  assert.deepEqual(sj1920.faecher.map((f) => f.name).sort(), ['Deutsch', 'Mathematik', 'Sozialkunde', 'Sport']);
+
+  const sport = getDb().prepare("SELECT nur_historisch FROM faecher WHERE klasse_id = ? AND name = 'Sport'").get(klasseId);
+  assert.equal(sport.nur_historisch, 1);
+});
+
 test.after(async () => {
   await fastify.close();
 });
