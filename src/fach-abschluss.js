@@ -26,6 +26,88 @@ export function ladeHistorischeNoten(historischesHalbjahrId) {
   return new Map(rows.map((r) => [r.schueler_id, r.note]));
 }
 
+/**
+ * Bezeichnungen der beiden Halbjahre eines Schuljahres, wie sie als
+ * historisches Halbjahr angelegt werden (z. B. "1. Halbjahr 2022/23").
+ */
+function halbjahrBezeichnungen(schuljahrBezeichnung) {
+  return [`1. Halbjahr ${schuljahrBezeichnung}`, `2. Halbjahr ${schuljahrBezeichnung}`];
+}
+
+/**
+ * Für eine Klasse bereits hinterlegte vergangene Schuljahre (über
+ * historische Halbjahre irgendeines ihrer Fächer), samt der Fächer, für die
+ * es schon eingetragen ist -- für die Übersicht in der
+ * Klassenleitungsübersicht (siehe fuegeVergangenesSchuljahrHinzu). Neueste
+ * zuerst. Bezeichnungen, die nicht dem "1./2. Halbjahr <Schuljahr>"-Schema
+ * folgen (z. B. manuell frei eingetragene Altdaten von vor dieser
+ * Funktion), werden unverändert als eigener Eintrag geführt.
+ */
+export function ladeVergangeneSchuljahre(klasseId) {
+  const rows = getDb().prepare(`
+    SELECT hh.bezeichnung, f.id AS fach_id, f.name AS fach_name
+    FROM historische_halbjahre hh
+    JOIN faecher f ON f.id = hh.fach_id
+    WHERE f.klasse_id = ?
+    ORDER BY f.name
+  `).all(klasseId);
+
+  const proSchuljahr = new Map();
+  for (const r of rows) {
+    const treffer = /^[12]\. Halbjahr (.+)$/.exec(r.bezeichnung);
+    const schuljahr = treffer ? treffer[1] : r.bezeichnung;
+    if (!proSchuljahr.has(schuljahr)) proSchuljahr.set(schuljahr, new Map());
+    proSchuljahr.get(schuljahr).set(r.fach_id, r.fach_name); // Map dedupliziert über beide Halbjahre hinweg
+  }
+  return Array.from(proSchuljahr.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([schuljahr, faecherMap]) => ({
+      schuljahr,
+      faecher: Array.from(faecherMap.entries()).map(([id, name]) => ({ id, name })),
+    }));
+}
+
+/**
+ * Fügt für ALLE Fächer einer Klasse ein vergangenes Schuljahr auf einen
+ * Schlag hinzu -- je Fach zwei historische Halbjahre ("1./2. Halbjahr
+ * <Bezeichnung>"), bereit für die Noteneingabe auf der jeweiligen
+ * Fach-Seite (Reiter "Historische Halbjahre"). Lehnt ab, wenn für diese
+ * Klasse (bei irgendeinem ihrer Fächer) schon ein historisches Halbjahr mit
+ * dieser Bezeichnung existiert, statt Duplikate oder eine inkonsistente
+ * Teilabdeckung zu erzeugen.
+ * @returns {{ok: true} | {ok: false, fehler: 'bereits-vorhanden'|'keine-faecher'}}
+ */
+export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, userId) {
+  const db = getDb();
+  const labels = halbjahrBezeichnungen(schuljahrBezeichnung);
+
+  const bereitsVorhanden = db.prepare(`
+    SELECT 1 FROM historische_halbjahre hh
+    JOIN faecher f ON f.id = hh.fach_id
+    WHERE f.klasse_id = ? AND hh.bezeichnung IN (?, ?)
+  `).get(klasseId, labels[0], labels[1]);
+  if (bereitsVorhanden) return { ok: false, fehler: 'bereits-vorhanden' };
+
+  const faecher = db.prepare('SELECT id FROM faecher WHERE klasse_id = ?').all(klasseId);
+  if (faecher.length === 0) return { ok: false, fehler: 'keine-faecher' };
+
+  const insert = db.prepare(`
+    INSERT INTO historische_halbjahre (fach_id, bezeichnung, reihenfolge, erstellt_von_id)
+    VALUES (?, ?, ?, ?)
+  `);
+  const tx = db.transaction(() => {
+    for (const f of faecher) {
+      let reihenfolge = db.prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(f.id).c;
+      for (const label of labels) {
+        insert.run(f.id, label, reihenfolge, userId);
+        reihenfolge += 1;
+      }
+    }
+  });
+  tx();
+  return { ok: true };
+}
+
 /** Fachabschlussnoten (eingefroren) als Map<schueler_id, note>. */
 export function ladeAbschlussnoten(fachId) {
   const rows = getDb().prepare('SELECT schueler_id, note FROM fach_abschlussnoten WHERE fach_id = ?').all(fachId);

@@ -111,6 +111,39 @@
       </tbody>
     </table>
   <% } %>
+
+  <div class="card" id="vergangene-schuljahre">
+    <h3>Vergangene Schuljahre</h3>
+    <p class="hint">
+      Für ein noch nicht erfasstes vergangenes Schuljahr (z. B. weil die Klasse erst später in diese
+      App aufgenommen wurde) lässt sich hier auf einen Schlag für <strong>alle Fächer</strong> dieser
+      Klasse ein historisches Halbjahrespaar anlegen ("1./2. Halbjahr &lt;Schuljahr&gt;"). Die
+      eigentlichen Noten trägst du danach je Fach auf dessen Seite im Reiter „Historische Halbjahre"
+      ein -- dort darfst du das als Klassenleitung schon immer, für jedes Fach. Ein bereits
+      hinzugefügtes Schuljahr lässt sich hier nicht erneut anlegen; für aktuelle Halbjahre gilt weiter
+      die normale Notentafel der Fachlehrkräfte.
+    </p>
+    <% if (vergangeneSchuljahre.length) { %>
+      <ul>
+        <% vergangeneSchuljahre.forEach(function(sj) { %>
+          <li>
+            <strong><%= sj.schuljahr %></strong> -- bereits vorhanden:
+            <% sj.faecher.forEach(function(f, i) { %>
+              <% if (i > 0) { %>, <% } %><a href="/teacher/fach/<%= f.id %>?tab=historie"><%= f.name %></a>
+            <% }); %>
+          </li>
+        <% }); %>
+      </ul>
+    <% } else { %>
+      <p class="hint">Noch keine vergangenen Schuljahre hinterlegt.</p>
+    <% } %>
+    <form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/vergangenes-schuljahr/neu" class="inline">
+      <label>Schuljahr
+        <input type="text" name="bezeichnung" placeholder="z. B. 2022/23" required>
+      </label>
+      <button type="submit">+ Vergangenes Schuljahr hinzufügen</button>
+    </form>
+  </div>
 </div>
 
 <div id="panel-fehlzeiten" class="reiter-panel <%= aktiverTab === 'fehlzeiten' ? 'active' : '' %>">

@@ -11,7 +11,8 @@ import { getDb } from '../db.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
 import { HALBJAHRE, FEHLZEIT_TYPEN } from '../grade-calc.js';
 import { ladeHalbjahresuebersicht } from '../noten-sync.js';
-import { ladeAbschlussuebersicht } from '../fach-abschluss.js';
+import { ladeAbschlussuebersicht, ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu } from '../fach-abschluss.js';
+import { parseSchuljahr } from '../schuljahr-utils.js';
 
 export default async function klassenlehrerRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -110,8 +111,9 @@ export default async function klassenlehrerRoutes(fastify) {
       for (const n of notizRows) notizenMap[n.schueler_id]?.push(n);
     }
 
-    // ---- Tab 2: Halbjahresübersicht ----
+    // ---- Tab 2: Halbjahresübersicht (inkl. "Vergangene Schuljahre") ----
     const halbjahresuebersicht = ladeHalbjahresuebersicht(klasse, halbjahr);
+    const vergangeneSchuljahre = ladeVergangeneSchuljahre(klasse.id);
 
     // ---- Tab 4: Abschluss-/Abgangsübersicht ----
     const abschlussuebersicht = ladeAbschlussuebersicht(klasse.id);
@@ -134,8 +136,51 @@ export default async function klassenlehrerRoutes(fastify) {
     return reply.viewEjs('klassenlehrer/klasse_detail.ejs', {
       user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
       halbjahresuebersicht, abschlussuebersicht, klassenleitungListe, zuweisbareLehrkraefte,
-      offeneEntsperrAnfragen,
+      offeneEntsperrAnfragen, vergangeneSchuljahre,
     });
+  });
+
+  // ---------- Vergangenes Schuljahr hinzufügen (Tab 2: Halbjahresübersicht) ----------
+  // Legt für ALLE Fächer der Klasse auf einen Schlag historische Halbjahre
+  // an (siehe fuegeVergangenesSchuljahrHinzu) -- die eigentliche
+  // Noteneingabe bleibt auf der jeweiligen Fach-Seite (Reiter "Historische
+  // Halbjahre"), dort durften Klassenleitung UND Fachlehrkraft schon immer
+  // eintragen (siehe userDarfFachBearbeiten). Neu ist hier nur das
+  // klassenweite Anlegen auf einen Schlag, mit Schutz gegen doppelte/
+  // aktuelle Schuljahre.
+  fastify.post('/klasse/:id/vergangenes-schuljahr/neu', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann vergangene Schuljahre hinzufügen.' });
+    }
+    const zielRedirect = `/klassenlehrer/klasse/${klasse.id}?tab=halbjahr`;
+    const bezeichnung = String(request.body?.bezeichnung || '').trim();
+    const geparst = parseSchuljahr(bezeichnung);
+    if (!geparst) {
+      request.flash?.('error', `Ungültiges Format „${bezeichnung}" -- Schuljahre müssen als YYYY/YY angegeben werden, z. B. 2022/23.`);
+      return reply.redirect(zielRedirect);
+    }
+    const eigenesStartjahr = parseSchuljahr(klasse.schuljahr_bezeichnung)?.startJahr;
+    if (eigenesStartjahr !== undefined && geparst.startJahr >= eigenesStartjahr) {
+      request.flash?.('error', `„${bezeichnung}" ist kein vergangenes Schuljahr -- die Klasse läuft aktuell in ${klasse.schuljahr_bezeichnung}.`);
+      return reply.redirect(zielRedirect);
+    }
+    const ergebnis = fuegeVergangenesSchuljahrHinzu(klasse.id, bezeichnung, request.user.id);
+    if (!ergebnis.ok) {
+      const meldungen = {
+        'bereits-vorhanden': `„${bezeichnung}" wurde für diese Klasse bereits hinzugefügt.`,
+        'keine-faecher': 'Diese Klasse hat noch keine Fächer.',
+      };
+      request.flash?.('error', meldungen[ergebnis.fehler] || 'Anlegen fehlgeschlagen.');
+      return reply.redirect(zielRedirect);
+    }
+    request.flash?.('success', `Schuljahr „${bezeichnung}" hinzugefügt -- Noten je Fach im Reiter „Historische Halbjahre" eintragen.`);
+    return reply.redirect(zielRedirect);
   });
 
   // ---------- Freie Notizen je Schüler/in (unabhängig von Noten/Fehlzeiten) ----------
