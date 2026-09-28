@@ -137,6 +137,33 @@ test('Freigegebene Klasse: Beitritt klappt weiterhin sofort (gewolltes Verhalten
   assert.equal((await beigetreten(`/teacher/klassen/${klasseId}`)).status, 200);
 });
 
+test('Beitritt mit dem Namen eines schon vorhandenen Fachs gibt keinen Zugriff auf dieses Fach', async () => {
+  // Mathe gehört der Lehrkraft, die die Klasse angelegt hat. Wer "Mathe" als
+  // eigenes Fach angibt, darf dadurch nicht in deren Fach landen (Klausuren
+  // löschen, Punkte ändern, Teilnehmer/innen entfernen).
+  const r = await form(beigetreten, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Mathe' });
+  // Schon über Englisch dabei → zurück auf die Klassenseite mit Hinweis.
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}`);
+  const zuweisung = db().prepare(`SELECT 1 FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id
+                                  WHERE fz.fach_id = ? AND u.username = 'beigetreten'`).get(matheId);
+  assert.equal(zuweisung, undefined, 'keine Zuweisung zum fremden Fach');
+  const html = await (await beigetreten(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /gibt es in dieser Klasse schon/);
+  assert.notEqual((await beigetreten(`/teacher/fach/${matheId}`)).status, 200);
+
+  // Wer noch gar nicht dabei ist, bleibt auf der Beitrittsseite und kann
+  // einen anderen Fachnamen wählen.
+  const neu = await form(klassenleitung, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Mathe' });
+  assert.equal(neu.headers.get('location'), `/teacher/klassen/${klasseId}/verknuepfen`);
+  assert.match(await (await klassenleitung(`/teacher/klassen/${klasseId}/verknuepfen`)).text(), /gibt es in dieser Klasse schon/);
+  assert.equal(db().prepare(`SELECT 1 FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id
+                             WHERE fz.fach_id = ? AND u.username = 'klassenleitung'`).get(matheId), undefined);
+
+  // Das eigene Fach noch einmal "beitreten" bleibt dagegen harmlos.
+  const erneut = await form(beigetreten, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Englisch' });
+  assert.equal(erneut.headers.get('location'), `/teacher/klassen/${klasseId}`);
+});
+
 test('Nach dem Beitritt: keine Fächer oder Schüler/innen anderer löschen', async () => {
   let r = await form(beigetreten, `/teacher/faecher/${matheId}/loeschen`, {});
   assert.equal(r.status, 403);
@@ -158,9 +185,8 @@ test('Nach dem Beitritt: auch kein Abgang, kein Reaktivieren, kein Abgangszeugni
 });
 
 test('Das eigene Fach löscht nach einem Beitritt ebenfalls die Klassenleitung', async () => {
-  // Bewusste Regel: Beim Beitritt mit einem schon vorhandenen Fachnamen wird
-  // man diesem Fach zugeordnet (fachAnlegenOderFinden) — "eigenes" Fach ist
-  // also kein verlässliches Kriterium.
+  // Bewusste Regel: Löschen entfernt alle Noten des Fachs — das bleibt der
+  // Klassenleitung bzw. Ersteller/in vorbehalten, auch beim eigenen Fach.
   const r = await form(beigetreten, `/teacher/faecher/${englischId}/loeschen`, {});
   assert.equal(r.status, 403);
 });

@@ -9,9 +9,8 @@
  *
  * Ersetzt die frühere Verknüpfungsanfrage mit Einstimmigkeitszwang aller
  * bereits verbundenen Personen — die brauchte für den Normalfall (dieselbe
- * Klasse, zweites Fach) unnötig lange, und Absicherung gegen ein doppelt
- * angelegtes Fach übernimmt ohnehin schon fachAnlegenOderFinden() unten
- * (UNIQUE(klasse_id, name) auf faecher).
+ * Klasse, zweites Fach) unnötig lange. Ein schon vorhandenes Fach wird beim
+ * Beitritt aber nicht einfach übernommen (siehe starteVerknuepfung unten).
  */
 
 import { getDb } from './db.js';
@@ -41,7 +40,18 @@ export function ermittleVerbundenePersonen(klasseId) {
 /**
  * Gewährt direkten Zugriff (neues Fach + Zuweisung), falls die Klasse leer
  * oder für Beitritt freigegeben ist, sonst Ablehnung.
- * Gibt { direkterBeitritt: true, fachId } oder { direkterBeitritt: false } zurück.
+ *
+ * Gibt es das gewünschte Fach in der Klasse schon, wird man ihm NUR
+ * zugeordnet, wenn noch niemand anderes mit der Klasse verbunden ist (leere
+ * Klassenhülle vom Admin) oder man ihm ohnehin schon zugeordnet ist. In einer
+ * bloß freigegebenen Klasse gehört ein bestehendes Fach einer anderen
+ * Lehrkraft — eine Zuweisung gäbe vollen Fach-Zugriff (Klausuren löschen,
+ * Punkte ändern, Teilnehmer/innen entfernen) allein über die Wahl desselben
+ * Fachnamens. Die Zuordnung zu einem fremden Fach bleibt Sache der
+ * Klassenleitung bzw. des Admins.
+ *
+ * Gibt { direkterBeitritt: true, fachId }, { direkterBeitritt: false,
+ * fachExistiert: true } oder { direkterBeitritt: false } zurück.
  */
 export function starteVerknuepfung({ klasseId, angefragtVonId, vorgeschlagenesFach }) {
   const db = getDb();
@@ -50,7 +60,18 @@ export function starteVerknuepfung({ klasseId, angefragtVonId, vorgeschlagenesFa
   verbundene.delete(angefragtVonId); // falls die Person selbst schon verbunden ist, ohnehin kein Thema
 
   if (verbundene.size === 0 || klasse?.offen_fuer_beitritt) {
-    const fachId = fachAnlegenOderFinden(klasseId, vorgeschlagenesFach);
+    const bestehend = db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?')
+      .get(klasseId, vorgeschlagenesFach);
+    if (bestehend) {
+      const schonZugeordnet = db.prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
+        .get(angefragtVonId, bestehend.id);
+      if (schonZugeordnet) return { direkterBeitritt: true, fachId: bestehend.id };
+      if (verbundene.size > 0) return { direkterBeitritt: false, fachExistiert: true };
+      db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
+        .run(angefragtVonId, bestehend.id);
+      return { direkterBeitritt: true, fachId: bestehend.id };
+    }
+    const fachId = fachAnlegen(klasseId, vorgeschlagenesFach);
     db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
       .run(angefragtVonId, fachId);
     return { direkterBeitritt: true, fachId };
@@ -59,11 +80,8 @@ export function starteVerknuepfung({ klasseId, angefragtVonId, vorgeschlagenesFa
   return { direkterBeitritt: false };
 }
 
-function fachAnlegenOderFinden(klasseId, name) {
-  const db = getDb();
-  const bestehend = db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasseId, name);
-  if (bestehend) return bestehend.id;
-  const info = db.prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(klasseId, name);
+function fachAnlegen(klasseId, name) {
+  const info = getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(klasseId, name);
   seedeTeilnehmerAusKlasse(info.lastInsertRowid, klasseId);
   return info.lastInsertRowid;
 }

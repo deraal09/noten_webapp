@@ -978,8 +978,15 @@ export default async function teacherRoutes(fastify) {
       klasseId: klasse.id, angefragtVonId: request.user.id, vorgeschlagenesFach: fach,
     });
     if (ergebnis.direkterBeitritt) {
-      request.flash?.('success', `Zugriff erhalten — dein Fach „${fach}" wurde angelegt.`);
+      request.flash?.('success', `Zugriff erhalten — dein Fach „${fach}".`);
       return reply.redirect(`/teacher/klassen/${klasse.id}`);
+    }
+    if (ergebnis.fachExistiert) {
+      request.flash?.('error', `Das Fach „${fach}" gibt es in dieser Klasse schon und gehört einer anderen Lehrkraft. Bitte die Klassenleitung oder den Admin, dich zuzuordnen — oder einen anderen Fachnamen wählen.`);
+      // Wer schon (über ein anderes Fach) dabei ist, landet auf der Klassenseite
+      // -- die Beitrittsseite würde ohnehin dorthin weiterleiten.
+      return reply.redirect(userHatKlassenZugriff(request.user, klasse.id)
+        ? `/teacher/klassen/${klasse.id}` : `/teacher/klassen/${klasse.id}/verknuepfen`);
     }
     request.flash?.('error', 'Diese Klasse ist nicht für automatischen Beitritt freigegeben. Bitte die Klassenleitung oder den Admin um Zuweisung bitten.');
     return reply.redirect('/teacher/klassen');

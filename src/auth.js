@@ -337,15 +337,18 @@ export function ladeMeineKurse(userId) {
 }
 
 /**
- * Darf dieses Fach gelöscht werden? Ein Kurs (ist_kurs=1) hängt seit der
- * Loslösung von der Ausgangsklasse (siehe routes/teacher.js /kurse/neu) nur
- * noch technisch an einer unsichtbaren, leeren Klassen-Hülle
- * (klassen.ist_kurs_huelle) -- die eigene Fach-Zuweisung ist dort die
- * richtige (und einzig sinnvolle) Berechtigung, nicht der Zugriff auf diese
- * Hülle (userHatKlassenZugriff würde dort mangels Ersteller/in,
- * Klassenleitung o. Ä. immer false liefern und den Kurs unlöschbar machen).
- * Ein normales Fach bleibt bei der bisherigen Regel: Zugriff auf die ganze
- * Heimat-Klasse.
+ * Darf dieses Fach gelöscht werden? Löschen entfernt per ON DELETE CASCADE
+ * alle Klausuren und Noten des Fachs — auch die anderer Lehrkräfte.
+ *   - Admin: immer.
+ *   - Kurs (ist_kurs=1): nur, wer die EINZIGE zugeordnete Lehrkraft ist
+ *     (istEinzigeLehrkraftImFach), sonst nur der Admin. Ein Kurs hängt nur
+ *     technisch an einer unsichtbaren Klassen-Hülle (klassen.ist_kurs_huelle)
+ *     ohne Ersteller/in oder Klassenleitung, die Klassenrechte greifen dort
+ *     also nicht.
+ *   - Normales Fach: wer die Heimat-Klasse verwalten darf
+ *     (userDarfKlasseVerwalten: Ersteller/in, Klassenleitung, Admin). Bloßer
+ *     Zugriff auf die Klasse — z. B. nach einem Beitritt — reicht nicht,
+ *     und die eigene Fach-Zuweisung auch nicht.
  */
 export function userDarfFachLoeschen(user, fach) {
   if (user.isAdmin) return true;
