@@ -14,9 +14,57 @@ import { ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
   ladeAbschlussuebersicht, ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu,
   ladeHistorischeHalbjahre, ladeHistorischeNoten, userDarfHistorischeNotenBearbeiten,
+  importiereHistorischeNoten,
 } from '../fach-abschluss.js';
 import { ladeFachMitUmfeld } from '../noten-service.js';
 import { parseSchuljahr } from '../schuljahr-utils.js';
+import { parseNotenTabelle } from '../csv-import.js';
+import Busboy from '@fastify/busboy';
+import { Readable } from 'node:stream';
+
+/**
+ * Liest ein multipart/form-data-Formular: alle einfachen Textfelder plus
+ * genau ein Datei-Feld. Eigener kleiner Parser statt @fastify/multipart, aus
+ * demselben Grund wie in routes/teacher.js (leseMultipartDatei) -- dessen
+ * globaler Content-Type-Parser würde ALLE Routen der App betreffen. Der
+ * Content-Type-Parser dafür wird weiter unten bewusst nur innerhalb eines
+ * eigenen fastify.register()-Blocks registriert.
+ */
+function leseMultipartFormular(buffer, contentType, dateiFeld) {
+  return new Promise((resolve, reject) => {
+    let busboy;
+    try {
+      busboy = new Busboy({ headers: { 'content-type': contentType } });
+    } catch (e) {
+      return reject(e);
+    }
+    const felder = {};
+    let datei = null;
+    busboy.on('field', (name, value) => { felder[name] = value; });
+    busboy.on('file', (name, stream) => {
+      const chunks = [];
+      stream.on('data', (c) => chunks.push(c));
+      stream.on('end', () => { if (name === dateiFeld) datei = Buffer.concat(chunks); });
+    });
+    busboy.on('error', reject);
+    busboy.on('finish', () => resolve({ felder, datei }));
+    Readable.from(buffer).pipe(busboy);
+  });
+}
+
+/**
+ * Prüft eine Schuljahr-Bezeichnung fürs "vergangenes Schuljahr"-Feature:
+ * gültiges YYYY/YY-Format UND wirklich vor dem laufenden Schuljahr der
+ * Klasse (siehe /klasse/:id/vergangenes-schuljahr/neu weiter unten und den
+ * Noten-Import, die beide dieselbe Regel brauchen).
+ */
+function pruefeVergangenesSchuljahr(klasseSchuljahrBezeichnung, bezeichnung) {
+  const geparst = parseSchuljahr(bezeichnung);
+  if (!geparst) return { ok: false, fehler: 'format' };
+  const eigenesStartjahr = parseSchuljahr(klasseSchuljahrBezeichnung)?.startJahr;
+  if (eigenesStartjahr !== undefined && geparst.startJahr >= eigenesStartjahr) return { ok: false, fehler: 'nicht-vergangen' };
+  return { ok: true };
+}
 
 export default async function klassenlehrerRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -164,14 +212,13 @@ export default async function klassenlehrerRoutes(fastify) {
     }
     const zielRedirect = `/klassenlehrer/klasse/${klasse.id}?tab=halbjahr`;
     const bezeichnung = String(request.body?.bezeichnung || '').trim();
-    const geparst = parseSchuljahr(bezeichnung);
-    if (!geparst) {
-      request.flash?.('error', `Ungültiges Format „${bezeichnung}" -- Schuljahre müssen als YYYY/YY angegeben werden, z. B. 2022/23.`);
-      return reply.redirect(zielRedirect);
-    }
-    const eigenesStartjahr = parseSchuljahr(klasse.schuljahr_bezeichnung)?.startJahr;
-    if (eigenesStartjahr !== undefined && geparst.startJahr >= eigenesStartjahr) {
-      request.flash?.('error', `„${bezeichnung}" ist kein vergangenes Schuljahr -- die Klasse läuft aktuell in ${klasse.schuljahr_bezeichnung}.`);
+    const pruefung = pruefeVergangenesSchuljahr(klasse.schuljahr_bezeichnung, bezeichnung);
+    if (!pruefung.ok) {
+      const meldungen = {
+        format: `Ungültiges Format „${bezeichnung}" -- Schuljahre müssen als YYYY/YY angegeben werden, z. B. 2022/23.`,
+        'nicht-vergangen': `„${bezeichnung}" ist kein vergangenes Schuljahr -- die Klasse läuft aktuell in ${klasse.schuljahr_bezeichnung}.`,
+      };
+      request.flash?.('error', meldungen[pruefung.fehler]);
       return reply.redirect(zielRedirect);
     }
     // Andere Fächer/Lernfelder als aktuell (z. B. ein inzwischen
@@ -199,6 +246,137 @@ export default async function klassenlehrerRoutes(fastify) {
     }
     request.flash?.('success', meldung);
     return reply.redirect(zielRedirect);
+  });
+
+  function baueImportMeldung(ergebnis) {
+    let meldung = `${ergebnis.notenGespeichert} Note(n) gespeichert.`;
+    if (ergebnis.faecherNeu.length) meldung += ` Neu angelegte Fächer: ${ergebnis.faecherNeu.join(', ')}.`;
+    if (ergebnis.faecherUebersprungen.length) {
+      meldung += ` Übersprungen (von einer Fachlehrkraft verwaltet, siehe 🔒): ${ergebnis.faecherUebersprungen.join(', ')}.`;
+    }
+    if (ergebnis.nichtGefundeneSchueler.length) {
+      meldung += ` Nicht gefunden (Name prüfen, exakt wie in der Klasse hinterlegt): ${ergebnis.nichtGefundeneSchueler.join(', ')}.`;
+    }
+    if (ergebnis.ungueltigeWerte.length) {
+      meldung += ` Ungültige Werte übersprungen: ${ergebnis.ungueltigeWerte.join('; ')}.`;
+    }
+    return meldung;
+  }
+
+  // ---------- Historische Noten für mehrere Fächer auf einen Schlag importieren ----------
+  // Ergänzt fuegeVergangenesSchuljahrHinzu (das nur die LEEREN historischen
+  // Halbjahre anlegt) um den eigentlichen Notenimport -- z. B. ein alter
+  // Word-/Excel-Notenspiegel mit Vorname/Nachname und einer Spalte je
+  // Fach/Lernfeld, per Text eingefügt oder als CSV hochgeladen (siehe
+  // src/csv-import.js: parseNotenTabelle, src/fach-abschluss.js:
+  // importiereHistorischeNoten).
+  fastify.get('/klasse/:id/historische-noten-import', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Noten importieren.' });
+    }
+    return reply.viewEjs('klassenlehrer/historische_noten_import.ejs', { user: request.user, klasse });
+  });
+
+  function pruefeImportEingaben(klasse, bezeichnung, halbjahrRoh) {
+    const pruefung = pruefeVergangenesSchuljahr(klasse.schuljahr_bezeichnung, bezeichnung);
+    if (!pruefung.ok) {
+      const meldungen = {
+        format: `Ungültiges Format „${bezeichnung}" -- Schuljahre müssen als YYYY/YY angegeben werden, z. B. 2022/23.`,
+        'nicht-vergangen': `„${bezeichnung}" ist kein vergangenes Schuljahr -- die Klasse läuft aktuell in ${klasse.schuljahr_bezeichnung}.`,
+      };
+      return { ok: false, fehler: meldungen[pruefung.fehler] };
+    }
+    const halbjahrNr = halbjahrRoh === '2' ? 2 : 1;
+    return { ok: true, halbjahrNr };
+  }
+
+  fastify.post('/klasse/:id/historische-noten-import/text', async (request, reply) => {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Noten importieren.' });
+    }
+    const zielRedirect = `/klassenlehrer/klasse/${klasse.id}/historische-noten-import`;
+    const bezeichnung = String(request.body?.bezeichnung || '').trim();
+    const eingaben = pruefeImportEingaben(klasse, bezeichnung, request.body?.halbjahr);
+    if (!eingaben.ok) {
+      request.flash?.('error', eingaben.fehler);
+      return reply.redirect(zielRedirect);
+    }
+    const tabelle = parseNotenTabelle(request.body?.text);
+    if (tabelle.fehler) {
+      const meldungen = {
+        'keine-daten': 'Bitte eine Kopfzeile plus mindestens eine Datenzeile einfügen.',
+        'keine-kopfzeile': 'Kopfzeile mit erkennbaren Nachname-/Vorname-Spalten fehlt (z. B. "Nachname", "Vorname").',
+        'keine-faecher': 'Außer Nachname/Vorname wurde keine Fach-Spalte gefunden.',
+      };
+      request.flash?.('error', meldungen[tabelle.fehler] || 'Tabelle konnte nicht gelesen werden.');
+      return reply.redirect(zielRedirect);
+    }
+    const ergebnis = importiereHistorischeNoten(klasse.id, bezeichnung, eingaben.halbjahrNr, tabelle, request.user);
+    request.flash?.('success', baueImportMeldung(ergebnis));
+    return reply.redirect(zielRedirect);
+  });
+
+  // CSV-Datei-Upload -- eigener, gekapselter Plugin-Scope wie bei
+  // teacher.js: /klassen/:id/schueler/csv (siehe leseMultipartFormular oben).
+  fastify.register(async function (scoped) {
+    scoped.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (request, payload, done) => {
+      done(null, payload);
+    });
+
+    scoped.post('/klasse/:id/historische-noten-import/csv', { bodyLimit: 2 * 1024 * 1024 }, async (request, reply) => {
+      const klasse = getDb().prepare(`
+        SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+        FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+        WHERE k.id = ?
+      `).get(request.params.id);
+      if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+      if (!userIstKlassenlehrer(request.user, klasse.id)) {
+        return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Noten importieren.' });
+      }
+      const zielRedirect = `/klassenlehrer/klasse/${klasse.id}/historische-noten-import`;
+      let felder = {};
+      let datei = null;
+      try {
+        ({ felder, datei } = await leseMultipartFormular(request.body, request.headers['content-type'], 'datei'));
+      } catch {
+        datei = null;
+      }
+      if (!datei) {
+        request.flash?.('error', 'Bitte eine CSV-Datei auswählen.');
+        return reply.redirect(zielRedirect);
+      }
+      const bezeichnung = String(felder.bezeichnung || '').trim();
+      const eingaben = pruefeImportEingaben(klasse, bezeichnung, felder.halbjahr);
+      if (!eingaben.ok) {
+        request.flash?.('error', eingaben.fehler);
+        return reply.redirect(zielRedirect);
+      }
+      const tabelle = parseNotenTabelle(datei.toString('utf8'));
+      if (tabelle.fehler) {
+        const meldungen = {
+          'keine-daten': 'Bitte eine Kopfzeile plus mindestens eine Datenzeile hochladen.',
+          'keine-kopfzeile': 'Kopfzeile mit erkennbaren Nachname-/Vorname-Spalten fehlt (z. B. "Nachname", "Vorname").',
+          'keine-faecher': 'Außer Nachname/Vorname wurde keine Fach-Spalte gefunden.',
+        };
+        request.flash?.('error', meldungen[tabelle.fehler] || 'Datei konnte nicht gelesen werden.');
+        return reply.redirect(zielRedirect);
+      }
+      const ergebnis = importiereHistorischeNoten(klasse.id, bezeichnung, eingaben.halbjahrNr, tabelle, request.user);
+      request.flash?.('success', baueImportMeldung(ergebnis));
+      return reply.redirect(zielRedirect);
+    });
   });
 
   // ---------- Historische Halbjahre eines Fachs (für Klassenleitung ohne eigene Fach-Zuweisung) ----------

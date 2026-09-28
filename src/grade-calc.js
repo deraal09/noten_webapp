@@ -52,6 +52,22 @@ export function nsCsvParse(csvStr) {
 }
 
 /**
+ * Parst eine Notenangabe mit optionaler Tendenz ("3+", "2-", "1") zu einer
+ * reinen Zahl -- die Tendenz ist fürs Zeugnis nicht relevant und wird
+ * verworfen (z. B. beim Massenimport historischer Noten per CSV/Text, siehe
+ * fach-abschluss.js: importiereHistorischeNoten). Gibt null zurück, wenn das
+ * Feld leer oder nicht als Zahl lesbar ist.
+ */
+export function parseTendenzNote(raw) {
+  let s = String(raw ?? '').trim();
+  if (!s) return null;
+  s = s.replace(',', '.').replace(/[+-]$/, '');
+  if (!s) return null;
+  const wert = Number(s);
+  return Number.isFinite(wert) ? wert : null;
+}
+
+/**
  * Liefert die Note für den gegebenen Prozentwert anhand des Schlüssels.
  */
 export function nsCsvLookup(prozent, csvStr) {

@@ -9,8 +9,9 @@
 
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
-import { HALBJAHRE, gesamtnoteJahr } from './grade-calc.js';
+import { HALBJAHRE, gesamtnoteJahr, parseTendenzNote } from './grade-calc.js';
 import { userHatFachZgriff, userIstKlassenlehrer } from './auth.js';
+import { holeSchuelerId } from './schueler-utils.js';
 
 /** Historische Halbjahre eines Fachs, älteste zuerst. */
 export function ladeHistorischeHalbjahre(fachId) {
@@ -298,4 +299,105 @@ export function ladeAbgangszeugnisDaten(schuelerIdParam) {
     return { fach, hjNoten, historische, abschlussnote };
   });
   return { schueler, zeilen };
+}
+
+/**
+ * Massenimport historischer Noten für EIN historisches Halbjahr (ein
+ * Schuljahr, 1. oder 2. Halbjahr) über MEHRERE Fächer auf einen Schlag, aus
+ * einer per Text eingefügten oder als CSV hochgeladenen Tabelle (siehe
+ * src/csv-import.js: parseNotenTabelle) -- Spalten sind Nachname/Vorname
+ * gefolgt von je einer Spalte pro Fach, z. B. aus einem alten Word-/Excel-
+ * Notenspiegel kopiert. Tendenzen ("3+", "2-") werden verworfen (siehe
+ * parseTendenzNote in grade-calc.js), da sie im Zeugnis nicht auftauchen.
+ *
+ * Für jede Fach-Spalte wird das Fach (per Name) und das historische
+ * Halbjahr bei Bedarf angelegt -- wie bei fuegeVergangenesSchuljahrHinzu ein
+ * neues Fach als nur_historisch, falls es unter diesem Namen noch nicht
+ * existiert. Ein Fach, dessen Halbjahr bereits von einer Fachlehrkraft
+ * angelegt wurde (siehe userDarfHistorischeNotenBearbeiten), wird
+ * übersprungen statt ihre Noten zu überschreiben. Schüler/innen werden per
+ * Nachname+Vorname der Klasse zugeordnet (siehe holeSchuelerId) --
+ * Namen ohne Treffer werden gemeldet, statt automatisch neue Schüler/innen
+ * anzulegen (das ist Sache der normalen Schüler-Verwaltung, nicht dieses
+ * reinen Noten-Imports).
+ *
+ * @returns {{ok: true, faecherNeu: string[], faecherUebersprungen: string[],
+ *   notenGespeichert: number, nichtGefundeneSchueler: string[], ungueltigeWerte: string[]}}
+ */
+export function importiereHistorischeNoten(klasseId, schuljahrBezeichnung, halbjahrNr, tabelle, user) {
+  const db = getDb();
+  const bezeichnung = `${halbjahrNr}. Halbjahr ${schuljahrBezeichnung}`;
+  const klasse = db.prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseId);
+  const [min, max] = klasse.notenschluessel === 'BG' ? [0, 15] : [1, 6];
+
+  const holeFach = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND name = ?');
+  const insertFach = db.prepare('INSERT INTO faecher (klasse_id, name, nur_historisch) VALUES (?, ?, 1)');
+  const holeHalbjahr = db.prepare('SELECT * FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = ?');
+  const zaehleHalbjahre = db.prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?');
+  const insertHalbjahr = db.prepare(`
+    INSERT INTO historische_halbjahre (fach_id, bezeichnung, reihenfolge, erstellt_von_id, erstellt_als_fachlehrkraft)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const upsertNote = db.prepare(`
+    INSERT INTO historische_noten (historisches_halbjahr_id, schueler_id, note)
+    VALUES (?, ?, ?)
+    ON CONFLICT(historisches_halbjahr_id, schueler_id) DO UPDATE SET note = excluded.note
+  `);
+
+  const faecherNeu = [];
+  const faecherUebersprungen = [];
+  const ungueltigeWerte = [];
+  const nichtGefundeneSchueler = new Set();
+  let notenGespeichert = 0;
+
+  const tx = db.transaction(() => {
+    const spalten = tabelle.fachSpalten.map((name) => {
+      let fach = holeFach.get(klasseId, name);
+      if (!fach) {
+        const info = insertFach.run(klasseId, name);
+        fach = { id: info.lastInsertRowid, klasse_id: klasseId, name, nur_historisch: 1 };
+        faecherNeu.push(name);
+      }
+      let hh = holeHalbjahr.get(fach.id, bezeichnung);
+      if (!hh) {
+        const reihenfolge = zaehleHalbjahre.get(fach.id).c;
+        const alsFachlehrkraft = userHatFachZgriff(user, fach.id) ? 1 : 0;
+        const info = insertHalbjahr.run(fach.id, bezeichnung, reihenfolge, user.id, alsFachlehrkraft);
+        hh = { id: info.lastInsertRowid, fach_id: fach.id, bezeichnung, erstellt_als_fachlehrkraft: alsFachlehrkraft };
+      }
+      const darfBearbeiten = userDarfHistorischeNotenBearbeiten(user, fach, hh);
+      if (!darfBearbeiten) faecherUebersprungen.push(name);
+      return { name, hh, darfBearbeiten };
+    });
+
+    for (const zeile of tabelle.zeilen) {
+      const schuelerId = holeSchuelerId(klasseId, zeile.nachname, zeile.vorname);
+      if (!schuelerId) {
+        nichtGefundeneSchueler.add(`${zeile.vorname} ${zeile.nachname}`.trim());
+        continue;
+      }
+      for (const spalte of spalten) {
+        if (!spalte.darfBearbeiten) continue;
+        const roh = zeile.noten[spalte.name];
+        const wert = parseTendenzNote(roh);
+        if (wert === null) continue; // leer/nicht lesbar -- unverändert lassen
+        if (wert < min || wert > max) {
+          ungueltigeWerte.push(`${spalte.name} bei ${zeile.vorname} ${zeile.nachname}: "${roh}"`);
+          continue;
+        }
+        upsertNote.run(spalte.hh.id, schuelerId, wert);
+        notenGespeichert++;
+      }
+    }
+  });
+  tx();
+
+  return {
+    ok: true,
+    faecherNeu,
+    faecherUebersprungen: [...new Set(faecherUebersprungen)],
+    notenGespeichert,
+    nichtGefundeneSchueler: [...nichtGefundeneSchueler],
+    ungueltigeWerte,
+  };
 }
