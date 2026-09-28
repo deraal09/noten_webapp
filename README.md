@@ -913,8 +913,9 @@ beachten — Migrationen sind nicht automatisch rückwärtskompatibel.
 
 ## Versionsnummer
 
-Die Fußzeile zeigt eine Version im Format `0.MINOR.PATCH` (z. B. `v0.35.0`),
-ausgelesen aus `package.json` (`app.js` → `reply.locals.appVersion` →
+Die Fußzeile zeigt eine Version im Format `0.MINOR.PATCH` samt Release-Datum
+(z. B. `v0.36.0 (28.09.2026)`), ausgelesen aus `package.json` (`version` und
+`releaseDate`; `app.js` → `reply.locals.appVersion`/`appReleaseDate` →
 `views/partials/layout.ejs`). Solange die App aktiv weiterentwickelt wird,
 bleibt die Hauptversion bei `0` (SemVer-Konvention: „kann sich noch
 grundlegend ändern").
@@ -922,11 +923,14 @@ grundlegend ändern").
 Es gibt **keinen Automatismus**, der die Version aus der Commit-Historie
 ableitet — die Commit-Nachrichten folgen keiner strikten
 `feat:`/`fix:`-Konvention, aus der sich das zuverlässig berechnen ließe.
-Stattdessen wird `version` in `package.json` von Hand gepflegt:
+Stattdessen werden `version` und `releaseDate` in `package.json` von Hand
+gepflegt, bei jeder Versionsänderung zusammen:
 
 - **Minor hoch, Patch auf 0** bei einer neuen Fähigkeit (z. B. ein neuer
   Menüpunkt, eine neue Aktion für eine Rolle).
 - **Patch hoch** bei Bugfixes, kleinen Anpassungen, Chores, Doku, Tests.
+- **`releaseDate`** auf das Datum dieser Änderung setzen (`YYYY-MM-DD`) und
+  einen kurzen Eintrag in [`CHANGELOG.md`](CHANGELOG.md) ergänzen.
 
 Das ist bewusst einfach gehalten (kein `feat:`/`fix:`-Zwang, kein
 Release-Tooling) — dafür braucht es Disziplin bei jedem Commit, der die

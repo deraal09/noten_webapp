@@ -77,7 +77,8 @@
 </main>
 <% if (!(typeof embed !== 'undefined' && embed)) { %>
 <footer class="footer">
-  <small>Notenverwaltung · <%= now.getFullYear() %><% if (typeof appVersion !== 'undefined' && appVersion) { %> · v<%= appVersion %><% } %></small>
+  <small>Notenverwaltung · <%= now.getFullYear() %><% if (typeof appVersion !== 'undefined' && appVersion) { %> · v<%= appVersion %><%
+    if (typeof appReleaseDate !== 'undefined' && appReleaseDate) { %> (<%= appReleaseDate.split('-').reverse().join('.') %>)<% } %><% } %></small>
 </footer>
 <% } %>
 <script>
