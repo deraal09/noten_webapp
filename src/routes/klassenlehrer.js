@@ -485,7 +485,9 @@ export default async function klassenlehrerRoutes(fastify) {
     if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Fächer löschen.' });
     }
-    const zielRedirect = `/klassenlehrer/klasse/${fach.klasse_id}?tab=halbjahr`;
+    // #fuer-loeschung: nach dem Löschen soll die Seite dort weiter angezeigt
+    // werden, statt ganz nach oben zu springen (siehe id in klasse_detail.ejs).
+    const zielRedirect = `/klassenlehrer/klasse/${fach.klasse_id}?tab=halbjahr#fuer-loeschung`;
     const anzahlZuweisungen = getDb().prepare('SELECT COUNT(*) AS c FROM fach_zuweisungen WHERE fach_id = ?').get(fach.id).c;
     if (anzahlZuweisungen > 0) {
       request.flash?.('error', `„${fach.name}" ist noch einer Lehrkraft zugewiesen -- bitte zuerst die Zuweisung entfernen.`);

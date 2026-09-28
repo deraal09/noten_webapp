@@ -480,6 +480,8 @@ test('POST /klassenlehrer/fach/:id/loeschen: nur die Klassenleitung darf, und nu
   assert.equal(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(lf5Id), undefined);
   // Zugehörige historische Noten/Halbjahre verschwinden per ON DELETE CASCADE mit.
   assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(lf5Id).c, 0);
+  // Redirect springt zurück zum Fächer-Bereich (#fuer-loeschung), nicht an den Seitenanfang.
+  assert.ok(r.headers.get('location').endsWith('#fuer-loeschung'));
 });
 
 test.after(async () => {
