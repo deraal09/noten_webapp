@@ -320,6 +320,60 @@ test('POST .../vergangenes-schuljahr/neu: Feld "Weitere Fächer" legt zusätzlic
   assert.equal(sport.nur_historisch, 1);
 });
 
+test('POST /klassenlehrer/fach/:id/lehrkraft/neu: nur die Klassenleitung darf zuweisen', async () => {
+  const lf5 = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId);
+  const unbeteiligtId = getDb().prepare("SELECT id FROM users WHERE username = 'lehrerunbeteiligt'").get().id;
+  const r = await form(lehrerFremd, `/klassenlehrer/fach/${lf5.id}/lehrkraft/neu`, { user_id: String(unbeteiligtId) });
+  assert.equal(r.status, 403);
+  assert.equal(getDb().prepare('SELECT 1 FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?').get(lf5.id, unbeteiligtId), undefined);
+});
+
+test('Klassenleitung ordnet einem rein historischen Fach eine Lehrkraft zu -- diese bekommt dadurch vollen Zugriff und kann die Noten ändern', async () => {
+  const lf5 = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId);
+  const unbeteiligtId = getDb().prepare("SELECT id FROM users WHERE username = 'lehrerunbeteiligt'").get().id;
+  const schuelerId = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(klasseId).id;
+  const hh = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2021/22'").get(lf5.id);
+
+  // Vor der Zuweisung: kein Zugriff auf die normale Fach-Seite, und Noten dürfen nicht geändert werden.
+  let r = await lehrerUnbeteiligt(`/teacher/fach/${lf5.id}`);
+  assert.equal(r.status, 403);
+  r = await form(lehrerUnbeteiligt, `/teacher/historie/${hh.id}/speichern`, { ['note_' + schuelerId]: '4' });
+  assert.equal(r.status, 403);
+
+  r = await form(lehrerA, `/klassenlehrer/fach/${lf5.id}/lehrkraft/neu`, { user_id: String(unbeteiligtId) });
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/klassenlehrer/fach/${lf5.id}/historie`);
+  assert.ok(getDb().prepare('SELECT 1 FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?').get(lf5.id, unbeteiligtId));
+
+  // Nach der Zuweisung: voller Zugriff auf die normale Fach-Seite (Live-Notentafel-Gate, siehe teacher.js),
+  // und die zuvor von der Klassenleitung angelegten Noten dürfen jetzt geändert werden.
+  r = await lehrerUnbeteiligt(`/teacher/fach/${lf5.id}`);
+  assert.equal(r.status, 200);
+  r = await form(lehrerUnbeteiligt, `/teacher/historie/${hh.id}/speichern`, { ['note_' + schuelerId]: '4' });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT note FROM historische_noten WHERE historisches_halbjahr_id = ? AND schueler_id = ?').get(hh.id, schuelerId).note, 4);
+
+  const html = await (await lehrerA(`/klassenlehrer/fach/${lf5.id}/historie`)).text();
+  assert.ok(html.includes('lehrerunbeteiligt') || html.includes('Lehrer Unbeteiligt'));
+});
+
+test('Klassenleitung entfernt die Zuweisung wieder -- Zugriff entfällt', async () => {
+  const lf5 = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId);
+  const unbeteiligtId = getDb().prepare("SELECT id FROM users WHERE username = 'lehrerunbeteiligt'").get().id;
+  const zuweisung = getDb().prepare('SELECT id FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?').get(lf5.id, unbeteiligtId);
+  assert.ok(zuweisung);
+
+  const rVerboten = await form(lehrerFremd, `/klassenlehrer/zuweisung/${zuweisung.id}/loeschen`, {});
+  assert.equal(rVerboten.status, 403);
+
+  const r = await form(lehrerA, `/klassenlehrer/zuweisung/${zuweisung.id}/loeschen`, {});
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT 1 FROM fach_zuweisungen WHERE id = ?').get(zuweisung.id), undefined);
+
+  const r2 = await lehrerUnbeteiligt(`/teacher/fach/${lf5.id}`);
+  assert.equal(r2.status, 403);
+});
+
 test.after(async () => {
   await fastify.close();
 });

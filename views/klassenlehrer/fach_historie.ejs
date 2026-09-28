@@ -55,3 +55,37 @@
     <button type="submit">+ Vergangenes Halbjahr hinzufügen</button>
   </form>
 </div>
+
+<div class="card">
+  <h2>Lehrkräfte zuordnen <small>(bekommen dadurch Zugriff auf die Notentafel/Historie dieses Fachs und können die Noten ändern)</small></h2>
+  <% if (!zuweisungen.length) { %>
+    <p class="hint">Diesem Fach ist noch keine Lehrkraft zugeordnet.</p>
+  <% } else { %>
+    <table class="data">
+      <thead><tr><th>Lehrkraft</th><th>Aktion</th></tr></thead>
+      <tbody>
+        <% zuweisungen.forEach(function(z) { %>
+          <tr>
+            <td><%= z.display_name || z.username %></td>
+            <td>
+              <form method="post" action="/klassenlehrer/zuweisung/<%= z.id %>/loeschen" class="inline" onsubmit="return confirm('Zuweisung entfernen?')">
+                <button type="submit" class="danger">🗑</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+  <form method="post" action="/klassenlehrer/fach/<%= fach.id %>/lehrkraft/neu" class="inline">
+    <label>Lehrkraft
+      <select name="user_id" required>
+        <option value="">— wählen —</option>
+        <% zuweisbareLehrkraefte.forEach(function(u) { %>
+          <option value="<%= u.id %>"><%= u.display_name || u.username %></option>
+        <% }); %>
+      </select>
+    </label>
+    <button type="submit">+ Zuweisen</button>
+  </form>
+</div>

@@ -218,9 +218,55 @@ export default async function klassenlehrerRoutes(fastify) {
       ...hh, noten: ladeHistorischeNoten(hh.id),
       darfBearbeiten: userDarfHistorischeNotenBearbeiten(request.user, fach, hh),
     }));
+    // Gerade bei einem rein historischen Fach (nur_historisch, siehe
+    // src/db.js) ist meist niemand zugewiesen -- die Klassenleitung kann
+    // hier trotzdem eine Lehrkraft zuordnen, die dann per fach_zuweisungen
+    // ganz normal Zugriff auf die Notentafel/Historie dieses Fachs bekommt
+    // (siehe userHatFachZgriff in src/auth.js).
+    const zuweisbareLehrkraefte = getDb().prepare(
+      "SELECT id, username, display_name FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
+    ).all();
+    const zuweisungen = getDb().prepare(`
+      SELECT fz.id, u.display_name, u.username
+      FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id
+      WHERE fz.fach_id = ? ORDER BY u.username
+    `).all(fach.id);
     return reply.viewEjs('klassenlehrer/fach_historie.ejs', {
-      user: request.user, fach, schueler, historischeHalbjahre,
+      user: request.user, fach, schueler, historischeHalbjahre, zuweisbareLehrkraefte, zuweisungen,
     });
+  });
+
+  // ---------- Lehrkraft einem Fach zuordnen (von der Historie-Seite aus) ----------
+  fastify.post('/fach/:id/lehrkraft/neu', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Lehrkräfte zuweisen.' });
+    }
+    const zielRedirect = `/klassenlehrer/fach/${fach.id}/historie`;
+    const userId = parseInt(request.body?.user_id, 10);
+    if (!userId) {
+      request.flash?.('error', 'Ungültige Auswahl.');
+      return reply.redirect(zielRedirect);
+    }
+    try {
+      getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(userId, fach.id);
+    } catch {
+      request.flash?.('error', 'Diese Zuweisung besteht bereits.');
+    }
+    return reply.redirect(zielRedirect);
+  });
+
+  fastify.post('/zuweisung/:id/loeschen', async (request, reply) => {
+    const z = getDb().prepare(`
+      SELECT fz.id, fz.fach_id, f.klasse_id FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id WHERE fz.id = ?
+    `).get(request.params.id);
+    if (!z) return reply.redirect('/klassenlehrer');
+    if (!userIstKlassenlehrer(request.user, z.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Zuweisungen entfernen.' });
+    }
+    getDb().prepare('DELETE FROM fach_zuweisungen WHERE id = ?').run(z.id);
+    return reply.redirect(`/klassenlehrer/fach/${z.fach_id}/historie`);
   });
 
   // ---------- Freie Notizen je Schüler/in (unabhängig von Noten/Fehlzeiten) ----------
