@@ -98,57 +98,44 @@ export function ladeVergangeneSchuljahre(klasseId) {
 }
 
 /**
- * Fügt für die AKTUELLEN Fächer einer Klasse (nicht: bereits vorhandene rein
- * historische Fächer aus früheren Aufrufen für ANDERE Schuljahre, siehe
- * unten) ein vergangenes Schuljahr hinzu -- je Fach zwei historische
- * Halbjahre ("1./2. Halbjahr <Bezeichnung>"), bereit für die Noteneingabe
- * auf der jeweiligen Fach-Seite (Reiter "Historische Halbjahre"). Fächer,
- * die dieses Schuljahr schon haben (z. B. weil eine Fachlehrkraft es zuvor
- * selbst für ihr Fach angelegt hat, siehe userDarfHistorischeNotenBearbeiten),
- * werden übersprungen statt Duplikate zu erzeugen -- die Klassenleitung
- * ergänzt so gezielt nur die noch fehlenden Fächer.
+ * Fügt für die EXPLIZIT GENANNTEN Fächer/Lernfelder ein vergangenes
+ * Schuljahr hinzu -- je Fach zwei historische Halbjahre ("1./2. Halbjahr
+ * <Bezeichnung>"), bereit für die Noteneingabe auf der jeweiligen Fach-Seite
+ * (Reiter "Historische Halbjahre"). Die aktuellen Fächer der Klasse werden
+ * NICHT automatisch übernommen -- ein vergangenes Schuljahr hatte oft einen
+ * ganz anderen Fächerkanon (andere Lernfelder) als das laufende, und ein
+ * automatisches Übertragen würde sonst falsche/unerwünschte historische
+ * Halbjahre für Fächer anlegen, die es damals gar nicht gab (und die
+ * zugehörigen, dafür extra angelegten "rein historischen" Fächer würden
+ * fälschlich im laufenden Schuljahr auftauchen, siehe faecher.nur_historisch
+ * in src/db.js).
  *
- * `neueFaecherNamen` deckt den Fall ab, dass die Klasse in diesem
- * vergangenen Schuljahr andere Fächer/Lernfelder hatte als aktuell (z. B.
- * ein inzwischen abgeschafftes Lernfeld) -- dafür werden bei Bedarf neue,
- * rein historische Fächer angelegt (faecher.nur_historisch = 1, siehe
- * src/db.js), die aus den "aktuellen Fächer"-Listen ausgeblendet bleiben.
- * Ein Name, der einem bereits vorhandenen Fach der Klasse entspricht (egal
- * ob aktuell oder rein historisch, z. B. weil dasselbe Lernfeld schon für
- * ein anderes vergangenes Schuljahr angelegt wurde), legt kein Duplikat an,
- * sondern verwendet dieses Fach für dieses Schuljahr mit weiter. Ein rein
- * historisches Fach wird dabei bewusst NUR berücksichtigt, wenn es hier
- * erneut per Name genannt wird -- sonst würde jeder weitere Aufruf (für ein
- * völlig anderes Schuljahr) versehentlich auch längst abgeschlossene
- * Lernfelder wieder aufgreifen.
+ * Jeder genannte Name wird, falls er zu einem bereits vorhandenen Fach der
+ * Klasse passt (egal ob aktuell oder schon früher rein historisch angelegt,
+ * z. B. weil dasselbe Lernfeld schon für ein anderes vergangenes Schuljahr
+ * genannt wurde), diesem Fach zugeordnet, statt ein Duplikat anzulegen.
+ * Fehlt ein passendes Fach, wird es neu als rein historisch angelegt
+ * (faecher.nur_historisch = 1). Ein Fach, das dieses Schuljahr schon hat
+ * (z. B. weil eine Fachlehrkraft es zuvor selbst für ihr Fach angelegt hat,
+ * siehe userDarfHistorischeNotenBearbeiten), wird übersprungen statt
+ * Duplikate zu erzeugen.
  *
- * Lehnt nur ab, wenn es für WIRKLICH JEDES betroffene Fach schon existiert
- * (nichts zu tun) oder die Klasse weder aktuelle noch neu zu benennende
- * Fächer hat.
+ * Lehnt ab, wenn gar keine Fächer/Lernfelder genannt wurden, oder wenn es
+ * für WIRKLICH JEDES genannte Fach schon existiert (nichts zu tun).
  * @returns {{ok: true, angelegtFuer: string[], uebersprungenFuer: string[], neuAngelegteFaecher: string[]} | {ok: false, fehler: 'bereits-vorhanden'|'keine-faecher'}}
  */
-export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, userId, neueFaecherNamen = []) {
+export function fuegeVergangenesSchuljahrHinzu(klasseId, schuljahrBezeichnung, userId, faecherNamen = []) {
   const db = getDb();
   const labels = halbjahrBezeichnungen(schuljahrBezeichnung);
 
-  const alleFaecher = db.prepare('SELECT id, name, nur_historisch FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasseId);
-  const aktuelleFaecher = alleFaecher.filter((f) => !f.nur_historisch);
-  const alleNamen = new Set(alleFaecher.map((f) => f.name));
+  const namenBereinigt = [...new Set((faecherNamen || []).map((n) => String(n || '').trim()).filter(Boolean))];
+  if (namenBereinigt.length === 0) return { ok: false, fehler: 'keine-faecher' };
 
-  const namenBereinigt = [...new Set((neueFaecherNamen || []).map((n) => String(n || '').trim()).filter(Boolean))];
-  const neueNamen = namenBereinigt.filter((n) => !alleNamen.has(n));
-  // Ein genannter Name, der zu einem bereits bestehenden rein historischen
-  // Fach passt, greift dieses gezielt für das aktuell angefragte Schuljahr
-  // wieder auf (z. B. dasselbe Lernfeld über mehrere vergangene Schuljahre
-  // hinweg) -- ein bereits aktuelles Fach mit diesem Namen braucht das
-  // nicht, das steckt ohnehin schon in aktuelleFaecher.
-  const wiederverwendeteHistorische = namenBereinigt
+  const alleFaecher = db.prepare('SELECT id, name FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasseId);
+  const neueNamen = namenBereinigt.filter((n) => !alleFaecher.some((f) => f.name === n));
+  const kandidaten = namenBereinigt
     .filter((n) => !neueNamen.includes(n))
-    .map((n) => alleFaecher.find((f) => f.name === n && f.nur_historisch))
-    .filter(Boolean);
-
-  const kandidaten = [...aktuelleFaecher, ...wiederverwendeteHistorische];
-  if (kandidaten.length === 0 && neueNamen.length === 0) return { ok: false, fehler: 'keine-faecher' };
+    .map((n) => alleFaecher.find((f) => f.name === n));
 
   const vorhandeneFachIds = new Set(db.prepare(`
     SELECT DISTINCT hh.fach_id FROM historische_halbjahre hh

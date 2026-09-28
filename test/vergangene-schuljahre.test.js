@@ -1,8 +1,11 @@
 /**
  * "Vergangene Schuljahre hinzufügen" in der Klassenleitungsübersicht (Tab
- * "Halbjahresübersicht"): legt auf einen Schlag für ALLE Fächer einer
- * Klasse ein Paar historischer Halbjahre ("1./2. Halbjahr <Schuljahr>") an,
- * statt dass die Klassenleitung das Fach für Fach von Hand eintippen muss.
+ * "Halbjahresübersicht"): legt auf einen Schlag für die EXPLIZIT GENANNTEN
+ * Fächer/Lernfelder ein Paar historischer Halbjahre ("1./2. Halbjahr
+ * <Schuljahr>") an, statt dass die Klassenleitung das Fach für Fach von
+ * Hand eintippen muss. Die aktuellen Fächer der Klasse werden bewusst NICHT
+ * automatisch übernommen, da der Fächerkanon eines vergangenen Schuljahres
+ * ein ganz anderer gewesen sein kann.
  *
  * Deckt sowohl die reinen Service-Funktionen (src/fach-abschluss.js:
  * ladeVergangeneSchuljahre/fuegeVergangenesSchuljahrHinzu) als auch die
@@ -91,8 +94,14 @@ test('Vorbereitung: Klasse 12A mit zwei Fächern, Lehrer A als Klassenleitung, e
     .run(klasseId, 'lehrera');
 });
 
-test('fuegeVergangenesSchuljahrHinzu legt für ALLE Fächer der Klasse zwei historische Halbjahre an', () => {
+test('fuegeVergangenesSchuljahrHinzu lehnt ohne genannte Fächer ab (kein automatisches Übernehmen der aktuellen Fächer)', () => {
   const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2024/25', 1);
+  assert.deepEqual(ergebnis, { ok: false, fehler: 'keine-faecher' });
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre').get().c, 0);
+});
+
+test('fuegeVergangenesSchuljahrHinzu legt für die genannten Fächer zwei historische Halbjahre an', () => {
+  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2024/25', 1, ['Deutsch', 'Mathematik']);
   assert.equal(ergebnis.ok, true);
   assert.deepEqual(ergebnis.angelegtFuer.sort(), ['Deutsch', 'Mathematik']);
   assert.deepEqual(ergebnis.uebersprungenFuer, []);
@@ -106,7 +115,7 @@ test('fuegeVergangenesSchuljahrHinzu legt für ALLE Fächer der Klasse zwei hist
 });
 
 test('fuegeVergangenesSchuljahrHinzu lehnt ein bereits vorhandenes Schuljahr ab (keine Duplikate)', () => {
-  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2024/25', 1);
+  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2024/25', 1, ['Deutsch', 'Mathematik']);
   assert.deepEqual(ergebnis, { ok: false, fehler: 'bereits-vorhanden' });
 
   // Keine zusätzlichen Zeilen entstanden.
@@ -146,8 +155,16 @@ test('POST .../vergangenes-schuljahr/neu: ungültiges Format wird abgelehnt', as
   assert.equal(ladeVergangeneSchuljahre(klasseId).length, 1);
 });
 
-test('POST .../vergangenes-schuljahr/neu: Klassenleitung legt ein echtes vergangenes Schuljahr über die Route an', async () => {
-  const r = await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, { bezeichnung: '2023/24' });
+test('POST .../vergangenes-schuljahr/neu: ohne genannte Fächer/Lernfelder kommt eine Fehlermeldung statt eines automatischen Übernehmens', async () => {
+  const r = await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, { bezeichnung: '2023/24', faecher: '' });
+  assert.equal(r.status, 302);
+  assert.equal(ladeVergangeneSchuljahre(klasseId).length, 1); // unverändert -- kein automatisches Übernehmen
+});
+
+test('POST .../vergangenes-schuljahr/neu: Klassenleitung legt ein echtes vergangenes Schuljahr für die genannten Fächer über die Route an', async () => {
+  const r = await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, {
+    bezeichnung: '2023/24', faecher: 'Deutsch\nMathematik',
+  });
   assert.equal(r.status, 302);
   assert.equal(r.headers.get('location'), `/klassenlehrer/klasse/${klasseId}?tab=halbjahr`);
 
@@ -238,7 +255,7 @@ test('fuegeVergangenesSchuljahrHinzu überspringt Fächer, die von einer Fachleh
   const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
   const anzahlVorher = getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(mathId).c;
 
-  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2022/23', 1);
+  const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2022/23', 1, ['Deutsch', 'Mathematik']);
   assert.equal(ergebnis.ok, true);
   assert.deepEqual(ergebnis.angelegtFuer, ['Deutsch']);
   assert.deepEqual(ergebnis.uebersprungenFuer, ['Mathematik']);
@@ -255,10 +272,11 @@ test('fuegeVergangenesSchuljahrHinzu überspringt Fächer, die von einer Fachleh
   assert.equal(deutschEintrag.erstelltAlsFachlehrkraft, false);
 });
 
-test('fuegeVergangenesSchuljahrHinzu legt zusätzliche, im aktuellen Schuljahr nicht mehr existierende Fächer als "nur_historisch" an', () => {
+test('fuegeVergangenesSchuljahrHinzu legt NUR die genannten, im aktuellen Schuljahr nicht mehr existierenden Fächer als "nur_historisch" an', () => {
   const ergebnis = fuegeVergangenesSchuljahrHinzu(klasseId, '2021/22', 1, ['LF5 Fachpraxis Pflege', '  Religion  ']);
   assert.equal(ergebnis.ok, true);
-  assert.deepEqual(ergebnis.angelegtFuer.sort(), ['Deutsch', 'LF5 Fachpraxis Pflege', 'Mathematik', 'Religion']);
+  // NICHT automatisch dabei: Deutsch/Mathematik -- nur die genannten Fächer.
+  assert.deepEqual(ergebnis.angelegtFuer.sort(), ['LF5 Fachpraxis Pflege', 'Religion']);
   assert.deepEqual(ergebnis.neuAngelegteFaecher.sort(), ['LF5 Fachpraxis Pflege', 'Religion']);
 
   const lf5 = getDb().prepare("SELECT * FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId);
@@ -274,7 +292,7 @@ test('Neu angelegtes historisches Fach taucht in der laufenden Fächerliste der 
 
   const liste = ladeVergangeneSchuljahre(klasseId);
   const sj2122 = liste.find((sj) => sj.schuljahr === '2021/22');
-  assert.deepEqual(sj2122.faecher.map((f) => f.name).sort(), ['Deutsch', 'LF5 Fachpraxis Pflege', 'Mathematik', 'Religion']);
+  assert.deepEqual(sj2122.faecher.map((f) => f.name).sort(), ['LF5 Fachpraxis Pflege', 'Religion']);
 });
 
 test('Klassenleitung kann für das neu angelegte historische Fach über die eigens vorgesehene Seite Noten eintragen', async () => {
@@ -305,16 +323,16 @@ test('Ein als "neues Fach" angegebener Name, der bereits existiert, erzeugt kein
   assert.equal(nachherAnzahl, 1); // weiterhin nur ein "Deutsch"
 });
 
-test('POST .../vergangenes-schuljahr/neu: Feld "Weitere Fächer" legt zusätzliche historische Fächer über die echte Route an', async () => {
+test('POST .../vergangenes-schuljahr/neu: Feld "Fächer" legt genau die genannten Fächer über die echte Route an (nicht die aktuellen)', async () => {
   const r = await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, {
-    bezeichnung: '2019/20', neue_faecher: 'Sozialkunde\nSport',
+    bezeichnung: '2019/20', faecher: 'Sozialkunde\nSport',
   });
   assert.equal(r.status, 302);
 
   const liste = ladeVergangeneSchuljahre(klasseId);
   const sj1920 = liste.find((sj) => sj.schuljahr === '2019/20');
   assert.ok(sj1920);
-  assert.deepEqual(sj1920.faecher.map((f) => f.name).sort(), ['Deutsch', 'Mathematik', 'Sozialkunde', 'Sport']);
+  assert.deepEqual(sj1920.faecher.map((f) => f.name).sort(), ['Sozialkunde', 'Sport']); // NICHT Deutsch/Mathematik
 
   const sport = getDb().prepare("SELECT nur_historisch FROM faecher WHERE klasse_id = ? AND name = 'Sport'").get(klasseId);
   assert.equal(sport.nur_historisch, 1);
@@ -355,6 +373,27 @@ test('Klassenleitung ordnet einem rein historischen Fach eine Lehrkraft zu -- di
 
   const html = await (await lehrerA(`/klassenlehrer/fach/${lf5.id}/historie`)).text();
   assert.ok(html.includes('lehrerunbeteiligt') || html.includes('Lehrer Unbeteiligt'));
+});
+
+test('Noteneingabe (Dashboard): ein rein historisches Fach erscheint NICHT im aktuellen Schuljahr, auch wenn die Lehrkraft zugewiesen ist', async () => {
+  const html = await (await lehrerUnbeteiligt('/teacher')).text();
+  assert.ok(!html.includes('LF5 Fachpraxis Pflege'));
+});
+
+test('Noteneingabe (Dashboard): das vergangene Schuljahr erscheint als Auswahl und zeigt das rein historische Fach erst nach Auswahl', async () => {
+  const rOhneAuswahl = await lehrerUnbeteiligt('/teacher');
+  const htmlOhneAuswahl = await rOhneAuswahl.text();
+  assert.ok(htmlOhneAuswahl.includes('2021/22')); // Schuljahr-Auswahl selbst ist sichtbar
+  assert.ok(!htmlOhneAuswahl.includes('LF5 Fachpraxis Pflege')); // aber das Fach noch nicht
+
+  const rMitAuswahl = await lehrerUnbeteiligt('/teacher?schuljahr=' + encodeURIComponent('2021/22'));
+  const htmlMitAuswahl = await rMitAuswahl.text();
+  assert.ok(htmlMitAuswahl.includes('LF5 Fachpraxis Pflege'));
+
+  // Ein anderes (für diese Lehrkraft nicht zutreffendes) Schuljahr zeigt es nicht.
+  const rAnderesJahr = await lehrerUnbeteiligt('/teacher?schuljahr=' + encodeURIComponent('2020/21'));
+  const htmlAnderesJahr = await rAnderesJahr.text();
+  assert.ok(!htmlAnderesJahr.includes('LF5 Fachpraxis Pflege'));
 });
 
 test('Klassenleitung entfernt die Zuweisung wieder -- Zugriff entfällt', async () => {

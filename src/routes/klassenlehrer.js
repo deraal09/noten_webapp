@@ -221,15 +221,17 @@ export default async function klassenlehrerRoutes(fastify) {
       request.flash?.('error', meldungen[pruefung.fehler]);
       return reply.redirect(zielRedirect);
     }
-    // Andere Fächer/Lernfelder als aktuell (z. B. ein inzwischen
-    // abgeschafftes Lernfeld) -- eine Zeile je Fach/Lernfeld.
-    const neueFaecherNamen = String(request.body?.neue_faecher || '')
+    // Die Fächer/Lernfelder dieses vergangenen Schuljahres -- eine Zeile je
+    // Fach/Lernfeld. Werden NICHT automatisch von den aktuellen Fächern der
+    // Klasse übernommen (die können sich seitdem geändert haben), siehe
+    // fuegeVergangenesSchuljahrHinzu.
+    const faecherNamen = String(request.body?.faecher || '')
       .split('\n').map((n) => n.trim()).filter(Boolean);
-    const ergebnis = fuegeVergangenesSchuljahrHinzu(klasse.id, bezeichnung, request.user.id, neueFaecherNamen);
+    const ergebnis = fuegeVergangenesSchuljahrHinzu(klasse.id, bezeichnung, request.user.id, faecherNamen);
     if (!ergebnis.ok) {
       const meldungen = {
-        'bereits-vorhanden': `„${bezeichnung}" wurde für diese Klasse bereits für alle Fächer hinzugefügt.`,
-        'keine-faecher': 'Diese Klasse hat noch keine Fächer -- ggf. zusätzlich Fach/Lernfeld-Namen für dieses Schuljahr angeben.',
+        'bereits-vorhanden': `„${bezeichnung}" wurde für diese Fächer bereits hinzugefügt.`,
+        'keine-faecher': 'Bitte mindestens ein Fach/Lernfeld angeben.',
       };
       request.flash?.('error', meldungen[ergebnis.fehler] || 'Anlegen fehlgeschlagen.');
       return reply.redirect(zielRedirect);

@@ -160,14 +160,20 @@ export default async function teacherRoutes(fastify) {
     // eine eigene, klassenlose Rubrik statt unter ihrer unsichtbaren
     // Kurs-Hülle zu erscheinen (siehe /kurse/neu, klassen.ist_kurs_huelle) --
     // deren technischer Name (__kurshuelle_…) wäre als "Klassen"-Überschrift
-    // nur verwirrend.
+    // nur verwirrend. Rein historische Fächer (faecher.nur_historisch, siehe
+    // fuegeVergangenesSchuljahrHinzu/importiereHistorischeNoten) bleiben hier
+    // bewusst außen vor: sie hängen technisch an der AKTUELLEN Klasse,
+    // gehören inhaltlich aber zu einem vergangenen Schuljahr und würden
+    // sonst als (leeres, teilnehmerloses) Fach im laufenden Schuljahr
+    // auftauchen. Sie erscheinen weiter unten nur, wenn explizit ein
+    // vergangenes Schuljahr ausgewählt wird (siehe dashboard.ejs).
     const rows = getDb().prepare(`
       SELECT f.id, f.name, f.ist_kurs, k.id AS klasse_id, k.name AS klasse_name, k.notenschluessel,
              s.id AS schuljahr_id, s.bezeichnung AS schuljahr_bezeichnung,
              (SELECT COUNT(*) FROM klausuren kk WHERE kk.fach_id = f.id) AS anzahl_klausuren,
              (SELECT COUNT(*) FROM unterrichtsleistungen uu WHERE uu.fach_id = f.id) AS anzahl_uls
       FROM fach_zuweisungen fz
-      JOIN faecher f ON f.id = fz.fach_id
+      JOIN faecher f ON f.id = fz.fach_id AND f.nur_historisch = 0
       JOIN klassen k ON k.id = f.klasse_id
       JOIN schuljahre s ON s.id = k.schuljahr_id
       WHERE fz.user_id = ?
@@ -187,8 +193,38 @@ export default async function teacherRoutes(fastify) {
       });
       byKlasse.get(r.klasse_id).faecher.push(eintrag);
     }
+
+    // Rein historische Fächer, denen der User zugewiesen ist, gruppiert nach
+    // dem Schuljahr aus der Bezeichnung ihrer historischen Halbjahre (siehe
+    // ladeVergangeneSchuljahre in fach-abschluss.js) -- per Auswahl (Query
+    // "schuljahr") sichtbar zu machen, Standard ist "kein vergangenes
+    // Schuljahr ausgewählt" (aktuelles Schuljahr, s. o.).
+    const vergangeneRows = getDb().prepare(`
+      SELECT f.id, f.name, k.name AS klasse_name, hh.bezeichnung
+      FROM fach_zuweisungen fz
+      JOIN faecher f ON f.id = fz.fach_id AND f.nur_historisch = 1
+      JOIN klassen k ON k.id = f.klasse_id
+      JOIN historische_halbjahre hh ON hh.fach_id = f.id
+      WHERE fz.user_id = ?
+    `).all(request.user.id);
+    const proSchuljahr = new Map();
+    for (const r of vergangeneRows) {
+      const treffer = /^[12]\. Halbjahr (.+)$/.exec(r.bezeichnung);
+      const sj = treffer ? treffer[1] : r.bezeichnung;
+      if (!proSchuljahr.has(sj)) proSchuljahr.set(sj, new Map());
+      proSchuljahr.get(sj).set(r.id, { id: r.id, name: r.name, klasse_name: r.klasse_name });
+    }
+    const verfuegbareSchuljahre = sortiereSchuljahreAbsteigend(
+      Array.from(proSchuljahr.keys()).map((bezeichnung) => ({ bezeichnung }))
+    ).map((s) => s.bezeichnung);
+    const gewaehltesSchuljahr = String(request.query?.schuljahr || '').trim();
+    const vergangeneFaecher = gewaehltesSchuljahr && proSchuljahr.has(gewaehltesSchuljahr)
+      ? Array.from(proSchuljahr.get(gewaehltesSchuljahr).values())
+      : [];
+
     return reply.viewEjs('teacher/dashboard.ejs', {
       user: request.user, byKlasse: Array.from(byKlasse.values()), kurse,
+      verfuegbareSchuljahre, gewaehltesSchuljahr, vergangeneFaecher,
     });
   });
 

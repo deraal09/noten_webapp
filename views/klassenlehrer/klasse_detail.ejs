@@ -116,16 +116,17 @@
     <h3>Vergangene Schuljahre</h3>
     <p class="hint">
       Für ein noch nicht erfasstes vergangenes Schuljahr (z. B. weil die Klasse erst später in diese
-      App aufgenommen wurde) lässt sich hier auf einen Schlag für die <strong>noch fehlenden Fächer</strong>
-      dieser Klasse ein historisches Halbjahrespaar anlegen ("1./2. Halbjahr &lt;Schuljahr&gt;"). Die
+      App aufgenommen wurde) lässt sich hier ein historisches Halbjahrespaar anlegen ("1./2. Halbjahr
+      &lt;Schuljahr&gt;") -- für genau die Fächer/Lernfelder, die unten eingetragen werden (die
+      <strong>aktuellen</strong> Fächer der Klasse werden NICHT automatisch übernommen, da der
+      Fächerkanon damals ein anderer gewesen sein kann). Ein eingetragener Name, der zu einem
+      bestehenden Fach der Klasse passt, verwendet dieses weiter; ein neuer Name wird eigens dafür als
+      rein historisches Fach angelegt und taucht nicht in der laufenden Fächerliste der Klasse auf. Die
       eigentlichen Noten trägst du danach je Fach auf dessen Seite im Reiter „Historische Halbjahre"
       ein. Hat eine Fachlehrkraft das für ihr Fach schon selbst angelegt, gehört es ihr -- du siehst
       die Noten dann nur noch an, statt sie zu überschreiben; nur bei den Fächern, die du selbst (oder
-      eine andere Klassenleitung) klassenweit hinzugefügt hast, kannst du sie weiter bearbeiten. Für
-      aktuelle Halbjahre gilt weiter die normale Notentafel der Fachlehrkräfte. Hatte die Klasse in
-      diesem Schuljahr ein Fach/Lernfeld, das es aktuell gar nicht mehr gibt, trage es unten bei
-      "Weitere Fächer/Lernfelder" ein -- es wird eigens dafür angelegt und taucht nicht in der
-      laufenden Fächerliste der Klasse auf.
+      eine andere Klassenleitung) hinzugefügt hast, kannst du sie weiter bearbeiten. Für aktuelle
+      Halbjahre gilt weiter die normale Notentafel der Fachlehrkräfte.
     </p>
     <% if (vergangeneSchuljahre.length) { %>
       <ul>
@@ -146,8 +147,8 @@
       <label>Schuljahr
         <input type="text" name="bezeichnung" placeholder="z. B. 2022/23" required>
       </label>
-      <label>Weitere Fächer/Lernfelder <small class="hint">(nur, falls damals andere als aktuell -- eine Zeile je Fach)</small>
-        <textarea name="neue_faecher" rows="3" placeholder="z. B.&#10;LF5 Fachpraxis Pflege&#10;Religion"></textarea>
+      <label>Fächer/Lernfelder dieses Schuljahres <small class="hint">(eine Zeile je Fach -- werden NICHT automatisch von den aktuellen Fächern übernommen)</small>
+        <textarea name="faecher" rows="4" placeholder="z. B.&#10;Deutsch&#10;Mathematik&#10;LF5 Fachpraxis Pflege&#10;Religion" required></textarea>
       </label>
       <button type="submit">+ Vergangenes Schuljahr hinzufügen</button>
     </form>
