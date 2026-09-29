@@ -12,6 +12,7 @@ import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-serv
 import { HALBJAHRE, gesamtnoteJahr, parseTendenzNote, NTG } from './grade-calc.js';
 import { userHatFachZgriff, userIstKlassenlehrer } from './auth.js';
 import { holeSchuelerId } from './schueler-utils.js';
+import { parseSchuljahr } from './schuljahr-utils.js';
 
 /** Historische Halbjahre eines Fachs, älteste zuerst. */
 export function ladeHistorischeHalbjahre(fachId) {
@@ -233,17 +234,63 @@ export function oeffneFach(fachId) {
 }
 
 /**
+ * Zu welchen Schuljahren gehören die historischen Halbjahre eines rein
+ * historischen Fachs -- neuestes zuerst. Ein Fach wird beim Anlegen eines
+ * vergangenen Schuljahres/beim Noten-Import per Name wiederverwendet (siehe
+ * fuegeVergangenesSchuljahrHinzu/importiereHistorischeNoten), kann also
+ * historische Halbjahre aus MEHREREN Schuljahren tragen -- deshalb eine
+ * Liste statt eines einzelnen Schuljahres.
+ */
+function schuljahreEinesFachs(historischeHalbjahre) {
+  const schuljahre = new Set();
+  for (const hh of historischeHalbjahre) {
+    const treffer = /^[12]\. Halbjahr (.+)$/.exec(hh.bezeichnung);
+    schuljahre.add(treffer ? treffer[1] : hh.bezeichnung);
+  }
+  return Array.from(schuljahre).sort((a, b) => (parseSchuljahr(b)?.startJahr ?? -Infinity) - (parseSchuljahr(a)?.startJahr ?? -Infinity));
+}
+
+/**
  * Daten für die Abschluss-/Abgangsübersicht einer Klasse -- zeigt die
  * Fachabschlussnote je Schüler/in und Fach (nur für bereits abgeschlossene
  * Fächer) plus einen Notenschnitt. Ausgelagert aus routes/teacher.js, damit
  * sowohl die eigenständige Seite (/teacher/klassen/:id/abschluss) als auch
  * der gleichnamige Reiter auf der Klassenleitungsübersicht (routes/
  * klassenlehrer.js) dieselbe Logik verwenden.
+ *
+ * Zeigt bewusst ALLE Fächer der Klasse über die gesamte Schullaufbahn --
+ * die aktuellen (laufendes Schuljahr) UND alle rein historischen Fächer
+ * vergangener Schuljahre (siehe "Vergangenes Schuljahr hinzufügen"/Noten-
+ * Import): eine Fachabschlussnote aus einem vergangenen Schuljahr soll hier
+ * genauso erscheinen wie eine aus dem laufenden, statt beim Abgang/Abschluss
+ * unvollständig zu wirken. Rein historische Fächer tragen zusätzlich das/die
+ * Schuljahr(e) ihrer historischen Halbjahre als Beschriftung.
  */
 export function ladeAbschlussuebersicht(klasseId) {
   const db = getDb();
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasseId);
-  const faecher = ladeFaecherFuerKlassenleitung(klasseId);
+  const aktuelleFaecher = ladeFaecherFuerKlassenleitung(klasseId).map((f) => ({ ...f, schuljahrLabel: null }));
+
+  const historischeHalbjahreProFach = new Map();
+  for (const r of db.prepare(`
+    SELECT hh.fach_id, hh.bezeichnung FROM historische_halbjahre hh
+    JOIN faecher f ON f.id = hh.fach_id
+    WHERE f.klasse_id = ? AND f.nur_historisch = 1
+  `).all(klasseId)) {
+    if (!historischeHalbjahreProFach.has(r.fach_id)) historischeHalbjahreProFach.set(r.fach_id, []);
+    historischeHalbjahreProFach.get(r.fach_id).push(r);
+  }
+  const historischeFaecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND nur_historisch = 1 ORDER BY name')
+    .all(klasseId)
+    .map((f) => {
+      const schuljahre = schuljahreEinesFachs(historischeHalbjahreProFach.get(f.id) ?? []);
+      const schuljahrLabel = schuljahre.length > 1
+        ? `${schuljahre[schuljahre.length - 1]}–${schuljahre[0]}`
+        : (schuljahre[0] ?? null);
+      return { ...f, schuljahrLabel };
+    });
+
+  const faecher = [...aktuelleFaecher, ...historischeFaecher];
   const abschlussByFach = new Map(faecher.map((f) => [f.id, f.abgeschlossen ? ladeAbschlussnoten(f.id) : new Map()]));
 
   const zeilen = schueler.map((s) => {

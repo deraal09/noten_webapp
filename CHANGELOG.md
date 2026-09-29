@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.39.0 - 2026-09-29
+
+- Abschluss-/Abgangsübersicht (Klassenleitungsübersicht-Reiter und eigene
+  Seite): zeigt jetzt alle Fächer über die gesamte Schullaufbahn -- neben
+  den aktuellen Fächern des laufenden Schuljahres auch alle rein
+  historischen Fächer vergangener Schuljahre samt Fachabschlussnote, statt
+  nur die aktuellen. Rein historische Fächer sind zusätzlich mit ihrem
+  Schuljahr (bzw. der Schuljahr-Spanne, falls sie mehrere umfassen)
+  beschriftet. Der "Ø Abschluss"-Notenschnitt mittelt entsprechend über
+  alle abgeschlossenen Fächer, nicht mehr nur die aktuellen.
+
 ## 0.38.2 - 2026-09-29
 
 - Fix: Noteneingabe zeigte bei einem rein historischen Fach weiterhin die

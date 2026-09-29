@@ -5,9 +5,11 @@
 </p>
 
 <p class="hint">
-  Zeigt die Fachabschlussnote je Fach — nur für Fächer, die die Fachlehrkraft (oder du als
-  Klassenleitung) über "Fach abschließen" auf der Noteneingabe-Seite abgeschlossen hat. Nicht
-  abgeschlossene Fächer zeigen "läuft", da sie (noch) keine Abschlussnote haben.
+  Zeigt die Fachabschlussnote je Fach über die gesamte Schullaufbahn -- die aktuellen Fächer des
+  laufenden Schuljahres UND alle rein historischen Fächer vergangener Schuljahre (mit Schuljahr in
+  der Spaltenüberschrift) -- jeweils nur für Fächer, die die Fachlehrkraft (oder du als
+  Klassenleitung) über "Fach abschließen" abgeschlossen hat. Nicht abgeschlossene Fächer zeigen
+  "läuft", da sie (noch) keine Abschlussnote haben.
 </p>
 
 <% if (!faecher.length) { %>
@@ -18,7 +20,7 @@
       <tr>
         <th>Schüler/in</th>
         <% faecher.forEach(function(f) { %>
-          <th><%= f.name %><br><small><%= f.abgeschlossen ? 'abgeschlossen' : 'läuft' %></small></th>
+          <th><%= f.name %><% if (f.schuljahrLabel) { %> <small class="hint">(<%= f.schuljahrLabel %>)</small><% } %><br><small><%= f.abgeschlossen ? 'abgeschlossen' : 'läuft' %></small></th>
         <% }); %>
         <th>Ø Abschluss</th>
         <th>Aktion</th>
