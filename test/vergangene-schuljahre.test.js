@@ -545,6 +545,20 @@ test('Fach abschließen: kann über die Klassenleitungs-Historie-Seite für ein 
   assert.equal(getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(religion.id).abgeschlossen, 0);
 });
 
+test('Noteneingabe (Dashboard): bei ausgewähltem vergangenen Schuljahr werden die AKTUELLEN Fächer ausgeblendet, der Link führt direkt in "Historische Halbjahre"', async () => {
+  const religion = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Religion'").get(klasseId);
+  const lehrerfremdId = getDb().prepare("SELECT id FROM users WHERE username = 'lehrerfremd'").get().id;
+  getDb().prepare('INSERT INTO fach_zuweisungen (fach_id, user_id) VALUES (?, ?)').run(religion.id, lehrerfremdId);
+
+  const htmlAktuell = await (await lehrerFremd('/teacher')).text();
+  assert.ok(htmlAktuell.includes('Mathematik')); // aktuelles Fach normal sichtbar
+
+  const htmlVergangen = await (await lehrerFremd('/teacher?schuljahr=' + encodeURIComponent('2021/22'))).text();
+  assert.ok(!htmlVergangen.includes('Mathematik')); // aktuelles Fach bei vergangenem Schuljahr ausgeblendet
+  assert.ok(htmlVergangen.includes('Religion'));
+  assert.match(htmlVergangen, new RegExp(`/teacher/fach/${religion.id}\\?tab=historie`));
+});
+
 test.after(async () => {
   await fastify.close();
 });

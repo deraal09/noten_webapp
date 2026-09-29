@@ -21,52 +21,54 @@
     <ul class="klasse-liste">
       <% vergangeneFaecher.forEach(function(f) { %>
         <li>
-          <a href="/teacher/fach/<%= f.id %>">
+          <a href="/teacher/fach/<%= f.id %>?tab=historie">
             <div class="kachel-zeile">
               <span class="kachel-icon-klein">🕘</span>
               <span class="kachel-titel-klein"><%= f.name %></span>
             </div>
           </a>
-          <div class="kachel-sub"><%= f.klasse_name %> -- Noten im Reiter „Historische Halbjahre"</div>
+          <div class="kachel-sub"><%= f.klasse_name %> -- Teilnehmer/innen und Noten im Reiter „Historische Halbjahre"</div>
         </li>
       <% }); %>
     </ul>
   <% } %>
 <% } %>
 
-<% byKlasse.forEach(function(k) { %>
-  <h2><%= k.name %> <small>(<%= k.schuljahr_bezeichnung %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
-  <ul class="klasse-liste">
-    <% k.faecher.forEach(function(f) { %>
-      <li>
-        <a href="/teacher/fach/<%= f.id %>">
-          <div class="kachel-zeile">
-            <span class="kachel-icon-klein">📝</span>
-            <span class="kachel-titel-klein"><%= f.name %></span>
-          </div>
-        </a>
-        <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)</div>
-      </li>
-    <% }); %>
-  </ul>
-<% }); %>
+<% if (!gewaehltesSchuljahr) { %>
+  <% byKlasse.forEach(function(k) { %>
+    <h2><%= k.name %> <small>(<%= k.schuljahr_bezeichnung %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
+    <ul class="klasse-liste">
+      <% k.faecher.forEach(function(f) { %>
+        <li>
+          <a href="/teacher/fach/<%= f.id %>">
+            <div class="kachel-zeile">
+              <span class="kachel-icon-klein">📝</span>
+              <span class="kachel-titel-klein"><%= f.name %></span>
+            </div>
+          </a>
+          <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)</div>
+        </li>
+      <% }); %>
+    </ul>
+  <% }); %>
 
-<% if (kurse.length) { %>
-  <h2>Kurse</h2>
-  <ul class="klasse-liste">
-    <% kurse.forEach(function(f) { %>
-      <li>
-        <a href="/teacher/fach/<%= f.id %>">
-          <div class="kachel-zeile">
-            <span class="kachel-icon-klein">📘</span>
-            <span class="kachel-titel-klein"><%= f.name %></span>
+  <% if (kurse.length) { %>
+    <h2>Kurse</h2>
+    <ul class="klasse-liste">
+      <% kurse.forEach(function(f) { %>
+        <li>
+          <a href="/teacher/fach/<%= f.id %>">
+            <div class="kachel-zeile">
+              <span class="kachel-icon-klein">📘</span>
+              <span class="kachel-titel-klein"><%= f.name %></span>
+            </div>
+          </a>
+          <div class="kachel-sub">
+            <%= f.schuljahr_bezeichnung %>, Notenschlüssel: <%= f.notenschluessel %> ·
+            <%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)
           </div>
-        </a>
-        <div class="kachel-sub">
-          <%= f.schuljahr_bezeichnung %>, Notenschlüssel: <%= f.notenschluessel %> ·
-          <%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)
-        </div>
-      </li>
-    <% }); %>
-  </ul>
+        </li>
+      <% }); %>
+    </ul>
+  <% } %>
 <% } %>

@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.38.1 - 2026-09-29
+
+- Fix: Noteneingabe (Dashboard) zeigte bei Auswahl eines vergangenen
+  Schuljahres zusätzlich weiterhin alle Fächer des aktuellen Schuljahres an
+  -- diese werden jetzt nur noch unter "Aktuelles Schuljahr" angezeigt.
+- Fix: die Kacheln der vergangenen Schuljahre führten auf die normale
+  Notenübersicht eines Fachs, die für ein rein historisches Fach immer leer
+  ist (keine Teilnehmer/innen, keine Klausuren) -- der Link führt jetzt
+  direkt in den Reiter "Historische Halbjahre" mit den tatsächlichen
+  Teilnehmer/innen und Noten.
+
 ## 0.38.0 - 2026-09-29
 
 - Historische Noten: neues Kürzel <code>ntg</code> (nicht teilgenommen) kann
