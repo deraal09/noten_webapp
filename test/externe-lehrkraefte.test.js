@@ -100,7 +100,9 @@ test('Nur Klassenleitung darf Einladungslinks erzeugen — ein unbeteiligter LDA
 });
 
 test('Klassenleitung (Lehrer A) erzeugt eine Einladung für eine externe Lehrkraft', async () => {
-  const r = await form(lehrerA, '/teacher/einladungen/neu', { display_name: 'Externe Vertretung', ttl_days: '14' });
+  const r = await form(lehrerA, '/teacher/einladungen/neu', {
+    display_name: 'Externe Vertretung', email: 'vertretung@schule.de', ttl_days: '14',
+  });
   assert.equal(r.status, 302);
   const eintrag = getDb().prepare("SELECT * FROM invitations WHERE display_name = 'Externe Vertretung'").get();
   assert.ok(eintrag);
@@ -108,6 +110,15 @@ test('Klassenleitung (Lehrer A) erzeugt eine Einladung für eine externe Lehrkra
   assert.equal(eintrag.created_by_id, getDb().prepare("SELECT id FROM users WHERE username = 'lehrera'").get().id);
   const html = await (await lehrerA('/teacher/einladungen')).text();
   assert.match(html, /🟢 offen/);
+
+  // Die App verschickt selbst keine E-Mails -- ein mailto-Link mit
+  // vorausgefülltem Text (inkl. Einladungs-Link) erspart das Formulieren
+  // von Hand im eigenen E-Mail-Programm.
+  assert.match(html, /href="mailto:vertretung%40schule\.de\?subject=Einladung/);
+  const mailtoMatch = html.match(/href="(mailto:[^"]+)"/);
+  const body = decodeURIComponent(mailtoMatch[1].split('body=')[1]);
+  assert.match(body, /^Hallo Externe Vertretung,/);
+  assert.match(body, new RegExp(`/einladung/${eintrag.token}`));
 });
 
 test('Lehrer B registriert sich über den Link — Konto ist sofort nutzbar, aber ohne Selbstbedienung', async () => {

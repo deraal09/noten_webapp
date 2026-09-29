@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.40.0 - 2026-09-29
+
+- Externe Lehrkräfte einladen (Klassenleitung + Admin): die App verschickt
+  weiterhin keine E-Mails selbst, aber neben dem "Link kopieren"-Button
+  gibt es jetzt einen ✉️-Button, der das eigene E-Mail-Programm mit
+  vorausgefülltem Betreff und Text (Anrede, Einladungslink, Gültigkeit)
+  öffnet -- Empfänger ist automatisch die beim Erstellen der Einladung
+  angegebene E-Mail-Adresse, falls vorhanden.
+
 ## 0.39.0 - 2026-09-29
 
 - Abschluss-/Abgangsübersicht (Klassenleitungsübersicht-Reiter und eigene

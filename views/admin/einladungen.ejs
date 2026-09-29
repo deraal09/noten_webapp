@@ -30,7 +30,11 @@
         <% var base = PUBLIC_URL || ''; var link = base + '/einladung/' + e.token; %>
         <% var status = e.used_at ? '✅ eingelöst' : ((e.expires_at && new Date(e.expires_at) < now) ? '⏱ abgelaufen' : '🟢 offen'); %>
         <tr>
-          <td><code class="token" data-link="<%= link %>"><%= e.token.slice(0, 12) %>…</code> <button type="button" class="copy-btn" data-target="<%= link %>">📋</button></td>
+          <td>
+            <code class="token" data-link="<%= link %>"><%= e.token.slice(0, 12) %>…</code>
+            <button type="button" class="copy-btn" data-target="<%= link %>" title="Link kopieren">📋</button>
+            <a class="btn" href="<%= baueEinladungsMailtoLink(e, link) %>" title="Einladung per E-Mail versenden">✉️</a>
+          </td>
           <td><%= e.role %></td>
           <td><%= e.created_at %></td>
           <td><%= e.expires_at || '∞' %></td>

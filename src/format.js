@@ -59,3 +59,22 @@ export function formatZeitLokal(sqliteUtcText) {
     minute: '2-digit',
   });
 }
+
+/**
+ * `mailto:`-Link mit vorausgefülltem Betreff/Text für eine Einladung --
+ * die App verschickt selbst keine E-Mails (kein SMTP-Versand), aber wer den
+ * Einladungslink bisher nur per Copy-Button kopieren und den erklärenden
+ * Text selbst tippen musste, kann so direkt das eigene E-Mail-Programm mit
+ * fertigem Text öffnen.
+ */
+export function baueEinladungsMailtoLink(einladung, link) {
+  const anrede = einladung.display_name ? `Hallo ${einladung.display_name},` : 'Hallo,';
+  const gueltigBis = einladung.expires_at
+    ? `\n\nDer Link ist bis zum ${formatZeitLokal(einladung.expires_at)} gültig.`
+    : '';
+  const text = `${anrede}\n\ndu bist eingeladen, dich in der Notenverwaltung selbst zu registrieren. `
+    + `Klicke dazu auf folgenden Link und lege einen eigenen Benutzernamen sowie ein Passwort fest:\n\n${link}`
+    + `${gueltigBis}\n\nViele Grüße`;
+  const empfaenger = einladung.email ? encodeURIComponent(einladung.email) : '';
+  return `mailto:${empfaenger}?subject=${encodeURIComponent('Einladung zur Notenverwaltung')}&body=${encodeURIComponent(text)}`;
+}
