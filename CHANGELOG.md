@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.38.2 - 2026-09-29
+
+- Fix: Noteneingabe zeigte bei einem rein historischen Fach weiterhin die
+  Halbjahresumschaltung des laufenden Schuljahres an, obwohl die für dieses
+  Fach keine Bedeutung hat -- sie ist jetzt ausgeblendet, stattdessen ist
+  der Reiter "Historische Halbjahre" (mit Teilnehmer/innen und Noten) von
+  vornherein aktiv statt der (für so ein Fach immer leeren) Notenübersicht.
+- Fix: bei einem normalen Fach führte ein Wechsel der Halbjahresumschaltung
+  dazu, dass Teilnehmer/innen und Noten scheinbar verschwanden, wenn zuvor
+  über "⋮ Mehr" ein anderer Reiter gewählt war -- die Umschaltung springt
+  jetzt gezielt zurück zur Notenübersicht.
+
 ## 0.38.1 - 2026-09-29
 
 - Fix: Noteneingabe (Dashboard) zeigte bei Auswahl eines vergangenen

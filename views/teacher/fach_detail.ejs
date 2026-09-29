@@ -12,21 +12,23 @@
   <% } %>
 </p>
 
-<div class="hj-tabs">
-  <% HALBJAHRE.forEach(function(h) { %>
-    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
-  <% }); %>
-</div>
+<% if (!fach.nur_historisch) { %>
+  <div class="hj-tabs">
+    <% HALBJAHRE.forEach(function(h) { %>
+      <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=uebersicht"><%= h %></a>
+    <% }); %>
+  </div>
+<% } %>
 
 <div class="reiter" data-storage-key="noteneingabe-reiter-<%= fach.id %>">
-  <button type="button" class="active" data-target="panel-uebersicht">Notenübersicht</button>
+  <button type="button" class="<%= fach.nur_historisch ? '' : 'active' %>" data-target="panel-uebersicht">Notenübersicht</button>
   <div class="reiter-mehr-wrapper">
-    <button type="button" class="reiter-mehr-toggle" aria-haspopup="true" aria-expanded="false">⋮ Mehr</button>
+    <button type="button" class="reiter-mehr-toggle <%= fach.nur_historisch ? 'active' : '' %>" aria-haspopup="true" aria-expanded="false">⋮ Mehr</button>
     <div class="reiter-mehr-menu">
       <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
       <button type="button" data-target="panel-klausuren">Klausuren</button>
       <button type="button" data-target="panel-manuell">Manuelle Noten</button>
-      <button type="button" data-target="panel-historie">Historische Halbjahre</button>
+      <button type="button" class="<%= fach.nur_historisch ? 'active' : '' %>" data-target="panel-historie">Historische Halbjahre</button>
       <button type="button" data-target="panel-teilnehmer">Teilnehmer/innen</button>
       <button type="button" data-target="panel-sync">Synchronisation</button>
       <% if (darfFachAbschliessen) { %>
@@ -54,7 +56,7 @@
   var sichtbareSpalten = 2 + (hatManuelleMuendlich ? 1 : 0) + (hatManuelleSchriftlich ? 1 : 0)
     + (zeigeMuendlicheNoteSpalte ? 1 : 0) + (zeigeSchriftlicheNoteSpalte ? 1 : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
-<div id="panel-uebersicht" class="reiter-panel active">
+<div id="panel-uebersicht" class="reiter-panel<%= fach.nur_historisch ? '' : ' active' %>">
   <h2>Notenübersicht</h2>
   <table class="data" id="uebersicht">
     <thead>
@@ -146,7 +148,7 @@
   <p class="hint">Für mündliche Noten die Datumstabelle im Reiter „Unterrichtsleistung" nutzen — die zählt (anders als diese Notiz hier) direkt in die Berechnung.</p>
 </div>
 
-<div id="panel-historie" class="reiter-panel card">
+<div id="panel-historie" class="reiter-panel card<%= fach.nur_historisch ? ' active' : '' %>">
   <h2>Historische Halbjahre <small>(Noten von vor Einführung der App)</small></h2>
   <% if (!historischeHalbjahre.length) { %>
     <p class="hint">Noch keine historischen Halbjahre hinterlegt.</p>

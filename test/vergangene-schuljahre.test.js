@@ -559,6 +559,36 @@ test('Noteneingabe (Dashboard): bei ausgewähltem vergangenen Schuljahr werden d
   assert.match(htmlVergangen, new RegExp(`/teacher/fach/${religion.id}\\?tab=historie`));
 });
 
+test('Noteneingabe: bei einem rein historischen Fach ist "Historische Halbjahre" von vornherein aktiv (kein leerer Notenübersicht-Reiter), und die (für dieses Fach sinnlose) Halbjahresumschaltung des laufenden Schuljahres wird nicht angezeigt', async () => {
+  const religion = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Religion'").get(klasseId);
+  const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
+
+  // Rein historisches Fach: kein "hj-tabs"-Umschalter für das laufende
+  // Schuljahr (der beträfe ohnehin nie die historischen Halbjahre unten),
+  // und "Historische Halbjahre" ist server-seitig direkt aktiv -- auch
+  // OHNE das "?tab=historie" aus dem Dashboard-Link, z. B. nach einem
+  // Redirect von /teacher/historie/:id/speichern.
+  const html = await (await lehrerFremd(`/teacher/fach/${religion.id}`)).text();
+  assert.doesNotMatch(html, /class="hj-tabs"/, 'Halbjahresumschaltung des laufenden Schuljahres ergibt für ein rein historisches Fach keinen Sinn');
+  assert.match(html, /<button type="button" class="" data-target="panel-uebersicht">/);
+  assert.match(html, /<div id="panel-uebersicht" class="reiter-panel">/);
+  assert.match(html, /class="[^"]*\bactive\b[^"]*" data-target="panel-historie">Historische Halbjahre/);
+  assert.match(html, /<div id="panel-historie" class="reiter-panel card active">/);
+
+  // Teilnehmer/innen und Noten sind direkt sichtbar, ohne erst manuell den
+  // Reiter wechseln zu müssen.
+  assert.match(html, /Adler, Anna/);
+  assert.match(html, />ntg<|ntg<\/td>|value="ntg"/);
+  assert.match(html, /value="2"/);
+
+  // Ein normales (nicht rein historisches) Fach zeigt die Halbjahresumschaltung
+  // weiterhin, und sie führt gezielt zurück zur Notenübersicht -- unabhängig
+  // davon, welcher Reiter zuletzt (z. B. über "⋮ Mehr") ausgewählt war.
+  const htmlMath = await (await lehrerFremd(`/teacher/fach/${mathId}`)).text();
+  assert.match(htmlMath, /class="hj-tabs"/);
+  assert.match(htmlMath, /href="\?hj=[^"]+&tab=uebersicht"/);
+});
+
 test.after(async () => {
   await fastify.close();
 });
