@@ -445,12 +445,16 @@ test('ladeHalbjahresuebersicht (aktuelles Schuljahr) enthält KEINE rein histori
   }
 });
 
-test('ladeHistorischeHalbjahresuebersicht liefert für ein vergangenes Schuljahr genau dessen Fächer/Noten', () => {
-  const { faecher, zeilen } = ladeHistorischeHalbjahresuebersicht(klasseId, '2021/22', '1. Halbjahr');
-  assert.deepEqual(faecher.map((f) => f.name).sort(), ['LF5 Fachpraxis Pflege', 'Religion']);
+test('ladeHistorischeHalbjahresuebersicht liefert für ein vergangenes Schuljahr BEIDE Halbjahre je Fach', () => {
+  const { spalten, zeilen } = ladeHistorischeHalbjahresuebersicht(klasseId, '2021/22');
+  const beschriftungen = spalten.map((s) => `${s.fach_name} (${s.hjKurz})`);
+  assert.deepEqual(beschriftungen, [
+    'LF5 Fachpraxis Pflege (1. Hj)', 'LF5 Fachpraxis Pflege (2. Hj)',
+    'Religion (1. Hj)', 'Religion (2. Hj)',
+  ]);
   const anna = zeilen.find((z) => z.schueler.vorname === 'Anna');
-  const lf5Idx = faecher.findIndex((f) => f.name === 'LF5 Fachpraxis Pflege');
-  assert.equal(anna.noten[lf5Idx].note, 4); // zuletzt von der zugewiesenen Lehrkraft auf 4 gesetzt
+  const lf5Hj1Idx = spalten.findIndex((s) => s.fach_name === 'LF5 Fachpraxis Pflege' && s.hjKurz === '1. Hj');
+  assert.equal(anna.noten[lf5Hj1Idx].note, 4); // zuletzt von der zugewiesenen Lehrkraft auf 4 gesetzt
 });
 
 test('Klassenleitungsübersicht (Halbjahresübersicht): Schuljahr-Auswahl zeigt aktuelle vs. historische Fächer/Noten', async () => {
@@ -496,6 +500,49 @@ test('POST /klassenlehrer/fach/:id/loeschen: nur die Klassenleitung darf, und nu
   assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(lf5Id).c, 0);
   // Redirect springt zurück zum Fächer-Bereich (#fuer-loeschung), nicht an den Seitenanfang.
   assert.ok(r.headers.get('location').endsWith('#fuer-loeschung'));
+});
+
+test('Historische Noten: "ntg" kann manuell eingetragen werden und zählt nicht in den Notenschnitt', async () => {
+  const religion = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Religion'").get(klasseId);
+  const annaId = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(klasseId).id;
+  const hh1 = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2021/22'").get(religion.id);
+  const hh2 = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '2. Halbjahr 2021/22'").get(religion.id);
+
+  let r = await form(lehrerA, `/teacher/historie/${hh1.id}/speichern`, { ['note_' + annaId]: 'ntg' });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT note FROM historische_noten WHERE historisches_halbjahr_id = ? AND schueler_id = ?').get(hh1.id, annaId).note, 'ntg');
+
+  r = await form(lehrerA, `/teacher/historie/${hh2.id}/speichern`, { ['note_' + annaId]: '2' });
+  assert.equal(r.status, 302);
+
+  const html = await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr&schuljahr=` + encodeURIComponent('2021/22'))).text();
+  assert.ok(html.includes('>ntg<') || html.includes('ntg</td>'));
+});
+
+test('Fach abschließen: kann über die Klassenleitungs-Historie-Seite für ein rein historisches Fach ausgelöst werden, "ntg" zählt nicht mit', async () => {
+  const religion = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Religion'").get(klasseId);
+  const annaId = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(klasseId).id;
+
+  let html = await (await lehrerA(`/klassenlehrer/fach/${religion.id}/historie`)).text();
+  assert.ok(html.includes('Fach abschließen'));
+
+  const r = await form(lehrerA, `/teacher/fach/${religion.id}/abschliessen`, {});
+  assert.equal(r.status, 302);
+  assert.ok(r.headers.get('location').includes(`/klassenlehrer/fach/${religion.id}/historie`));
+
+  const fach = getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(religion.id);
+  assert.equal(fach.abgeschlossen, 1);
+  // "ntg" (1. Halbjahr) zählt nicht mit -- die Abschlussnote ist genau die
+  // einzige echte Note (2. Halbjahr = 2), nicht deren Mittelwert mit "ntg".
+  const abschlussnote = getDb().prepare('SELECT note FROM fach_abschlussnoten WHERE fach_id = ? AND schueler_id = ?').get(religion.id, annaId);
+  assert.equal(abschlussnote.note, 2);
+
+  html = await (await lehrerA(`/klassenlehrer/fach/${religion.id}/historie`)).text();
+  assert.match(html, /Fach abgeschlossen/);
+
+  const rOeffnen = await form(lehrerA, `/teacher/fach/${religion.id}/oeffnen`, {});
+  assert.equal(rOeffnen.status, 302);
+  assert.equal(getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(religion.id).abgeschlossen, 0);
 });
 
 test.after(async () => {

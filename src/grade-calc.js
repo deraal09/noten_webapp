@@ -8,6 +8,12 @@ export const FEHLZEIT_TYPEN = ['entschuldigt', 'unentschuldigt', 'betrieblich'];
 export const NOTE_TYPEN = ['muendlich', 'schriftlich'];
 export const DEFAULT_GEWICHTUNG = 60; // % mündliche Unterrichtsleistungen
 
+// "nicht teilgenommen" -- einziges nicht-numerisches Kürzel bei historischen
+// Noten (siehe parseTendenzNote unten, historische_noten.note in src/db.js).
+// Zählt nirgends in einen Notenschnitt hinein (wie eine fehlende Note), wird
+// aber -- anders als eine fehlende Note -- explizit als "ntg" angezeigt.
+export const NTG = 'ntg';
+
 // Standard-Notenbereiche
 export const NOTENSCHLUESSEL = { IHK: [1, 6], BG: [0, 15] };
 
@@ -55,12 +61,15 @@ export function nsCsvParse(csvStr) {
  * Parst eine Notenangabe mit optionaler Tendenz ("3+", "2-", "1") zu einer
  * reinen Zahl -- die Tendenz ist fürs Zeugnis nicht relevant und wird
  * verworfen (z. B. beim Massenimport historischer Noten per CSV/Text, siehe
- * fach-abschluss.js: importiereHistorischeNoten). Gibt null zurück, wenn das
- * Feld leer oder nicht als Zahl lesbar ist.
+ * fach-abschluss.js: importiereHistorischeNoten). "ntg" (Groß-/Kleinschreibung
+ * und umgebende Leerzeichen egal) liefert das NTG-Kürzel zurück statt einer
+ * Zahl. Gibt null zurück, wenn das Feld leer oder nicht lesbar ist.
+ * @returns {number | 'ntg' | null}
  */
 export function parseTendenzNote(raw) {
   let s = String(raw ?? '').trim();
   if (!s) return null;
+  if (s.toLowerCase() === NTG) return NTG;
   s = s.replace(',', '.').replace(/[+-]$/, '');
   if (!s) return null;
   const wert = Number(s);
@@ -178,7 +187,10 @@ export function unterrichtsleistungNote(datumsWerte, zusatzleistungen) {
 }
 
 export function gesamtnoteJahr(hjNoten) {
-  const notes = hjNoten.filter((n) => n !== null && n !== undefined);
+  // typeof-Filter statt nur null/undefined: historische Noten können auch
+  // "ntg" (nicht teilgenommen, siehe NTG oben) enthalten -- zählt wie eine
+  // fehlende Note nicht in den Schnitt hinein.
+  const notes = hjNoten.filter((n) => typeof n === 'number');
   if (!notes.length) return null;
   return Math.round((notes.reduce((a, b) => a + b, 0) / notes.length) * 100) / 100;
 }
@@ -210,6 +222,7 @@ export function nichtBestanden(note, nsTyp) {
 
 export function formatNote(n) {
   if (n === null || n === undefined) return '—';
+  if (n === NTG) return NTG;
   // Bis zu 2 Nachkommastellen, aber eine überflüssige zweite Null abschneiden:
   // 2,5 statt 2,50 – während Durchschnitte wie 2,33 erhalten bleiben.
   return Number(n).toFixed(2).replace(/0$/, '').replace('.', ',');

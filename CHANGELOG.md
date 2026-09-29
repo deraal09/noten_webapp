@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.38.0 - 2026-09-29
+
+- Historische Noten: neues Kürzel <code>ntg</code> (nicht teilgenommen) kann
+  jetzt statt einer Zahl eingetragen werden (manuell und per Text-/CSV-Import)
+  -- zählt wie eine fehlende Note nicht in den Notenschnitt, wird aber
+  explizit als "ntg" angezeigt statt als "–".
+- Fach abschließen (Fachabschlussnote aus allen Halbjahren) ist jetzt auch
+  für rein historische Fächer über die Klassenleitungs-Seite
+  (/klassenlehrer/fach/:id/historie) verfügbar, nicht mehr nur über die
+  normale Fach-Seite einer zugewiesenen Lehrkraft.
+- Klassenleitungsübersicht: die Halbjahresübersicht eines vergangenen
+  Schuljahres zeigt jetzt beide Halbjahre nebeneinander statt nur eines.
+
 ## 0.37.1 - 2026-09-29
 
 - Fix: Bei einem rein historischen Fach zeigte die normale Fach-Seite

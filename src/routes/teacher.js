@@ -9,7 +9,9 @@ import {
   userDarfFachLoeschen, userDarfKlasseVerwalten,
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
-import { HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV } from '../grade-calc.js';
+import {
+  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG,
+} from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import {
   ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerSchueler,
@@ -79,11 +81,13 @@ function userDarfFachBearbeiten(user, fach) {
 }
 
 /**
- * Wohin nach einer Historie-Aktion (anlegen/speichern/löschen) zurückleiten:
- * die zugewiesene Lehrkraft auf die normale Fach-Seite, eine Klassenleitung
- * ohne eigene Zuweisung stattdessen auf die eigens dafür vorgesehene, auf
- * historische Halbjahre beschränkte Klassenleitungs-Seite (GET /teacher/fach/:id
- * bleibt bewusst der zugewiesenen Lehrkraft vorbehalten, siehe dort).
+ * Wohin nach einer Historie-Aktion (anlegen/speichern/löschen) oder einem
+ * Fach-Abschluss (abschliessen/oeffnen) zurückleiten: die zugewiesene
+ * Lehrkraft auf die normale Fach-Seite, eine Klassenleitung ohne eigene
+ * Zuweisung stattdessen auf die eigens dafür vorgesehene Klassenleitungs-Seite
+ * (GET /teacher/fach/:id bleibt bewusst der zugewiesenen Lehrkraft
+ * vorbehalten, siehe dort; /klassenlehrer/fach/:id/historie zeigt neben
+ * historischen Halbjahren auch den Fach-Abschluss-Status).
  */
 function historieZielRedirect(user, fach) {
   return userHatFachZgriff(user, fach.id)
@@ -807,7 +811,7 @@ export default async function teacherRoutes(fastify) {
     }
     schliesseFachAb(fach.id, request.user.id);
     request.flash?.('success', 'Fach abgeschlossen — Fachabschlussnoten berechnet.');
-    return reply.redirect(`/teacher/fach/${fach.id}`);
+    return reply.redirect(historieZielRedirect(request.user, fach));
   });
 
   fastify.post('/fach/:id/oeffnen', async (request, reply) => {
@@ -818,7 +822,7 @@ export default async function teacherRoutes(fastify) {
     }
     oeffneFach(fach.id);
     request.flash?.('success', 'Fach wieder geöffnet.');
-    return reply.redirect(`/teacher/fach/${fach.id}`);
+    return reply.redirect(historieZielRedirect(request.user, fach));
   });
 
   // ---------- Historische Halbjahre (Noten von vor Einführung der App) ----------
@@ -854,13 +858,15 @@ export default async function teacherRoutes(fastify) {
     `);
     const tx = getDb().transaction(() => {
       for (const s of schuelerListe) {
-        const roh = String(request.body?.['note_' + s.id] ?? '').trim().replace(',', '.');
-        if (roh === '') {
+        const roh = String(request.body?.['note_' + s.id] ?? '');
+        if (roh.trim() === '') {
           upsert.run(hh.id, s.id, null);
           continue;
         }
-        const wert = Number(roh);
-        if (Number.isFinite(wert) && wert >= min && wert <= max) upsert.run(hh.id, s.id, wert);
+        const wert = parseTendenzNote(roh);
+        if (wert === null) continue; // nicht lesbar -- unverändert lassen
+        if (wert !== NTG && (wert < min || wert > max)) continue; // außerhalb des Notenschlüssels -- unverändert lassen
+        upsert.run(hh.id, s.id, wert);
       }
     });
     tx();

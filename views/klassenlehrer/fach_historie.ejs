@@ -18,6 +18,7 @@
       </form>
       <% if (hh.darfBearbeiten) { %>
         <form method="post" action="/teacher/historie/<%= hh.id %>/speichern">
+          <p class="hint">Note eintragen oder <code>ntg</code> für „nicht teilgenommen".</p>
           <table class="data">
             <thead><tr><th>Schüler/in</th><th>Note</th></tr></thead>
             <tbody>
@@ -25,8 +26,8 @@
                 <tr>
                   <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
                   <td>
-                    <input type="number" name="note_<%= s.id %>" class="note-historisch" step="0.1"
-                           min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>"
+                    <input type="text" name="note_<%= s.id %>" class="note-historisch" size="4"
+                           title="Note (<%= fach.notenschluessel === 'BG' ? '0-15' : '1-6' %>) oder ntg"
                            value="<%= hh.noten.get(s.id) === undefined ? '' : hh.noten.get(s.id) %>">
                   </td>
                 </tr>
@@ -54,6 +55,29 @@
     <input type="text" name="bezeichnung" placeholder="z. B. 1. Halbjahr 2022/23" required>
     <button type="submit">+ Vergangenes Halbjahr hinzufügen</button>
   </form>
+</div>
+
+<div class="card">
+  <h2>Fach abschließen</h2>
+  <% if (fach.abgeschlossen) { %>
+    <p>
+      ✅ Fach abgeschlossen am <strong><%= formatZeitLokal(fach.abgeschlossen_am) %></strong> —
+      die Fachabschlussnote (Mittelwert aus allen historischen Halbjahren) ist eingefroren.
+    </p>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/oeffnen" class="inline"
+          onsubmit="return confirm('Fach wieder öffnen? Die Fachabschlussnote bleibt bis zum nächsten Abschließen unverändert sichtbar.')">
+      <button type="submit">🔓 Fach wieder öffnen</button>
+    </form>
+  <% } else { %>
+    <p class="hint">
+      Optional: markiert das Fach als abgeschlossen und berechnet je Schüler/in eine
+      Fachabschlussnote als Mittelwert aus allen vorhandenen historischen Halbjahren.
+    </p>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/abschliessen" class="inline"
+          onsubmit="return confirm('Fach abschließen? Für jede Schülerin/jeden Schüler wird eine Fachabschlussnote aus allen historischen Halbjahren berechnet.')">
+      <button type="submit">✅ Fach abschließen</button>
+    </form>
+  <% } %>
 </div>
 
 <div class="card">

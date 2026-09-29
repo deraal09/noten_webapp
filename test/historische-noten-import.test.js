@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 import { parseNotenTabelle } from '../src/csv-import.js';
-import { parseTendenzNote } from '../src/grade-calc.js';
+import { parseTendenzNote, NTG } from '../src/grade-calc.js';
 
 test('parseTendenzNote: entfernt eine Tendenz und liefert die reine Zahl', () => {
   assert.equal(parseTendenzNote('3+'), 3);
@@ -33,6 +33,12 @@ test('parseTendenzNote: entfernt eine Tendenz und liefert die reine Zahl', () =>
   assert.equal(parseTendenzNote('-'), null);
   assert.equal(parseTendenzNote('abc'), null);
   assert.equal(parseTendenzNote(undefined), null);
+});
+
+test('parseTendenzNote: erkennt das Kürzel "ntg" (nicht teilgenommen), unabhängig von Groß-/Kleinschreibung', () => {
+  assert.equal(parseTendenzNote('ntg'), NTG);
+  assert.equal(parseTendenzNote('NTG'), NTG);
+  assert.equal(parseTendenzNote('  Ntg  '), NTG);
 });
 
 test('parseNotenTabelle: lehnt zu wenig Zeilen ab', () => {
@@ -267,6 +273,17 @@ test('POST .../historische-noten-import/csv: ohne Datei kommt eine Fehlermeldung
     bezeichnung: '2017/18', halbjahr: '1',
   });
   assert.equal(r.status, 302);
+});
+
+test('POST .../historische-noten-import/text: "ntg" wird als Kürzel gespeichert, nicht als ungültiger Wert abgelehnt', async () => {
+  const text = 'Nachname\tVorname\tDeutsch\nAdler\tAnna\tntg\n';
+  const r = await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/historische-noten-import/text`, {
+    bezeichnung: '2016/17', halbjahr: '1', text,
+  });
+  assert.equal(r.status, 302);
+  const hh = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2016/17'").get(deutschId);
+  const note = getDb().prepare('SELECT note FROM historische_noten WHERE historisches_halbjahr_id = ? AND schueler_id = ?').get(hh.id, annaId);
+  assert.equal(note.note, 'ntg');
 });
 
 test.after(async () => {

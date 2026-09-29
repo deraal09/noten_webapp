@@ -177,7 +177,7 @@ export default async function klassenlehrerRoutes(fastify) {
     ).map((s) => s.bezeichnung);
     const gewaehltesSchuljahr = verfuegbareSchuljahre.includes(request.query?.schuljahr) ? request.query.schuljahr : '';
     const historischeHalbjahresuebersicht = gewaehltesSchuljahr
-      ? ladeHistorischeHalbjahresuebersicht(klasse.id, gewaehltesSchuljahr, halbjahr)
+      ? ladeHistorischeHalbjahresuebersicht(klasse.id, gewaehltesSchuljahr)
       : null;
 
     // Fächer ohne zugewiesene Lehrkraft -- die Klassenleitung darf sie

@@ -9,7 +9,7 @@
 
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
-import { HALBJAHRE, gesamtnoteJahr, parseTendenzNote } from './grade-calc.js';
+import { HALBJAHRE, gesamtnoteJahr, parseTendenzNote, NTG } from './grade-calc.js';
 import { userHatFachZgriff, userIstKlassenlehrer } from './auth.js';
 import { holeSchuelerId } from './schueler-utils.js';
 
@@ -190,10 +190,16 @@ export function schliesseFachAb(fachId, userId) {
   const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
   if (!fach) throw new Error('Fach nicht gefunden');
   // Teilnehmerliste statt "alle Schüler/innen der Klasse" -- siehe
-  // berechneGesamtnoten in noten-service.js.
-  const schuelerListe = db.prepare(
-    'SELECT s.id FROM fach_teilnehmer ft JOIN schueler s ON s.id = ft.schueler_id WHERE ft.fach_id = ?'
-  ).all(fachId);
+  // berechneGesamtnoten in noten-service.js. Ausnahme: ein rein historisches
+  // Fach (nur_historisch) hat absichtlich KEINE Teilnehmerliste (siehe
+  // fuelleFachTeilnehmerAuf in src/db.js) -- seine historischen Noten hängen
+  // stattdessen an allen aktuellen Schüler/innen der Klasse, genau wie beim
+  // Eintragen selbst (siehe /historie/:id/speichern).
+  const schuelerListe = fach.nur_historisch
+    ? db.prepare('SELECT id FROM schueler WHERE klasse_id = ?').all(fach.klasse_id)
+    : db.prepare(
+      'SELECT s.id FROM fach_teilnehmer ft JOIN schueler s ON s.id = ft.schueler_id WHERE ft.fach_id = ?'
+    ).all(fachId);
 
   const hjNotenMaps = HALBJAHRE.map((hj) => berechneGesamtnoten(fachId, hj));
   const historischeHalbjahre = ladeHistorischeHalbjahre(fachId);
@@ -368,7 +374,7 @@ export function importiereHistorischeNoten(klasseId, schuljahrBezeichnung, halbj
         const roh = zeile.noten[spalte.name];
         const wert = parseTendenzNote(roh);
         if (wert === null) continue; // leer/nicht lesbar -- unverändert lassen
-        if (wert < min || wert > max) {
+        if (wert !== NTG && (wert < min || wert > max)) {
           ungueltigeWerte.push(`${spalte.name} bei ${zeile.vorname} ${zeile.nachname}: "${roh}"`);
           continue;
         }
@@ -393,33 +399,41 @@ export function importiereHistorischeNoten(klasseId, schuljahrBezeichnung, halbj
  * Historische Entsprechung von ladeHalbjahresuebersicht (noten-sync.js) für
  * die Schuljahr-Auswahl in der Klassenleitungsübersicht: statt des
  * synchronisierten Live-Standes zeigt sie die historischen Noten (siehe
- * historische_halbjahre/-noten) für EIN konkretes vergangenes Halbjahr
- * ("1./2. Halbjahr <Schuljahr>") -- über alle Fächer, die für dieses
- * Halbjahr historische Daten haben (aktuelle wie rein historische, siehe
+ * historische_halbjahre/-noten) für EIN vergangenes SCHULJAHR -- über BEIDE
+ * Halbjahre hinweg (je eine Spalte pro Fach UND Halbjahr, mit Daten), damit
+ * die Klassenleitung nicht extra zwischen 1./2. Halbjahr umschalten muss wie
+ * bei der laufenden Notentafel. Deckt alle Fächer ab, die für dieses
+ * Schuljahr historische Daten haben (aktuelle wie rein historische, siehe
  * faecher.nur_historisch). Rein lesend: Sync-Stand, Sperren, Notizen und
  * Konferenzmodus gibt es für historische Halbjahre nicht, die Bearbeitung
  * läuft weiterhin über die jeweilige Fach-Seite (Reiter "Historische
  * Halbjahre" bzw. /klassenlehrer/fach/:id/historie).
  */
-export function ladeHistorischeHalbjahresuebersicht(klasseId, schuljahrBezeichnung, halbjahrLabel) {
+export function ladeHistorischeHalbjahresuebersicht(klasseId, schuljahrBezeichnung) {
   const db = getDb();
-  const bezeichnung = `${halbjahrLabel} ${schuljahrBezeichnung}`;
+  const labels = halbjahrBezeichnungen(schuljahrBezeichnung);
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasseId);
   const halbjahre = db.prepare(`
-    SELECT hh.id AS hh_id, f.id AS fach_id, f.name AS fach_name
+    SELECT hh.id AS hh_id, hh.bezeichnung, f.id AS fach_id, f.name AS fach_name
     FROM historische_halbjahre hh
     JOIN faecher f ON f.id = hh.fach_id
-    WHERE f.klasse_id = ? AND hh.bezeichnung = ?
-    ORDER BY f.name
-  `).all(klasseId, bezeichnung);
-  const faecher = halbjahre.map((h) => ({ id: h.fach_id, name: h.fach_name }));
+    WHERE f.klasse_id = ? AND hh.bezeichnung IN (?, ?)
+    ORDER BY f.name, hh.bezeichnung
+  `).all(klasseId, labels[0], labels[1]);
+  // Eine Spalte je (Fach, Halbjahr)-Kombination, für die es tatsächlich ein
+  // historisches Halbjahr gibt -- ein Fach mit nur einem der beiden
+  // Halbjahre bekommt entsprechend auch nur eine Spalte.
+  const spalten = halbjahre.map((h) => ({
+    hh_id: h.hh_id, fach_id: h.fach_id, fach_name: h.fach_name,
+    hjKurz: h.bezeichnung.startsWith('1.') ? '1. Hj' : '2. Hj',
+  }));
 
   const notenByHh = new Map();
-  if (halbjahre.length) {
+  if (spalten.length) {
     const rows = db.prepare(`
       SELECT historisches_halbjahr_id, schueler_id, note FROM historische_noten
-      WHERE historisches_halbjahr_id IN (${halbjahre.map(() => '?').join(',')})
-    `).all(...halbjahre.map((h) => h.hh_id));
+      WHERE historisches_halbjahr_id IN (${spalten.map(() => '?').join(',')})
+    `).all(...spalten.map((s) => s.hh_id));
     for (const r of rows) {
       if (!notenByHh.has(r.historisches_halbjahr_id)) notenByHh.set(r.historisches_halbjahr_id, new Map());
       notenByHh.get(r.historisches_halbjahr_id).set(r.schueler_id, r.note);
@@ -427,11 +441,13 @@ export function ladeHistorischeHalbjahresuebersicht(klasseId, schuljahrBezeichnu
   }
 
   const zeilen = schueler.map((s) => {
-    const noten = halbjahre.map((h) => ({ note: notenByHh.get(h.hh_id)?.get(s.id) ?? null }));
-    const vorhanden = noten.map((n) => n.note).filter((n) => n !== null && n !== undefined);
+    const noten = spalten.map((sp) => ({ note: notenByHh.get(sp.hh_id)?.get(s.id) ?? null }));
+    // typeof-Filter statt nur null/undefined: "ntg" (siehe NTG in
+    // grade-calc.js) zählt wie eine fehlende Note nicht in den Schnitt.
+    const vorhanden = noten.map((n) => n.note).filter((n) => typeof n === 'number');
     const schnitt = vorhanden.length ? vorhanden.reduce((a, b) => a + b, 0) / vorhanden.length : null;
     return { schueler: s, noten, schnitt };
   });
 
-  return { faecher, zeilen };
+  return { spalten, zeilen };
 }

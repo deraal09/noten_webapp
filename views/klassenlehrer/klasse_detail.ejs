@@ -124,20 +124,20 @@
   <% } %>
   <% } else { %>
     <p class="hint">
-      Historischer Stand für <strong><%= halbjahr %> <%= gewaehltesSchuljahr %></strong> -- rein lesend,
-      kein Sync/Sperren/Notizen/Konferenzmodus für vergangene Halbjahre. Noten trägst du je Fach auf
-      dessen Seite im Reiter „Historische Halbjahre" bzw. über
+      Historischer Stand für <strong><%= gewaehltesSchuljahr %></strong> -- zeigt beide Halbjahre
+      nebeneinander, rein lesend, kein Sync/Sperren/Notizen/Konferenzmodus für vergangene Halbjahre.
+      Noten trägst du je Fach auf dessen Seite im Reiter „Historische Halbjahre" bzw. über
       „<a href="#vergangene-schuljahre">Vergangene Schuljahre</a>" unten ein.
     </p>
-    <% if (!historischeHalbjahresuebersicht.faecher.length) { %>
+    <% if (!historischeHalbjahresuebersicht.spalten.length) { %>
       <p>Für <%= gewaehltesSchuljahr %> sind noch keine Fächer/Noten hinterlegt.</p>
     <% } else { %>
       <table class="data">
         <thead>
           <tr>
             <th>Schüler/in</th>
-            <% historischeHalbjahresuebersicht.faecher.forEach(function(f) { %>
-              <th><%= f.name %></th>
+            <% historischeHalbjahresuebersicht.spalten.forEach(function(sp) { %>
+              <th><%= sp.fach_name %> <small>(<%= sp.hjKurz %>)</small></th>
             <% }); %>
             <th>Ø Notenschnitt</th>
           </tr>
