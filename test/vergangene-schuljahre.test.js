@@ -379,6 +379,20 @@ test('Klassenleitung ordnet einem rein historischen Fach eine Lehrkraft zu -- di
   assert.ok(html.includes('lehrerunbeteiligt') || html.includes('Lehrer Unbeteiligt'));
 });
 
+test('Fach-Detailseite (Noteneingabe) zeigt bei einem rein historischen Fach die Teilnehmer/innen UND Noten im Historie-Panel (nicht nur das Lernfeld)', async () => {
+  const lf5 = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'LF5 Fachpraxis Pflege'").get(klasseId);
+  const html = await (await lehrerUnbeteiligt(`/teacher/fach/${lf5.id}`)).text();
+  assert.ok(html.includes('LF5 Fachpraxis Pflege'));
+  // Das ist der eigentliche Bug: die Teilnehmerliste der Live-Notentafel
+  // (fach_teilnehmer) ist bei einem rein historischen Fach absichtlich leer
+  // -- das "Historische Halbjahre"-Panel darf sich darauf NICHT stützen,
+  // sondern muss alle aktuellen Schüler/innen der Klasse zeigen (siehe
+  // schuelerHistorie in routes/teacher.js).
+  assert.ok(html.includes('Adler'));
+  assert.ok(html.includes('Anna'));
+  assert.match(html, /value="4"/); // die zuvor gespeicherte historische Note
+});
+
 test('Noteneingabe (Dashboard): ein rein historisches Fach erscheint NICHT im aktuellen Schuljahr, auch wenn die Lehrkraft zugewiesen ist', async () => {
   const html = await (await lehrerUnbeteiligt('/teacher')).text();
   assert.ok(!html.includes('LF5 Fachpraxis Pflege'));

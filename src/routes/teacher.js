@@ -254,6 +254,15 @@ export default async function teacherRoutes(fastify) {
       ...hh, noten: ladeHistorischeNoten(hh.id),
       darfBearbeiten: userDarfHistorischeNotenBearbeiten(request.user, fach, hh),
     }));
+    // Historische Noten hängen an den AKTUELLEN Schüler/innen der Klasse
+    // (siehe /historie/:id/speichern), nicht an fach_teilnehmer -- bei einem
+    // rein historischen Fach (nur_historisch) ist die Teilnehmerliste
+    // absichtlich leer (siehe fuelleFachTeilnehmerAuf in src/db.js), sonst
+    // würde das "Historische Halbjahre"-Panel unten (das dieselbe Liste wie
+    // die Live-Notentafel nutzen würde) fälschlich leer bleiben.
+    const schuelerHistorie = getDb().prepare(
+      'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
+    ).all(fach.klasse_id);
     const abschlussnoten = fach.abgeschlossen ? ladeAbschlussnoten(fach.id) : new Map();
     // Sperren über die Schüler-IDs statt "die eine Klasse" -- bei einem
     // klassenübergreifenden Kurs liegt die Sperre bei der jeweils EIGENEN
@@ -266,7 +275,7 @@ export default async function teacherRoutes(fastify) {
       termine: uebersicht.termine,
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
-      historischeHalbjahre, abschlussnoten, sperren, teilnehmer,
+      historischeHalbjahre, schuelerHistorie, abschlussnoten, sperren, teilnehmer,
       darfFachAbschliessen: userDarfFachBearbeiten(request.user, fach),
       darfHistorieAnlegen: userDarfFachBearbeiten(request.user, fach),
       darfHistorieLoeschen: userIstKlassenlehrer(request.user, fach.klasse_id),

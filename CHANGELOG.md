@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.37.1 - 2026-09-29
+
+- Fix: Bei einem rein historischen Fach zeigte die normale Fach-Seite
+  (Noteneingabe) im Panel "Historische Halbjahre" nur den Fachnamen, aber
+  keine Teilnehmer/innen oder Noten -- die Liste stützte sich fälschlich auf
+  die (bei einem rein historischen Fach absichtlich leere) Teilnehmerliste
+  der Live-Notentafel statt auf alle aktuellen Schüler/innen der Klasse, wie
+  es die Speicher-Route und die Klassenleitungs-Seite bereits richtig
+  machten.
+- Fach löschen (Klassenleitung): Sprung zurück zum Fächer-Bereich statt an
+  den Seitenanfang.
+
 ## 0.37.0 - 2026-09-28
 
 - Fix: rein historische Fächer (z. B. für ein vergangenes Schuljahr mit

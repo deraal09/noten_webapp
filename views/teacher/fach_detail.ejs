@@ -166,7 +166,7 @@
           <table class="data">
             <thead><tr><th>Schüler/in</th><th>Note</th></tr></thead>
             <tbody>
-              <% schueler.forEach(function(s) { %>
+              <% schuelerHistorie.forEach(function(s) { %>
                 <tr>
                   <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
                   <td>
@@ -184,7 +184,7 @@
         <table class="data">
           <thead><tr><th>Schüler/in</th><th>Note</th></tr></thead>
           <tbody>
-            <% schueler.forEach(function(s) { %>
+            <% schuelerHistorie.forEach(function(s) { %>
               <tr>
                 <td class="name"><%= s.nachname %>, <%= s.vorname %></td>
                 <td><%= hh.noten.get(s.id) === undefined ? '–' : hh.noten.get(s.id) %></td>
