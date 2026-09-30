@@ -199,6 +199,51 @@ test('Klasse löschen: Schüler/innen (nur die Person) wandern in "Ohne Klasse",
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(cemId).klasse_id, klasse10A);
 });
 
+test('Sammelklasse ist für jede Lehrkraft einsehbar; übernehmen geht per Reiter nur in Klassen, die man verwalten darf', async () => {
+  await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjAltId), name: '9D', notenschluessel: 'IHK' });
+  const klasse9D = getDb().prepare("SELECT id FROM klassen WHERE name = '9D'").get().id;
+  await form(lehrerA, `/teacher/klassen/${klasse9D}/schueler/neu`, { nachname: 'Dietz', vorname: 'Dora' });
+  const doraId = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Dietz'").get().id;
+  await form(lehrerA, `/teacher/klassen/${klasse9D}/loeschen`, {});
+  const ablage = getDb().prepare('SELECT * FROM klassen WHERE ist_ablage = 1').get();
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(doraId).klasse_id, ablage.id);
+
+  // Lehrer Fremd hat nichts mit den Klassen zu tun und sieht trotzdem die Sammelklasse -- ohne Lösch-/Abgangs-Aktionen.
+  const liste = await (await lehrerFremd('/teacher/klassen')).text();
+  assert.match(liste, /Ohne Klasse/);
+  let r = await lehrerFremd(`/teacher/klassen/${ablage.id}`);
+  assert.equal(r.status, 200);
+  const htmlAblage = await r.text();
+  assert.match(htmlAblage, /Dietz/);
+  assert.match(htmlAblage, /Versetzen nach/);
+  assert.doesNotMatch(htmlAblage, /Klasse löschen/);
+  assert.doesNotMatch(htmlAblage, /\/abgang/);
+  assert.equal((await form(lehrerFremd, `/teacher/klassen/${ablage.id}/loeschen`, {})).status, 403);
+  assert.equal((await form(lehrerFremd, `/teacher/schueler/${doraId}/loeschen`, {})).status, 403);
+
+  // Übernehmen in eine Klasse, die man nicht verwaltet: abgelehnt.
+  assert.equal((await form(lehrerFremd, `/teacher/klassen/${klasse10A}/schueler/aus-ablage`, { schueler_id: String(doraId) })).status, 403);
+
+  // Als Klassenleitung der 10A sieht Lehrer Fremd oben den Reiter und kann Personen übernehmen.
+  const fremdId = getDb().prepare("SELECT id FROM users WHERE username = 'lehrerfremd'").get().id;
+  await form(lehrerA, `/teacher/klassen/${klasse10A}/klassenleitung/hinzufuegen`, { user_id: String(fremdId) });
+  const html10A = await (await lehrerFremd(`/teacher/klassen/${klasse10A}`)).text();
+  assert.match(html10A, /data-target="schueler-ablage"/);
+  assert.match(html10A, /Dietz, Dora/);
+
+  // Nur Personen, die wirklich in einer Sammelklasse stehen, sind über diesen Weg übernehmbar.
+  r = await form(lehrerFremd, `/teacher/klassen/${klasse10A}/schueler/aus-ablage`, { schueler_id: [String(doraId), String(benId + 9999)] });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(doraId).klasse_id, klasse10A);
+  const htmlDanach = await (await lehrerFremd(`/teacher/klassen/${klasse10A}`)).text();
+  assert.doesNotMatch(htmlDanach, /<input type="checkbox" name="schueler_id" value="\d+">\s*Dietz/);
+
+  // Aus einer echten Klasse lässt sich niemand über den Ablage-Weg herausziehen.
+  const annaKlasseVorher = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(annaId).klasse_id;
+  await form(lehrerA, `/teacher/klassen/${klasse10B}/schueler/aus-ablage`, { schueler_id: String(annaId) });
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(annaId).klasse_id, annaKlasseVorher);
+});
+
 test('Die Sammelklasse selbst zu löschen entfernt ihre Schüler/innen endgültig', async () => {
   const ablage = getDb().prepare('SELECT * FROM klassen WHERE ist_ablage = 1').get();
   const r = await form(lehrerA, `/teacher/klassen/${ablage.id}/loeschen`, {});

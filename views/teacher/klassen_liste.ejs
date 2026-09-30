@@ -189,10 +189,14 @@
                   <span class="kachel-titel-klein"><%= k.name %></span>
                 </div>
               </a>
-              <div class="kachel-sub">Notenschlüssel: <%= k.notenschluessel %></div>
-              <div class="kachel-aktionen">
-                <a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a>
-              </div>
+              <% if (k.ist_ablage) { %>
+                <div class="kachel-sub">Sammelklasse -- Personen daraus lassen sich in jede Klasse übernehmen</div>
+              <% } else { %>
+                <div class="kachel-sub">Notenschlüssel: <%= k.notenschluessel %></div>
+                <div class="kachel-aktionen">
+                  <a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a>
+                </div>
+              <% } %>
             </li>
           <% }); %>
         </ul>

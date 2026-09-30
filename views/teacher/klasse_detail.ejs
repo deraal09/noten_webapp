@@ -1,7 +1,7 @@
 <h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
-  <a class="btn" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a>
+  <% if (!klasse.ist_ablage) { %><a class="btn" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a><% } %>
   <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
     <a class="btn" href="/teacher/klassen/<%= klasse.id %>/zeugnis">📋 Zeugnisübersicht</a>
   <% } %>
@@ -75,10 +75,14 @@
 <% } %>
 
 <h2>Schüler/innen (<%= schueler.length %>)</h2>
+<% if (!klasse.ist_ablage || darfVerwalten) { %>
 <div class="reiter unter-reiter" data-storage-key="klasse-<%= klasse.id %>-schueler-hinzufuegen">
   <button type="button" class="active" data-target="schueler-einzeln">Einzeln</button>
   <button type="button" data-target="schueler-mehrere">Mehrere auf einmal</button>
   <button type="button" data-target="schueler-csv">CSV-Import</button>
+  <% if (ablagePersonen.length) { %>
+    <button type="button" data-target="schueler-ablage">Aus „Ohne Klasse“ übernehmen (<%= ablagePersonen.length %>)</button>
+  <% } %>
 </div>
 
 <div id="schueler-einzeln" class="reiter-panel unter-panel card active">
@@ -114,16 +118,52 @@ Meier, Carla"></textarea>
   </form>
 </div>
 
+<% if (ablagePersonen.length) { %>
+<div id="schueler-ablage" class="reiter-panel unter-panel card">
+  <p class="hint">
+    Personen aus der Sammelklasse „Ohne Klasse“ (z. B. nach dem Löschen einer Klasse oder bei
+    Wiederholern) auswählen und in diese Klasse übernehmen. Alle bisherigen Noten der Personen bleiben erhalten.
+  </p>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/aus-ablage">
+    <label class="feld">Suche
+      <input type="text" id="ablage-suche" placeholder="Name eingeben …" autocomplete="off">
+    </label>
+    <ul class="klasse-liste" id="ablage-liste">
+      <% ablagePersonen.forEach(function(p) { %>
+        <li data-name="<%= (p.nachname + ' ' + p.vorname).toLowerCase() %>">
+          <label>
+            <input type="checkbox" name="schueler_id" value="<%= p.id %>">
+            <%= p.nachname %>, <%= p.vorname %> <small class="hint">(<%= p.schuljahr_bezeichnung %><%= p.status === 'abgang' ? ', Abgang' : '' %>)</small>
+          </label>
+        </li>
+      <% }); %>
+    </ul>
+    <button type="submit">+ Ausgewählte übernehmen</button>
+  </form>
+  <script>
+    (function() {
+      var suche = document.getElementById('ablage-suche');
+      var eintraege = document.querySelectorAll('#ablage-liste li');
+      suche.addEventListener('input', function() {
+        var q = suche.value.trim().toLowerCase();
+        eintraege.forEach(function(li) { li.hidden = q !== '' && li.dataset.name.indexOf(q) === -1; });
+      });
+    })();
+  </script>
+</div>
+<% } %>
+<% } %>
+
 <% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
    var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
 <table class="data">
-  <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
+  <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten || darfVersetzen) { %><th>Aktion</th><% } %></tr></thead>
   <tbody>
     <% schuelerAktiv.forEach(function(s) { %>
       <tr>
         <td><%= s.nachname %></td>
         <td><%= s.vorname %></td>
-        <% if (darfVerwalten) { %>
+        <% if (darfVerwalten || darfVersetzen) { %>
         <td>
           <% if (versetzZiele.length) { %>
             <form method="post" action="/teacher/schueler/<%= s.id %>/versetzen" class="inline" onsubmit="return confirm('Person in die gewählte Klasse versetzen? Alle bisherigen Noten bleiben der Person erhalten.')">
@@ -140,12 +180,14 @@ Meier, Carla"></textarea>
               <button type="submit" title="In eine andere Klasse versetzen (Noten bleiben erhalten)">↔</button>
             </form>
           <% } %>
+          <% if (darfVerwalten) { %>
           <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" class="inline" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
             <button type="submit" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
           </form>
           <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren. Für einen normalen Abgang stattdessen den Button „🚪 Abgang" nutzen.')">
             <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
           </form>
+          <% } %>
         </td>
         <% } %>
       </tr>
@@ -182,6 +224,7 @@ Meier, Carla"></textarea>
   </details>
 <% } %>
 
+<% if (!klasse.ist_ablage) { %>
 <h2>Fächer</h2>
 <p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen.
   <% if (istKlassenlehrer) { %>Als Klassenleitung kannst du unten weitere Lehrkräfte den Fächern zuordnen.
@@ -208,6 +251,7 @@ Meier, Carla"></textarea>
     <% }); %>
   </tbody>
 </table>
+<% } %>
 
 <% if (istKlassenlehrer) { %>
   <h2>Lehrkräfte zuordnen</h2>

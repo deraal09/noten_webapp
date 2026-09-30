@@ -128,3 +128,44 @@ export function loescheKlasseMitSchuelerUebernahme(klasseId, userId) {
     return { gerettet, ablageKlasseId };
   })();
 }
+
+/**
+ * Alle Personen, die aktuell in einer Sammelklasse "Ohne Klasse" stehen
+ * (über alle Schuljahre) -- Auswahlliste für den Reiter "Aus Ohne Klasse
+ * übernehmen" auf der Klassenseite.
+ */
+export function ladeAblagePersonen() {
+  return getDb().prepare(`
+    SELECT s.id, s.nachname, s.vorname, s.status, sj.bezeichnung AS schuljahr_bezeichnung
+    FROM schueler s
+    JOIN klassen k ON k.id = s.klasse_id
+    JOIN schuljahre sj ON sj.id = k.schuljahr_id
+    WHERE k.ist_ablage = 1
+    ORDER BY s.nachname, s.vorname, sj.bezeichnung
+  `).all();
+}
+
+/**
+ * Übernimmt ausgewählte Personen aus einer Sammelklasse in die Zielklasse
+ * (wie versetzeSchueler, aber nur für Personen, die tatsächlich in einer
+ * Sammelklasse stehen -- über diesen Weg darf keine Person aus einer echten
+ * fremden Klasse gezogen werden).
+ *
+ * @returns {{uebernommen: number, fehler: string[]}} fehler: Namen der nicht übernommenen Personen
+ */
+export function uebernehmeAusAblage(zielKlasseId, schuelerIds) {
+  const db = getDb();
+  let uebernommen = 0;
+  const fehler = [];
+  for (const id of schuelerIds) {
+    const person = db.prepare(`
+      SELECT s.* FROM schueler s JOIN klassen k ON k.id = s.klasse_id
+      WHERE s.id = ? AND k.ist_ablage = 1
+    `).get(id);
+    if (!person) continue;
+    const ergebnis = versetzeSchueler(person.id, zielKlasseId);
+    if (ergebnis.ok) uebernommen += 1;
+    else fehler.push(`${person.nachname}, ${person.vorname}`);
+  }
+  return { uebernommen, fehler };
+}

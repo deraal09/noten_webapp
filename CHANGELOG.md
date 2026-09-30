@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.42.0 - 2026-09-30
+
+- Sammelklasse "Ohne Klasse": ist jetzt für jede Lehrkraft einsehbar (in
+  "Meine Klassen" und als Klassenseite) und erlaubt jeder Lehrkraft das
+  Versetzen der enthaltenen Personen in eine Klasse. Löschen der Sammelklasse
+  sowie Abgang/Löschen einzelner Personen bleiben Klassenleitung/Ersteller/in/
+  Admin vorbehalten.
+- Klassenseite: neuer Reiter "Aus „Ohne Klasse“ übernehmen" neben
+  Einzeln/Mehrere/CSV -- Personen aus der Sammelklasse per Suche und
+  Mehrfachauswahl direkt in die eigene Klasse übernehmen (Noten bleiben
+  erhalten), wie bei den Kursen.
+
 ## 0.41.0 - 2026-09-30
 
 - Schüler/innen versetzen: auf der Klassenseite lässt sich eine Person über

@@ -26,7 +26,9 @@ import {
   ladeSperrenFuerSchueler, holeSperre,
 } from '../noten-sperre.js';
 import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
-import { ladeVersetzZiele, versetzeSchueler, loescheKlasseMitSchuelerUebernahme } from '../klassenwechsel.js';
+import {
+  ladeVersetzZiele, versetzeSchueler, loescheKlasseMitSchuelerUebernahme, ladeAblagePersonen, uebernehmeAusAblage,
+} from '../klassenwechsel.js';
 import { parseSchuelerCsv } from '../csv-import.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
 import {
@@ -941,7 +943,15 @@ export default async function teacherRoutes(fastify) {
     const klassen = ladeMeineKlassen(request.user.id);
     const klassenNachSchuljahr = new Map();
     for (const sj of schuljahreReiter) klassenNachSchuljahr.set(sj.id, []);
-    for (const k of klassen) klassenNachSchuljahr.get(k.schuljahr_id)?.push(k);
+    // Sammelklassen "Ohne Klasse" mit Personen sind für alle Lehrkräfte sichtbar.
+    const sichtbareKlassen = [...klassen];
+    const ablagen = db.prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung FROM klassen k
+      JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE k.ist_ablage = 1 AND EXISTS (SELECT 1 FROM schueler sc WHERE sc.klasse_id = k.id)
+    `).all();
+    for (const a of ablagen) if (!sichtbareKlassen.some((k) => k.id === a.id)) sichtbareKlassen.push(a);
+    for (const k of sichtbareKlassen) klassenNachSchuljahr.get(k.schuljahr_id)?.push(k);
 
     // Kurse (siehe ladeMeineKurse) bekommen in "Meine Klassen" eine eigene
     // Rubrik neben den echten Klassen -- gleiches Gruppieren nach Schuljahr,
@@ -957,11 +967,11 @@ export default async function teacherRoutes(fastify) {
     // Schuljahr konsistent geschrieben wird (z. B. immer "12BFI1"), statt sie
     // jedes Mal neu einzutippen. Kurs-Hüllen (siehe /kurse/neu) sind keine
     // echten Klassen und tauchen hier daher nicht auf.
-    const bekannteKlassennamen = db.prepare('SELECT DISTINCT name FROM klassen WHERE ist_kurs_huelle = 0 ORDER BY name').all()
+    const bekannteKlassennamen = db.prepare('SELECT DISTINCT name FROM klassen WHERE ist_kurs_huelle = 0 AND ist_ablage = 0 ORDER BY name').all()
       .map((r) => r.name);
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
-      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen,
+      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen: sichtbareKlassen,
       kurseNachSchuljahr, bildungsgaenge: BILDUNGSGAENGE,
       kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), bekannteKlassennamen,
     });
@@ -1289,7 +1299,9 @@ export default async function teacherRoutes(fastify) {
       WHERE k.id = ?
     `).get(request.params.id);
     if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
-    if (!userHatKlassenZugriff(request.user, klasse.id)) {
+    // Die Sammelklasse "Ohne Klasse" ist für ALLE Lehrkräfte einsehbar, damit
+    // jede Lehrkraft die dort geretteten Personen in ihre Klassen übernehmen kann.
+    if (!klasse.ist_ablage && !userHatKlassenZugriff(request.user, klasse.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const schueler = getDb().prepare(
@@ -1332,7 +1344,10 @@ export default async function teacherRoutes(fastify) {
     return reply.viewEjs('teacher/klasse_detail.ejs', {
       user: request.user, klasse, schueler, faecher, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
-      andereSchuljahre, versetzZiele: darfVerwalten ? ladeVersetzZiele(klasse) : [],
+      andereSchuljahre,
+      darfVersetzen: darfVerwalten || Boolean(klasse.ist_ablage),
+      versetzZiele: darfVerwalten || klasse.ist_ablage ? ladeVersetzZiele(klasse) : [],
+      ablagePersonen: darfVerwalten && !klasse.ist_ablage && klasse.notenschluessel !== 'SPA' ? ladeAblagePersonen() : [],
     });
   });
 
@@ -1435,7 +1450,8 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/schueler/:id/versetzen', async (request, reply) => {
     const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
     if (!s) return reply.redirect('/teacher/klassen');
-    if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
+    const quelleIstAblage = getDb().prepare('SELECT ist_ablage FROM klassen WHERE id = ?').get(s.klasse_id)?.ist_ablage;
+    if (!quelleIstAblage && !userDarfKlasseVerwalten(request.user, s.klasse_id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
     const roh = String(request.body?.ziel_klasse_id || '');
@@ -1444,6 +1460,22 @@ export default async function teacherRoutes(fastify) {
     if (ergebnis.ok) request.flash?.('success', 'Person versetzt -- alle Noten bleiben erhalten.');
     else request.flash?.('error', VERSETZEN_FEHLER[ergebnis.fehler] || 'Versetzen nicht möglich.');
     return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
+  });
+
+  // Reiter "Aus Ohne Klasse übernehmen": ausgewählte Personen der Sammelklasse
+  // wandern in diese Klasse (Noten bleiben an der Person erhalten).
+  fastify.post('/klassen/:id/schueler/aus-ablage', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id, ist_ablage, ist_kurs_huelle FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.redirect('/teacher/klassen');
+    if (klasse.ist_ablage || klasse.ist_kurs_huelle || !userDarfKlasseVerwalten(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
+    }
+    const roh = request.body?.schueler_id;
+    const ids = (Array.isArray(roh) ? roh : [roh]).map((x) => parseInt(x, 10)).filter(Number.isInteger);
+    const { uebernommen, fehler } = uebernehmeAusAblage(klasse.id, ids);
+    if (uebernommen > 0) request.flash?.('success', `${uebernommen} Person(en) aus „Ohne Klasse“ übernommen -- alle Noten bleiben erhalten.`);
+    if (fehler.length) request.flash?.('error', `Nicht übernommen (Name bereits in der Klasse oder SPA-Klasse): ${fehler.join('; ')}`);
+    return reply.redirect(`/teacher/klassen/${klasse.id}`);
   });
 
   fastify.post('/klassen/:id/schueler/neu', async (request, reply) => {
