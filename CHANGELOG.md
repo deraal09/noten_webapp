@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.42.1 - 2026-09-30
+
+- Fix: SPA-Klassen bekommen jetzt ebenfalls Zugriff auf die Personen in der
+  Sammelklasse "Ohne Klasse" (Reiter "Aus „Ohne Klasse“ übernehmen") und
+  können Personen dorthin versetzen. Zwischen echten SPA-Klassen ist das
+  Versetzen bei gleichem Bildungsgang möglich; SPA <-> IHK/BG bleibt
+  ausgeschlossen.
+
 ## 0.42.0 - 2026-09-30
 
 - Sammelklasse "Ohne Klasse": ist jetzt für jede Lehrkraft einsehbar (in

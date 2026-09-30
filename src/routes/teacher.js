@@ -1347,7 +1347,7 @@ export default async function teacherRoutes(fastify) {
       andereSchuljahre,
       darfVersetzen: darfVerwalten || Boolean(klasse.ist_ablage),
       versetzZiele: darfVerwalten || klasse.ist_ablage ? ladeVersetzZiele(klasse) : [],
-      ablagePersonen: darfVerwalten && !klasse.ist_ablage && klasse.notenschluessel !== 'SPA' ? ladeAblagePersonen() : [],
+      ablagePersonen: darfVerwalten && !klasse.ist_ablage ? ladeAblagePersonen() : [],
     });
   });
 
@@ -1438,10 +1438,9 @@ export default async function teacherRoutes(fastify) {
 
   const VERSETZEN_FEHLER = {
     'abgang': 'Personen mit Abgang können nicht versetzt werden -- bitte zuerst reaktivieren.',
-    'spa': 'SPA-Klassen unterstützen kein Versetzen.',
     'ziel-unbekannt': 'Zielklasse nicht gefunden.',
     'gleiche-klasse': 'Die Person ist bereits in dieser Klasse.',
-    'notenschluessel': 'Die Zielklasse hat einen anderen Notenschlüssel.',
+    'notenschluessel': 'Die Zielklasse hat einen anderen Notenschlüssel (bei SPA: anderer Bildungsgang).',
     'name-vergeben': 'In der Zielklasse gibt es bereits eine Person mit diesem Namen.',
   };
 
@@ -1474,7 +1473,7 @@ export default async function teacherRoutes(fastify) {
     const ids = (Array.isArray(roh) ? roh : [roh]).map((x) => parseInt(x, 10)).filter(Number.isInteger);
     const { uebernommen, fehler } = uebernehmeAusAblage(klasse.id, ids);
     if (uebernommen > 0) request.flash?.('success', `${uebernommen} Person(en) aus „Ohne Klasse“ übernommen -- alle Noten bleiben erhalten.`);
-    if (fehler.length) request.flash?.('error', `Nicht übernommen (Name bereits in der Klasse oder SPA-Klasse): ${fehler.join('; ')}`);
+    if (fehler.length) request.flash?.('error', `Nicht übernommen (Name bereits in der Klasse): ${fehler.join('; ')}`);
     return reply.redirect(`/teacher/klassen/${klasse.id}`);
   });
 

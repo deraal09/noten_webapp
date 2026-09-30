@@ -244,6 +244,50 @@ test('Sammelklasse ist für jede Lehrkraft einsehbar; übernehmen geht per Reite
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(annaId).klasse_id, annaKlasseVorher);
 });
 
+test('SPA-Klassen: Personen aus "Ohne Klasse" übernehmen, nach "Ohne Klasse" versetzen, und zwischen SPA-Klassen nur bei gleichem Bildungsgang', async () => {
+  const legeSpaKlasseAn = async (name, bildungsgang) => {
+    await form(lehrerA, '/teacher/klassen/neu', {
+      schuljahr_id: String(sjNeuId), name, notenschluessel: 'SPA', spa_bildungsgang: bildungsgang,
+    });
+    const id = getDb().prepare('SELECT id FROM klassen WHERE name = ?').get(name).id;
+    await form(lehrerA, `/teacher/klassen/${id}/klassenlehrer/eintragen`, {});
+    return id;
+  };
+  const spaA = await legeSpaKlasseAn('13SPA1', 'SPA_REGULAR');
+  const spaB = await legeSpaKlasseAn('13SPA2', 'SPA_REGULAR');
+  const spaPia = await legeSpaKlasseAn('13PIA', 'SPA_PIA');
+  assert.ok(getDb().prepare('SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ?').get(spaA).c > 0, 'SPA-Klasse hat ihre festen Fächer');
+
+  // Person in die Sammelklasse rutschen lassen (z. B. durch Löschen einer Klasse) ...
+  await form(lehrerA, `/teacher/klassen/${spaB}/schueler/neu`, { nachname: 'Ebert', vorname: 'Eva' });
+  const evaId = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Ebert'").get().id;
+  let r = await form(lehrerA, `/teacher/schueler/${evaId}/versetzen`, { ziel_klasse_id: 'ohne-klasse' });
+  assert.equal(r.status, 302);
+  const ablage = getDb().prepare('SELECT * FROM klassen WHERE ist_ablage = 1 AND schuljahr_id = ?').get(sjNeuId);
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, ablage.id);
+
+  // ... und über den Reiter in eine SPA-Klasse übernehmen, inkl. Teilnahme an deren Fächern.
+  const html = await (await lehrerA(`/teacher/klassen/${spaA}`)).text();
+  assert.match(html, /data-target="schueler-ablage"/);
+  assert.match(html, /Ebert, Eva/);
+  r = await form(lehrerA, `/teacher/klassen/${spaA}/schueler/aus-ablage`, { schueler_id: String(evaId) });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaA);
+  const spaFaecher = getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND nur_historisch = 0').all(spaA);
+  for (const f of spaFaecher) {
+    assert.ok(getDb().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(f.id, evaId));
+  }
+
+  // Zwischen echten SPA-Klassen: gleicher Bildungsgang ja, anderer nein.
+  await form(lehrerA, `/teacher/schueler/${evaId}/versetzen`, { ziel_klasse_id: String(spaPia) });
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaA, 'anderer SPA-Bildungsgang -> nicht versetzt');
+  await form(lehrerA, `/teacher/schueler/${evaId}/versetzen`, { ziel_klasse_id: String(spaB) });
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaB);
+  // SPA -> IHK-Klasse bleibt verboten.
+  await form(lehrerA, `/teacher/schueler/${evaId}/versetzen`, { ziel_klasse_id: String(klasse10A) });
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaB);
+});
+
 test('Die Sammelklasse selbst zu löschen entfernt ihre Schüler/innen endgültig', async () => {
   const ablage = getDb().prepare('SELECT * FROM klassen WHERE ist_ablage = 1').get();
   const r = await form(lehrerA, `/teacher/klassen/${ablage.id}/loeschen`, {});

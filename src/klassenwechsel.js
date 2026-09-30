@@ -36,25 +36,30 @@ export function findeOderLegeAblageKlasseAn(schuljahrId) {
   return db.prepare('SELECT * FROM klassen WHERE id = ?').get(info.lastInsertRowid);
 }
 
-/** SPA-Klassen haben ein eigenes Bewertungsmodell und sind vom Versetzen ausgenommen. */
-function istSpa(klasse) {
-  return klasse.notenschluessel === 'SPA';
+/**
+ * Darf eine Person von `quelle` nach `ziel` wechseln? Die Sammelklasse "Ohne
+ * Klasse" ist mit jeder Klasse verträglich (auch SPA), da sie keine Fächer
+ * und Noten hat. Zwischen echten Klassen müssen Notenschlüssel -- bei SPA
+ * zusätzlich der Bildungsgang -- übereinstimmen.
+ */
+function verschiebbar(quelle, ziel) {
+  if (quelle.ist_ablage || ziel.ist_ablage) return true;
+  if (quelle.notenschluessel !== ziel.notenschluessel) return false;
+  return quelle.notenschluessel !== 'SPA' || (quelle.spa_bildungsgang ?? '') === (ziel.spa_bildungsgang ?? '');
 }
 
 /**
  * Klassen, in die Personen aus `quellKlasse` versetzt werden können: alle
- * echten Klassen (auch anderer Schuljahre) mit gleichem Notenschlüssel.
- * Die Sammelklasse "Ohne Klasse" ist immer erlaubt, da sie keine Fächer hat.
+ * verträglichen echten Klassen (auch anderer Schuljahre, siehe verschiebbar)
+ * plus die Sammelklasse "Ohne Klasse".
  */
 export function ladeVersetzZiele(quellKlasse) {
-  if (istSpa(quellKlasse)) return [];
   return getDb().prepare(`
-    SELECT k.id, k.name, k.ist_ablage, s.bezeichnung AS schuljahr_bezeichnung
+    SELECT k.id, k.name, k.ist_ablage, k.notenschluessel, k.spa_bildungsgang, s.bezeichnung AS schuljahr_bezeichnung
     FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
-    WHERE k.ist_kurs_huelle = 0 AND k.id != ? AND k.notenschluessel != 'SPA'
-      AND (k.notenschluessel = ? OR k.ist_ablage = 1 OR ? = 1)
+    WHERE k.ist_kurs_huelle = 0 AND k.id != ?
     ORDER BY s.bezeichnung DESC, k.name
-  `).all(quellKlasse.id, quellKlasse.notenschluessel, quellKlasse.ist_ablage);
+  `).all(quellKlasse.id).filter((k) => verschiebbar(quellKlasse, k));
 }
 
 /**
@@ -70,17 +75,13 @@ export function versetzeSchueler(schuelerId, zielKlasseId) {
   if (!schueler) return { ok: false, fehler: 'schueler-unbekannt' };
   if (schueler.status === 'abgang') return { ok: false, fehler: 'abgang' };
   const quelle = db.prepare('SELECT * FROM klassen WHERE id = ?').get(schueler.klasse_id);
-  if (istSpa(quelle)) return { ok: false, fehler: 'spa' };
 
   const ziel = zielKlasseId === 'ohne-klasse'
     ? findeOderLegeAblageKlasseAn(quelle.schuljahr_id)
     : db.prepare('SELECT * FROM klassen WHERE id = ? AND ist_kurs_huelle = 0').get(zielKlasseId);
   if (!ziel) return { ok: false, fehler: 'ziel-unbekannt' };
   if (ziel.id === quelle.id) return { ok: false, fehler: 'gleiche-klasse' };
-  if (istSpa(ziel)) return { ok: false, fehler: 'spa' };
-  if (!ziel.ist_ablage && !quelle.ist_ablage && ziel.notenschluessel !== quelle.notenschluessel) {
-    return { ok: false, fehler: 'notenschluessel' };
-  }
+  if (!verschiebbar(quelle, ziel)) return { ok: false, fehler: 'notenschluessel' };
   if (holeSchuelerId(ziel.id, schueler.nachname, schueler.vorname) !== null) {
     return { ok: false, fehler: 'name-vergeben' };
   }
