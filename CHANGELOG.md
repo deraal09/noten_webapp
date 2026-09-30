@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.40.1 - 2026-09-30
+
+- Fix: "Klasse löschen" durfte bisher nur die erstellende Lehrkraft oder der
+  Admin -- jetzt darf das auch jede eingetragene (Co-)Klassenleitung, die
+  die Klasse nicht selbst angelegt hat (dieselbe Regel wie überall sonst
+  beim Verwalten einer Klasse).
+
 ## 0.40.0 - 2026-09-29
 
 - Externe Lehrkräfte einladen (Klassenleitung + Admin): die App verschickt

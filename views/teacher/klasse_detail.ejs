@@ -11,7 +11,7 @@
   <% if (istKlassenlehrer) { %>
     <a class="btn" href="/klassenlehrer/klasse/<%= klasse.id %>">🎓 Klassenleitung</a>
   <% } %>
-  <% if (eigentuemer) { %>
+  <% if (darfVerwalten) { %>
     <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
       <button type="submit" class="danger">🗑 Klasse löschen</button>
     </form>

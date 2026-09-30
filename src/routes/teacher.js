@@ -1300,7 +1300,6 @@ export default async function teacherRoutes(fastify) {
            FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id WHERE fz.fach_id = f.id) AS lehrer_liste
       FROM faecher f WHERE f.klasse_id = ? AND f.nur_historisch = 0 ORDER BY f.name
     `).all(klasse.id);
-    const eigentuemer = klasse.created_by_id === request.user.id || request.user.isAdmin;
     // Löschen/Abgang/Abgangszeugnis nur anzeigen, wenn die Aktion auch
     // durchgeht (dieselbe Regel wie in den Routen, siehe userDarfKlasseVerwalten).
     const darfVerwalten = userDarfKlasseVerwalten(request.user, klasse.id);
@@ -1330,7 +1329,7 @@ export default async function teacherRoutes(fastify) {
       : [];
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      user: request.user, klasse, schueler, faecher, eigentuemer, kannExportieren, darfVerwalten,
+      user: request.user, klasse, schueler, faecher, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
       andereSchuljahre,
     });
@@ -1409,10 +1408,10 @@ export default async function teacherRoutes(fastify) {
   });
 
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {
-    const klasse = getDb().prepare('SELECT created_by_id FROM klassen WHERE id = ?').get(request.params.id);
+    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
     if (!klasse) return reply.redirect('/teacher/klassen');
-    if (klasse.created_by_id !== request.user.id && !request.user.isAdmin) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die erstellende Lehrkraft oder der Admin kann diese Klasse löschen.' });
+    if (!userDarfKlasseVerwalten(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
     getDb().prepare('DELETE FROM klassen WHERE id = ?').run(request.params.id);
     return reply.redirect('/teacher/klassen');
