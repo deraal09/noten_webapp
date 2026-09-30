@@ -12,7 +12,7 @@
     <a class="btn" href="/klassenlehrer/klasse/<%= klasse.id %>">🎓 Klassenleitung</a>
   <% } %>
   <% if (darfVerwalten) { %>
-    <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('<% if (klasse.ist_ablage) { %>Sammelklasse löschen? Die enthaltenen Schüler/innen gehen dabei verloren.<% } else { %>Klasse löschen? Fächer, Klausuren und Noten dieser Klasse gehen verloren. Die Schüler/innen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“ erhalten und können von dort in andere Klassen versetzt werden.<% } %>')">
       <button type="submit" class="danger">🗑 Klasse löschen</button>
     </form>
   <% } %>
@@ -125,6 +125,21 @@ Meier, Carla"></textarea>
         <td><%= s.vorname %></td>
         <% if (darfVerwalten) { %>
         <td>
+          <% if (versetzZiele.length) { %>
+            <form method="post" action="/teacher/schueler/<%= s.id %>/versetzen" class="inline" onsubmit="return confirm('Person in die gewählte Klasse versetzen? Alle bisherigen Noten bleiben der Person erhalten.')">
+              <select name="ziel_klasse_id" required aria-label="Zielklasse">
+                <option value="">↔ Versetzen nach …</option>
+                <% if (!klasse.ist_ablage) { %><option value="ohne-klasse">Ohne Klasse</option><% } %>
+                <% versetzZiele.filter(function(z) { return !z.ist_ablage; }).forEach(function(z) { %>
+                  <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
+                <% }); %>
+                <% versetzZiele.filter(function(z) { return z.ist_ablage; }).forEach(function(z) { %>
+                  <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
+                <% }); %>
+              </select>
+              <button type="submit" title="In eine andere Klasse versetzen (Noten bleiben erhalten)">↔</button>
+            </form>
+          <% } %>
           <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" class="inline" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
             <button type="submit" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
           </form>

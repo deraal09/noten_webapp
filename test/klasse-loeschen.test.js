@@ -112,7 +112,8 @@ test('Co-Klassenleitung (Lehrer B, NICHT Ersteller/in der Klasse) darf die Klass
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasseId), undefined, 'Klasse wurde gelöscht');
   assert.equal(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(mathId), undefined, 'Fächer der Klasse verschwinden per Cascade mit');
-  assert.equal(getDb().prepare("SELECT 1 FROM schueler WHERE klasse_id = ?").get(klasseId), undefined, 'Schüler/innen verschwinden per Cascade mit');
+  assert.equal(getDb().prepare("SELECT 1 FROM schueler WHERE klasse_id = ?").get(klasseId), undefined, 'Schüler/innen sind nicht mehr in der gelöschten Klasse');
+  assert.equal(getDb().prepare("SELECT COUNT(*) AS c FROM schueler WHERE nachname = 'Adler'").get().c, 1, 'sondern als Person in der Sammelklasse erhalten (siehe schueler-versetzen.test.js)');
 });
 
 test('Der Admin darf jede Klasse löschen, auch ohne eigene Zuweisung', async () => {

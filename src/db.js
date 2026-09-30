@@ -153,6 +153,10 @@ CREATE TABLE IF NOT EXISTS klassen (
     -- Klassen-Auflistung herausgefiltert (ladeMeineKlassen und alle Stellen,
     -- die "echte" Klassen aufzählen).
     ist_kurs_huelle INTEGER NOT NULL DEFAULT 0,
+    -- Sammelklasse "Ohne Klasse" je Schuljahr: nimmt beim Löschen einer
+    -- Klasse deren Schüler/innen (nur Stammdaten, keine Noten/Fächer) auf
+    -- und ist kein echter Jahrgang -- siehe src/klassenwechsel.js.
+    ist_ablage INTEGER NOT NULL DEFAULT 0,
     UNIQUE (schuljahr_id, name)
 );
 
@@ -744,6 +748,7 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'spa_fach_key', 'spa_fach_key TEXT');
   ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'historische_halbjahre', 'erstellt_als_fachlehrkraft', 'erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'faecher', 'nur_historisch', 'nur_historisch INTEGER NOT NULL DEFAULT 0');
   // Einmalige Bereinigung: auf Bestandsdatenbanken kann ein rein historisches

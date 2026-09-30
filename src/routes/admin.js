@@ -12,6 +12,7 @@ import {
 } from '../auth/ldap-settings.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
 import { pruefeNotenschluesselWechsel, seedeTeilnehmerAusKlasse } from '../fach-teilnehmer.js';
+import { loescheKlasseMitSchuelerUebernahme } from '../klassenwechsel.js';
 import {
   istGueltigesSchuljahrFormat, sortiereSchuljahreAbsteigend, aktuellesStartjahr, parseSchuljahr,
 } from '../schuljahr-utils.js';
@@ -154,7 +155,7 @@ export default async function adminRoutes(fastify) {
 
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {
     const sjId = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(request.params.id)?.schuljahr_id;
-    getDb().prepare('DELETE FROM klassen WHERE id = ?').run(request.params.id);
+    loescheKlasseMitSchuelerUebernahme(Number(request.params.id), null);
     return reply.redirect(`/admin/schuljahre/${sjId}`);
   });
 

@@ -1,0 +1,130 @@
+/**
+ * Klassenwechsel einzelner Schüler/innen und Klasse löschen, ohne die
+ * Personen zu verlieren.
+ *
+ * Noten (aktuelle wie historische) hängen am Schüler-Datensatz, nicht an
+ * der Klasse -- ein Versetzen ändert deshalb nur die Klassenzuordnung der
+ * Person. Die Teilnahmen an den Fächern der bisherigen Klasse bleiben
+ * bewusst bestehen (wie beim Abgang, siehe /schueler/:id/abgang), damit
+ * Notentafeln, die Notenhistorie und das Abgangszeugnis nichts verlieren.
+ */
+
+import { getDb } from './db.js';
+import { DEFAULT_NS_CSV } from './grade-calc.js';
+import { holeSchuelerId } from './schueler-utils.js';
+
+export const ABLAGE_KLASSENNAME = 'Ohne Klasse';
+
+/**
+ * Sammelklasse "Ohne Klasse" des Schuljahres -- wird bei Bedarf angelegt.
+ * Sie hat nie Fächer, der Notenschlüssel ist daher nur ein Platzhalter.
+ */
+export function findeOderLegeAblageKlasseAn(schuljahrId) {
+  const db = getDb();
+  const vorhanden = db.prepare('SELECT * FROM klassen WHERE schuljahr_id = ? AND ist_ablage = 1').get(schuljahrId);
+  if (vorhanden) return vorhanden;
+  // Der Name ist pro Schuljahr eindeutig: eine echte Klasse, die schon so
+  // heißt, bekommt einen Zähler angehängt statt die Anlage scheitern zu lassen.
+  let name = ABLAGE_KLASSENNAME;
+  for (let i = 2; db.prepare('SELECT 1 FROM klassen WHERE schuljahr_id = ? AND name = ?').get(schuljahrId, name); i += 1) {
+    name = `${ABLAGE_KLASSENNAME} ${i}`;
+  }
+  const info = db.prepare(`
+    INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, ist_ablage)
+    VALUES (?, ?, 'IHK', ?, 1)
+  `).run(schuljahrId, name, DEFAULT_NS_CSV.IHK || '');
+  return db.prepare('SELECT * FROM klassen WHERE id = ?').get(info.lastInsertRowid);
+}
+
+/** SPA-Klassen haben ein eigenes Bewertungsmodell und sind vom Versetzen ausgenommen. */
+function istSpa(klasse) {
+  return klasse.notenschluessel === 'SPA';
+}
+
+/**
+ * Klassen, in die Personen aus `quellKlasse` versetzt werden können: alle
+ * echten Klassen (auch anderer Schuljahre) mit gleichem Notenschlüssel.
+ * Die Sammelklasse "Ohne Klasse" ist immer erlaubt, da sie keine Fächer hat.
+ */
+export function ladeVersetzZiele(quellKlasse) {
+  if (istSpa(quellKlasse)) return [];
+  return getDb().prepare(`
+    SELECT k.id, k.name, k.ist_ablage, s.bezeichnung AS schuljahr_bezeichnung
+    FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+    WHERE k.ist_kurs_huelle = 0 AND k.id != ? AND k.notenschluessel != 'SPA'
+      AND (k.notenschluessel = ? OR k.ist_ablage = 1 OR ? = 1)
+    ORDER BY s.bezeichnung DESC, k.name
+  `).all(quellKlasse.id, quellKlasse.notenschluessel, quellKlasse.ist_ablage);
+}
+
+/**
+ * Versetzt eine Person in eine andere Klasse. `zielKlasseId` darf
+ * 'ohne-klasse' sein: dann wird die Sammelklasse des Schuljahres der
+ * bisherigen Klasse verwendet.
+ *
+ * @returns {{ok: true, zielKlasseId: number} | {ok: false, fehler: string}}
+ */
+export function versetzeSchueler(schuelerId, zielKlasseId) {
+  const db = getDb();
+  const schueler = db.prepare('SELECT * FROM schueler WHERE id = ?').get(schuelerId);
+  if (!schueler) return { ok: false, fehler: 'schueler-unbekannt' };
+  if (schueler.status === 'abgang') return { ok: false, fehler: 'abgang' };
+  const quelle = db.prepare('SELECT * FROM klassen WHERE id = ?').get(schueler.klasse_id);
+  if (istSpa(quelle)) return { ok: false, fehler: 'spa' };
+
+  const ziel = zielKlasseId === 'ohne-klasse'
+    ? findeOderLegeAblageKlasseAn(quelle.schuljahr_id)
+    : db.prepare('SELECT * FROM klassen WHERE id = ? AND ist_kurs_huelle = 0').get(zielKlasseId);
+  if (!ziel) return { ok: false, fehler: 'ziel-unbekannt' };
+  if (ziel.id === quelle.id) return { ok: false, fehler: 'gleiche-klasse' };
+  if (istSpa(ziel)) return { ok: false, fehler: 'spa' };
+  if (!ziel.ist_ablage && !quelle.ist_ablage && ziel.notenschluessel !== quelle.notenschluessel) {
+    return { ok: false, fehler: 'notenschluessel' };
+  }
+  if (holeSchuelerId(ziel.id, schueler.nachname, schueler.vorname) !== null) {
+    return { ok: false, fehler: 'name-vergeben' };
+  }
+
+  db.transaction(() => {
+    db.prepare('UPDATE schueler SET klasse_id = ? WHERE id = ?').run(ziel.id, schueler.id);
+    // Wie bei einer neu angelegten Person: Teilnehmer/in aller aktuellen
+    // Fächer der neuen Klasse.
+    const ins = db.prepare('INSERT OR IGNORE INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)');
+    for (const f of db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND nur_historisch = 0').all(ziel.id)) {
+      ins.run(f.id, schueler.id);
+    }
+  })();
+  return { ok: true, zielKlasseId: ziel.id };
+}
+
+/**
+ * Löscht eine Klasse samt Fächern und Noten, rettet aber vorher alle
+ * Schüler/innen (nur die Person selbst, keine Noten der gelöschten Fächer)
+ * in die Sammelklasse "Ohne Klasse" des Schuljahres. Die Sammelklasse selbst
+ * wird ohne Rettung gelöscht.
+ *
+ * @returns {{gerettet: number, ablageKlasseId: number | null}}
+ */
+export function loescheKlasseMitSchuelerUebernahme(klasseId, userId) {
+  const db = getDb();
+  const klasse = db.prepare('SELECT * FROM klassen WHERE id = ?').get(klasseId);
+  if (!klasse) return { gerettet: 0, ablageKlasseId: null };
+
+  return db.transaction(() => {
+    let gerettet = 0;
+    let ablageKlasseId = null;
+    if (!klasse.ist_ablage) {
+      const anzahl = db.prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(klasseId).c;
+      if (anzahl > 0) {
+        const ablage = findeOderLegeAblageKlasseAn(klasse.schuljahr_id);
+        ablageKlasseId = ablage.id;
+        // Wer die Klasse löscht, muss die Geretteten auch weiterverschieben
+        // können -- dafür wird die Person Klassenleitung der Sammelklasse.
+        if (userId) db.prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(ablage.id, userId);
+        gerettet = db.prepare('UPDATE schueler SET klasse_id = ? WHERE klasse_id = ?').run(ablage.id, klasseId).changes;
+      }
+    }
+    db.prepare('DELETE FROM klassen WHERE id = ?').run(klasseId);
+    return { gerettet, ablageKlasseId };
+  })();
+}

@@ -26,6 +26,7 @@ import {
   ladeSperrenFuerSchueler, holeSperre,
 } from '../noten-sperre.js';
 import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
+import { ladeVersetzZiele, versetzeSchueler, loescheKlasseMitSchuelerUebernahme } from '../klassenwechsel.js';
 import { parseSchuelerCsv } from '../csv-import.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
 import {
@@ -1331,7 +1332,7 @@ export default async function teacherRoutes(fastify) {
     return reply.viewEjs('teacher/klasse_detail.ejs', {
       user: request.user, klasse, schueler, faecher, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
-      andereSchuljahre,
+      andereSchuljahre, versetzZiele: darfVerwalten ? ladeVersetzZiele(klasse) : [],
     });
   });
 
@@ -1413,8 +1414,36 @@ export default async function teacherRoutes(fastify) {
     if (!userDarfKlasseVerwalten(request.user, klasse.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
-    getDb().prepare('DELETE FROM klassen WHERE id = ?').run(request.params.id);
+    const { gerettet } = loescheKlasseMitSchuelerUebernahme(klasse.id, request.user.isAdmin ? null : request.user.id);
+    if (gerettet > 0) {
+      request.flash?.('success', `Klasse gelöscht. ${gerettet} Schüler/innen wurden in die Sammelklasse „Ohne Klasse“ übernommen.`);
+    }
     return reply.redirect('/teacher/klassen');
+  });
+
+  const VERSETZEN_FEHLER = {
+    'abgang': 'Personen mit Abgang können nicht versetzt werden -- bitte zuerst reaktivieren.',
+    'spa': 'SPA-Klassen unterstützen kein Versetzen.',
+    'ziel-unbekannt': 'Zielklasse nicht gefunden.',
+    'gleiche-klasse': 'Die Person ist bereits in dieser Klasse.',
+    'notenschluessel': 'Die Zielklasse hat einen anderen Notenschlüssel.',
+    'name-vergeben': 'In der Zielklasse gibt es bereits eine Person mit diesem Namen.',
+  };
+
+  // Versetzen: die Person wechselt die Klasse, behält aber ALLE Noten (siehe
+  // src/klassenwechsel.js) -- z. B. beim Wiederholen/Überspringen einer Stufe.
+  fastify.post('/schueler/:id/versetzen', async (request, reply) => {
+    const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
+    if (!s) return reply.redirect('/teacher/klassen');
+    if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
+    }
+    const roh = String(request.body?.ziel_klasse_id || '');
+    const zielId = roh === 'ohne-klasse' ? roh : parseInt(roh, 10);
+    const ergebnis = versetzeSchueler(request.params.id, Number.isNaN(zielId) ? null : zielId);
+    if (ergebnis.ok) request.flash?.('success', 'Person versetzt -- alle Noten bleiben erhalten.');
+    else request.flash?.('error', VERSETZEN_FEHLER[ergebnis.fehler] || 'Versetzen nicht möglich.');
+    return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
   });
 
   fastify.post('/klassen/:id/schueler/neu', async (request, reply) => {

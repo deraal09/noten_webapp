@@ -68,13 +68,21 @@ export function ladeFachMitUmfeld(id) {
  * Datenbank-Neustart fach_teilnehmer für sie nachträglich aufgefüllt hat,
  * siehe fuelleFachTeilnehmerAuf in src/db.js) fälschlich als aktuelles Fach
  * in der laufenden Halbjahresübersicht auftauchen.
+ *
+ * Fächer einer FREMDEN Klasse zählen nur im selben Schuljahr (so sind
+ * klassenübergreifende Kurse definiert) -- sonst würden die alten Fächer
+ * einer versetzten Person (siehe src/klassenwechsel.js) als Spalten in der
+ * Übersicht ihrer neuen Klasse auftauchen.
  */
 export function ladeFaecherFuerKlassenleitung(klasseId) {
   return getDb().prepare(`
     SELECT DISTINCT f.* FROM faecher f
     JOIN fach_teilnehmer ft ON ft.fach_id = f.id
     JOIN schueler s ON s.id = ft.schueler_id
+    JOIN klassen fk ON fk.id = f.klasse_id
+    JOIN klassen k ON k.id = s.klasse_id
     WHERE s.klasse_id = ? AND f.nur_historisch = 0
+      AND (f.klasse_id = s.klasse_id OR fk.schuljahr_id = k.schuljahr_id)
     ORDER BY f.name
   `).all(klasseId);
 }

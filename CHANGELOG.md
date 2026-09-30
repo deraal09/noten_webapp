@@ -6,6 +6,24 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.41.0 - 2026-09-30
+
+- Schüler/innen versetzen: auf der Klassenseite lässt sich eine Person über
+  "↔ Versetzen nach …" in eine andere Klasse (auch eines anderen Schuljahres,
+  gleicher Notenschlüssel) oder in die Sammelklasse "Ohne Klasse" verschieben
+  -- z. B. beim Wiederholen/Überspringen einer Stufe. Alle Noten bleiben
+  erhalten (sie hängen an der Person), die Teilnahme an den Fächern der
+  bisherigen Klasse bleibt bestehen und die Person wird Teilnehmer/in der
+  Fächer der neuen Klasse. SPA-Klassen sind ausgenommen.
+- Klasse löschen: die Schüler/innen (nur die Person, nicht die Noten der
+  gelöschten Fächer) werden jetzt nicht mehr mitgelöscht, sondern in die
+  Sammelklasse "Ohne Klasse" des Schuljahres übernommen und können von dort
+  in andere Klassen versetzt werden. Gilt auch für das Löschen im Admin-
+  Bereich. Wer eine Klasse löscht, wird Klassenleitung der Sammelklasse.
+- Die Halbjahresübersicht/Abschlussübersicht einer Klasse zeigt Fächer einer
+  fremden Klasse nur noch im selben Schuljahr, damit die alten Fächer einer
+  versetzten Person nicht als Spalten in der neuen Klasse auftauchen.
+
 ## 0.40.1 - 2026-09-30
 
 - Fix: "Klasse löschen" durfte bisher nur die erstellende Lehrkraft oder der
