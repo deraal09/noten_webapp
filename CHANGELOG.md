@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.44.0 - 2026-09-30
+
+- SPA-Abschlusszeugnis: pro Person lässt sich jede Zeugnisposition
+  (Lernfeld/Fach) aus beliebigen Fächern der Person zusammenstellen -- auch
+  aus Fächern früherer Klassen und rein historischen Fächern vergangener
+  Schuljahre, nicht mehr nur aus den Fächern der aktuellen Klasse. Neuer Link
+  "🎛 Fächer wählen" je Person im Abschlusszeugnis (4. Halbjahr der
+  Zeugnisübersicht); mehrere gewählte Fächer werden gemittelt (Schulnoten
+  1-6 werden dafür in Punkte umgerechnet). Ohne Auswahl bleibt alles beim
+  Standard, angepasste Positionen sind mit ✎ markiert; die Auswahl lässt sich
+  auf den Standard zurücksetzen.
+
 ## 0.43.0 - 2026-09-30
 
 - Abgangs-/Abschlusszeugnis zeigt jetzt ALLE Fächer/Lernfelder über ALLE

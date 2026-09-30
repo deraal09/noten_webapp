@@ -39,9 +39,12 @@ import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter } from '../s
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
 import {
   berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer,
-  ladeEingabeAnzeige as ladeSpaEingabeAnzeige, zeugnisFuerKlasse as spaZeugnisFuerKlasse,
+  ladeEingabeAnzeige as ladeSpaEingabeAnzeige,
   seedeSpaFaecher, spaSchemaFuerFach, spaKomponentenKonfig, spaSetzeKomponenteAktiv,
 } from '../spa-noten-service.js';
+import {
+  zeugnisMitQuellen, ladeQuellenSeite, speichereQuellenAuswahl, loescheQuellenAuswahl,
+} from '../spa-zeugnis-quellen.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -1126,10 +1129,56 @@ export default async function teacherRoutes(fastify) {
     }
     let halbjahr = parseInt(request.query?.hj, 10);
     if (![1, 2, 3, 4].includes(halbjahr)) halbjahr = 1;
-    const zeilen = spaZeugnisFuerKlasse(getDb(), klasse.id, halbjahr);
+    const zeilen = zeugnisMitQuellen(getDb(), klasse, halbjahr);
     return reply.viewEjs('teacher/klasse_zeugnis_spa.ejs', {
       user: request.user, klasse, halbjahr, zeilen,
     });
+  });
+
+  // ---------- SPA-Abschlusszeugnis: Quellfächer je Person wählen ----------
+  // Jede Zeugnisposition (Lernfeld/Fach) lässt sich pro Person aus beliebigen
+  // ihrer Fächer zusammenstellen -- auch aus früheren Klassen und rein
+  // historischen Fächern (siehe src/spa-zeugnis-quellen.js).
+  function ladeSpaKlasseFuerQuellen(request, reply) {
+    const klasse = getDb().prepare(`
+      SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.id = ?
+    `).get(request.params.id);
+    if (!klasse || klasse.notenschluessel !== 'SPA') {
+      reply.code(404).viewEjs('error.ejs', { code: 404, message: 'SPA-Klasse nicht gefunden.' });
+      return null;
+    }
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin darf das Abschlusszeugnis zusammenstellen.' });
+      return null;
+    }
+    return klasse;
+  }
+
+  fastify.get('/klassen/:id/zeugnis/:schuelerId/quellen', async (request, reply) => {
+    const klasse = ladeSpaKlasseFuerQuellen(request, reply);
+    if (!klasse) return reply;
+    const daten = ladeQuellenSeite(getDb(), klasse, Number(request.params.schuelerId));
+    if (!daten) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in dieser Klasse.' });
+    return reply.viewEjs('teacher/zeugnis_quellen.ejs', { user: request.user, klasse, ...daten });
+  });
+
+  fastify.post('/klassen/:id/zeugnis/:schuelerId/quellen', async (request, reply) => {
+    const klasse = ladeSpaKlasseFuerQuellen(request, reply);
+    if (!klasse) return reply;
+    const schuelerId = Number(request.params.schuelerId);
+    if (!ladeQuellenSeite(getDb(), klasse, schuelerId)) {
+      return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in dieser Klasse.' });
+    }
+    if (request.body?.zuruecksetzen === '1') {
+      loescheQuellenAuswahl(getDb(), schuelerId);
+      request.flash?.('success', 'Auswahl zurückgesetzt -- das Abschlusszeugnis nutzt wieder die Fächer der aktuellen Klasse.');
+    } else {
+      const roh = request.body?.quelle;
+      speichereQuellenAuswahl(getDb(), klasse, schuelerId, Array.isArray(roh) ? roh : (roh ? [roh] : []));
+      request.flash?.('success', 'Zusammenstellung des Abschlusszeugnisses gespeichert.');
+    }
+    return reply.redirect(`/teacher/klassen/${klasse.id}/zeugnis/${schuelerId}/quellen`);
   });
 
   // ---------- Abschluss-/Abgangsübersicht (Klassenleitung/Admin) ----------

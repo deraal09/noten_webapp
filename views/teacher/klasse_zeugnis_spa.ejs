@@ -31,6 +31,7 @@
         <% if (halbjahr === 4 && zeilen[0].pruefungen.length) { %>
           <% zeilen[0].pruefungen.forEach(function(p) { %><th><%= p.label %></th><% }); %>
         <% } %>
+        <% if (halbjahr === 4) { %><th>Zusammenstellung</th><% } %>
       </tr>
     </thead>
     <tbody>
@@ -44,6 +45,7 @@
               <% } else { %>
                 <%= f.endpunkte.toFixed(2) %> <strong>(<%= f.tendenz %>)</strong>
               <% } %>
+              <% if (f.angepasst) { %><span title="Zusammengestellt aus: <%= (f.quellen || []).join('; ') %>">✎</span><% } %>
             </td>
           <% }); %>
           <% if (halbjahr === 4) { %>
@@ -56,6 +58,9 @@
                 <% } %>
               </td>
             <% }); %>
+          <% } %>
+          <% if (halbjahr === 4) { %>
+            <td><a href="/teacher/klassen/<%= klasse.id %>/zeugnis/<%= z.schuelerId %>/quellen" title="Fächer je Zeugnisposition für diese Person wählen (auch aus früheren Klassen/historisch)">🎛 Fächer wählen</a></td>
           <% } %>
         </tr>
       <% }); %>

@@ -363,7 +363,7 @@ export function ladeEingabeAnzeige(db, fachId, schuelerId, halbjahr, schemaHalbj
 }
 
 /** Zeugnisnote als Anzeige-Tendenz: Fächer mit Schema-Flag `kommaNote` (WPK) als ganze Komma-Note ("3,0") statt Tendenz (3+/3/3-). */
-function ausweisTendenz(istKomma, tendenz) {
+export function ausweisTendenz(istKomma, tendenz) {
   if (istKomma && tendenz) {
     const n = parseInt(tendenz, 10);
     if (Number.isFinite(n)) return `${n},0`;

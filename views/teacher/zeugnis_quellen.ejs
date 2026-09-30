@@ -1,0 +1,52 @@
+<h1>Abschlusszeugnis zusammenstellen: <%= schueler.nachname %>, <%= schueler.vorname %>
+  <small>(<%= klasse.name %>, <%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= klasse.id %>/zeugnis?hj=4">← Zur Zeugnisübersicht</a>
+</p>
+
+<p class="hint">
+  Jede Position des Abschlusszeugnisses kann für diese Person aus beliebigen ihrer Fächer zusammengestellt
+  werden -- auch aus früheren Klassen und rein historischen Fächern vergangener Schuljahre. Ohne Häkchen gilt der
+  Standard (das SPA-Fach der aktuellen Klasse). Sind mehrere Fächer gewählt, wird der Mittelwert ihrer Punkte
+  verwendet; Fächer mit Schulnoten (1-6) werden dafür in Punkte umgerechnet (1 = 14, 2 = 11, 3 = 8, 4 = 5, 5 = 2, 6 = 0).
+  Das Zeugnis zählt nur Fächer mit einem Wert.
+</p>
+
+<form method="post" action="/teacher/klassen/<%= klasse.id %>/zeugnis/<%= schueler.id %>/quellen">
+  <% positionen.forEach(function(pos) { %>
+    <details class="card" <%= pos.angepasst ? 'open' : '' %>>
+      <summary>
+        <strong><%= pos.label %></strong>
+        <% if (pos.angepasst) { %><small class="hint">(angepasst)</small><% } else { %><small class="hint">(Standard)</small><% } %>
+      </summary>
+      <table class="data">
+        <thead><tr><th></th><th>Fach</th><th>Klasse / Schuljahr</th><th>Punkte</th></tr></thead>
+        <tbody>
+          <% pos.kandidaten.forEach(function(k) { %>
+            <tr>
+              <td>
+                <input type="checkbox" name="quelle" value="<%= pos.key %>|<%= k.fach.id %>" <%= k.gewaehlt ? 'checked' : '' %>
+                       aria-label="<%= k.fach.name %> für <%= pos.label %> verwenden">
+              </td>
+              <td class="name">
+                <%= k.fach.name %>
+                <% if (k.fach.id === pos.standardFachId) { %><small class="hint">(Standard)</small><% } %>
+                <% if (k.fach.nur_historisch) { %><small class="hint">(historisch)</small><% } %>
+                <% if (k.fach.abgeschlossen) { %><small class="hint">(abgeschlossen)</small><% } %>
+              </td>
+              <td><%= k.fach.klasse_name %> · <%= k.fach.schuljahr_bezeichnung %></td>
+              <td class="note-cell"><%= k.punkte === null ? '–' : k.punkte.toFixed(2) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </details>
+  <% }); %>
+  <button type="submit">💾 Zusammenstellung speichern</button>
+</form>
+
+<form method="post" action="/teacher/klassen/<%= klasse.id %>/zeugnis/<%= schueler.id %>/quellen" class="inline"
+      onsubmit="return confirm('Alle gewählten Fächer zurücksetzen? Das Abschlusszeugnis nutzt dann wieder die Fächer der aktuellen Klasse.')">
+  <input type="hidden" name="zuruecksetzen" value="1">
+  <button type="submit" class="danger">↩ Auf Standard zurücksetzen</button>
+</form>

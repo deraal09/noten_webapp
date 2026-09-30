@@ -239,6 +239,19 @@ CREATE TABLE IF NOT EXISTS spa_komponenten_noten (
     UNIQUE (fach_id, schueler_id, halbjahr, komponente_schluessel)
 );
 
+-- Pro Person gewählte Quellfächer für eine Position des SPA-Abschlusszeugnisses
+-- (position = "<Fach-Schlüssel>:<Halbjahr>", z. B. "LF1:4"). Ohne Zeilen gilt
+-- der Standard (das SPA-Fach der aktuellen Klasse); mit Zeilen wird die Position
+-- aus den gewählten Fächern (auch früherer Klassen/rein historisch) zusammengestellt,
+-- siehe src/spa-zeugnis-quellen.js.
+CREATE TABLE IF NOT EXISTS spa_zeugnis_quellen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    position TEXT NOT NULL,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    UNIQUE (schueler_id, position, fach_id)
+);
+
 -- Je Klasse (genauer: je SPA-Fach, das schon eindeutig zu einer Klasse
 -- gehört) abgeschaltete Rest-Anteil-Komponenten eines Lernfelds (z. B. LF3:
 -- Kunst/Spiel/Musik/Bewegung) -- eine Zeile bedeutet "deaktiviert", ihr
