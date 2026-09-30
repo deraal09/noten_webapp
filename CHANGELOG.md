@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.43.0 - 2026-09-30
+
+- Abgangs-/Abschlusszeugnis zeigt jetzt ALLE Fächer/Lernfelder über ALLE
+  Schuljahre. Bisher fehlten die rein historischen Fächer vergangener
+  Schuljahre (und damit deren Noten), es war nur das aktuelle Schuljahr
+  enthalten. Je Fach gibt es die Einzelnoten (chronologisch, auch SPA-
+  Halbjahre) und den aktuellen Stand; die Fächer müssen nicht abgeschlossen
+  sein. Ein bereits abgeschlossenes Lernfeld zählt nur mit seiner
+  Gesamtnote (Abschlussnote).
+- Abgang: neben "🚪 Abgang" gibt es "🚪🎓 Abgang + Abgangszeugnis" -- trägt
+  den Abgang ein und öffnet direkt das Zeugnis mit allen Noten bis zu diesem
+  Schuljahr. Die Zeugnisseite heißt bei Abgang "Abgangszeugnis", sonst
+  "Abschlusszeugnis"; der Link in der Abschluss-/Abgangsübersicht heißt
+  entsprechend "Abgangs-/Abschlusszeugnis".
+
 ## 0.42.1 - 2026-09-30
 
 - Fix: SPA-Klassen bekommen jetzt ebenfalls Zugriff auf die Personen in der

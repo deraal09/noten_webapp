@@ -283,6 +283,10 @@ test('SPA-Klassen: Personen aus "Ohne Klasse" übernehmen, nach "Ohne Klasse" ve
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaA, 'anderer SPA-Bildungsgang -> nicht versetzt');
   await form(lehrerA, `/teacher/schueler/${evaId}/versetzen`, { ziel_klasse_id: String(spaB) });
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaB);
+  // Das Zeugnis für eine SPA-Person enthält deren SPA-Fächer (noch ohne Noten) und läuft ohne Fehler durch.
+  const spaZeugnis = ladeAbgangszeugnisDaten(evaId);
+  assert.ok(spaZeugnis.zeilen.length >= spaFaecher.length);
+  assert.ok(spaZeugnis.zeilen.every((z) => Array.isArray(z.eintraege)));
   // SPA -> IHK-Klasse bleibt verboten.
   await form(lehrerA, `/teacher/schueler/${evaId}/versetzen`, { ziel_klasse_id: String(klasse10A) });
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaB);

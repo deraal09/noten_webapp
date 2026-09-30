@@ -1581,6 +1581,8 @@ export default async function teacherRoutes(fastify) {
     }
     getDb().prepare("UPDATE schueler SET status = 'abgang', abgang_am = datetime('now') WHERE id = ?")
       .run(request.params.id);
+    // Option "Abgang + Abgangszeugnis": danach direkt das Zeugnis mit allen Noten öffnen.
+    if (request.body?.zeugnis === '1') return reply.redirect(`/teacher/schueler/${request.params.id}/abgangszeugnis`);
     return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
   });
 

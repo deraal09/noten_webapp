@@ -1,4 +1,5 @@
-<h1>Abgangszeugnis: <%= schueler.nachname %>, <%= schueler.vorname %> <small>(<%= schueler.klasse_name %>)</small></h1>
+<% var zeugnisArt = schueler.status === 'abgang' ? 'Abgangszeugnis' : 'Abschlusszeugnis'; %>
+<h1><%= zeugnisArt %>: <%= schueler.nachname %>, <%= schueler.vorname %> <small>(<%= schueler.klasse_name %>)</small></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen/<%= schueler.klasse_id %>">← Zur Klasse</a>
   <button type="button" class="btn" onclick="window.print()">🖨 Drucken</button>
@@ -9,9 +10,9 @@
 <% } %>
 
 <p class="hint">
-  Übersicht über alle Fächer, an denen diese Person teilnimmt oder teilgenommen hat — 1./2.
-  Halbjahr (live berechnet, Stand jetzt), historische Halbjahre (vor Einführung der App) und die
-  Abschlussnote, sofern das Fach bereits abgeschlossen wurde.
+  Alle Fächer/Lernfelder über alle besuchten Schuljahre. Die Fächer müssen nicht abgeschlossen sein: bei einem
+  laufenden Fach werden alle Einzelnoten (1./2. Halbjahr, historische Halbjahre) und der aktuelle Stand
+  (Mittelwert) gezeigt, bei einem bereits abgeschlossenen Fach zählt nur die Gesamtnote (Abschlussnote).
 </p>
 
 <% if (!zeilen.length) { %>
@@ -21,28 +22,29 @@
     <thead>
       <tr>
         <th>Fach</th>
-        <% zeilen[0].hjNoten.forEach(function(h) { %><th><%= h.halbjahr %></th><% }); %>
-        <th>Historische Halbjahre</th>
-        <th>Abschlussnote</th>
+        <th>Einzelnoten</th>
+        <th>Gesamtnote</th>
       </tr>
     </thead>
     <tbody>
       <% zeilen.forEach(function(z) { %>
         <tr>
           <td class="name"><%= z.fach.name %></td>
-          <% z.hjNoten.forEach(function(h) { %>
-            <td class="note-cell"><%= h.note === null ? '–' : formatNote(h.note) %></td>
-          <% }); %>
           <td>
-            <% if (!z.historische.length) { %>–<% } else { %>
-              <% z.historische.forEach(function(hh) { %>
-                <div><%= hh.bezeichnung %>: <%= hh.note === null ? '–' : formatNote(hh.note) %></div>
+            <% if (z.fach.abgeschlossen) { %>
+              <span class="hint">abgeschlossen -- es zählt nur die Gesamtnote</span>
+            <% } else if (!z.eintraege.length) { %>–<% } else { %>
+              <% z.eintraege.forEach(function(e) { %>
+                <div><%= e.label %>: <%= e.anzeige !== null ? e.anzeige : formatNote(e.note) %></div>
               <% }); %>
             <% } %>
           </td>
           <td class="note-cell">
-            <% if (!z.fach.abgeschlossen) { %><span class="hint">läuft</span>
-            <% } else { %><%= z.abschlussnote === null ? '–' : formatNote(z.abschlussnote) %><% } %>
+            <% if (z.fach.abgeschlossen) { %>
+              <strong><%= z.abschlussnote === null ? '–' : formatNote(z.abschlussnote) %></strong>
+            <% } else if (z.stand !== null) { %>
+              <%= formatNote(z.stand) %> <small class="hint">(aktueller Stand)</small>
+            <% } else { %>–<% } %>
           </td>
         </tr>
       <% }); %>

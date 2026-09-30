@@ -13,6 +13,7 @@ import { HALBJAHRE, gesamtnoteJahr, parseTendenzNote, NTG } from './grade-calc.j
 import { userHatFachZgriff, userIstKlassenlehrer } from './auth.js';
 import { holeSchuelerId } from './schueler-utils.js';
 import { parseSchuljahr } from './schuljahr-utils.js';
+import { berechneFachFuerSchueler as berechneSpaFachFuerSchueler } from './spa-noten-service.js';
 
 /** Historische Halbjahre eines Fachs, älteste zuerst. */
 export function ladeHistorischeHalbjahre(fachId) {
@@ -306,11 +307,27 @@ export function ladeAbschlussuebersicht(klasseId) {
 }
 
 /**
- * Alle Noten einer einzelnen Person über alle Fächer hinweg, in denen sie
- * (aktuell oder ehemals) Teilnehmer/in ist -- Grundlage des Abgangszeugnisses
- * (siehe routes/teacher.js /schueler/:id/abgangszeugnis). Bleibt bewusst
- * unabhängig vom schueler.status: Noten verschwinden nie, auch nicht nach
- * einem Abgang aus der Klasse (siehe schueler.status in src/db.js).
+ * Sortierschlüssel eines Zeugnis-Eintrags: Startjahr des Schuljahres, dann
+ * Halbjahr -- Einträge ohne erkennbares Schuljahr landen am Ende.
+ */
+function zeugnisSortierschluessel(schuljahr, halbjahrNr) {
+  return [parseSchuljahr(schuljahr)?.startJahr ?? Infinity, halbjahrNr];
+}
+
+/**
+ * Alle Noten einer einzelnen Person über ALLE Fächer und ALLE Schuljahre --
+ * Grundlage des Abgangs-/Abschlusszeugnisses (siehe routes/teacher.js
+ * /schueler/:id/abgangszeugnis). Enthalten sind
+ *  - alle Fächer, an denen die Person (auch in einer früheren Klasse) teilnimmt,
+ *  - alle rein historischen Fächer ihrer Klasse (vergangene Schuljahre) sowie
+ *    alle, zu denen sie historische Noten hat.
+ * Je Fach gibt es die Einzelnoten (1./2. Halbjahr des laufenden Schuljahres
+ * live berechnet, historische Halbjahre, bei SPA-Fächern die Halbjahres-
+ * Endpunkte) sowie den aktuellen Stand (Mittelwert wie beim Fach-Abschluss).
+ * Ein bereits abgeschlossenes Fach zählt nur mit seiner Abschlussnote.
+ * Bleibt bewusst unabhängig vom schueler.status: Noten verschwinden nie,
+ * auch nicht nach einem Abgang aus der Klasse (siehe schueler.status in
+ * src/db.js).
  */
 export function ladeAbgangszeugnisDaten(schuelerIdParam) {
   const db = getDb();
@@ -321,22 +338,56 @@ export function ladeAbgangszeugnisDaten(schuelerIdParam) {
   const schueler = db.prepare('SELECT s.*, k.name AS klasse_name FROM schueler s JOIN klassen k ON k.id = s.klasse_id WHERE s.id = ?').get(schuelerId);
   if (!schueler) return null;
   const faecher = db.prepare(`
-    SELECT f.*, k.name AS klasse_name
-    FROM fach_teilnehmer ft
-    JOIN faecher f ON f.id = ft.fach_id
+    SELECT f.*, k.name AS klasse_name, sj.bezeichnung AS schuljahr_bezeichnung
+    FROM faecher f
     JOIN klassen k ON k.id = f.klasse_id
-    WHERE ft.schueler_id = ?
+    JOIN schuljahre sj ON sj.id = k.schuljahr_id
+    WHERE f.id IN (
+      SELECT fach_id FROM fach_teilnehmer WHERE schueler_id = ?
+      UNION SELECT id FROM faecher WHERE klasse_id = ? AND nur_historisch = 1
+      UNION SELECT hh.fach_id FROM historische_halbjahre hh
+            JOIN historische_noten hn ON hn.historisches_halbjahr_id = hh.id
+            WHERE hn.schueler_id = ?
+    )
     ORDER BY f.name
-  `).all(schuelerId);
+  `).all(schuelerId, schueler.klasse_id, schuelerId);
+
   const zeilen = faecher.map((fach) => {
-    const hjNoten = HALBJAHRE.map((hj) => ({
-      halbjahr: hj, note: berechneGesamtnoten(fach.id, hj).get(schuelerId) ?? null,
-    }));
-    const historische = ladeHistorischeHalbjahre(fach.id).map((hh) => ({
-      bezeichnung: hh.bezeichnung, note: ladeHistorischeNoten(hh.id).get(schuelerId) ?? null,
-    }));
+    const eintraege = [];
+    if (fach.spa_fach_key) {
+      for (const e of berechneSpaFachFuerSchueler(db, fach.id, schuelerId)) {
+        if (e.endpunkte === null) continue;
+        eintraege.push({
+          label: `${e.halbjahr}. Halbjahr (SPA, ${fach.schuljahr_bezeichnung})`,
+          note: e.endpunkte, anzeige: `${e.endpunkte.toFixed(2)} (${e.tendenz})`, spa: true,
+          sortierung: zeugnisSortierschluessel(fach.schuljahr_bezeichnung, e.halbjahr),
+        });
+      }
+    } else if (!fach.nur_historisch) {
+      HALBJAHRE.forEach((hj, i) => {
+        const note = berechneGesamtnoten(fach.id, hj).get(schuelerId) ?? null;
+        if (note === null) return;
+        eintraege.push({
+          label: `${hj} ${fach.schuljahr_bezeichnung}`, note, anzeige: null, spa: false,
+          sortierung: zeugnisSortierschluessel(fach.schuljahr_bezeichnung, i + 1),
+        });
+      });
+    }
+    for (const hh of ladeHistorischeHalbjahre(fach.id)) {
+      const note = ladeHistorischeNoten(hh.id).get(schuelerId);
+      if (note === undefined || note === null) continue;
+      const treffer = /^([12])\. Halbjahr (.+)$/.exec(hh.bezeichnung);
+      eintraege.push({
+        label: hh.bezeichnung, note, anzeige: null, spa: false,
+        sortierung: treffer ? zeugnisSortierschluessel(treffer[2], Number(treffer[1])) : [Infinity, 0],
+      });
+    }
+    eintraege.sort((a, b) => (a.sortierung[0] - b.sortierung[0]) || (a.sortierung[1] - b.sortierung[1]) || 0);
+
+    // SPA-Endpunkte haben keinen Mittelwert über Halbjahre, dort gibt es keinen "Stand".
+    const stand = fach.spa_fach_key ? null : gesamtnoteJahr(eintraege.map((e) => e.note));
     const abschlussnote = fach.abgeschlossen ? (ladeAbschlussnoten(fach.id).get(schuelerId) ?? null) : null;
-    return { fach, hjNoten, historische, abschlussnote };
+    return { fach, eintraege, stand, abschlussnote };
   });
   return { schueler, zeilen };
 }

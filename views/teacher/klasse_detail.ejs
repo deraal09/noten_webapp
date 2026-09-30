@@ -182,7 +182,8 @@ Meier, Carla"></textarea>
           <% } %>
           <% if (darfVerwalten) { %>
           <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" class="inline" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
-            <button type="submit" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
+            <button type="submit" name="zeugnis" value="0" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
+            <button type="submit" name="zeugnis" value="1" title="Abgang eintragen und direkt das Abgangszeugnis mit allen Noten erstellen">🚪🎓 Abgang + Abgangszeugnis</button>
           </form>
           <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren. Für einen normalen Abgang stattdessen den Button „🚪 Abgang" nutzen.')">
             <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
