@@ -272,12 +272,11 @@
         </label>
       </form>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="einstellungen auto-speichern">
-        <% if (!k.teileInfo) { %>
-          <label class="feld">Anzahl Aufgaben
-            <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
-          </label>
-        <% } else { %>
-          <span class="hint">Die Aufgabenzahl ergibt sich aus den Teilen (siehe unten).</span>
+        <label class="feld">Anzahl Aufgaben
+          <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="<%= k.teileInfo ? 40 : 20 %>">
+        </label>
+        <% if (k.teileInfo) { %>
+          <span class="hint">Die Teile (siehe unten) passen sich an: zusätzliche Aufgaben kommen zum letzten Teil dazu, fehlende werden von hinten abgezogen.</span>
         <% } %>
         <span class="hint">Maximal erreichbare Punkte je Aufgabe:</span>
         <span class="aufgabe-liste">
@@ -879,17 +878,57 @@
   // ersten Ziffer schon abschickt; Datum (.auto-speichern-sofort) speichert
   // dagegen sofort bei "change", weil ein Datepicker ohnehin erst bei
   // vollständiger Auswahl feuert.
+  //
+  // Scroll-Position und fokussiertes Feld werden vor dem Absenden gemerkt und
+  // nach dem Neuladen wiederhergestellt -- sonst springt die Seite bei jeder
+  // Änderung (Max-Punkte, Anzahl Aufgaben, Teile, Gewichtung) nach oben und
+  // man muss das Feld erst wieder suchen.
+  const FOKUS_KEY = 'noteneingabe-fokus';
+  function merkeFokus(form, feld) {
+    try {
+      sessionStorage.setItem(FOKUS_KEY, JSON.stringify({
+        pfad: location.pathname + location.search, y: window.scrollY,
+        action: form.getAttribute('action'), name: feld ? feld.name : null, wert: feld ? feld.value : null,
+      }));
+    } catch (e) { /* z. B. privater Modus */ }
+  }
+  function stelleFokusWiederHer() {
+    let gemerkt = null;
+    try {
+      gemerkt = JSON.parse(sessionStorage.getItem(FOKUS_KEY) || 'null');
+      sessionStorage.removeItem(FOKUS_KEY);
+    } catch (e) { return; }
+    if (!gemerkt || gemerkt.pfad.split('?')[0] !== location.pathname) return;
+    window.scrollTo(0, gemerkt.y);
+    if (!gemerkt.name) return;
+    const forms = Array.from(document.querySelectorAll('form')).filter(function(f) { return f.getAttribute('action') === gemerkt.action; });
+    for (const f of forms) {
+      const feld = f.querySelector('[name="' + gemerkt.name + '"]');
+      if (feld && feld.offsetParent !== null) {
+        feld.focus({ preventScroll: true });
+        if (typeof feld.setSelectionRange === 'function') {
+          try { feld.setSelectionRange(feld.value.length, feld.value.length); } catch (e) { /* number-Felder kennen keine Auswahl */ }
+        }
+        return;
+      }
+    }
+  }
   document.querySelectorAll('form.auto-speichern').forEach(function(form) {
-    const absenden = debounce(function() { form.submit(); }, 600);
+    const absenden = debounce(function() { merkeFokus(form, document.activeElement && form.contains(document.activeElement) ? document.activeElement : null); form.submit(); }, 600);
     form.querySelectorAll('input').forEach(function(feld) {
       feld.addEventListener('input', absenden);
     });
   });
   document.querySelectorAll('form.auto-speichern-sofort').forEach(function(form) {
     form.querySelectorAll('input').forEach(function(feld) {
-      feld.addEventListener('change', function() { form.submit(); });
+      feld.addEventListener('change', function() { merkeFokus(form, null); form.submit(); });
     });
   });
+  // Normale Absende-Buttons (z. B. "Teile speichern") bleiben ebenfalls an der Stelle.
+  document.querySelectorAll('#panel-klausuren form, #panel-uls form').forEach(function(form) {
+    form.addEventListener('submit', function() { merkeFokus(form, null); });
+  });
+  stelleFokusWiederHer();
 
   // Pfeiltasten hoch/runter und Enter springen in derselben Spalte (also
   // z. B. derselben Aufgabe/demselben Termin) zur vorherigen/nächsten

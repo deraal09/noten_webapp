@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.47.0 - 2026-10-01
+
+- Klausuren und Unterrichtsleistungen: Zahlenfelder (Aufgabenzahl, Max-Punkte,
+  Gewichtung, Teile) haben keine Pfeile mehr, die Werte werden direkt getippt.
+- Beim Eintragen springt die Seite nicht mehr nach oben: Scroll-Position und
+  das fokussierte Feld bleiben nach dem automatischen Speichern erhalten
+  (Max-Punkte, Anzahl Aufgaben, Teile, Gewichtung).
+- "Anzahl Aufgaben" ist auch bei mehrteiligen Klausuren änderbar; die Teile
+  passen sich an: zusätzliche Aufgaben kommen zum letzten Teil, fehlende
+  werden von hinten abgezogen (bleibt nur ein Teil übrig, ist die Klausur
+  wieder einteilig).
+
 ## 0.46.1 - 2026-10-01
 
 - SPA: Klausuren und Unterrichtsleistung werden jetzt direkt in Punkten

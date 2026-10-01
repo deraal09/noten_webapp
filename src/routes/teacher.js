@@ -10,7 +10,7 @@ import {
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
-  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, halbjahreFuerFach, SPA_HALBJAHRE,
+  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, halbjahreFuerFach, SPA_HALBJAHRE,
 } from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import {
@@ -587,11 +587,16 @@ export default async function teacherRoutes(fastify) {
     const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
     if (!k) return reply.redirect('/teacher');
     if (!userHatFachZgriff(request.user, k.fach_id)) return reply.code(403).send({ error: 'forbidden' });
-    // Bei einer mehrteiligen Klausur legen die Teile die Aufgabenzahl fest.
+    // Bei einer mehrteiligen Klausur passen sich die Teile an die neue
+    // Aufgabenzahl an (siehe passeTeileAnAufgabenzahl) -- Aufgaben kommen zum
+    // letzten Teil dazu bzw. werden von hinten abgezogen.
     const teileInfo = parseKlausurTeile(k.teile);
-    const anzahl = teileInfo
-      ? teileInfo.teile.reduce((a, t) => a + t.aufgaben, 0)
-      : Math.max(1, parseInt(request.body?.anzahl_aufgaben, 10) || JSON.parse(k.max_punkte_pro_aufgabe).length);
+    const anzahl = Math.max(1, Math.min(40, parseInt(request.body?.anzahl_aufgaben, 10) || JSON.parse(k.max_punkte_pro_aufgabe).length));
+    if (teileInfo) {
+      const angepasst = passeTeileAnAufgabenzahl(teileInfo, anzahl);
+      getDb().prepare('UPDATE klausuren SET teile = ? WHERE id = ?')
+        .run(angepasst ? JSON.stringify(angepasst) : null, request.params.id);
+    }
     const neueWerte = [];
     for (let i = 0; i < anzahl; i++) {
       neueWerte.push(Number(request.body?.['mp_' + i]) || 1);

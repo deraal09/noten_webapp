@@ -505,3 +505,15 @@ details summary { cursor: pointer; padding: 0.3rem 0; font-weight: 500; }
 /* Deaktivierte SPA-Komponente (siehe fach_detail_spa.ejs): bleibt anklickbar
    (zum Wieder-Aktivieren), soll aber optisch klar "aus" wirken. */
 .komponente-inaktiv { opacity: 0.5; }
+
+/* Klausuren/Unterrichtsleistung: Zahlenfelder (Max-Punkte, Gewichtung, Teile, ...)
+   ohne Hoch/Runter-Pfeile -- Werte werden direkt eingetippt. */
+#panel-klausuren input[type=number], #panel-uls input[type=number] {
+  -moz-appearance: textfield; appearance: textfield;
+}
+#panel-klausuren input[type=number]::-webkit-outer-spin-button,
+#panel-klausuren input[type=number]::-webkit-inner-spin-button,
+#panel-uls input[type=number]::-webkit-outer-spin-button,
+#panel-uls input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}

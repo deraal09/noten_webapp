@@ -22,7 +22,7 @@ delete process.env.LDAP_URL;
 const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
 const {
-  HALBJAHRE, DEFAULT_NS_CSV, klausurNote, klausurTeilNoten, parseKlausurTeile, kleinerIstBesser,
+  HALBJAHRE, DEFAULT_NS_CSV, klausurNote, klausurTeilNoten, parseKlausurTeile, kleinerIstBesser, passeTeileAnAufgabenzahl,
 } = await import('../src/grade-calc.js');
 
 const fastify = await buildApp({ logger: false });
@@ -174,14 +174,14 @@ test('Teile einrichten: zwei Teile, Aufgabenzahl ergibt sich aus den Teilen, lee
   assert.equal(klausur.note, 2.36, '0,6 * 1,0 + 0,4 * 4,4');
 });
 
-test('Notenübersicht-Seite zeigt Teile, Teilnoten, Gesamtnote; "Anzahl Aufgaben" entfällt', async () => {
+test('Notenübersicht-Seite zeigt Teile, Teilnoten, Gesamtnote; Hinweis zur Aufgabenzahl', async () => {
   const html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
   assert.match(html, /Hörverstehen <small>\(60%\)<\/small>/);
   assert.match(html, /Schreiben <small>\(40%\)<\/small>/);
   assert.match(html, /class="note-cell k-teilnote"[^>]*data-teil="0">1,0<\/td>/);
   assert.match(html, /class="note-cell k-teilnote"[^>]*data-teil="1">4,4<\/td>/);
   assert.match(html, /Gesamtnote/);
-  assert.match(html, /Die Aufgabenzahl ergibt sich aus den Teilen/);
+  assert.match(html, /Die Teile \(siehe unten\) passen sich an/);
 });
 
 test('Ein Teil bestimmt die beste Note: Gesamtnote kann durch die anderen Teile nicht besser werden', async () => {
@@ -195,10 +195,48 @@ test('Ein Teil bestimmt die beste Note: Gesamtnote kann durch die anderen Teile 
   await punkte(0, 10); await punkte(1, 10);
 });
 
-test('Maxpunkte-Route ändert die Aufgabenzahl einer mehrteiligen Klausur nicht; Punkte je Aufgabe lassen sich weiter setzen', async () => {
-  await form(lehrerA, `/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: '7', mp_0: '10', mp_1: '10', mp_2: '20', halbjahr: HJ });
-  const k = getDb().prepare('SELECT max_punkte_pro_aufgabe FROM klausuren WHERE id = ?').get(klausurId);
-  assert.deepEqual(JSON.parse(k.max_punkte_pro_aufgabe), [10, 10, 20]);
+test('Anzahl Aufgaben ändern: die Teile passen sich an (mehr -> letzter Teil wächst, weniger -> von hinten gekürzt)', async () => {
+  const teileVon = () => parseKlausurTeile(getDb().prepare('SELECT teile FROM klausuren WHERE id = ?').get(klausurId).teile);
+  const anzahl = () => JSON.parse(getDb().prepare('SELECT max_punkte_pro_aufgabe FROM klausuren WHERE id = ?').get(klausurId).max_punkte_pro_aufgabe).length;
+
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: '5', mp_0: '10', mp_1: '10', mp_2: '20', halbjahr: HJ });
+  assert.equal(anzahl(), 5);
+  assert.deepEqual(teileVon().teile.map((t) => [t.name, t.aufgaben, t.gewichtung]), [['Hörverstehen', 2, 60], ['Schreiben', 3, 40]]);
+
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: '3', mp_0: '10', mp_1: '10', mp_2: '20', halbjahr: HJ });
+  assert.equal(anzahl(), 3);
+  assert.deepEqual(teileVon().teile.map((t) => [t.name, t.aufgaben, t.gewichtung]), [['Hörverstehen', 2, 60], ['Schreiben', 1, 40]]);
+
+  // Bleibt nur ein Teil übrig, ist die Klausur wieder einteilig
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: '2', mp_0: '10', mp_1: '10', halbjahr: HJ });
+  assert.equal(getDb().prepare('SELECT teile FROM klausuren WHERE id = ?').get(klausurId).teile, null);
+
+  // Wiederherstellen für die folgenden Tests
+  await formListe(lehrerA, `/teacher/klausuren/${klausurId}/teile`, teileFormular([['bestimmend', '']]));
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: '3', mp_0: '10', mp_1: '10', mp_2: '20', halbjahr: HJ });
+  assert.equal(teileVon().teile.length, 2);
+  await punkte(0, 10); await punkte(1, 10); await punkte(2, 5);
+});
+
+test('Anzahl-Feld ist auch bei mehrteiligen Klausuren vorhanden; Zahlenfelder ohne Pfeile; Fokus bleibt erhalten', async () => {
+  const html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /name="anzahl_aufgaben"[^>]*max="40"/);
+  assert.match(html, /stelleFokusWiederHer/);
+  const css = fs.readFileSync(new URL('../static/css/app.css', import.meta.url), 'utf8');
+  assert.match(css, /#panel-klausuren input\[type=number\]/);
+  assert.match(css, /spin-button/);
+});
+
+test('passeTeileAnAufgabenzahl: Randfälle', () => {
+  const info = { teile: [{ name: 'A', aufgaben: 2, gewichtung: 50 }, { name: 'B', aufgaben: 2, gewichtung: 30 }, { name: 'C', aufgaben: 1, gewichtung: 20 }], bestimmend: 2 };
+  assert.equal(passeTeileAnAufgabenzahl(null, 4), null);
+  assert.deepEqual(passeTeileAnAufgabenzahl(info, 5).teile.map((t) => t.aufgaben), [2, 2, 1]);
+  assert.deepEqual(passeTeileAnAufgabenzahl(info, 8).teile.map((t) => t.aufgaben), [2, 2, 4]);
+  const kleiner = passeTeileAnAufgabenzahl(info, 3);
+  assert.deepEqual(kleiner.teile.map((t) => t.aufgaben), [2, 1]);
+  assert.equal(kleiner.bestimmend, null, 'bestimmender Teil entfallen');
+  assert.equal(passeTeileAnAufgabenzahl(info, 2), null, 'ein Teil -> einteilig');
+  assert.equal(info.teile[2].aufgaben, 1, 'Eingabe bleibt unverändert');
 });
 
 test('Ungültige Teile (nur ein Teil / keine Gewichtung) werden abgelehnt, bisherige Teile bleiben', async () => {

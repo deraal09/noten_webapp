@@ -149,6 +149,41 @@ export function parseKlausurTeile(roh) {
 }
 
 /**
+ * Passt die Teile einer mehrteiligen Klausur an eine neue GESAMT-Aufgabenzahl
+ * an: zusätzliche Aufgaben kommen zum letzten Teil dazu, fehlende werden von
+ * hinten abgezogen (ein Teil, der dabei leer würde, entfällt). Bleibt nur ein
+ * Teil übrig, ist die Klausur wieder einteilig (null). Reihenfolge, Namen und
+ * Gewichtungen der übrigen Teile bleiben erhalten.
+ *
+ * @param {ReturnType<typeof parseKlausurTeile>} teileInfo
+ * @param {number} neueAnzahl
+ * @returns {ReturnType<typeof parseKlausurTeile>}
+ */
+export function passeTeileAnAufgabenzahl(teileInfo, neueAnzahl) {
+  if (!teileInfo) return null;
+  const teile = teileInfo.teile.map((t) => ({ ...t }));
+  const summe = teile.reduce((a, t) => a + t.aufgaben, 0);
+  if (neueAnzahl > summe) {
+    teile[teile.length - 1].aufgaben += neueAnzahl - summe;
+  } else {
+    let abziehen = summe - neueAnzahl;
+    while (abziehen > 0 && teile.length > 0) {
+      const letzter = teile[teile.length - 1];
+      if (letzter.aufgaben > abziehen) {
+        letzter.aufgaben -= abziehen;
+        abziehen = 0;
+      } else {
+        abziehen -= letzter.aufgaben;
+        teile.pop();
+      }
+    }
+  }
+  if (teile.length < 2) return null;
+  const bestimmend = teileInfo.bestimmend !== null && teileInfo.bestimmend < teile.length ? teileInfo.bestimmend : null;
+  return { teile, bestimmend };
+}
+
+/**
  * Noten der einzelnen Teile einer mehrteiligen Klausur (je Teil null, solange
  * nicht alle Aufgaben des Teils bepunktet sind). Bei einteiliger Klausur null.
  * @returns {Array<number|null>|null}
