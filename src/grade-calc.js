@@ -148,6 +148,44 @@ export function parseKlausurTeile(roh) {
   return { teile, bestimmend };
 }
 
+export const MAX_KLAUSUR_TEILE = 6;
+
+/**
+ * Ändert die ANZAHL DER TEILE einer Klausur (1 = einteilig -> null).
+ *  - einteilig -> n Teile: die vorhandenen Aufgaben werden gleichmäßig verteilt
+ *    (Rest zum letzten Teil, mindestens eine Aufgabe je Teil), Gewichtung
+ *    gleich groß.
+ *  - mehr Teile: neue Teile bekommen eine Aufgabe und die durchschnittliche
+ *    Gewichtung der vorhandenen.
+ *  - weniger Teile: von hinten entfernt (samt Aufgaben).
+ * Namen, Aufgaben und Gewichtungen der bleibenden Teile bleiben unverändert.
+ *
+ * @param {ReturnType<typeof parseKlausurTeile>} teileInfo
+ * @param {number} aufgabenGesamt aktuelle Gesamt-Aufgabenzahl
+ * @param {number} neueTeilzahl
+ */
+export function passeTeileAnTeilzahl(teileInfo, aufgabenGesamt, neueTeilzahl) {
+  const n = Math.max(1, Math.min(MAX_KLAUSUR_TEILE, Math.floor(Number(neueTeilzahl)) || 1));
+  if (n < 2) return null;
+  const runde = (x) => Math.round(x * 10) / 10;
+  if (!teileInfo) {
+    const gesamt = Math.max(aufgabenGesamt, n);
+    const basis = Math.floor(gesamt / n);
+    const gw = Math.floor(1000 / n) / 10;
+    const teile = Array.from({ length: n }, (_, i) => ({
+      name: `Teil ${i + 1}`,
+      aufgaben: i === n - 1 ? gesamt - basis * (n - 1) : basis,
+      gewichtung: i === n - 1 ? runde(100 - gw * (n - 1)) : gw,
+    }));
+    return { teile, bestimmend: null };
+  }
+  const teile = teileInfo.teile.slice(0, n).map((t) => ({ ...t }));
+  const schnitt = runde(teile.reduce((a, t) => a + t.gewichtung, 0) / teile.length);
+  while (teile.length < n) teile.push({ name: `Teil ${teile.length + 1}`, aufgaben: 1, gewichtung: schnitt });
+  const bestimmend = teileInfo.bestimmend !== null && teileInfo.bestimmend < n ? teileInfo.bestimmend : null;
+  return { teile, bestimmend };
+}
+
 /**
  * Passt die Teile einer mehrteiligen Klausur an eine neue GESAMT-Aufgabenzahl
  * an: zusätzliche Aufgaben kommen zum letzten Teil dazu, fehlende werden von

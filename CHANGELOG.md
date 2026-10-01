@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.48.0 - 2026-10-01
+
+- Klausuren neu gegliedert: Beim Anlegen werden nur noch Name und Datum
+  eingegeben. In der Klausur gibt es dann "Anzahl Teile" (Standard 1).
+  - 1 Teil: normale Klausur mit "Anzahl Aufgaben" und Max-Punkten je Aufgabe.
+  - Mehr Teile: eine Tabelle mit Name, Aufgaben und Gewichtung je Teil, dazu
+    die Auswahl, welcher Teil die beste Note begrenzt (nur bei mehreren
+    Teilen sichtbar). Die Aufgabenzahl ergibt sich aus den Teilen, die
+    Max-Punkte sind nach Teilen gruppiert.
+  - Ändern der Teilezahl verteilt die Aufgaben bzw. ergänzt/entfernt Teile von
+    hinten; Eingaben in der Teile-Tabelle werden beim Verlassen des Feldes
+    automatisch gespeichert (Fokus und Scroll-Position bleiben erhalten).
+- Der Bereich "Klausur aus mehreren Teilen (optional)" mit "Teile speichern"
+  und "Wieder einteilig machen" entfällt.
+
 ## 0.47.1 - 2026-10-01
 
 - Klausuren: Der Cursor springt beim Eintippen von Punkten nicht mehr an den

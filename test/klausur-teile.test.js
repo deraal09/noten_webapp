@@ -22,7 +22,7 @@ delete process.env.LDAP_URL;
 const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
 const {
-  HALBJAHRE, DEFAULT_NS_CSV, klausurNote, klausurTeilNoten, parseKlausurTeile, kleinerIstBesser, passeTeileAnAufgabenzahl,
+  HALBJAHRE, DEFAULT_NS_CSV, klausurNote, klausurTeilNoten, parseKlausurTeile, kleinerIstBesser, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl,
 } = await import('../src/grade-calc.js');
 
 const fastify = await buildApp({ logger: false });
@@ -174,14 +174,15 @@ test('Teile einrichten: zwei Teile, Aufgabenzahl ergibt sich aus den Teilen, lee
   assert.equal(klausur.note, 2.36, '0,6 * 1,0 + 0,4 * 4,4');
 });
 
-test('Notenübersicht-Seite zeigt Teile, Teilnoten, Gesamtnote; Hinweis zur Aufgabenzahl', async () => {
+test('Notenübersicht-Seite zeigt Teile, Teilnoten, Gesamtnote; Anzahl Teile', async () => {
   const html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
   assert.match(html, /Hörverstehen <small>\(60%\)<\/small>/);
   assert.match(html, /Schreiben <small>\(40%\)<\/small>/);
   assert.match(html, /class="note-cell k-teilnote"[^>]*data-teil="0">1,0<\/td>/);
   assert.match(html, /class="note-cell k-teilnote"[^>]*data-teil="1">4,4<\/td>/);
   assert.match(html, /Gesamtnote/);
-  assert.match(html, /Die Teile \(siehe unten\) passen sich an/);
+  assert.match(html, /name="anzahl_teile" value="2"/);
+  assert.match(html, /Aufgaben gesamt: <strong>3<\/strong>/);
 });
 
 test('Ein Teil bestimmt die beste Note: Gesamtnote kann durch die anderen Teile nicht besser werden', async () => {
@@ -218,16 +219,78 @@ test('Anzahl Aufgaben ändern: die Teile passen sich an (mehr -> letzter Teil w�
   await punkte(0, 10); await punkte(1, 10); await punkte(2, 5);
 });
 
-test('Anzahl-Feld ist auch bei mehrteiligen Klausuren vorhanden; Zahlenfelder ohne Pfeile; Fokus bleibt erhalten', async () => {
+test('Oberfläche: Anlegen nur mit Name/Datum, Anzahl Teile (Standard 1), Teile-Tabelle nur bei mehreren Teilen; Zahlenfelder ohne Pfeile; Fokus bleibt', async () => {
   const html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
-  assert.match(html, /name="anzahl_aufgaben"[^>]*max="40"/);
+  const anlegen = html.slice(html.indexOf('id="klausur-panel-anlegen"'));
+  assert.doesNotMatch(anlegen.slice(0, anlegen.indexOf('+ Klausur anlegen')), /name="aufgaben"/, 'Anlegen ohne Aufgabenzahl');
+  assert.match(html, /name="teil_aufgaben"/, 'mehrteilige Klausur zeigt die Teile-Tabelle');
+  assert.doesNotMatch(html, /name="anzahl_aufgaben"/, 'bei Teilen ergibt sich die Aufgabenzahl aus den Teilen');
+  assert.match(html, /Bestimmt beste Note/);
   assert.match(html, /stelleFokusWiederHer/);
-  assert.match(html, /feld\.name === 'anzahl_aufgaben'/, 'Aufgabenzahl wird erst beim Verlassen/Enter übernommen');
+  assert.match(html, /feld\.name === 'anzahl_aufgaben' \|\| feld\.name === 'anzahl_teile'/, 'Zahlen werden erst beim Verlassen/Enter übernommen');
   assert.match(html, /feld\.value = '';\s+feld\.value = v;/, 'Eingabemarke ans Ende');
-  assert.match(html, /action="\/teacher\/klausuren\/\d+\/teile" autocomplete="off"/);
   const css = fs.readFileSync(new URL('../static/css/app.css', import.meta.url), 'utf8');
   assert.match(css, /#panel-klausuren input\[type=number\]/);
   assert.match(css, /spin-button/);
+});
+
+test('Anzahl Teile: 1 = einteilig ohne Teile-Tabelle und Auswahl "beste Note"; mehr Teile verteilen die Aufgaben', async () => {
+  const teileVon = () => parseKlausurTeile(getDb().prepare('SELECT teile FROM klausuren WHERE id = ?').get(klausurId).teile);
+  const anzahl = () => JSON.parse(getDb().prepare('SELECT max_punkte_pro_aufgabe FROM klausuren WHERE id = ?').get(klausurId).max_punkte_pro_aufgabe).length;
+
+  // 2 -> 1: einteilig, Aufgaben bleiben, Seite zeigt Anzahl Aufgaben statt Tabelle
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/teile-anzahl`, { anzahl_teile: '1' });
+  assert.equal(teileVon(), null);
+  assert.equal(anzahl(), 3);
+  let html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /name="anzahl_teile" value="1"/);
+  assert.match(html, /name="anzahl_aufgaben" value="3"/);
+  assert.doesNotMatch(html, /name="teil_aufgaben"/);
+  assert.doesNotMatch(html, /Bestimmt beste Note/);
+
+  // 1 -> 3: 3 Aufgaben gleichmäßig, gleiche Gewichtung
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/teile-anzahl`, { anzahl_teile: '3' });
+  assert.deepEqual(teileVon().teile.map((t) => [t.name, t.aufgaben, t.gewichtung]), [['Teil 1', 1, 33.3], ['Teil 2', 1, 33.3], ['Teil 3', 1, 33.4]]);
+  html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /Bestimmt beste Note/);
+
+  // 3 -> 2: letzter Teil samt Aufgabe entfällt; 2 -> 4: neue Teile mit einer Aufgabe
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/teile-anzahl`, { anzahl_teile: '2' });
+  assert.equal(anzahl(), 2);
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/teile-anzahl`, { anzahl_teile: '4' });
+  assert.equal(anzahl(), 4);
+  assert.deepEqual(teileVon().teile.map((t) => t.aufgaben), [1, 1, 1, 1]);
+
+  // Zugriffsschutz bleibt: Anzahl Teile 1 + Wiederherstellen der Ausgangslage für die Folgetests
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/teile-anzahl`, { anzahl_teile: '1' });
+  await formListe(lehrerA, `/teacher/klausuren/${klausurId}/teile`, teileFormular([['bestimmend', '']]));
+  await form(lehrerA, `/teacher/klausuren/${klausurId}/maxpunkte`, { mp_0: '10', mp_1: '10', mp_2: '20', halbjahr: HJ });
+  await punkte(0, 10); await punkte(1, 10); await punkte(2, 5);
+  assert.equal(anzahl(), 3);
+});
+
+test('Teile bearbeiten: leere Aufgabenzahl zählt als 1, komplett leere Zeile entfällt', async () => {
+  await formListe(lehrerA, `/teacher/klausuren/${klausurId}/teile`, [
+    ['teil_name', 'A'], ['teil_aufgaben', '2'], ['teil_gewichtung', '50'],
+    ['teil_name', 'B'], ['teil_aufgaben', ''], ['teil_gewichtung', '50'],
+    ['teil_name', ''], ['teil_aufgaben', ''], ['teil_gewichtung', ''],
+    ['bestimmend', ''],
+  ]);
+  const t = parseKlausurTeile(getDb().prepare('SELECT teile FROM klausuren WHERE id = ?').get(klausurId).teile);
+  assert.deepEqual(t.teile.map((x) => x.aufgaben), [2, 1]);
+  await formListe(lehrerA, `/teacher/klausuren/${klausurId}/teile`, teileFormular([['bestimmend', '']]));
+});
+
+test('passeTeileAnTeilzahl: Randfälle', () => {
+  assert.equal(passeTeileAnTeilzahl(null, 5, 1), null);
+  assert.deepEqual(passeTeileAnTeilzahl(null, 5, 2).teile.map((t) => t.aufgaben), [2, 3]);
+  assert.deepEqual(passeTeileAnTeilzahl(null, 1, 3).teile.map((t) => t.aufgaben), [1, 1, 1], 'mindestens eine Aufgabe je Teil');
+  const info = { teile: [{ name: 'A', aufgaben: 2, gewichtung: 60 }, { name: 'B', aufgaben: 1, gewichtung: 40 }], bestimmend: 1 };
+  const mehr = passeTeileAnTeilzahl(info, 3, 3);
+  assert.deepEqual(mehr.teile.map((t) => [t.name, t.aufgaben, t.gewichtung]), [['A', 2, 60], ['B', 1, 40], ['Teil 3', 1, 50]]);
+  assert.equal(mehr.bestimmend, 1);
+  assert.equal(passeTeileAnTeilzahl({ ...info, bestimmend: 1 }, 3, 2).bestimmend, 1);
+  assert.equal(passeTeileAnTeilzahl(info, 3, 99).teile.length, 6, 'höchstens 6 Teile');
 });
 
 test('passeTeileAnAufgabenzahl: Randfälle', () => {
