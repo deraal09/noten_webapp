@@ -24,6 +24,7 @@
 import { spaSchemaFuer, spaFachName, spaFaecherFuerBildungsgang } from './spa-schema.js';
 import { berechneFach, tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
 import { seedeTeilnehmerAusKlasse } from './fach-teilnehmer.js';
+import { leistungsPunkte, leistungsZiel } from './spa-leistung.js';
 
 /**
  * @typedef {import('./spa-grade-calc.js').ErgebnisHalbjahr} ErgebnisHalbjahr
@@ -183,6 +184,18 @@ function ladeEingaben(db, fachId, schuelerId, schema) {
         komponenten[k.schluessel] = kr?.punkte ?? null;
       }
       eingabe.komponenten = komponenten;
+    }
+    // Leistungsnote aus Klausuren/Unterrichtsleistung (siehe spa-leistung.js):
+    // ersetzt den Direktwert bzw. füttert die gewählte Komponente -- aber nur,
+    // wo nichts von Hand eingetragen ist.
+    const leistung = leistungsPunkte(db, fachId, s.halbjahr, schuelerId);
+    if (leistung !== null) {
+      if (s.halbjahrModus === 'direkt') {
+        if (eingabe.direktwert === null) eingabe.direktwert = leistung;
+      } else {
+        const ziel = leistungsZiel(db, fachId, s.halbjahr);
+        if (ziel && ziel in eingabe.komponenten && eingabe.komponenten[ziel] === null) eingabe.komponenten[ziel] = leistung;
+      }
     }
     return eingabe;
   });
@@ -359,6 +372,11 @@ export function ladeEingabeAnzeige(db, fachId, schuelerId, halbjahr, schemaHalbj
     for (const r of rows) komponenten[r.komponente_schluessel] = r.punkte;
     ergebnis.komponenten = komponenten;
   }
+  // Leistungsnote aus Klausuren/UL (Punkte) und, bei Komponenten-Fächern, die
+  // Komponente, die sie füttert -- für den Platzhalter in der Eingabemaske.
+  ergebnis.leistung = leistungsPunkte(db, fachId, halbjahr, schuelerId);
+  ergebnis.leistungsZiel = schemaHalbjahr?.halbjahrModus === 'komponenten_gewichtet'
+    ? leistungsZiel(db, fachId, halbjahr) : null;
   return ergebnis;
 }
 

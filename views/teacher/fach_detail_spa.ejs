@@ -2,6 +2,7 @@
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher">← Meine Noteneingabe</a>
   <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
+  <a class="btn" href="/teacher/fach/<%= fach.id %>?ansicht=leistungen&hj=<%= halbjahr %>">📝 Klausuren &amp; Unterrichtsleistung</a>
 </p>
 <p class="hint">
   SPA-Fach mit festem Bewertungsschema über 4 Halbjahre (siehe src/spa-schema.js) --
@@ -101,6 +102,7 @@
               <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
                      data-sid="<%= s.id %>" data-feld="komponente:<%= k.schluessel %>"
                      value="<%= eingabe.komponenten[k.schluessel] === null ? '' : eingabe.komponenten[k.schluessel] %>"
+                     <% if (eingabe.leistung !== null && eingabe.leistungsZiel === k.schluessel) { %>placeholder="<%= eingabe.leistung %>" title="Leer = Leistungsnote aus Klausuren/Unterrichtsleistung (<%= eingabe.leistung %> Punkte)"<% } %>
                      <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
             </td>
           <% }); %>
@@ -109,6 +111,7 @@
             <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
                    data-sid="<%= s.id %>" data-feld="direktwert"
                    value="<%= eingabe.direktwert === null ? '' : eingabe.direktwert %>"
+                   <% if (eingabe.leistung !== null) { %>placeholder="<%= eingabe.leistung %>" title="Leer = Leistungsnote aus Klausuren/Unterrichtsleistung (<%= eingabe.leistung %> Punkte)"<% } %>
                    <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
           </td>
         <% } %>

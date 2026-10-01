@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.46.0 - 2026-10-01
+
+- SPA: Klausuren und Unterrichtsleistung (Datumstabelle, Zusatzleistungen,
+  mehrteilige Klausuren) werden wie bei IHK abgehandelt -- auf der
+  SPA-Fachseite führt der neue Button "📝 Klausuren & Unterrichtsleistung" zur
+  gewohnten Ansicht mit allen vier Halbjahren. Die daraus berechnete
+  Leistungsnote (Note 1-6, Gewichtung schriftlich/mündlich wie im Schuljahr
+  eingestellt) wird in SPA-Punkte umgerechnet (1 = 14, 2 = 11, 3 = 8, 4 = 5,
+  5 = 2, 6 = 0) und ersetzt den Punktwert des Halbjahres; ein von Hand
+  eingetragener Wert behält Vorrang und die Eingabemaske zeigt die
+  Leistungsnote als Platzhalter. Bei Fächern mit Komponenten (z. B. LF2/LF3)
+  wird pro Fach und Halbjahr gewählt, in welche Komponente die Leistungsnote
+  einfließt. Nur die Zeugnisnoten folgen weiter dem eigenen SPA-
+  Bewertungssystem.
+
 ## 0.45.0 - 2026-10-01
 
 - Klausuren können aus mehreren Teilen bestehen (alle Notenschlüssel mit

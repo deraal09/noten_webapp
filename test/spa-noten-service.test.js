@@ -183,7 +183,10 @@ test('ladeEingabeAnzeige: Prüfungswert einer FHR-Note wird mitgeliefert', () =>
 test('ladeEingabeAnzeige: fehlende Zeile liefert lauter null statt Fehler', () => {
   const schema = spaSchemaFuer('LF1', 'SPA_PIA').find((s) => s.halbjahr === 3);
   const eingabe = ladeEingabeAnzeige(db, 1, 1, 3, schema);
-  assert.deepEqual(eingabe, { direktwert: null, pruefungswert: null, importierteEndnote: null, istNa: false, komponenten: null });
+  assert.deepEqual(eingabe, {
+    direktwert: null, pruefungswert: null, importierteEndnote: null, istNa: false, komponenten: null,
+    leistung: null, leistungsZiel: null, // keine Klausuren/UL -> keine Leistungsnote
+  });
 });
 
 test('zeugnisFuerKlasse: 2. Hj. zeigt nur die vorhandenen, für dieses Halbjahr aktiven Fächer in fester Reihenfolge', () => {

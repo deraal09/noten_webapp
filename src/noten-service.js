@@ -100,7 +100,10 @@ export function getNotenschluesselCsv(fach) {
   const k = getDb().prepare('SELECT notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
     .get(fach.klasse_id);
   if (k?.notenschluessel_csv) return k.notenschluessel_csv;
-  return DEFAULT_NS_CSV[k?.notenschluessel] || '';
+  // SPA-Klassen bewerten Klausuren/Unterrichtsleistung wie IHK (Note 1-6, die
+  // danach in Punkte umgerechnet wird, siehe src/spa-leistung.js); nur die
+  // Zeugnisnoten haben ein eigenes Bewertungssystem.
+  return DEFAULT_NS_CSV[k?.notenschluessel === 'SPA' ? 'IHK' : k?.notenschluessel] || '';
 }
 
 /**
@@ -158,6 +161,49 @@ export function berechneGesamtnoten(fachId, halbjahr) {
     ergebnis.set(s.id, gn);
   }
   return ergebnis;
+}
+
+/**
+ * Gesamtnote EINER Person in einem Fach + Halbjahr (Klausuren + Unterrichts-
+ * leistung wie in berechneGesamtnoten, aber nur für diese Person) -- null,
+ * solange nichts benotet ist. `halbjahr` ist der Text ("1. Halbjahr" ...).
+ * Für SPA-Fächer (siehe src/spa-leistung.js), die für jede Person und jedes
+ * der vier Halbjahre gefragt werden: ohne Klausur/UL/Termin sofort null.
+ */
+export function berechneGesamtnoteEinerPerson(fachId, halbjahr, schuelerId) {
+  const db = getDb();
+  const vorhanden = db.prepare(`
+    SELECT (SELECT COUNT(*) FROM klausuren WHERE fach_id = @f AND halbjahr = @h)
+         + (SELECT COUNT(*) FROM unterrichtsleistungen WHERE fach_id = @f AND halbjahr = @h)
+         + (SELECT COUNT(*) FROM unterricht_termine WHERE fach_id = @f AND halbjahr = @h) AS c
+  `).get({ f: fachId, h: halbjahr }).c;
+  if (!vorhanden) return null;
+  const fach = ladeFachMitUmfeld(fachId);
+  if (!fach) return null;
+  const csvStr = getNotenschluesselCsv(fach);
+  const schuljahr = db.prepare('SELECT gewichtung_muendlich FROM schuljahre WHERE id = ?').get(fach.schuljahr_id);
+  const ulPct = schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG;
+
+  const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
+  const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
+  const punkteVon = (tabelle, spalte, id) => {
+    const row = db.prepare(`SELECT punkte FROM ${tabelle} WHERE ${spalte} = ? AND schueler_id = ?`).get(id, schuelerId);
+    return row ? JSON.parse(row.punkte) : null;
+  };
+  const klausurData = klausuren.map((k) => {
+    const punkte = punkteVon('klausur_ergebnisse', 'klausur_id', k.id);
+    const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csvStr) : null;
+    return { note, gewichtung: k.gewichtung };
+  });
+  const zusatzleistungen = uls.map((u) => {
+    const punkte = punkteVon('ul_ergebnisse', 'ul_id', u.id);
+    const note = punkte ? noteAusPunkten(punkte, JSON.parse(u.max_punkte_pro_aufgabe), csvStr) : null;
+    return { note, gewichtung: u.gewichtung };
+  });
+  const { termine, noten: terminNoten } = ladeUnterrichtTermine(fachId, halbjahr);
+  const datumsWerte = datumsWerteFuerSchueler(schuelerId, termine, terminNoten);
+  const { note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen);
+  return gesamtnoteHj(100 - ulPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
 }
 
 /**

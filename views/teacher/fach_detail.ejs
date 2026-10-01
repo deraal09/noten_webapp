@@ -4,6 +4,9 @@
 </h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher">← Meine Noteneingabe</a>
+  <% if (spaLeistung) { %>
+    <a class="btn" href="/teacher/fach/<%= fach.id %>?hj=<%= spaLeistung.hjNr %>">← SPA-Eingabemaske (Punkte)</a>
+  <% } %>
   <% if (!fach.ist_kurs) { %>
     <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
   <% } %>
@@ -11,6 +14,33 @@
     <a class="btn" href="/teacher/fach/<%= fach.id %>/besprechung/<%= schueler[0].id %>?hj=<%= encodeURIComponent(halbjahr) %>">🗣 Notenbesprechung starten</a>
   <% } %>
 </p>
+
+<% if (spaLeistung) { %>
+  <div class="card">
+    <p class="hint">
+      Klausuren und Unterrichtsleistung werden wie bei IHK bewertet (Note 1-6). Die Leistungsnote wird in
+      SPA-Punkte umgerechnet (1 = 14, 2 = 11, 3 = 8, 4 = 5, 5 = 2, 6 = 0) und ersetzt im <%= halbjahr %> den
+      Punktwert dieses Fachs -- ein von Hand eingetragener Wert in der SPA-Eingabemaske hat Vorrang. Nur das
+      Zeugnis folgt danach dem SPA-Bewertungssystem.
+    </p>
+    <% if (spaLeistung.schemaHj && spaLeistung.schemaHj.halbjahrModus === 'komponenten_gewichtet') { %>
+      <form method="post" action="/teacher/fach/<%= fach.id %>/spa/leistung-ziel" class="inline">
+        <input type="hidden" name="halbjahr" value="<%= spaLeistung.hjNr %>">
+        <label>Leistungsnote fließt in Komponente
+          <select name="komponente" <%= spaLeistung.darfBearbeiten ? '' : 'disabled' %>>
+            <option value="">– keine (nur von Hand eintragen) –</option>
+            <% spaLeistung.schemaHj.komponenten.forEach(function(k) { %>
+              <option value="<%= k.schluessel %>" <%= spaLeistung.ziel === k.schluessel ? 'selected' : '' %>><%= spaLeistung.komponentenNamen[k.schluessel] || k.schluessel %></option>
+            <% }); %>
+          </select>
+        </label>
+        <% if (spaLeistung.darfBearbeiten) { %><button type="submit">Übernehmen</button><% } %>
+      </form>
+    <% } else { %>
+      <p class="hint">Dieses Fach hat im <%= halbjahr %> einen einzelnen Punktwert -- die Leistungsnote ersetzt ihn.</p>
+    <% } %>
+  </div>
+<% } %>
 
 <% if (!fach.nur_historisch) { %>
   <div class="hj-tabs">
@@ -27,12 +57,14 @@
     <div class="reiter-mehr-menu">
       <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
       <button type="button" data-target="panel-klausuren">Klausuren</button>
-      <button type="button" data-target="panel-manuell">Manuelle Noten</button>
-      <button type="button" class="<%= fach.nur_historisch ? 'active' : '' %>" data-target="panel-historie">Historische Halbjahre</button>
-      <button type="button" data-target="panel-teilnehmer">Teilnehmer/innen</button>
-      <button type="button" data-target="panel-sync">Synchronisation</button>
-      <% if (darfFachAbschliessen) { %>
-        <button type="button" data-target="panel-abschluss">Fach abschließen</button>
+      <% if (!spaLeistung) { %>
+        <button type="button" data-target="panel-manuell">Manuelle Noten</button>
+        <button type="button" class="<%= fach.nur_historisch ? 'active' : '' %>" data-target="panel-historie">Historische Halbjahre</button>
+        <button type="button" data-target="panel-teilnehmer">Teilnehmer/innen</button>
+        <button type="button" data-target="panel-sync">Synchronisation</button>
+        <% if (darfFachAbschliessen) { %>
+          <button type="button" data-target="panel-abschluss">Fach abschließen</button>
+        <% } %>
       <% } %>
     </div>
   </div>
@@ -54,7 +86,7 @@
   var zeigeMuendlicheNoteSpalte = !(hatManuelleMuendlich && !hatUlEintraege);
   var zeigeSchriftlicheNoteSpalte = !(hatManuelleSchriftlich && !hatKlausurEintraege);
   var sichtbareSpalten = 2 + (hatManuelleMuendlich ? 1 : 0) + (hatManuelleSchriftlich ? 1 : 0)
-    + (zeigeMuendlicheNoteSpalte ? 1 : 0) + (zeigeSchriftlicheNoteSpalte ? 1 : 0) + (fach.abgeschlossen ? 1 : 0);
+    + (zeigeMuendlicheNoteSpalte ? 1 : 0) + (zeigeSchriftlicheNoteSpalte ? 1 : 0) + (spaLeistung ? 1 : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
 <div id="panel-uebersicht" class="reiter-panel<%= fach.nur_historisch ? '' : ' active' %>">
   <h2>Notenübersicht</h2>
@@ -67,6 +99,7 @@
         <% if (zeigeMuendlicheNoteSpalte) { %><th>Mündliche Note</th><% } %>
         <% if (zeigeSchriftlicheNoteSpalte) { %><th>Schriftliche Note</th><% } %>
         <th>Gesamtnote</th>
+        <% if (spaLeistung) { %><th title="Leistungsnote in SPA-Punkten (0-15)">Punkte (SPA)</th><% } %>
         <% if (fach.abgeschlossen) { %><th>Abschlussnote</th><% } %>
       </tr>
     </thead>
@@ -108,6 +141,7 @@
           <% if (zeigeMuendlicheNoteSpalte) { %><td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td><% } %>
           <% if (zeigeSchriftlicheNoteSpalte) { %><td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td><% } %>
           <td class="gesamt-cell"><%= r.gesamt === null ? '–' : formatNote(r.gesamt) %></td>
+          <% if (spaLeistung) { %><td class="note-cell spa-punkte-cell"><%= r.gesamt === null ? '–' : noteZuSpaPunkten(r.gesamt).toFixed(2) %></td><% } %>
           <% if (fach.abgeschlossen) { %>
             <td class="note-cell"><% var an = abschlussnoten.get(r.schueler_id); %><%= (an === null || an === undefined) ? '–' : formatNote(an) %></td>
           <% } %>
@@ -130,6 +164,7 @@
   </table>
 </div>
 
+<% if (!spaLeistung) { %>
 <div id="panel-manuell" class="reiter-panel card">
   <h2>Manuelle Noten</h2>
   <form method="post" action="/teacher/fach/<%= fach.id %>/noten/hinzufuegen" class="inline">
@@ -205,6 +240,8 @@
     </form>
   <% } %>
 </div>
+
+<% } %>
 
 <div id="panel-klausuren" class="reiter-panel">
   <div class="reiter unter-reiter card" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
@@ -517,6 +554,7 @@
   </div>
 </div>
 
+<% if (!spaLeistung) { %>
 <div id="panel-teilnehmer" class="reiter-panel">
   <p class="hint">
     Diese Liste bestimmt, wer in diesem Fach benotet wird
@@ -647,6 +685,8 @@
       </form>
     <% } %>
   </div>
+<% } %>
+
 <% } %>
 
 <script>
@@ -783,6 +823,8 @@
           const sn = tr.querySelector('.schriftliche-note');
           if (sn) sn.textContent = s.schriftlicheNote !== null ? s.schriftlicheNote.toString().replace('.', ',') : '–';
           tr.querySelector('.gesamt-cell').textContent = s.gesamt !== null ? s.gesamt.toString().replace('.', ',') : '–';
+          const spaPunkte = tr.querySelector('.spa-punkte-cell');
+          if (spaPunkte) spaPunkte.textContent = s.gesamt !== null ? Math.max(0, Math.min(15, 17 - 3 * s.gesamt)).toFixed(2) : '–';
         }
         const datumsZelle = document.querySelector('.datums-durchschnitt[data-sid="' + s.schueler_id + '"]');
         if (datumsZelle) {

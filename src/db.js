@@ -239,6 +239,20 @@ CREATE TABLE IF NOT EXISTS spa_komponenten_noten (
     UNIQUE (fach_id, schueler_id, halbjahr, komponente_schluessel)
 );
 
+-- SPA: Klausuren/Unterrichtsleistung eines Fachs (wie bei IHK, Tabellen
+-- klausuren/unterrichtsleistungen/unterricht_termine mit halbjahr = "<n>. Halbjahr")
+-- ergeben je Halbjahr eine Leistungsnote, die in Punkte umgerechnet den Punktwert
+-- des Halbjahres ersetzt (bzw. bei Fächern mit Komponenten die hier gewählte
+-- Komponente füttert), solange dort nichts von Hand eingetragen ist -- siehe
+-- src/spa-leistung.js.
+CREATE TABLE IF NOT EXISTS spa_leistung_ziele (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    halbjahr INTEGER NOT NULL,
+    komponente_schluessel TEXT NOT NULL,
+    UNIQUE (fach_id, halbjahr)
+);
+
 -- Pro Person gewählte Quellfächer für eine Position des SPA-Abschlusszeugnisses
 -- (position = "<Fach-Schlüssel>:<Halbjahr>", z. B. "LF1:4"). Ohne Zeilen gilt
 -- der Standard (das SPA-Fach der aktuellen Klasse); mit Zeilen wird die Position

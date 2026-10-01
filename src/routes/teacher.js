@@ -10,7 +10,7 @@ import {
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
-  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile,
+  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, halbjahreFuerFach, SPA_HALBJAHRE,
 } from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import {
@@ -45,6 +45,7 @@ import {
 import {
   zeugnisMitQuellen, ladeQuellenSeite, speichereQuellenAuswahl, loescheQuellenAuswahl,
 } from '../spa-zeugnis-quellen.js';
+import { leistungsZiel, setzeLeistungsZiel, noteZuSpaPunkten } from '../spa-leistung.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -99,6 +100,21 @@ function historieZielRedirect(user, fach) {
   return userHatFachZgriff(user, fach.id)
     ? `/teacher/fach/${fach.id}`
     : `/klassenlehrer/fach/${fach.id}/historie`;
+}
+
+/**
+ * Halbjahres-Text für Klausuren/Unterrichtsleistung eines Fachs aus Query/Body:
+ * SPA-Fächer haben vier Halbjahre, alle anderen zwei. Akzeptiert auch nur die
+ * Ziffer ("3" statt "3. Halbjahr", wie in den SPA-Links); sonst das erste Halbjahr.
+ */
+function halbjahrFuerFach(fach, roh) {
+  const liste = halbjahreFuerFach(fach);
+  const text = /^[1-4]$/.test(String(roh)) ? `${roh}. Halbjahr` : roh;
+  return liste.includes(text) ? text : liste[0];
+}
+
+function halbjahrFuerFachId(fachId, roh) {
+  return halbjahrFuerFach(getDb().prepare('SELECT spa_fach_key FROM faecher WHERE id = ?').get(fachId), roh);
 }
 
 /** Aktives Halbjahr (laut Query oder erstes im Schema aktives) für eine SPA-Fachseite. */
@@ -254,8 +270,16 @@ export default async function teacherRoutes(fastify) {
     // Komponenten-Gewichtung, Tendenznote) als die reguläre Klausuren/UL-
     // Notentafel unten -- eigene Ansicht statt Verzweigungen quer durch
     // fach_detail.ejs (siehe src/spa-noten-service.js, spa-schema.js).
-    if (fach.spa_fach_key) return renderSpaFachDetail(request, reply, fach);
-    const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
+    // Klausuren/Unterrichtsleistung eines SPA-Fachs laufen dagegen wie bei IHK
+    // über dieselbe Seite (?ansicht=leistungen, nur diese beiden Reiter) und
+    // speisen die Punkte des Fachs (siehe src/spa-leistung.js).
+    // Die Klausur-/UL-Aktionen leiten mit dem Text-Halbjahr ("3. Halbjahr")
+    // zurück, die SPA-Links der Eingabemaske nutzen nur die Ziffer.
+    const textHalbjahr = /\. Halbjahr$/.test(String(request.query?.hj || ''));
+    if (fach.spa_fach_key && request.query?.ansicht !== 'leistungen' && !textHalbjahr) {
+      return renderSpaFachDetail(request, reply, fach);
+    }
+    const halbjahr = halbjahrFuerFach(fach, request.query?.hj);
     const uebersicht = ladeNotenuebersicht(fach, halbjahr);
     const zuweisung = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?')
       .get(fach.id, request.user.id);
@@ -279,7 +303,17 @@ export default async function teacherRoutes(fastify) {
     // Klasse einer teilnehmenden Person (siehe fach_teilnehmer).
     const sperren = ladeSperrenFuerSchueler(uebersicht.schueler.map((s) => s.id), halbjahr);
     const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
+    let spaLeistung = null;
+    if (fach.spa_fach_key) {
+      const hjNr = SPA_HALBJAHRE.indexOf(halbjahr) + 1;
+      const schemaHj = spaSchemaFuerFach(getDb(), fach.id).schema.find((x) => x.halbjahr === hjNr);
+      spaLeistung = {
+        hjNr, schemaHj, ziel: leistungsZiel(getDb(), fach.id, hjNr),
+        komponentenNamen: KOMPONENTEN_NAMEN, darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
+      };
+    }
     return reply.viewEjs('teacher/fach_detail.ejs', {
+      HALBJAHRE: halbjahreFuerFach(fach), spaLeistung, noteZuSpaPunkten,
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
       termine: uebersicht.termine,
@@ -290,6 +324,27 @@ export default async function teacherRoutes(fastify) {
       darfHistorieAnlegen: userDarfFachBearbeiten(request.user, fach),
       darfHistorieLoeschen: userIstKlassenlehrer(request.user, fach.klasse_id),
     });
+  });
+
+  // Komponente wählen, in die die Leistungsnote aus Klausuren/Unterrichtsleistung
+  // bei einem SPA-Fach mit Komponenten (z. B. LF2/LF3) einfließt -- leer = keine.
+  fastify.post('/fach/:id/spa/leistung-ziel', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach || !fach.spa_fach_key) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'SPA-Fach nicht gefunden.' });
+    if (!userHatFachZgriff(request.user, fach.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const hjNr = parseInt(request.body?.halbjahr, 10);
+    const schemaHj = spaSchemaFuerFach(getDb(), fach.id).schema.find((x) => x.halbjahr === hjNr);
+    const komponente = String(request.body?.komponente || '');
+    if (schemaHj?.halbjahrModus === 'komponenten_gewichtet'
+        && (komponente === '' || schemaHj.komponenten.some((k) => k.schluessel === komponente))) {
+      setzeLeistungsZiel(getDb(), fach.id, hjNr, komponente);
+      request.flash?.('success', komponente ? 'Die Leistungsnote fließt jetzt in diese Komponente ein.' : 'Die Leistungsnote fließt in keine Komponente ein.');
+    } else {
+      request.flash?.('error', 'Ungültige Komponente für dieses Halbjahr.');
+    }
+    return reply.redirect(`/teacher/fach/${fach.id}?ansicht=leistungen&hj=${hjNr}`);
   });
 
   // ---------- SPA-Eingabemaske (eigenes Bewertungsmodell, siehe oben) ----------
@@ -432,7 +487,7 @@ export default async function teacherRoutes(fastify) {
     const fach = ladeFachMitUmfeld(request.params.id);
     if (!fach) return reply.code(404).send({ error: 'not found' });
     if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
-    const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
+    const halbjahr = halbjahrFuerFachId(request.params.id, request.query?.hj);
     const uebersicht = ladeNotenuebersicht(fach, halbjahr);
     return reply.send({
       schueler: uebersicht.rows, halbjahr, csv_typ: fach.notenschluessel,
@@ -483,7 +538,7 @@ export default async function teacherRoutes(fastify) {
   // ---------- Klausuren ----------
   fastify.post('/fach/:id/klausuren/neu', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
-    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
     const name = String(request.body?.name || '').trim();
     const aufgaben = Math.max(1, parseInt(request.body?.aufgaben, 10) || 1);
     const datum = alsGueltigesDatumOderNull(request.body?.datum);
@@ -663,7 +718,7 @@ export default async function teacherRoutes(fastify) {
   // ---------- Unterrichtsleistungen ----------
   fastify.post('/fach/:id/uls/neu', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
-    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
     const name = String(request.body?.name || '').trim();
     const aufgaben = Math.max(1, parseInt(request.body?.aufgaben, 10) || 1);
     const datum = alsGueltigesDatumOderNull(request.body?.datum);
@@ -782,7 +837,7 @@ export default async function teacherRoutes(fastify) {
   // ---------- Datumstabelle (Unterrichtsleistung ohne Einzelgewichtung) ----------
   fastify.post('/fach/:id/unterricht/termine/neu', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
-    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
+    const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
     const datum = String(request.body?.datum || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) {
       request.flash?.('error', 'Ungültiges Datum.');

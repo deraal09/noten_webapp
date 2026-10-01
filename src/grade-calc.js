@@ -4,6 +4,15 @@
  */
 
 export const HALBJAHRE = ['1. Halbjahr', '2. Halbjahr'];
+// SPA-Klassen laufen über vier Halbjahre (siehe src/spa-schema.js); Klausuren/
+// Unterrichtsleistung eines SPA-Fachs nutzen dieselben Tabellen wie IHK/BG,
+// mit dem Halbjahr als Text "<n>. Halbjahr".
+export const SPA_HALBJAHRE = ['1. Halbjahr', '2. Halbjahr', '3. Halbjahr', '4. Halbjahr'];
+
+/** Erlaubte Halbjahres-Texte für Klausuren/UL eines Fachs (SPA: vier, sonst zwei). */
+export function halbjahreFuerFach(fach) {
+  return fach?.spa_fach_key ? SPA_HALBJAHRE : HALBJAHRE;
+}
 export const FEHLZEIT_TYPEN = ['entschuldigt', 'unentschuldigt', 'betrieblich'];
 export const NOTE_TYPEN = ['muendlich', 'schriftlich'];
 export const DEFAULT_GEWICHTUNG = 60; // % mündliche Unterrichtsleistungen
