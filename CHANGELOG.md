@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.46.1 - 2026-10-01
+
+- SPA: Klausuren und Unterrichtsleistung werden jetzt direkt in Punkten
+  (0-15) bewertet statt über eine Schulnote 1-6: der Punkteschlüssel der
+  Klasse (wie der BG-Schlüssel) übersetzt den Prozentwert in Punkte, die
+  Tendenznote (1+ ... 6) wird daraus mit der SPA-Skala berechnet. Die
+  Leistungspunkte ersetzen wie bisher den Punktwert des Halbjahres bzw.
+  füttern die gewählte Komponente (Handeingaben haben Vorrang). In der
+  Ansicht heißen die Spalten "Punkte"/"Gesamtpunkte" und eine neue Spalte
+  zeigt die Tendenz. Die mehrteilige Klausur mit "beste Note bestimmt"
+  deckelt entsprechend nach oben (mehr Punkte = besser).
+
 ## 0.46.0 - 2026-10-01
 
 - SPA: Klausuren und Unterrichtsleistung (Datumstabelle, Zusatzleistungen,

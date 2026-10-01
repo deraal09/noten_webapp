@@ -1,28 +1,30 @@
 /**
- * SPA: Klausuren und Unterrichtsleistung wie bei IHK -- sie haben Einfluss
- * auf die Note des Fachs. Je Halbjahr entsteht aus Klausuren/UL (gleiche
- * Berechnung wie IHK, siehe berechneGesamtnoteEinerPerson) eine Note 1-6, die
- * in SPA-Punkte (0-15) umgerechnet wird und
- *  - bei Fächern mit einem Punktwert je Halbjahr (halbjahrModus 'direkt') den
- *    Direktwert ersetzt,
- *  - bei Fächern mit Komponenten (z. B. LF2/LF3) die Komponente füttert, die
+ * SPA: Klausuren und Unterrichtsleistung werden wie bei IHK abgehandelt
+ * (Klausuren mit Teilen, Datumstabelle, Zusatzleistungen, Gewichtung
+ * schriftlich/mündlich), aber in PUNKTEN: der Punkteschlüssel übersetzt den
+ * Prozentwert direkt in Punkte 0-15 (siehe getNotenschluesselCsv in
+ * noten-service.js), die Tendenznote (1+ ... 6) wird daraus mit der SPA-Skala
+ * berechnet. Die Leistungspunkte eines Halbjahres
+ *  - ersetzen bei Fächern mit einem Punktwert je Halbjahr (halbjahrModus
+ *    'direkt') den Direktwert,
+ *  - füttern bei Fächern mit Komponenten (z. B. LF2/LF3) die Komponente, die
  *    pro Fach und Halbjahr gewählt ist (spa_leistung_ziele).
  * Ein von Hand eingetragener Wert hat immer Vorrang. Nur die Zeugnisnoten
  * folgen danach dem eigenen SPA-Bewertungssystem (src/spa-grade-calc.js).
  */
 
 import { berechneGesamtnoteEinerPerson } from './noten-service.js';
+import { tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
 
-/** Schulnote (1-6) -> Punkte 0-15 der SPA-Notenskala (1 = 14, 2 = 11, ... 6 = 0), auf zwei Stellen. */
-export function noteZuSpaPunkten(note) {
-  const punkte = Math.max(0, Math.min(15, 17 - 3 * note));
-  return Math.round(punkte * 100) / 100;
+/** Tendenznote (1+ ... 6) zu Punkten 0-15 nach der SPA-Notenskala; null bei fehlendem Wert. */
+export function spaTendenz(punkte) {
+  return punkte === null || punkte === undefined ? null : tendenzAusEndpunkten(punkte, STANDARD_NOTENSKALA);
 }
 
-/** Leistungsnote einer Person in einem SPA-Fach/Halbjahr (1-4) in Punkten -- oder null, wenn nichts benotet ist. */
+/** Leistungspunkte einer Person in einem SPA-Fach/Halbjahr (1-4) -- oder null, wenn nichts bepunktet ist. */
 export function leistungsPunkte(db, fachId, halbjahrNr, schuelerId) {
-  const note = berechneGesamtnoteEinerPerson(fachId, `${halbjahrNr}. Halbjahr`, schuelerId);
-  return note === null ? null : noteZuSpaPunkten(note);
+  const punkte = berechneGesamtnoteEinerPerson(fachId, `${halbjahrNr}. Halbjahr`, schuelerId);
+  return punkte === null ? null : Math.round(punkte * 100) / 100;
 }
 
 /** Gewählte Komponente, in die die Leistungsnote bei Fächern mit Komponenten einfließt (oder null). */

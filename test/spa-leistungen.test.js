@@ -20,7 +20,7 @@ delete process.env.LDAP_URL;
 
 const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
-const { noteZuSpaPunkten } = await import('../src/spa-leistung.js');
+const { spaTendenz } = await import('../src/spa-leistung.js');
 
 const fastify = await buildApp({ logger: false });
 const base = await fastify.listen({ port: 0, host: '127.0.0.1' });
@@ -68,13 +68,14 @@ const spaDaten = async (fachId, hj) => {
   return data.schueler.find((s) => s.schueler_id === schuelerId);
 };
 
-test('noteZuSpaPunkten: 1 = 14, 2 = 11, 4 = 5, 6 = 0 (auf 0-15 begrenzt)', () => {
-  assert.equal(noteZuSpaPunkten(1), 14);
-  assert.equal(noteZuSpaPunkten(2), 11);
-  assert.equal(noteZuSpaPunkten(2.5), 9.5);
-  assert.equal(noteZuSpaPunkten(4), 5);
-  assert.equal(noteZuSpaPunkten(6), 0);
-  assert.equal(noteZuSpaPunkten(0.5), 15);
+test('spaTendenz: Punkte 0-15 werden mit der SPA-Notenskala in Tendenznoten umgerechnet', () => {
+  assert.equal(spaTendenz(15), '1+');
+  assert.equal(spaTendenz(14), '1');
+  assert.equal(spaTendenz(11), '2');
+  assert.equal(spaTendenz(6), '4+');
+  assert.equal(spaTendenz(5.6), '4+', 'es wird kaufmännisch auf ganze Punkte gerundet');
+  assert.equal(spaTendenz(0), '6');
+  assert.equal(spaTendenz(null), null);
 });
 
 test('Vorbereitung: SPA-Klasse, Person, LF1 Halbjahr 1 = 10 Punkte von Hand', async () => {
@@ -100,28 +101,28 @@ test('Klausuren lassen sich in allen vier Halbjahren eines SPA-Fachs anlegen (Ha
   getDb().prepare("DELETE FROM klausuren WHERE fach_id = ? AND name = 'Klausur Hj 3'").run(lf1Id);
 });
 
-test('Direkt-Fach (LF1): die Leistungsnote aus der Klausur ersetzt den Punktwert (10/10 -> Note 1 -> 14 Punkte)', async () => {
+test('Direkt-Fach (LF1): die Leistungspunkte aus der Klausur ersetzen den Punktwert (10/10 = 100 % -> 15 Punkte)', async () => {
   await klausurMitPunkten(lf1Id, '2. Halbjahr', 10);
   const daten = await spaDaten(lf1Id, 2);
-  // LF1 2. Hj.: fortlaufend 50/50 aus 1. Hj. (10 von Hand) und 2. Hj. (14 aus der Klausur) = 12
-  assert.equal(daten.endpunkte, 12);
+  // LF1 2. Hj.: fortlaufend 50/50 aus 1. Hj. (10 von Hand) und 2. Hj. (15 aus der Klausur) = 12,5
+  assert.equal(daten.endpunkte, 12.5);
   const html = await (await admin(`/teacher/klassen/${klasseId}/zeugnis?hj=2`)).text();
-  assert.match(html, /12\.00/);
+  assert.match(html, /12\.50/);
 });
 
 test('Ein von Hand eingetragener Punktwert hat Vorrang vor der Leistungsnote', async () => {
   await form(admin, `/teacher/fach/${lf1Id}/spa/eingabe`, { schueler_id: String(schuelerId), halbjahr: '2', feld: 'direktwert', wert: '12' });
   assert.equal((await spaDaten(lf1Id, 2)).endpunkte, 11, '0,5 * 10 + 0,5 * 12');
   await form(admin, `/teacher/fach/${lf1Id}/spa/eingabe`, { schueler_id: String(schuelerId), halbjahr: '2', feld: 'direktwert', wert: '' });
-  assert.equal((await spaDaten(lf1Id, 2)).endpunkte, 12, 'ohne Handwert wieder die Leistungsnote');
+  assert.equal((await spaDaten(lf1Id, 2)).endpunkte, 12.5, 'ohne Handwert wieder die Leistungspunkte');
 });
 
-test('Leistungen-Seite eines SPA-Fachs: Klausuren/UL wie bei IHK, vier Halbjahre, Punkte (SPA), nur die passenden Reiter', async () => {
+test('Leistungen-Seite eines SPA-Fachs: Klausuren/UL wie bei IHK, vier Halbjahre, Gesamtpunkte mit Tendenz, nur die passenden Reiter', async () => {
   const r = await admin(`/teacher/fach/${lf1Id}?ansicht=leistungen&hj=2`);
   assert.equal(r.status, 200);
   const html = await r.text();
-  assert.match(html, /Punkte \(SPA\)/);
-  assert.match(html, /14\.00/);
+  assert.match(html, /Gesamtpunkte/);
+  assert.match(html, /spa-tendenz-cell">1\+</, '15 Punkte = Tendenz 1+');
   assert.match(html, /data-target="panel-klausuren"/);
   assert.match(html, /data-target="panel-uls"/);
   assert.match(html, /4\. Halbjahr/);
@@ -131,13 +132,20 @@ test('Leistungen-Seite eines SPA-Fachs: Klausuren/UL wie bei IHK, vier Halbjahre
 
   // Die Redirects der Klausur-/UL-Aktionen (Text-Halbjahr) landen ebenfalls auf dieser Seite.
   const html2 = await (await admin(`/teacher/fach/${lf1Id}?hj=${encodeURIComponent('2. Halbjahr')}`)).text();
-  assert.match(html2, /Punkte \(SPA\)/);
+  assert.match(html2, /Gesamtpunkte/);
+});
+
+test('Halbe Punktzahl: 5/10 = 50 % -> 6 Punkte -> Tendenz 4+ (Punkteschlüssel, keine Umrechnung über Schulnoten)', async () => {
+  await klausurMitPunkten(lf1Id, '3. Halbjahr', 5);
+  const html = await (await admin(`/teacher/fach/${lf1Id}?ansicht=leistungen&hj=${encodeURIComponent('3. Halbjahr')}`)).text();
+  assert.match(html, /gesamt-cell">6,0</);
+  assert.match(html, /spa-tendenz-cell">4\+</);
 });
 
 test('SPA-Eingabemaske verlinkt auf die Leistungen und zeigt die Leistungsnote als Platzhalter', async () => {
   const html = await (await admin(`/teacher/fach/${lf1Id}?hj=2`)).text();
   assert.match(html, /\?ansicht=leistungen&(amp;)?hj=2/);
-  assert.match(html, /placeholder="14"/);
+  assert.match(html, /placeholder="15"/);
 });
 
 test('Fach mit Komponenten (LF2): ohne gewählte Komponente keine Wirkung, mit Auswahl füttert die Leistungsnote sie', async () => {

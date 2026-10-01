@@ -100,10 +100,11 @@ export function getNotenschluesselCsv(fach) {
   const k = getDb().prepare('SELECT notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
     .get(fach.klasse_id);
   if (k?.notenschluessel_csv) return k.notenschluessel_csv;
-  // SPA-Klassen bewerten Klausuren/Unterrichtsleistung wie IHK (Note 1-6, die
-  // danach in Punkte umgerechnet wird, siehe src/spa-leistung.js); nur die
+  // SPA-Klassen bewerten Klausuren/Unterrichtsleistung in Punkten (0-15): der
+  // Punkteschlüssel Prozent -> Punkte entspricht dem der BG; die Tendenznote
+  // (1+ ... 6) wird erst daraus berechnet (siehe src/spa-leistung.js). Nur die
   // Zeugnisnoten haben ein eigenes Bewertungssystem.
-  return DEFAULT_NS_CSV[k?.notenschluessel === 'SPA' ? 'IHK' : k?.notenschluessel] || '';
+  return DEFAULT_NS_CSV[k?.notenschluessel === 'SPA' ? 'BG' : k?.notenschluessel] || '';
 }
 
 /**
@@ -290,7 +291,8 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       datumsDurchschnitt,
       muendlicheNote,
       gesamt: gn,
-      nicht_bestanden: gn !== null ? nichtBestanden(gn, fach.notenschluessel) : false,
+      // SPA-Punkte (0-15) bestehen wie BG-Punkte ab 4.
+      nicht_bestanden: gn !== null ? nichtBestanden(gn, fach.notenschluessel === 'SPA' ? 'BG' : fach.notenschluessel) : false,
     };
   });
 
