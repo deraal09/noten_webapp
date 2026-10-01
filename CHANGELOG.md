@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.49.1 - 2026-10-01
+
+- Klausuren: Gewichtung, Datum und Anzahl Teile stehen in einer Reihe und
+  rutschen auf schmalen Bildschirmen (Smartphone) automatisch in die nächste
+  Zeile; die Erklärung zur Anzahl Teile steht darunter. Bei den
+  Unterrichtsleistungen gilt das für Gewichtung und Datum.
+
 ## 0.49.0 - 2026-10-01
 
 - Klausuren und Unterrichtsleistungen: Die maximal erreichbaren Punkte je

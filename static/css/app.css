@@ -521,3 +521,8 @@ details summary { cursor: pointer; padding: 0.3rem 0; font-weight: 500; }
 /* Max-Punkte je Aufgabe stehen als Zeile über den Spalten der Schülertabelle. */
 table.tafel input.maxpunkt { width: 50px; padding: 0.2rem; border: 1px solid var(--border-strong); border-radius: 3px; text-align: center; background: var(--bg-input); color: var(--text); font-weight: 600; }
 table.tafel .maxpunkte-zeile th { text-align: center; white-space: nowrap; }
+
+/* Gewichtung, Datum, Anzahl Teile usw. nebeneinander, bei schmalem Bildschirm umbrechend. */
+.einstellungen-reihe { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.25rem 1.25rem; margin: 0.5rem 0; }
+.einstellungen-reihe .einstellungen { margin: 0; }
+.einstellungen-reihe .einstellungen .feld { margin-bottom: 0; }
