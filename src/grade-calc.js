@@ -104,6 +104,88 @@ export function noteAusPunkten(punkte, maxPunkte, csvStr) {
 }
 
 /**
+ * Gilt im Notenschlüssel "kleiner = besser" (IHK: 1 ist die beste Note) oder
+ * "größer = besser" (BG: 15 Punkte sind die beste Note)? Erkennbar an der
+ * Richtung der CSV: die höchste Prozentstufe liefert die beste Note.
+ */
+export function kleinerIstBesser(csvStr) {
+  const entries = nsCsvParse(csvStr);
+  if (entries.length < 2) return true;
+  return entries[0][1] <= entries[entries.length - 1][1];
+}
+
+/**
+ * Mehrteilige Klausur: die Aufgaben einer Klausur werden hintereinander auf
+ * Teile aufgeteilt. Gespeichert wird das als JSON in klausuren.teile:
+ * `{"teile":[{"name":"Teil A","aufgaben":2,"gewichtung":60},...],"bestimmend":0}`.
+ * `bestimmend` ist der Index des Teils, dessen Note die BESTE erreichbare
+ * Gesamtnote festlegt (oder null). Gibt null zurück, wenn die Klausur
+ * einteilig ist (kein/ungültiges JSON, weniger als zwei Teile).
+ *
+ * @returns {{teile: Array<{name: string, aufgaben: number, gewichtung: number}>, bestimmend: number|null}|null}
+ */
+export function parseKlausurTeile(roh) {
+  if (!roh) return null;
+  let obj;
+  try { obj = typeof roh === 'string' ? JSON.parse(roh) : roh; } catch { return null; }
+  if (!obj || !Array.isArray(obj.teile) || obj.teile.length < 2) return null;
+  const teile = obj.teile.map((t, i) => ({
+    name: String(t?.name || `Teil ${i + 1}`),
+    aufgaben: Math.max(1, Math.floor(Number(t?.aufgaben) || 1)),
+    gewichtung: Number.isFinite(Number(t?.gewichtung)) && Number(t.gewichtung) >= 0 ? Number(t.gewichtung) : 0,
+  }));
+  const b = obj.bestimmend;
+  const bestimmend = Number.isInteger(b) && b >= 0 && b < teile.length ? b : null;
+  return { teile, bestimmend };
+}
+
+/**
+ * Noten der einzelnen Teile einer mehrteiligen Klausur (je Teil null, solange
+ * nicht alle Aufgaben des Teils bepunktet sind). Bei einteiliger Klausur null.
+ * @returns {Array<number|null>|null}
+ */
+export function klausurTeilNoten(punkte, maxPunkte, teileInfo, csvStr) {
+  if (!teileInfo) return null;
+  const summe = teileInfo.teile.reduce((a, t) => a + t.aufgaben, 0);
+  if (summe !== maxPunkte.length) return null;
+  let start = 0;
+  return teileInfo.teile.map((t) => {
+    const von = start;
+    start += t.aufgaben;
+    if (!Array.isArray(punkte)) return null;
+    return noteAusPunkten(punkte.slice(von, start), maxPunkte.slice(von, start), csvStr);
+  });
+}
+
+/**
+ * Note einer Klausur -- einteilig wie bisher aus allen Punkten, mehrteilig
+ * als prozentual gewichteter Mittelwert der Teilnoten. Bestimmt ein Teil die
+ * beste erreichbare Note ("bestimmend"), kann die Gesamtnote durch die
+ * anderen Teile nicht besser werden als dessen Note, wohl aber schlechter.
+ * Solange ein Teil noch nicht komplett benotet ist, gibt es keine Gesamtnote.
+ *
+ * @param {Array<number|null>|null} punkte - alle Punkte der Klausur (Aufgaben aller Teile hintereinander)
+ * @param {number[]} maxPunkte
+ * @param {ReturnType<typeof parseKlausurTeile>} teileInfo
+ * @param {string} csvStr
+ * @returns {number|null}
+ */
+export function klausurNote(punkte, maxPunkte, teileInfo, csvStr) {
+  if (!teileInfo) return noteAusPunkten(punkte, maxPunkte, csvStr);
+  const teilNoten = klausurTeilNoten(punkte, maxPunkte, teileInfo, csvStr);
+  if (!teilNoten || teilNoten.some((n) => n === null)) return null;
+  const summeGew = teileInfo.teile.reduce((a, t) => a + t.gewichtung, 0);
+  const gew = (i) => (summeGew > 0 ? teileInfo.teile[i].gewichtung / summeGew : 1 / teilNoten.length);
+  const mittel = teilNoten.reduce((a, n, i) => a + n * gew(i), 0);
+  let gesamt = Math.round(mittel * 100) / 100;
+  if (teileInfo.bestimmend !== null) {
+    const grenze = teilNoten[teileInfo.bestimmend];
+    gesamt = kleinerIstBesser(csvStr) ? Math.max(gesamt, grenze) : Math.min(gesamt, grenze);
+  }
+  return gesamt;
+}
+
+/**
  * Berechnet die Gesamtnote für ein Halbjahr aus der schriftlichen Note
  * (gewichteter Durchschnitt der Klausuren) und der mündlichen Note
  * (gewichteter Durchschnitt der ULs), kombiniert im Verhältnis

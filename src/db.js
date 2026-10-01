@@ -447,7 +447,11 @@ CREATE TABLE IF NOT EXISTS klausuren (
     -- Leistung erbracht wurde (z. B. für eine Notenkonferenz).
     datum TEXT,
     max_punkte_pro_aufgabe TEXT NOT NULL DEFAULT '[]',
-    gewichtung REAL NOT NULL DEFAULT 0
+    gewichtung REAL NOT NULL DEFAULT 0,
+    -- Mehrteilige Klausur (JSON, siehe parseKlausurTeile in src/grade-calc.js);
+    -- NULL = einteilig. Die Aufgaben-Punkte bleiben eine einzige Liste, die
+    -- Teile gruppieren sie nur der Reihe nach.
+    teile TEXT
 );
 
 CREATE TABLE IF NOT EXISTS klausur_ergebnisse (
@@ -752,6 +756,7 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'abgeschlossen_am', 'abgeschlossen_am TEXT');
   ensureColumn(db, 'faecher', 'abgeschlossen_von_id', 'abgeschlossen_von_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
+  ensureColumn(db, 'klausuren', 'teile', 'teile TEXT');
   ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
   ensureColumn(db, 'klassen', 'offen_fuer_beitritt', 'offen_fuer_beitritt INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'faecher', 'ist_kurs', 'ist_kurs INTEGER NOT NULL DEFAULT 0');

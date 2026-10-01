@@ -6,7 +6,7 @@
 import { getDb } from '../db.js';
 import { requireAuth, userDarfKlasseExportieren } from '../auth.js';
 import {
-  HALBJAHRE, noteAusPunkten, gesamtnoteHj, gesamtnoteJahr, unterrichtsleistungNote, formatNote,
+  HALBJAHRE, noteAusPunkten, klausurNote, parseKlausurTeile, gesamtnoteHj, gesamtnoteJahr, unterrichtsleistungNote, formatNote,
 } from '../grade-calc.js';
 
 export default async function exportRoutes(fastify) {
@@ -150,7 +150,7 @@ function zeileFuerSchuelerFachHj(klasse, csv, fach, schueler, halbjahr) {
     const row = db.prepare('SELECT punkte FROM klausur_ergebnisse WHERE klausur_id = ? AND schueler_id = ?')
       .get(k.id, schueler.id);
     const punkte = row ? JSON.parse(row.punkte) : null;
-    const note = punkte ? noteAusPunkten(punkte, JSON.parse(k.max_punkte_pro_aufgabe), csv) : null;
+    const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csv) : null;
     return { note, gewichtung: k.gewichtung };
   });
   const zusatzleistungen = uls.map((u) => {

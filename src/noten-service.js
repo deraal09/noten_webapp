@@ -7,6 +7,7 @@
 import { getDb } from './db.js';
 import {
   noteAusPunkten, gesamtnoteHj, teilNote, unterrichtsleistungNote, nichtBestanden,
+  klausurNote, klausurTeilNoten, parseKlausurTeile,
   DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from './grade-calc.js';
 
@@ -143,7 +144,7 @@ export function berechneGesamtnoten(fachId, halbjahr) {
   for (const s of schueler) {
     const klausurData = klausuren.map((k) => {
       const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
-      const note = punkte ? noteAusPunkten(punkte, JSON.parse(k.max_punkte_pro_aufgabe), csvStr) : null;
+      const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csvStr) : null;
       return { note, gewichtung: k.gewichtung };
     });
     const zusatzleistungen = uls.map((u) => {
@@ -214,8 +215,12 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   const rows = schueler.map((s) => {
     const klausurData = klausuren.map((k) => {
       const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
-      const note = punkte ? noteAusPunkten(punkte, JSON.parse(k.max_punkte_pro_aufgabe), csvStr) : null;
-      return { id: k.id, name: k.name, gewichtung: k.gewichtung, punkte, note };
+      const maxArr = JSON.parse(k.max_punkte_pro_aufgabe);
+      const teileInfo = parseKlausurTeile(k.teile);
+      const note = punkte ? klausurNote(punkte, maxArr, teileInfo, csvStr) : null;
+      // Je Teil einer mehrteiligen Klausur eine eigene Note (sonst null).
+      const teilNoten = teileInfo && punkte ? klausurTeilNoten(punkte, maxArr, teileInfo, csvStr) : null;
+      return { id: k.id, name: k.name, gewichtung: k.gewichtung, punkte, note, teilNoten };
     });
     const ulData = uls.map((u) => {
       const punkte = ulErgs.get(u.id)?.get(s.id) || null;
@@ -243,5 +248,8 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     };
   });
 
-  return { schriftlichPct, ulPct, csvStr, klausuren, uls, termine, schueler, rows };
+  return {
+    schriftlichPct, ulPct, csvStr, uls, termine, schueler, rows,
+    klausuren: klausuren.map((k) => ({ ...k, teileInfo: parseKlausurTeile(k.teile) })),
+  };
 }

@@ -10,7 +10,7 @@ import {
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
-  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG,
+  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile,
 } from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import {
@@ -529,10 +529,14 @@ export default async function teacherRoutes(fastify) {
   });
 
   fastify.post('/klausuren/:id/maxpunkte', async (request, reply) => {
-    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe FROM klausuren WHERE id = ?').get(request.params.id);
+    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
     if (!k) return reply.redirect('/teacher');
     if (!userHatFachZgriff(request.user, k.fach_id)) return reply.code(403).send({ error: 'forbidden' });
-    const anzahl = Math.max(1, parseInt(request.body?.anzahl_aufgaben, 10) || JSON.parse(k.max_punkte_pro_aufgabe).length);
+    // Bei einer mehrteiligen Klausur legen die Teile die Aufgabenzahl fest.
+    const teileInfo = parseKlausurTeile(k.teile);
+    const anzahl = teileInfo
+      ? teileInfo.teile.reduce((a, t) => a + t.aufgaben, 0)
+      : Math.max(1, parseInt(request.body?.anzahl_aufgaben, 10) || JSON.parse(k.max_punkte_pro_aufgabe).length);
     const neueWerte = [];
     for (let i = 0; i < anzahl; i++) {
       neueWerte.push(Number(request.body?.['mp_' + i]) || 1);
@@ -552,6 +556,65 @@ export default async function teacherRoutes(fastify) {
     }
     syncFallsAutoAktiv(k.fach_id, k.halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}`);
+  });
+
+  // Mehrteilige Klausur einrichten/ändern: Teile mit Namen, Aufgabenzahl und
+  // prozentualer Gewichtung; optional bestimmt EIN Teil die beste erreichbare
+  // Gesamtnote (siehe klausurNote in src/grade-calc.js). Die Aufgaben bleiben
+  // eine gemeinsame Liste -- die Teile gruppieren sie nur der Reihe nach.
+  const MAX_KLAUSUR_TEILE = 6;
+  fastify.post('/klausuren/:id/teile', async (request, reply) => {
+    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe FROM klausuren WHERE id = ?').get(request.params.id);
+    if (!k) return reply.redirect('/teacher');
+    if (!userHatFachZgriff(request.user, k.fach_id)) return reply.code(403).send({ error: 'forbidden' });
+    const zurueck = `/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}&tab=klausuren&open=klausur-panel-${request.params.id}`;
+    const liste = (roh) => (Array.isArray(roh) ? roh : [roh]);
+
+    // "Einteilig machen": Teile entfernen, die Aufgaben bleiben unverändert.
+    if (request.body?.einteilig === '1') {
+      getDb().prepare('UPDATE klausuren SET teile = NULL WHERE id = ?').run(request.params.id);
+      syncFallsAutoAktiv(k.fach_id, k.halbjahr, request.user.id);
+      request.flash?.('success', 'Klausur ist wieder einteilig.');
+      return reply.redirect(zurueck);
+    }
+
+    const namen = liste(request.body?.teil_name);
+    const aufgabenRoh = liste(request.body?.teil_aufgaben);
+    const gewichtungen = liste(request.body?.teil_gewichtung);
+    const bestimmendRoh = request.body?.bestimmend;
+    const bestimmendZeile = bestimmendRoh === undefined || bestimmendRoh === '' ? null : parseInt(bestimmendRoh, 10);
+    const teile = [];
+    let bestimmend = null;
+    for (let i = 0; i < Math.min(aufgabenRoh.length, MAX_KLAUSUR_TEILE); i++) {
+      const aufgaben = parseInt(aufgabenRoh[i], 10);
+      if (!Number.isFinite(aufgaben) || aufgaben < 1) continue; // leere Zeile = kein Teil
+      const gewichtung = Number(String(gewichtungen[i] ?? '').replace(',', '.'));
+      if (bestimmendZeile === i) bestimmend = teile.length;
+      teile.push({
+        name: String(namen[i] ?? '').trim() || `Teil ${teile.length + 1}`,
+        aufgaben: Math.min(aufgaben, 20),
+        gewichtung: Number.isFinite(gewichtung) && gewichtung >= 0 ? gewichtung : 0,
+      });
+    }
+    const gesamtAufgaben = teile.reduce((a, t) => a + t.aufgaben, 0);
+    if (teile.length < 2 || gesamtAufgaben > 40 || teile.reduce((a, t) => a + t.gewichtung, 0) <= 0) {
+      request.flash?.('error', 'Eine mehrteilige Klausur braucht mindestens zwei Teile mit je mindestens einer Aufgabe und einer Gewichtung über 0 %.');
+      return reply.redirect(zurueck);
+    }
+
+    // Aufgabenliste auf die Summe der Teile bringen (vorhandene Max-Punkte bleiben).
+    const alteMax = JSON.parse(k.max_punkte_pro_aufgabe);
+    const neueMax = Array.from({ length: gesamtAufgaben }, (_, i) => alteMax[i] ?? 1);
+    getDb().prepare('UPDATE klausuren SET teile = ?, max_punkte_pro_aufgabe = ? WHERE id = ?')
+      .run(JSON.stringify({ teile, bestimmend }), JSON.stringify(neueMax), request.params.id);
+    for (const e of getDb().prepare('SELECT id, punkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(request.params.id)) {
+      const arr = JSON.parse(e.punkte).slice(0, gesamtAufgaben);
+      while (arr.length < gesamtAufgaben) arr.push(null);
+      getDb().prepare('UPDATE klausur_ergebnisse SET punkte = ? WHERE id = ?').run(JSON.stringify(arr), e.id);
+    }
+    syncFallsAutoAktiv(k.fach_id, k.halbjahr, request.user.id);
+    request.flash?.('success', 'Teile der Klausur gespeichert.');
+    return reply.redirect(zurueck);
   });
 
   fastify.post('/klausuren/:id/punkte', async (request, reply) => {

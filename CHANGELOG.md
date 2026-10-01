@@ -6,6 +6,22 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.45.0 - 2026-10-01
+
+- Klausuren können aus mehreren Teilen bestehen (alle Notenschlüssel mit
+  Klausuren, also IHK und BG): im Klausur-Reiter unter "Klausur aus mehreren
+  Teilen" werden Teile mit Name, Aufgabenzahl und prozentualer Gewichtung
+  angelegt. Jeder Teil bekommt aus seinen Aufgaben eine eigene Note (in der
+  Tabelle je Teil eine Note-Spalte), die Gesamtnote der Klausur wird
+  prozentual aus den Teilnoten berechnet. Optional bestimmt EIN Teil die
+  beste erreichbare Note: die anderen Teile können die Gesamtnote dann nicht
+  weiter aufwerten, sie aber immer abwerten (bei IHK ist kleiner besser, bei
+  BG größer -- die Richtung wird aus dem Notenschlüssel erkannt). Eine
+  Gesamtnote gibt es erst, wenn alle Teile vollständig bepunktet sind. Die
+  Klausur lässt sich jederzeit wieder einteilig machen, eingetragene Punkte
+  bleiben erhalten. Wirkt auch in Notenübersicht, Halbjahresübersicht,
+  Synchronisation und CSV-Export.
+
 ## 0.44.0 - 2026-09-30
 
 - SPA-Abschlusszeugnis: pro Person lässt sich jede Zeugnisposition

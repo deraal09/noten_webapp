@@ -233,9 +233,13 @@
         </label>
       </form>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="einstellungen auto-speichern">
-        <label class="feld">Anzahl Aufgaben
-          <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
-        </label>
+        <% if (!k.teileInfo) { %>
+          <label class="feld">Anzahl Aufgaben
+            <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
+          </label>
+        <% } else { %>
+          <span class="hint">Die Aufgabenzahl ergibt sich aus den Teilen (siehe unten).</span>
+        <% } %>
         <span class="hint">Maximal erreichbare Punkte je Aufgabe:</span>
         <span class="aufgabe-liste">
           <% maxArr.forEach(function(mp, i) { %>
@@ -246,15 +250,76 @@
         </span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
+      <details class="card" <%= k.teileInfo ? 'open' : '' %>>
+        <summary>Klausur aus mehreren Teilen <%= k.teileInfo ? '(' + k.teileInfo.teile.length + ' Teile)' : '(optional)' %></summary>
+        <p class="hint">
+          Jeder Teil bekommt aus seinen Aufgaben eine eigene Note. Die Gesamtnote der Klausur wird prozentual
+          aus den Teilnoten berechnet. Optional bestimmt ein Teil die <strong>beste</strong> erreichbare Note:
+          die anderen Teile können die Gesamtnote dann nicht über diese Note hinaus verbessern, sie aber immer
+          verschlechtern. Die Aufgaben werden der Reihe nach auf die Teile verteilt; leere Zeilen werden ignoriert.
+        </p>
+        <% var teilZeilen = Math.min(6, Math.max(k.teileInfo ? k.teileInfo.teile.length + 1 : 2, 3)); %>
+        <form method="post" action="/teacher/klausuren/<%= k.id %>/teile">
+          <table class="data">
+            <thead><tr><th>Teil</th><th>Name</th><th>Aufgaben</th><th>Gewichtung %</th><th>Bestimmt beste Note</th></tr></thead>
+            <tbody>
+              <% for (var ti = 0; ti < teilZeilen; ti++) {
+                   var teil = k.teileInfo ? k.teileInfo.teile[ti] : null; %>
+                <tr>
+                  <td><%= ti + 1 %></td>
+                  <td><input type="text" name="teil_name" value="<%= teil ? teil.name : '' %>" placeholder="Teil <%= ti + 1 %>" maxlength="60"></td>
+                  <td><input type="number" name="teil_aufgaben" value="<%= teil ? teil.aufgaben : '' %>" min="1" max="20"></td>
+                  <td><input type="number" name="teil_gewichtung" value="<%= teil ? teil.gewichtung : '' %>" min="0" max="100" step="0.1"></td>
+                  <td><input type="radio" name="bestimmend" value="<%= ti %>" <%= (k.teileInfo && k.teileInfo.bestimmend === ti) ? 'checked' : '' %> aria-label="Teil <%= ti + 1 %> bestimmt die beste Note"></td>
+                </tr>
+              <% } %>
+              <tr>
+                <td colspan="4"><small class="hint">Kein Teil begrenzt die Gesamtnote</small></td>
+                <td><input type="radio" name="bestimmend" value="" <%= (!k.teileInfo || k.teileInfo.bestimmend === null) ? 'checked' : '' %> aria-label="Kein Teil bestimmt die beste Note"></td>
+              </tr>
+            </tbody>
+          </table>
+          <button type="submit">💾 Teile speichern</button>
+        </form>
+        <% if (k.teileInfo) { %>
+          <form method="post" action="/teacher/klausuren/<%= k.id %>/teile" class="inline"
+                onsubmit="return confirm('Wieder eine einteilige Klausur daraus machen? Die eingetragenen Punkte bleiben erhalten.')">
+            <input type="hidden" name="einteilig" value="1">
+            <button type="submit" class="danger">Wieder einteilig machen</button>
+          </form>
+        <% } %>
+      </details>
       <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
       <table class="tafel">
+        <%
+          // Aufgaben-Index -> Teil (nur bei mehrteiliger Klausur): ein Teil-Block endet mit seiner Teilnote.
+          var teilEnde = {};
+          if (k.teileInfo) { var pos = 0; k.teileInfo.teile.forEach(function(t, ti) { pos += t.aufgaben; teilEnde[pos - 1] = ti; }); }
+        %>
         <thead>
-          <tr>
-            <th>Schüler/in</th>
-            <% maxArr.forEach(function(_, i) { %><th class="aufgabe-head">A<%= i+1 %></th><% }); %>
-            <th>Punkte gesamt</th>
-            <th class="note-col">Note</th>
-          </tr>
+          <% if (k.teileInfo) { %>
+            <tr>
+              <th rowspan="2">Schüler/in</th>
+              <% k.teileInfo.teile.forEach(function(t, ti) { %>
+                <th colspan="<%= t.aufgaben + 1 %>" class="teil-head"><%= t.name %> <small>(<%= t.gewichtung %>%)</small><%= k.teileInfo.bestimmend === ti ? ' ★' : '' %></th>
+              <% }); %>
+              <th rowspan="2">Punkte gesamt</th>
+              <th rowspan="2" class="note-col">Gesamtnote</th>
+            </tr>
+            <tr>
+              <% maxArr.forEach(function(_, i) { %>
+                <th class="aufgabe-head">A<%= i+1 %></th>
+                <% if (teilEnde[i] !== undefined) { %><th class="note-col">Note</th><% } %>
+              <% }); %>
+            </tr>
+          <% } else { %>
+            <tr>
+              <th>Schüler/in</th>
+              <% maxArr.forEach(function(_, i) { %><th class="aufgabe-head">A<%= i+1 %></th><% }); %>
+              <th>Punkte gesamt</th>
+              <th class="note-col">Note</th>
+            </tr>
+          <% } %>
         </thead>
         <tbody>
           <% rows.forEach(function(r) {
@@ -266,6 +331,10 @@
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
                 <td><input type="number" class="punkt" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
+                <% if (teilEnde[i] !== undefined) {
+                     var tn = (eintrag && eintrag.teilNoten) ? eintrag.teilNoten[teilEnde[i]] : null; %>
+                  <td class="note-cell k-teilnote" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-teil="<%= teilEnde[i] %>"><%= (tn === null || tn === undefined) ? '–' : formatNote(tn) %></td>
+                <% } %>
               <% }); %>
               <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe %> / <%= maxSumme %></td>
               <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
@@ -683,6 +752,11 @@
         document.querySelectorAll('.k-note[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
           const k = s.klausuren.find(function(x) { return x.id === Number(cell.dataset.kid); });
           cell.textContent = (k && k.note !== null) ? k.note.toString().replace('.', ',') : '–';
+        });
+        document.querySelectorAll('.k-teilnote[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
+          const k = s.klausuren.find(function(x) { return x.id === Number(cell.dataset.kid); });
+          const tn = (k && k.teilNoten) ? k.teilNoten[Number(cell.dataset.teil)] : null;
+          cell.textContent = (tn !== null && tn !== undefined) ? tn.toString().replace('.', ',') : '–';
         });
         document.querySelectorAll('.u-note[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
           const u = s.uls.find(function(x) { return x.id === Number(cell.dataset.kid); });
