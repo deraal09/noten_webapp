@@ -222,6 +222,9 @@ test('Anzahl-Feld ist auch bei mehrteiligen Klausuren vorhanden; Zahlenfelder oh
   const html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
   assert.match(html, /name="anzahl_aufgaben"[^>]*max="40"/);
   assert.match(html, /stelleFokusWiederHer/);
+  assert.match(html, /feld\.name === 'anzahl_aufgaben'/, 'Aufgabenzahl wird erst beim Verlassen/Enter übernommen');
+  assert.match(html, /feld\.value = '';\s+feld\.value = v;/, 'Eingabemarke ans Ende');
+  assert.match(html, /action="\/teacher\/klausuren\/\d+\/teile" autocomplete="off"/);
   const css = fs.readFileSync(new URL('../static/css/app.css', import.meta.url), 'utf8');
   assert.match(css, /#panel-klausuren input\[type=number\]/);
   assert.match(css, /spin-button/);

@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.47.1 - 2026-10-01
+
+- Klausuren: Der Cursor springt beim Eintippen von Punkten nicht mehr an den
+  Anfang des Feldes, langsam getippte Ziffern landen in der richtigen
+  Reihenfolge (Auto-Speichern wartet zudem 0,8 s).
+- "Anzahl Aufgaben" wird jetzt beim Verlassen des Feldes bzw. mit Enter
+  übernommen statt nach jeder Ziffer: Zwischenstände wie "1" auf dem Weg zu
+  "12" haben die Teile einer mehrteiligen Klausur vorher durcheinandergebracht.
+  Die Teile (Aufgaben je Teil) passen sich der neuen Anzahl an.
+
 ## 0.47.0 - 2026-10-01
 
 - Klausuren und Unterrichtsleistungen: Zahlenfelder (Aufgabenzahl, Max-Punkte,

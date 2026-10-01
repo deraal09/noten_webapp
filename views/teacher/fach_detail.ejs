@@ -297,7 +297,7 @@
           verschlechtern. Die Aufgaben werden der Reihe nach auf die Teile verteilt; leere Zeilen werden ignoriert.
         </p>
         <% var teilZeilen = Math.min(6, Math.max(k.teileInfo ? k.teileInfo.teile.length + 1 : 2, 3)); %>
-        <form method="post" action="/teacher/klausuren/<%= k.id %>/teile">
+        <form method="post" action="/teacher/klausuren/<%= k.id %>/teile" autocomplete="off">
           <table class="data">
             <thead><tr><th>Teil</th><th>Name</th><th>Aufgaben</th><th>Gewichtung %</th><th>Bestimmt beste Note</th></tr></thead>
             <tbody>
@@ -888,9 +888,15 @@
     try {
       sessionStorage.setItem(FOKUS_KEY, JSON.stringify({
         pfad: location.pathname + location.search, y: window.scrollY,
-        action: form.getAttribute('action'), name: feld ? feld.name : null, wert: feld ? feld.value : null,
+        action: form ? form.getAttribute('action') : null, name: feld ? feld.name : null,
       }));
     } catch (e) { /* z. B. privater Modus */ }
+  }
+  // Merkt sich das gerade aktive Feld (falls es zu einem Formular gehört).
+  function merkeAktivesFeld() {
+    const aktiv = document.activeElement;
+    const form = aktiv && aktiv.form;
+    merkeFokus(form || null, form ? aktiv : null);
   }
   function stelleFokusWiederHer() {
     let gemerkt = null;
@@ -906,16 +912,38 @@
       const feld = f.querySelector('[name="' + gemerkt.name + '"]');
       if (feld && feld.offsetParent !== null) {
         feld.focus({ preventScroll: true });
+        // Cursor ans Ende: number-Felder kennen keine setSelectionRange-Auswahl,
+        // das erneute Zuweisen des Werts setzt die Eingabemarke aber ans Ende.
+        // Sonst würden langsam getippte Ziffern in falscher Reihenfolge landen.
+        const v = feld.value;
+        feld.value = '';
+        feld.value = v;
         if (typeof feld.setSelectionRange === 'function') {
-          try { feld.setSelectionRange(feld.value.length, feld.value.length); } catch (e) { /* number-Felder kennen keine Auswahl */ }
+          try { feld.setSelectionRange(v.length, v.length); } catch (e) { /* number-Felder */ }
         }
         return;
       }
     }
   }
   document.querySelectorAll('form.auto-speichern').forEach(function(form) {
-    const absenden = debounce(function() { merkeFokus(form, document.activeElement && form.contains(document.activeElement) ? document.activeElement : null); form.submit(); }, 600);
+    const absenden = debounce(function() { merkeAktivesFeld(); form.submit(); }, 800);
     form.querySelectorAll('input').forEach(function(feld) {
+      if (feld.name === 'anzahl_aufgaben') {
+        // Die Aufgabenzahl formt auch die Teile um: Zwischenstände beim Tippen
+        // ("1" auf dem Weg zu "12") würden sie zerstören. Deshalb erst beim
+        // Verlassen des Feldes bzw. mit Enter übernehmen.
+        let abgeschickt = false;
+        const uebernehmen = function() {
+          if (abgeschickt) return;
+          abgeschickt = true;
+          setTimeout(function() { merkeAktivesFeld(); form.submit(); }, 0);
+        };
+        feld.addEventListener('change', uebernehmen);
+        feld.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); uebernehmen(); }
+        });
+        return;
+      }
       feld.addEventListener('input', absenden);
     });
   });
