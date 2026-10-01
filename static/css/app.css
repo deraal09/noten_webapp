@@ -526,3 +526,8 @@ table.tafel .maxpunkte-zeile th { text-align: center; white-space: nowrap; }
 .einstellungen-reihe { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.25rem 1.25rem; margin: 0.5rem 0; }
 .einstellungen-reihe .einstellungen { margin: 0; }
 .einstellungen-reihe .einstellungen .feld { margin-bottom: 0; }
+
+/* Zeile "Max. Punkte" deutlich vom Tabellenkopf und den Schülerzeilen absetzen. */
+table.tafel .maxpunkte-zeile th { background: color-mix(in srgb, var(--accent) 22%, var(--bg-card)); color: var(--text); border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); font-size: 0.85rem; }
+table.tafel .maxpunkte-zeile th:first-child { text-align: left; color: var(--accent); font-weight: 700; }
+table.tafel .maxpunkte-zeile input.maxpunkt { border: 1px solid var(--accent); background: var(--bg-card); }

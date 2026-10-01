@@ -345,7 +345,7 @@
             </tr>
           <% } %>
           <tr class="maxpunkte-zeile">
-            <th class="aufgabe-head">Max. Punkte</th>
+            <th class="aufgabe-head">▼ Max. Punkte</th>
             <% maxArr.forEach(function(mp, i) { %>
               <th class="aufgabe-head"><input type="number" class="maxpunkt" name="mp_<%= i %>" form="maxpunkte-form-k<%= k.id %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>" aria-label="Max. Punkte Aufgabe <%= i+1 %>"></th>
               <% if (teilEnde[i] !== undefined) { %><th class="note-col"></th><% } %>
@@ -494,7 +494,7 @@
             <th class="note-col">Note</th>
           </tr>
           <tr class="maxpunkte-zeile">
-            <th class="aufgabe-head">Max. Punkte</th>
+            <th class="aufgabe-head">▼ Max. Punkte</th>
             <% maxArr.forEach(function(mp, i) { %>
               <th class="aufgabe-head"><input type="number" class="maxpunkt" name="mp_<%= i %>" form="maxpunkte-form-u<%= u.id %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>" aria-label="Max. Punkte Aufgabe <%= i+1 %>"></th>
             <% }); %>

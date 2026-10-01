@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.49.2 - 2026-10-01
+
+- Klausuren/Unterrichtsleistungen: Die Zeile "Max. Punkte" in der Tabelle ist
+  farblich deutlich abgesetzt (getönter Hintergrund, Akzentlinien oben und
+  unten, hervorgehobene Beschriftung "▼ Max. Punkte"), im hellen wie im
+  dunklen Design.
+
 ## 0.49.1 - 2026-10-01
 
 - Klausuren: Gewichtung, Datum und Anzahl Teile stehen in einer Reihe und
