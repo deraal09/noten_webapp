@@ -300,7 +300,7 @@
           </table>
         </form>
       <% } %>
-      <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" class="einstellungen auto-speichern">
+      <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" id="maxpunkte-form-k<%= k.id %>" class="einstellungen auto-speichern">
         <% if (k.teileInfo) { %>
           <span class="hint">Aufgaben gesamt: <strong><%= maxArr.length %></strong> (Summe der Teile)</span>
         <% } else { %>
@@ -308,19 +308,7 @@
             <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
           </label>
         <% } %>
-        <span class="hint">Maximal erreichbare Punkte je Aufgabe:</span>
-        <span class="aufgabe-liste">
-          <%
-            var teilStart = {};
-            if (k.teileInfo) { var p0 = 0; k.teileInfo.teile.forEach(function(t, ti) { teilStart[p0] = t.name; p0 += t.aufgaben; }); }
-          %>
-          <% maxArr.forEach(function(mp, i) { %>
-            <% if (teilStart[i] !== undefined) { %><strong class="hint"><%= teilStart[i] %>:</strong><% } %>
-            <label class="aufgabe-feld">A<%= i+1 %>
-              <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>">
-            </label>
-          <% }); %>
-        </span>
+        <span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.</span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
       <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
@@ -354,6 +342,15 @@
               <th class="note-col"><%= NL %></th>
             </tr>
           <% } %>
+          <tr class="maxpunkte-zeile">
+            <th class="aufgabe-head">Max. Punkte</th>
+            <% maxArr.forEach(function(mp, i) { %>
+              <th class="aufgabe-head"><input type="number" class="maxpunkt" name="mp_<%= i %>" form="maxpunkte-form-k<%= k.id %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>" aria-label="Max. Punkte Aufgabe <%= i+1 %>"></th>
+              <% if (teilEnde[i] !== undefined) { %><th class="note-col"></th><% } %>
+            <% }); %>
+            <th class="aufgabe-head"><%= maxSumme %></th>
+            <th class="note-col"></th>
+          </tr>
         </thead>
         <tbody>
           <% rows.forEach(function(r) {
@@ -476,18 +473,11 @@
           <input type="date" name="datum" value="<%= u.datum || '' %>">
         </label>
       </form>
-      <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" class="einstellungen auto-speichern">
+      <form method="post" action="/teacher/uls/<%= u.id %>/maxpunkte" id="maxpunkte-form-u<%= u.id %>" class="einstellungen auto-speichern">
         <label class="feld">Anzahl Aufgaben
           <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
         </label>
-        <span class="hint">Maximal erreichbare Punkte je Aufgabe:</span>
-        <span class="aufgabe-liste">
-          <% maxArr.forEach(function(mp, i) { %>
-            <label class="aufgabe-feld">A<%= i+1 %>
-              <input type="number" name="mp_<%= i %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>">
-            </label>
-          <% }); %>
-        </span>
+        <span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.</span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
       <% var maxSummeUl = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
@@ -498,6 +488,14 @@
             <% maxArr.forEach(function(_, i) { %><th class="aufgabe-head">A<%= i+1 %></th><% }); %>
             <th>Punkte gesamt</th>
             <th class="note-col">Note</th>
+          </tr>
+          <tr class="maxpunkte-zeile">
+            <th class="aufgabe-head">Max. Punkte</th>
+            <% maxArr.forEach(function(mp, i) { %>
+              <th class="aufgabe-head"><input type="number" class="maxpunkt" name="mp_<%= i %>" form="maxpunkte-form-u<%= u.id %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>" aria-label="Max. Punkte Aufgabe <%= i+1 %>"></th>
+            <% }); %>
+            <th class="aufgabe-head"><%= maxSummeUl %></th>
+            <th class="note-col"></th>
           </tr>
         </thead>
         <tbody>
@@ -902,7 +900,8 @@
     if (!gemerkt.name) return;
     const forms = Array.from(document.querySelectorAll('form')).filter(function(f) { return f.getAttribute('action') === gemerkt.action; });
     for (const f of forms) {
-      const feld = f.querySelector('[name="' + gemerkt.name + '"]');
+      // form.elements enthält auch Felder außerhalb des <form>, die per form="..." zugeordnet sind (Max-Punkte in der Tabelle)
+      const feld = Array.from(f.elements).find(function(el) { return el.name === gemerkt.name && el.offsetParent !== null; });
       if (feld && feld.offsetParent !== null) {
         feld.focus({ preventScroll: true });
         // Cursor ans Ende: number-Felder kennen keine setSelectionRange-Auswahl,
@@ -918,9 +917,10 @@
       }
     }
   }
+  function inputsVon(form) { return Array.from(form.elements).filter(function(el) { return el.tagName === 'INPUT'; }); }
   document.querySelectorAll('form.auto-speichern').forEach(function(form) {
     const absenden = debounce(function() { merkeAktivesFeld(); form.submit(); }, 800);
-    form.querySelectorAll('input').forEach(function(feld) {
+    inputsVon(form).forEach(function(feld) {
       if (feld.name === 'anzahl_aufgaben' || feld.name === 'anzahl_teile') {
         // Aufgaben- und Teilezahl formen die Teile um: Zwischenstände beim Tippen
         // ("1" auf dem Weg zu "12") würden sie zerstören. Deshalb erst beim
@@ -941,7 +941,7 @@
     });
   });
   document.querySelectorAll('form.auto-speichern-sofort').forEach(function(form) {
-    form.querySelectorAll('input').forEach(function(feld) {
+    inputsVon(form).forEach(function(feld) {
       feld.addEventListener('change', function() { setTimeout(function() { merkeAktivesFeld(); form.submit(); }, 0); });
     });
   });

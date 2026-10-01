@@ -226,6 +226,9 @@ test('Oberfläche: Anlegen nur mit Name/Datum, Anzahl Teile (Standard 1), Teile-
   assert.match(html, /name="teil_aufgaben"/, 'mehrteilige Klausur zeigt die Teile-Tabelle');
   assert.doesNotMatch(html, /name="anzahl_aufgaben"/, 'bei Teilen ergibt sich die Aufgabenzahl aus den Teilen');
   assert.match(html, /Bestimmt beste Note/);
+  assert.match(html, /class="maxpunkte-zeile"/, 'Max-Punkte stehen als Zeile über den Spalten der Tabelle');
+  assert.match(html, /<input type="number" class="maxpunkt" name="mp_0" form="maxpunkte-form-k\d+"/);
+  assert.doesNotMatch(html, /class="aufgabe-liste"/);
   assert.match(html, /stelleFokusWiederHer/);
   assert.match(html, /feld\.name === 'anzahl_aufgaben' \|\| feld\.name === 'anzahl_teile'/, 'Zahlen werden erst beim Verlassen/Enter übernommen');
   assert.match(html, /feld\.value = '';\s+feld\.value = v;/, 'Eingabemarke ans Ende');

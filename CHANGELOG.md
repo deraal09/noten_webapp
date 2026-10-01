@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.49.0 - 2026-10-01
+
+- Klausuren und Unterrichtsleistungen: Die maximal erreichbaren Punkte je
+  Aufgabe stehen jetzt als eigene Zeile "Max. Punkte" direkt über den Spalten
+  der Schülertabelle (statt in einer Liste darüber) und lassen sich dort
+  bearbeiten -- so sind sie der jeweiligen Aufgabe sofort zuzuordnen. Die
+  Summe steht über der Spalte "Punkte gesamt".
+
 ## 0.48.0 - 2026-10-01
 
 - Klausuren neu gegliedert: Beim Anlegen werden nur noch Name und Datum
