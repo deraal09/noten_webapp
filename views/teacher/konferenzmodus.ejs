@@ -104,7 +104,7 @@
       <% notizen.forEach(function(n) { %>
         <tr>
           <td><%= formatZeitLokal(n.created_at) %></td>
-          <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : ('Besprechung' + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %></td>
+          <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : ((n.typ === 'unterricht' ? 'Unterricht' : 'Besprechung') + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %></td>
           <td><%= n.display_name || n.username || '—' %></td>
           <td><%= n.text %></td>
         </tr>

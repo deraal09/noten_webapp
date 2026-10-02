@@ -74,7 +74,7 @@
                     <li>
                       <small>
                         <%= formatZeitLokal(n.created_at) %> ·
-                        <%= n.typ === 'konferenz' ? 'Notenkonferenz' : ('Besprechung' + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %> ·
+                        <%= n.typ === 'konferenz' ? 'Notenkonferenz' : ((n.typ === 'unterricht' ? 'Unterricht' : 'Besprechung') + (n.fach_name ? ' (' + n.fach_name + ')' : '')) %> ·
                         <%= n.display_name || n.username || '—' %>
                       </small><br>
                       <%= n.text %>

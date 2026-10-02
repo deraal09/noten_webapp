@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.50.0 - 2026-10-02
+
+- Datumstabelle: Neben jeder Person gibt es einen kleinen Notizzettel (📝).
+  Ein Klick öffnet ein Popup mit dem Verlauf der Notizen zur
+  Unterrichtsleistung (je Person, Fach und Halbjahr) und einem Feld für eine
+  neue Notiz (Strg+Enter speichert). Das Symbol ist gelb hinterlegt und zeigt
+  die Anzahl, sobald Notizen vorhanden sind. Verfasser/in und Admins können
+  eigene Notizen löschen.
+- Die Notizen erscheinen in der Notenbesprechung (eigener Kasten bei der
+  Datumstabelle und in der Notizenliste, Art "Unterricht (Datumstabelle)")
+  sowie in den Notizlisten der Klassenübersicht und des Konferenzmodus. In der
+  Notenbesprechung kann diese Art auch direkt angelegt werden.
+
 ## 0.49.2 - 2026-10-01
 
 - Klausuren/Unterrichtsleistungen: Die Zeile "Max. Punkte" in der Tabelle ist

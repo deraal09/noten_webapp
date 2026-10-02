@@ -4,6 +4,7 @@
  */
 
 import { getDb } from '../db.js';
+import { formatZeitLokal } from '../format.js';
 import {
   requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
   userDarfFachLoeschen, userDarfKlasseVerwalten,
@@ -303,6 +304,12 @@ export default async function teacherRoutes(fastify) {
     // Klasse einer teilnehmenden Person (siehe fach_teilnehmer).
     const sperren = ladeSperrenFuerSchueler(uebersicht.schueler.map((s) => s.id), halbjahr);
     const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
+    // Anzahl der Unterrichtsnotizen je Person (Notizzettel-Symbol in der Datumstabelle).
+    const unterrichtNotizAnzahl = {};
+    for (const n of getDb().prepare(`
+      SELECT schueler_id, COUNT(*) AS anzahl FROM notenbesprechung_notizen
+      WHERE fach_id = ? AND halbjahr = ? AND typ = 'unterricht' GROUP BY schueler_id
+    `).all(fach.id, halbjahr)) unterrichtNotizAnzahl[n.schueler_id] = n.anzahl;
     let spaLeistung = null;
     if (fach.spa_fach_key) {
       const hjNr = SPA_HALBJAHRE.indexOf(halbjahr) + 1;
@@ -316,7 +323,7 @@ export default async function teacherRoutes(fastify) {
       HALBJAHRE: halbjahreFuerFach(fach), spaLeistung, spaTendenz,
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
-      termine: uebersicht.termine,
+      termine: uebersicht.termine, unterrichtNotizAnzahl,
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       historischeHalbjahre, schuelerHistorie, abschlussnoten, sperren, teilnehmer,
@@ -502,7 +509,7 @@ export default async function teacherRoutes(fastify) {
     if (!userHatFachZgriff(request.user, fach.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
-    const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
+    const halbjahr = halbjahrFuerFachId(fach.id, request.query?.hj);
     const uebersicht = ladeNotenuebersicht(fach, halbjahr);
     const idx = uebersicht.rows.findIndex((r) => r.schueler_id === Number(request.params.schuelerId));
     if (idx === -1) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in diesem Fach.' });
@@ -523,8 +530,8 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/fach/:id/besprechung/:schuelerId/notiz', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
-    const halbjahr = HALBJAHRE.includes(request.body?.halbjahr) ? request.body.halbjahr : HALBJAHRE[0];
-    const typ = request.body?.typ === 'konferenz' ? 'konferenz' : 'besprechung';
+    const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    const typ = ['konferenz', 'unterricht'].includes(request.body?.typ) ? request.body.typ : 'besprechung';
     const text = String(request.body?.text || '').trim();
     if (text) {
       getDb().prepare(`
@@ -533,6 +540,58 @@ export default async function teacherRoutes(fastify) {
       `).run(request.params.schuelerId, typ === 'konferenz' ? null : request.params.id, halbjahr, typ, text, request.user.id);
     }
     return reply.redirect(`/teacher/fach/${request.params.id}/besprechung/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
+  });
+
+  // ---------- Notizen zur Unterrichtsleistung (Notizzettel in der Datumstabelle) ----------
+  // Je Person, Fach und Halbjahr, als Verlauf (nichts wird überschrieben). Sie
+  // erscheinen auch in der Notenbesprechung (typ 'unterricht').
+  const unterrichtNotizen = (schuelerId, fachId, halbjahr, userId, isAdmin) =>
+    getDb().prepare(`
+      SELECT n.id, n.text, n.created_at, n.created_by_id, u.display_name, u.username
+      FROM notenbesprechung_notizen n LEFT JOIN users u ON u.id = n.created_by_id
+      WHERE n.schueler_id = ? AND n.fach_id = ? AND n.halbjahr = ? AND n.typ = 'unterricht'
+      ORDER BY n.created_at DESC, n.id DESC
+    `).all(schuelerId, fachId, halbjahr).map((n) => ({
+      id: n.id, text: n.text, von: n.display_name || n.username || 'unbekannt',
+      am: formatZeitLokal(n.created_at), loeschbar: isAdmin || n.created_by_id === userId,
+    }));
+  const unterrichtNotizKontext = (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) { reply.code(404).send({ ok: false, error: 'not found' }); return null; }
+    if (!userHatFachZgriff(request.user, fach.id)) { reply.code(403).send({ ok: false, error: 'forbidden' }); return null; }
+    const schuelerId = parseInt(request.params.schuelerId, 10);
+    if (!ladeTeilnehmerMitHerkunft(fach).some((t) => t.id === schuelerId)) {
+      reply.code(404).send({ ok: false, error: 'not found' });
+      return null;
+    }
+    return { fach, schuelerId, halbjahr: halbjahrFuerFachId(fach.id, request.query?.hj ?? request.body?.halbjahr) };
+  };
+
+  fastify.get('/fach/:id/unterricht/notizen/:schuelerId', async (request, reply) => {
+    const ctx = unterrichtNotizKontext(request, reply);
+    if (!ctx) return;
+    return reply.send({ ok: true, notizen: unterrichtNotizen(ctx.schuelerId, ctx.fach.id, ctx.halbjahr, request.user.id, request.user.isAdmin) });
+  });
+
+  fastify.post('/fach/:id/unterricht/notizen/:schuelerId', async (request, reply) => {
+    const ctx = unterrichtNotizKontext(request, reply);
+    if (!ctx) return;
+    const text = String(request.body?.text || '').trim().slice(0, 4000);
+    if (!text) return reply.code(400).send({ ok: false, error: 'leer' });
+    getDb().prepare(`
+      INSERT INTO notenbesprechung_notizen (schueler_id, fach_id, halbjahr, typ, text, created_by_id)
+      VALUES (?, ?, ?, 'unterricht', ?, ?)
+    `).run(ctx.schuelerId, ctx.fach.id, ctx.halbjahr, text, request.user.id);
+    return reply.send({ ok: true, notizen: unterrichtNotizen(ctx.schuelerId, ctx.fach.id, ctx.halbjahr, request.user.id, request.user.isAdmin) });
+  });
+
+  fastify.post('/unterricht/notizen/:noteId/loeschen', async (request, reply) => {
+    const n = getDb().prepare("SELECT * FROM notenbesprechung_notizen WHERE id = ? AND typ = 'unterricht'").get(request.params.noteId);
+    if (!n) return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userHatFachZgriff(request.user, n.fach_id)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    if (!request.user.isAdmin && n.created_by_id !== request.user.id) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    getDb().prepare('DELETE FROM notenbesprechung_notizen WHERE id = ?').run(n.id);
+    return reply.send({ ok: true, notizen: unterrichtNotizen(n.schueler_id, n.fach_id, n.halbjahr, request.user.id, request.user.isAdmin) });
   });
 
   // ---------- Klausuren ----------

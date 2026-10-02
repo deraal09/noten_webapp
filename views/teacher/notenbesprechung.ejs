@@ -62,6 +62,20 @@
   </p>
   <p>Ø Datumstabelle: <strong><%= zeile.datumsDurchschnitt === null ? '–' : formatNote(zeile.datumsDurchschnitt) %></strong></p>
 <% } %>
+<% var unterrichtNotizen = notizen.filter(function(n) { return n.typ === 'unterricht'; }); %>
+<% if (unterrichtNotizen.length) { %>
+  <div class="card unterricht-notizen">
+    <strong>📝 Notizen zum Unterricht</strong>
+    <ul class="notiz-liste">
+      <% unterrichtNotizen.forEach(function(n) { %>
+        <li>
+          <div class="notiz-text"><%= n.text %></div>
+          <div class="notiz-meta hint"><%= n.display_name || n.username || 'unbekannt' %> · <%= formatZeitLokal(n.created_at) %></div>
+        </li>
+      <% }); %>
+    </ul>
+  </div>
+<% } %>
 
 <h3>Zusatzleistungen</h3>
 <% if (!zeile.uls.length) { %><p class="hint">Keine Zusatzleistungen in diesem Halbjahr.</p><% } %>
@@ -97,6 +111,7 @@
   <label>Art
     <select name="typ">
       <option value="besprechung">Notenbesprechung (dieses Fach)</option>
+      <option value="unterricht">Unterricht / Datumstabelle (dieses Fach)</option>
       <option value="konferenz">Notenkonferenz-Entscheidung (klassenweit)</option>
     </select>
   </label>
@@ -115,7 +130,7 @@
       <% notizen.forEach(function(n) { %>
         <tr>
           <td><%= n.created_at %></td>
-          <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : 'Besprechung' %></td>
+          <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : (n.typ === 'unterricht' ? 'Unterricht (Datumstabelle)' : 'Besprechung') %></td>
           <td><%= n.display_name || n.username || '—' %></td>
           <td><%= n.text %></td>
         </tr>

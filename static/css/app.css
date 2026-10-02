@@ -531,3 +531,11 @@ table.tafel .maxpunkte-zeile th { text-align: center; white-space: nowrap; }
 table.tafel .maxpunkte-zeile th { background: color-mix(in srgb, var(--accent) 22%, var(--bg-card)); color: var(--text); border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); font-size: 0.85rem; }
 table.tafel .maxpunkte-zeile th:first-child { text-align: left; color: var(--accent); font-weight: 700; }
 table.tafel .maxpunkte-zeile input.maxpunkt { border: 1px solid var(--accent); background: var(--bg-card); }
+
+/* Notizzettel-Symbol in der Datumstabelle (gefüllt, wenn Notizen vorhanden sind). */
+table.tafel button.notiz-btn { padding: 0 0.3rem; margin-left: 0.25rem; font-size: 0.95rem; line-height: 1.4; background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; opacity: 0.55; }
+table.tafel button.notiz-btn:hover, table.tafel button.notiz-btn:focus-visible { opacity: 1; border-color: var(--border-strong); }
+table.tafel button.notiz-btn.hat-notiz { opacity: 1; background: color-mix(in srgb, #f6c945 40%, var(--bg-card)); border-color: #e0b12d; }
+table.tafel button.notiz-btn sup { font-size: 0.65rem; margin-left: 1px; }
+.unterricht-notizen { margin: 0.5rem 0 1rem; }
+.notiz-meta button.danger { padding: 0 0.3rem; font-size: 0.75rem; margin-left: 0.4rem; }

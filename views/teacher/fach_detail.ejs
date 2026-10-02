@@ -438,7 +438,12 @@
           <% rows.forEach(function(r) {
                var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
             <tr>
-              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %>
+                <% var nAnz = (typeof unterrichtNotizAnzahl !== 'undefined' && unterrichtNotizAnzahl[r.schueler_id]) || 0; %>
+                <button type="button" class="notiz-btn<%= nAnz ? ' hat-notiz' : '' %>" data-sid="<%= r.schueler_id %>"
+                        data-name="<%= r.nachname %>, <%= r.vorname %>" data-anzahl="<%= nAnz %>"
+                        title="<%= nAnz ? nAnz + ' Notiz(en) zum Unterricht' : 'Notiz zum Unterricht' %>" aria-label="Notizen zum Unterricht von <%= r.vorname %> <%= r.nachname %>">📝<% if (nAnz) { %><sup><%= nAnz %></sup><% } %></button>
+              </td>
               <% r.terminNoten.forEach(function(tn) { %>
                 <td>
                   <input type="number" class="note-datum" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
@@ -454,6 +459,20 @@
         </tbody>
       </table>
       </div>
+      <dialog id="unterricht-notiz-dialog" class="notiz-dialog">
+        <h2>Notizen: <span id="unterricht-notiz-name"></span></h2>
+        <p class="hint">
+          Notizen zur Unterrichtsleistung (<%= halbjahr %>) – sie sind auch in der Notenbesprechung
+          sichtbar. Ältere Einträge bleiben erhalten, es wird nichts überschrieben.
+        </p>
+        <ul class="notiz-liste" id="unterricht-notiz-liste"></ul>
+        <p class="hint" id="unterricht-notiz-leer">Noch keine Notizen.</p>
+        <textarea id="unterricht-notiz-text" rows="3" maxlength="4000" placeholder="Neue Notiz hinzufügen…"></textarea>
+        <div class="form-actions">
+          <button type="button" id="unterricht-notiz-speichern">+ Notiz hinzufügen</button>
+          <button type="button" id="unterricht-notiz-schliessen">Schließen</button>
+        </div>
+      </dialog>
     <% } %>
   </div>
 
@@ -954,6 +973,71 @@
     form.addEventListener('submit', function() { merkeFokus(form, null); });
   });
   stelleFokusWiederHer();
+
+  // Notizzettel in der Datumstabelle: Popup mit Verlauf + neuer Notiz (AJAX,
+  // die Seite wird nicht neu geladen).
+  (function() {
+    const dlg = document.getElementById('unterricht-notiz-dialog');
+    if (!dlg) return;
+    const liste = document.getElementById('unterricht-notiz-liste');
+    const leer = document.getElementById('unterricht-notiz-leer');
+    const text = document.getElementById('unterricht-notiz-text');
+    const FACH = '<%= fach.id %>';
+    const HJ = '<%= halbjahr %>';
+    let aktuell = null; // { sid, btn }
+    const url = function(sid) { return '/teacher/fach/' + FACH + '/unterricht/notizen/' + sid + '?hj=' + encodeURIComponent(HJ); };
+    function zeige(notizen) {
+      liste.textContent = '';
+      notizen.forEach(function(n) {
+        const li = document.createElement('li');
+        const t = document.createElement('div'); t.className = 'notiz-text'; t.textContent = n.text;
+        const m = document.createElement('div'); m.className = 'notiz-meta hint'; m.textContent = n.von + ' · ' + n.am + ' ';
+        if (n.loeschbar) {
+          const x = document.createElement('button');
+          x.type = 'button'; x.className = 'danger'; x.textContent = '🗑'; x.title = 'Notiz löschen';
+          x.addEventListener('click', function() {
+            if (!confirm('Notiz löschen?')) return;
+            fetch('/teacher/unterricht/notizen/' + n.id + '/loeschen', { method: 'POST' })
+              .then(function(r) { return r.json(); }).then(function(d) { if (d.ok) zeige(d.notizen); });
+          });
+          m.appendChild(x);
+        }
+        li.appendChild(t); li.appendChild(m); liste.appendChild(li);
+      });
+      leer.hidden = notizen.length > 0;
+      if (aktuell) {
+        const b = aktuell.btn;
+        b.classList.toggle('hat-notiz', notizen.length > 0);
+        b.dataset.anzahl = String(notizen.length);
+        b.textContent = '📝';
+        if (notizen.length) { const sup = document.createElement('sup'); sup.textContent = String(notizen.length); b.appendChild(sup); }
+        b.title = notizen.length ? notizen.length + ' Notiz(en) zum Unterricht' : 'Notiz zum Unterricht';
+      }
+    }
+    document.querySelectorAll('button.notiz-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        aktuell = { sid: btn.dataset.sid, btn: btn };
+        document.getElementById('unterricht-notiz-name').textContent = btn.dataset.name;
+        text.value = '';
+        liste.textContent = '';
+        leer.hidden = true;
+        dlg.showModal();
+        fetch(url(aktuell.sid)).then(function(r) { return r.json(); }).then(function(d) { if (d.ok) zeige(d.notizen); });
+        text.focus();
+      });
+    });
+    function speichern() {
+      const wert = text.value.trim();
+      if (!wert || !aktuell) return;
+      const body = new URLSearchParams({ text: wert, halbjahr: HJ });
+      fetch(url(aktuell.sid), { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (d.ok) { text.value = ''; zeige(d.notizen); text.focus(); } });
+    }
+    document.getElementById('unterricht-notiz-speichern').addEventListener('click', speichern);
+    text.addEventListener('keydown', function(e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); speichern(); } });
+    document.getElementById('unterricht-notiz-schliessen').addEventListener('click', function() { dlg.close(); });
+  })();
 
   // Pfeiltasten hoch/runter und Enter springen in derselben Spalte (also
   // z. B. derselben Aufgabe/demselben Termin) zur vorherigen/nächsten
