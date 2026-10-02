@@ -959,19 +959,22 @@ export default async function teacherRoutes(fastify) {
     }
     const fach = ladeFachMitUmfeld(t.fach_id);
     const [min, max] = fach.notenschluessel === 'BG' ? [0, 15] : [1, 6];
+    // Eingabe: leer = nichts eingetragen, Zahl im Notenbereich = Note, alles
+    // andere ("n.a.", Text, Zahl außerhalb des Bereichs) = n.a. (nicht anwesend).
+    const roh = String(request.body?.wert ?? '').trim();
     let wert = null;
-    if (request.body?.wert !== '' && request.body?.wert !== null && request.body?.wert !== undefined) {
-      wert = Number(request.body.wert);
-      if (!Number.isFinite(wert) || wert < min || wert > max) {
-        return reply.code(400).send({ ok: false, error: `Note außerhalb des Bereichs ${min}–${max}.` });
-      }
+    let na = 0;
+    if (roh !== '') {
+      const zahl = /^[+-]?\d+([.,]\d+)?$/.test(roh) ? Number(roh.replace(',', '.')) : NaN;
+      if (Number.isFinite(zahl) && zahl >= min && zahl <= max) wert = zahl;
+      else na = 1;
     }
     getDb().prepare(`
-      INSERT INTO unterricht_noten (termin_id, schueler_id, wert) VALUES (?, ?, ?)
-      ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert
-    `).run(request.params.id, schuelerId, wert);
+      INSERT INTO unterricht_noten (termin_id, schueler_id, wert, nicht_anwesend) VALUES (?, ?, ?, ?)
+      ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert, nicht_anwesend = excluded.nicht_anwesend
+    `).run(request.params.id, schuelerId, wert, na);
     syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.user.id);
-    return reply.send({ ok: true });
+    return reply.send({ ok: true, wert, na: Boolean(na) });
   });
 
   // ---------- Manuelle Noten ----------

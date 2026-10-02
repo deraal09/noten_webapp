@@ -119,13 +119,47 @@ test('Note für einen Termin eintragen (AJAX), erscheint in der Übersicht als D
   assert.equal(zeileS2.datumsDurchschnitt, null, 'kein Eintrag für s2 -> kein Durchschnitt');
 });
 
-test('Notenwert außerhalb des Bereichs wird abgelehnt', async () => {
-  const r = await jsonPost(lehrerA, `/teacher/unterricht/termine/${termin1}/note`, {
-    schueler_id: String(s1), wert: '7', // IHK: 1-6
-  });
-  assert.equal(r.status, 400);
-  const row = getDb().prepare('SELECT wert FROM unterricht_noten WHERE termin_id = ? AND schueler_id = ?').get(termin1, s1);
-  assert.equal(row.wert, 2, 'ungültiger Wert darf den bestehenden nicht überschreiben');
+test('Datumstabelle: nur Noten oder n.a. -- Zahl außerhalb des Bereichs und beliebiger Text werden zu n.a.', async () => {
+  const setze = async (sid, wert) => (await jsonPost(lehrerA, `/teacher/unterricht/termine/${termin1}/note`, { schueler_id: String(sid), wert })).json();
+  const zeile = async (sid) => (await (await lehrerA(`/teacher/fach/${fachId}/noten?hj=${encodeURIComponent(HJ)}`)).json()).schueler.find((x) => x.schueler_id === sid);
+
+  // IHK: 1-6 -> 7 ist keine Note, also n.a. (der bisherige Wert wird ersetzt)
+  let d = await setze(s2, '7');
+  assert.deepEqual([d.ok, d.wert, d.na], [true, null, true]);
+  for (const text of ['n.a.', 'na', 'N.A', 'abwesend', '2x', '0']) {
+    d = await setze(s2, text);
+    assert.equal(d.na, true, `"${text}" -> n.a.`);
+    assert.equal(d.wert, null);
+  }
+  let z = await zeile(s2);
+  assert.equal(z.terminNoten[0].na, true);
+  assert.equal(z.terminNoten[0].wert, null);
+  assert.equal(z.naAnzahl, 1);
+  assert.equal(z.datumsDurchschnitt, null, 'n.a. zählt nicht in den Durchschnitt');
+  assert.equal((await zeile(s1)).naAnzahl, 0);
+
+  // Komma wird akzeptiert und ersetzt n.a.; leer löscht den Eintrag
+  d = await setze(s2, '2,5');
+  assert.deepEqual([d.wert, d.na], [2.5, false]);
+  z = await zeile(s2);
+  assert.equal(z.naAnzahl, 0);
+  assert.equal(z.datumsDurchschnitt, 2.5);
+  d = await setze(s2, '');
+  assert.deepEqual([d.wert, d.na], [null, false]);
+  assert.equal((await zeile(s2)).datumsDurchschnitt, null);
+});
+
+test('n.a. wird in Datumstabelle, Notenübersicht und Notenbesprechung angezeigt und gezählt', async () => {
+  await jsonPost(lehrerA, `/teacher/unterricht/termine/${termin1}/note`, { schueler_id: String(s2), wert: 'n.a.' });
+  const html = await (await lehrerA(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /class="note-datum ist-na"[^>]*value="n\.a\."/);
+  assert.match(html, /<th title="Anzahl der Termine mit n\.a\. \(nicht anwesend\)">n\.a\.<\/th>/);
+  assert.match(html, new RegExp(`<td class="note-cell na-summe" data-sid="${s2}">1</td>`), 'Summe in der Datumstabelle');
+  assert.match(html, /<th title="Summe der Termine mit n\.a\./, 'Spalte in der Notenübersicht');
+  const bes = await (await lehrerA(`/teacher/fach/${fachId}/besprechung/${s2}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(bes, /01\.09\.2025: n\.a\./);
+  assert.match(bes, /nicht anwesend \(n\.a\.\): <strong>1<\/strong>/);
+  await jsonPost(lehrerA, `/teacher/unterricht/termine/${termin1}/note`, { schueler_id: String(s2), wert: '' });
 });
 
 test('Zweiter Termin + zweite Note -> Durchschnitt über beide Termine', async () => {

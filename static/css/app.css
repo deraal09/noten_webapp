@@ -539,3 +539,6 @@ table.tafel button.notiz-btn.hat-notiz { opacity: 1; background: color-mix(in sr
 table.tafel button.notiz-btn sup { font-size: 0.65rem; margin-left: 1px; }
 .unterricht-notizen { margin: 0.5rem 0 1rem; }
 .notiz-meta button.danger { padding: 0 0.3rem; font-size: 0.75rem; margin-left: 0.4rem; }
+
+/* Datumstabelle: Noteneingabe als Textfeld (Note oder n.a.). */
+table.tafel input.note-datum.ist-na { background: var(--bg-header); color: var(--text-muted); font-style: italic; }

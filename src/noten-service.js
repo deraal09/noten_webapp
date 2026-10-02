@@ -18,9 +18,10 @@ function ladeUnterrichtTermine(fachId, halbjahr) {
     'SELECT * FROM unterricht_termine WHERE fach_id = ? AND halbjahr = ? ORDER BY datum, id'
   ).all(fachId, halbjahr);
   const noten = new Map(); // schueler_id -> Map<termin_id, wert>
+  const na = new Map(); // schueler_id -> Set<termin_id> mit "n.a." (nicht anwesend)
   if (termine.length) {
     const rows = db.prepare(`
-      SELECT un.termin_id, un.schueler_id, un.wert
+      SELECT un.termin_id, un.schueler_id, un.wert, un.nicht_anwesend
       FROM unterricht_noten un
       JOIN unterricht_termine ut ON ut.id = un.termin_id
       WHERE ut.fach_id = ? AND ut.halbjahr = ?
@@ -28,9 +29,13 @@ function ladeUnterrichtTermine(fachId, halbjahr) {
     for (const r of rows) {
       if (!noten.has(r.schueler_id)) noten.set(r.schueler_id, new Map());
       noten.get(r.schueler_id).set(r.termin_id, r.wert);
+      if (r.nicht_anwesend) {
+        if (!na.has(r.schueler_id)) na.set(r.schueler_id, new Set());
+        na.get(r.schueler_id).add(r.termin_id);
+      }
     }
   }
-  return { termine, noten };
+  return { termine, noten, na };
 }
 
 /** Eingetragene Datumstabellen-Werte eines/einer Schüler/in (ohne Lücken). */
@@ -257,7 +262,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     if (!manuelleMap.has(n.schueler_id)) manuelleMap.set(n.schueler_id, { muendlich: [], schriftlich: [] });
     manuelleMap.get(n.schueler_id)[n.typ].push({ id: n.id, wert: n.wert });
   }
-  const { termine, noten: terminNoten } = ladeUnterrichtTermine(fach.id, halbjahr);
+  const { termine, noten: terminNoten, na: terminNa } = ladeUnterrichtTermine(fach.id, halbjahr);
 
   const rows = schueler.map((s) => {
     const klausurData = klausuren.map((k) => {
@@ -276,7 +281,8 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     });
     const manuelle = manuelleMap.get(s.id) || { muendlich: [], schriftlich: [] };
     const eigeneTerminNoten = terminNoten.get(s.id) || new Map();
-    const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null }));
+    const eigeneNa = terminNa.get(s.id) || new Set();
+    const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null, na: eigeneNa.has(t.id) }));
     const datumsWerte = datumsWerteFuerSchueler(s.id, termine, terminNoten);
     const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, ulData);
     const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
@@ -289,6 +295,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       muendlich: manuelle.muendlich, schriftlich: manuelle.schriftlich,
       schriftlicheNote: teilNote(klausurData),
       datumsDurchschnitt,
+      naAnzahl: eigeneNa.size,
       muendlicheNote,
       gesamt: gn,
       // SPA-Punkte (0-15) bestehen wie BG-Punkte ab 4.

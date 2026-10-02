@@ -772,6 +772,8 @@ function migrate(db) {
   ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
   ensureColumn(db, 'klausuren', 'teile', 'teile TEXT');
   ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
+  // Datumstabelle: "n.a." (nicht anwesend) statt einer Note; wert bleibt dann NULL und zählt nicht in den Schnitt.
+  ensureColumn(db, 'unterricht_noten', 'nicht_anwesend', 'nicht_anwesend INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'offen_fuer_beitritt', 'offen_fuer_beitritt INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'faecher', 'ist_kurs', 'ist_kurs INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'schueler', 'status', "status TEXT NOT NULL DEFAULT 'aktiv'");

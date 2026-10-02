@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.51.0 - 2026-10-02
+
+- Datumstabelle: Anwesenheit mit "n.a." (nicht anwesend). Die Felder nehmen nur
+  noch Noten (auch mit Komma) oder n.a. an; jede andere Eingabe -- auch eine
+  Zahl außerhalb des Notenbereichs -- wird automatisch zu n.a. Einträge mit
+  n.a. zählen nicht in den Durchschnitt, werden aber je Person gezählt.
+- Die Summe der n.a.-Einträge steht in der Datumstabelle (Spalte "n.a."), in
+  der Notenübersicht (sobald Termine vorhanden sind) und in der
+  Notenbesprechung (dort auch die einzelnen Termine mit n.a.).
+
 ## 0.50.0 - 2026-10-02
 
 - Datumstabelle: Neben jeder Person gibt es einen kleinen Notizzettel (📝).

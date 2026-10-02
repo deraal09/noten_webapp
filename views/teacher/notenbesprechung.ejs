@@ -57,10 +57,10 @@
 <% if (!zeile.terminNoten.length) { %><p class="hint">Noch keine Termine in diesem Halbjahr.</p><% } else { %>
   <p>
     <% zeile.terminNoten.forEach(function(tn) { %>
-      <span class="tag" title="<%= tn.datum %>"><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.wert === null ? '–' : Number(tn.wert).toString().replace('.', ',') %></span>
+      <span class="tag" title="<%= tn.datum %>"><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.na ? 'n.a.' : (tn.wert === null ? '–' : Number(tn.wert).toString().replace('.', ',')) %></span>
     <% }); %>
   </p>
-  <p>Ø Datumstabelle: <strong><%= zeile.datumsDurchschnitt === null ? '–' : formatNote(zeile.datumsDurchschnitt) %></strong></p>
+  <p>Ø Datumstabelle: <strong><%= zeile.datumsDurchschnitt === null ? '–' : formatNote(zeile.datumsDurchschnitt) %></strong> · nicht anwesend (n.a.): <strong><%= zeile.naAnzahl %></strong></p>
 <% } %>
 <% var unterrichtNotizen = notizen.filter(function(n) { return n.typ === 'unterricht'; }); %>
 <% if (unterrichtNotizen.length) { %>

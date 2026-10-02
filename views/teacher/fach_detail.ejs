@@ -82,12 +82,13 @@
   var hatManuelleMuendlich = rows.some(function(r) { return r.muendlich.length > 0; });
   var hatManuelleSchriftlich = rows.some(function(r) { return r.schriftlich.length > 0; });
   var hatUlEintraege = rows.some(function(r) {
-    return r.terminNoten.some(function(t) { return t.wert !== null; }) || r.uls.some(function(u) { return u.punkte !== null; });
+    return r.terminNoten.some(function(t) { return t.wert !== null || t.na; }) || r.uls.some(function(u) { return u.punkte !== null; });
   });
   var hatKlausurEintraege = rows.some(function(r) { return r.klausuren.some(function(k) { return k.punkte !== null; }); });
   var zeigeMuendlicheNoteSpalte = !(hatManuelleMuendlich && !hatUlEintraege);
   var zeigeSchriftlicheNoteSpalte = !(hatManuelleSchriftlich && !hatKlausurEintraege);
-  var sichtbareSpalten = 2 + (hatManuelleMuendlich ? 1 : 0) + (hatManuelleSchriftlich ? 1 : 0)
+  var zeigeNaSpalte = termine.length > 0;
+  var sichtbareSpalten = 2 + (zeigeNaSpalte ? 1 : 0) + (hatManuelleMuendlich ? 1 : 0) + (hatManuelleSchriftlich ? 1 : 0)
     + (zeigeMuendlicheNoteSpalte ? 1 : 0) + (zeigeSchriftlicheNoteSpalte ? 1 : 0) + (spaLeistung ? 1 : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
 <div id="panel-uebersicht" class="reiter-panel<%= fach.nur_historisch ? '' : ' active' %>">
@@ -102,6 +103,7 @@
         <% if (zeigeSchriftlicheNoteSpalte) { %><th>Schriftliche <%= NL %></th><% } %>
         <th>Gesamt<%= spaLeistung ? 'punkte' : 'note' %></th>
         <% if (spaLeistung) { %><th title="Tendenznote aus den Leistungspunkten (SPA-Notenskala)">Tendenz</th><% } %>
+        <% if (zeigeNaSpalte) { %><th title="Summe der Termine mit n.a. (nicht anwesend) in der Datumstabelle">n.a.</th><% } %>
         <% if (fach.abgeschlossen) { %><th>Abschlussnote</th><% } %>
       </tr>
     </thead>
@@ -144,6 +146,7 @@
           <% if (zeigeSchriftlicheNoteSpalte) { %><td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td><% } %>
           <td class="gesamt-cell"><%= r.gesamt === null ? '–' : formatNote(r.gesamt) %></td>
           <% if (spaLeistung) { %><td class="note-cell spa-tendenz-cell"><%= r.gesamt === null ? '–' : spaTendenz(r.gesamt) %></td><% } %>
+          <% if (zeigeNaSpalte) { %><td class="note-cell na-summe" data-sid="<%= r.schueler_id %>"><%= r.naAnzahl %></td><% } %>
           <% if (fach.abgeschlossen) { %>
             <td class="note-cell"><% var an = abschlussnoten.get(r.schueler_id); %><%= (an === null || an === undefined) ? '–' : formatNote(an) %></td>
           <% } %>
@@ -406,7 +409,9 @@
   <div id="ul-panel-datumstabelle" class="reiter-panel unter-panel card active">
     <p class="hint">
       Eine Spalte je Unterrichtstermin, eine Note je Schüler/in ohne
-      Einzelgewichtung. Der Durchschnitt aller eingetragenen Noten bildet die
+      Einzelgewichtung. Eingetragen werden nur Noten oder <strong>n.a.</strong>
+      (nicht anwesend) – alles andere wird automatisch zu n.a.; n.a. zählt nicht
+      in den Durchschnitt, wird aber je Person gezählt. Der Durchschnitt aller eingetragenen Noten bildet die
       Basis der Unterrichtsleistungsnote — Zusatzleistungen (eigene Reiter)
       zählen zusätzlich mit ihrer eigenen Gewichtung.
     </p>
@@ -432,6 +437,7 @@
               </th>
             <% }); %>
             <th>Ø</th>
+            <th title="Anzahl der Termine mit n.a. (nicht anwesend)">n.a.</th>
           </tr>
         </thead>
         <tbody>
@@ -446,14 +452,14 @@
               </td>
               <% r.terminNoten.forEach(function(tn) { %>
                 <td>
-                  <input type="number" class="note-datum" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
-                    min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" step="0.1"
-                    value="<%= tn.wert === null ? '' : tn.wert %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>>
+                  <input type="text" inputmode="decimal" autocomplete="off" class="note-datum<%= tn.na ? ' ist-na' : '' %>" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
+                    value="<%= tn.na ? 'n.a.' : (tn.wert === null ? '' : String(tn.wert).replace('.', ',')) %>" placeholder="–" title="Note oder n.a. (nicht anwesend)" <%= gesperrt ? 'disabled' : '' %>>
                 </td>
               <% }); %>
               <td class="note-cell datums-durchschnitt" data-sid="<%= r.schueler_id %>">
                 <%= r.datumsDurchschnitt === null ? '–' : formatNote(r.datumsDurchschnitt) %>
               </td>
+              <td class="note-cell na-summe" data-sid="<%= r.schueler_id %>"><%= r.naAnzahl %></td>
             </tr>
           <% }); %>
         </tbody>
@@ -845,6 +851,7 @@
             spaTendenzZelle.textContent = s.gesamt !== null ? skala[Math.max(0, Math.min(15, Math.round(s.gesamt)))] : '–';
           }
         }
+        document.querySelectorAll('.na-summe[data-sid="' + s.schueler_id + '"]').forEach(function(z) { z.textContent = String(s.naAnzahl); });
         const datumsZelle = document.querySelector('.datums-durchschnitt[data-sid="' + s.schueler_id + '"]');
         if (datumsZelle) {
           datumsZelle.textContent = s.datumsDurchschnitt !== null ? s.datumsDurchschnitt.toString().replace('.', ',') : '–';
@@ -872,14 +879,35 @@
       refresh();
     }, 400));
   });
+  // Datumstabelle: nur Noten oder "n.a." (nicht anwesend). Beim Tippen wird
+  // gespeichert, sobald der Wert eine gültige Zahl oder n.a. ist; beim
+  // Verlassen des Feldes (change) wird jede andere Eingabe zu n.a. und das Feld
+  // mit dem gespeicherten Wert überschrieben.
   document.querySelectorAll('input.note-datum').forEach(function(inp) {
-    inp.addEventListener('input', debounce(async function() {
+    const speichern = async function() {
       const body = new URLSearchParams();
       body.append('schueler_id', inp.dataset.sid);
       body.append('wert', inp.value);
-      await fetch('/teacher/unterricht/termine/' + inp.dataset.termin + '/note', { method: 'POST', body });
+      const r = await fetch('/teacher/unterricht/termine/' + inp.dataset.termin + '/note', { method: 'POST', body });
+      let d = null;
+      try { d = await r.json(); } catch (e) { /* ignorieren */ }
+      return d;
+    };
+    const zeigeWert = function(d) {
+      if (!d || !d.ok) return;
+      inp.value = d.na ? 'n.a.' : (d.wert === null ? '' : String(d.wert).replace('.', ','));
+      inp.classList.toggle('ist-na', Boolean(d.na));
+    };
+    const istGueltig = function(v) { return v === '' || /^(n\.?a\.?)$/i.test(v) || /^\d+([.,]\d+)?$/.test(v); };
+    inp.addEventListener('input', debounce(async function() {
+      if (!istGueltig(inp.value.trim())) return; // erst beim Verlassen zu n.a. machen
+      await speichern();
       refresh();
     }, 400));
+    inp.addEventListener('change', async function() {
+      zeigeWert(await speichern());
+      refresh();
+    });
   });
 
   // Gewichtung/Datum/Max-Punkte bei Klausuren und Zusatzleistungen: kein
