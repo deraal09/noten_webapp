@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.51.2 - 2026-10-06
+
+- SPA-Eingabemaske: Die Felder für die Notenpunkte haben keine Pfeile mehr,
+  die Punkte werden direkt getippt.
+- SPA: Beim Ein-/Ausschalten einer Komponente der Zusammensetzung (z. B.
+  Lernfeld 3) bleiben Scroll-Position und der angeklickte Umschalter erhalten,
+  die Seite springt nicht mehr nach oben.
+
 ## 0.51.1 - 2026-10-06
 
 - SPA: Die Zusammensetzung eines Lernfelds (z. B. Lernfeld 3: Komponenten

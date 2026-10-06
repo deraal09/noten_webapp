@@ -155,6 +155,34 @@
 </table>
 
 <script>
+// Zusammensetzung (Komponenten ein-/ausschalten): Das Formular lädt die Seite
+// neu -- Scroll-Position und der angeklickte Umschalter werden gemerkt und
+// danach wiederhergestellt, damit die Ansicht nicht nach oben springt.
+(function() {
+  var KEY = 'spa-komponente-fokus';
+  var box = document.getElementById('komponenten-einstellungen');
+  if (box) {
+    box.querySelectorAll('form').forEach(function(form) {
+      form.addEventListener('submit', function() {
+        var k = form.querySelector('input[name="komponente"]');
+        try {
+          sessionStorage.setItem(KEY, JSON.stringify({ pfad: location.pathname + location.search, y: window.scrollY, komponente: k ? k.value : null }));
+        } catch (e) { /* z. B. privater Modus */ }
+      });
+    });
+  }
+  var gemerkt = null;
+  try { gemerkt = JSON.parse(sessionStorage.getItem(KEY) || 'null'); sessionStorage.removeItem(KEY); } catch (e) { return; }
+  if (!gemerkt || gemerkt.pfad.split('?')[0] !== location.pathname) return;
+  window.scrollTo(0, gemerkt.y);
+  if (!box || !gemerkt.komponente) return;
+  var ziel = Array.from(box.querySelectorAll('input[name="komponente"]')).find(function(i) { return i.value === gemerkt.komponente; });
+  var knopf = ziel && ziel.form && ziel.form.querySelector('button');
+  if (knopf) knopf.focus({ preventScroll: true });
+})();
+</script>
+
+<script>
 (function() {
   var tabelle = document.getElementById('spa-tabelle');
   if (!tabelle) return;

@@ -112,6 +112,13 @@ test('Admin (zählt als Klassenleitung) kann Musik im 1. Hj. abschalten -- Einga
   assert.ok(htmlHj2.includes('data-feld="komponente:musik"'));
 });
 
+test('Fokus/Scroll-Position bleiben beim Schalten erhalten; Notenpunkte-Felder ohne Pfeile', async () => {
+  const html = await (await admin(`/teacher/fach/${lf3Id}?hj=1`)).text();
+  assert.ok(html.includes("spa-komponente-fokus"), 'merkt Scroll-Position und Umschalter über den Reload');
+  const css = fs.readFileSync(new URL('../static/css/app.css', import.meta.url), 'utf8');
+  assert.match(css, /#spa-tabelle input\[type=number\]::-webkit-inner-spin-button/);
+});
+
 test('Einfache Fachlehrkraft sieht den deaktivierten Status informativ, ohne ihn ändern zu können', async () => {
   const html = await (await fachlehrkraft(`/teacher/fach/${lf3Id}?hj=1`)).text();
   assert.ok(html.includes('deaktiviert'));

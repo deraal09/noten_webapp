@@ -542,3 +542,8 @@ table.tafel button.notiz-btn sup { font-size: 0.65rem; margin-left: 1px; }
 
 /* Datumstabelle: Noteneingabe als Textfeld (Note oder n.a.). */
 table.tafel input.note-datum.ist-na { background: var(--bg-header); color: var(--text-muted); font-style: italic; }
+
+/* SPA-Eingabemaske: Notenpunkte ohne Pfeile (Zahlen werden direkt getippt). */
+#spa-tabelle input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+#spa-tabelle input[type=number]::-webkit-outer-spin-button,
+#spa-tabelle input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
