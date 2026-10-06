@@ -467,7 +467,8 @@ export default async function teacherRoutes(fastify) {
     if (!Number.isFinite(halbjahr) || !komponente) return reply.code(400).send({ ok: false, error: 'bad params' });
     const erfolg = spaSetzeKomponenteAktiv(getDb(), fach.id, halbjahr, komponente, aktiv);
     if (!erfolg) return reply.code(400).send({ ok: false, error: 'unbekannte oder nicht schaltbare Komponente' });
-    return reply.send({ ok: true });
+    // Normales Formular (kein fetch): zurück zur Fachseite, sonst zeigt der Browser den JSON-Quelltext an.
+    return reply.redirect(`/teacher/fach/${fach.id}?hj=${halbjahr}`);
   });
 
   // ---------- Sync mit Klassenleitung ----------

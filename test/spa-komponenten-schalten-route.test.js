@@ -99,8 +99,8 @@ test('Admin (zählt als Klassenleitung) kann Musik im 1. Hj. abschalten -- Einga
   let r = await form(admin, `/teacher/fach/${lf3Id}/spa/komponente`, {
     halbjahr: '1', komponente: 'musik', aktiv: '0',
   });
-  assert.equal(r.status, 200);
-  assert.deepEqual(await r.json(), { ok: true });
+  assert.equal(r.status, 302, 'Formular-Post führt zurück zur Seite statt JSON anzuzeigen');
+  assert.equal(r.headers.get('location'), `/teacher/fach/${lf3Id}?hj=1`);
 
   const html = await (await admin(`/teacher/fach/${lf3Id}?hj=1`)).text();
   assert.ok(!html.includes('data-feld="komponente:musik"'), 'deaktivierte Komponente darf keine Eingabespalte mehr haben');

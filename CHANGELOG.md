@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.51.1 - 2026-10-06
+
+- SPA: Die Zusammensetzung eines Lernfelds (z. B. Lernfeld 3: Komponenten
+  ein-/ausschalten) lässt sich wieder auswählen. Der Klick zeigte bisher den
+  JSON-Quelltext der Antwort statt die Seite; jetzt geht es zurück zur
+  Fachseite des Halbjahrs.
+
 ## 0.51.0 - 2026-10-02
 
 - Datumstabelle: Anwesenheit mit "n.a." (nicht anwesend). Die Felder nehmen nur
