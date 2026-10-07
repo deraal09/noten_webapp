@@ -1,0 +1,32 @@
+<%# Untertabellen je Fach mit Zusammensetzung: Noten der Unterfächer bzw. Punkte der SPA-Komponenten je Person.
+    Erwartet: faecher, zeilen (z.noten[i].note = Note im Fach), modus ('halbjahr' | 'abschluss'). %>
+<% faecher.forEach(function(f, fi) { if (!f.teiltabelle) return; %>
+  <details class="teiltabelle">
+    <summary>⚙ Zusammensetzung <%= f.name %><% if (modus === 'abschluss') { %> <small class="hint">(Durchschnitt je Bestandteil über seine Halbjahre)</small><% } %></summary>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Schüler/in</th>
+          <% f.teiltabelle.spalten.forEach(function(sp) { %>
+            <th><%= sp.name %><% if (sp.anteil) { %><br><small class="hint"><%= sp.anteil %></small><% } %></th>
+          <% }); %>
+          <th><%= f.name %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% zeilen.forEach(function(z) {
+             var werte = f.teiltabelle.werte.get(z.schueler.id) || [];
+             var n = z.noten[fi]; %>
+          <tr>
+            <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
+            <% f.teiltabelle.spalten.forEach(function(sp, si) {
+                 var w = werte[si]; var wert = (w !== null && typeof w === 'object') ? w.wert : w; %>
+              <td<% if (w && typeof w === 'object' && w.titel) { %> title="<%= w.titel %>"<% } %>><%= wert === null || wert === undefined ? '–' : formatNote(wert) %></td>
+            <% }); %>
+            <td><strong><%= (modus === 'abschluss' && !f.abgeschlossen) ? 'läuft' : (n.note === null || n.note === undefined ? '–' : formatNote(n.note)) %></strong></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </details>
+<% }); %>

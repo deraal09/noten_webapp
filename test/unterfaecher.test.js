@@ -497,6 +497,28 @@ test('Zusammensetzung der Fächer steht in den Spaltenköpfen der Halbjahres- un
   html = await (await admin(`/teacher/klassen/${klasseId}/abschluss`)).text();
   assert.match(html, /zusammensetzung-kopf">⚙ Gleichungen \(3\. Hj\.\) · Geometrie \(3\. Hj\.\)</);
 
+  // Untertabelle je Fach: Noten der Unterfächer je Person
+  const uh = ladeHalbjahresuebersicht(klasse, HJ3);
+  const tt = uh.faecher.find((f) => f.id === matheId).teiltabelle;
+  assert.deepEqual(tt.spalten, [{ name: 'Gleichungen', anteil: '75 %' }, { name: 'Geometrie', anteil: '25 %' }]);
+  const kinder = U.ladeUnterfaecher(matheId);
+  assert.deepEqual(tt.werte.get(annaId), kinder.map((k) => berechneGesamtnoten(k.id, HJ3).get(annaId) ?? null));
+  assert.notEqual(tt.werte.get(annaId)[0], null, 'Anna hat eine Note im ersten Unterfach');
+  html = await (await admin(`/teacher/klassen/${klasseId}/uebersicht?hj=${enc(HJ3)}`)).text();
+  assert.match(html, /<details class="teiltabelle">\s*<summary>⚙ Zusammensetzung Mathe/);
+  assert.match(html, /<th>Geometrie<br><small class="hint">25 %<\/small><\/th>/);
+  const abTt = ladeAbschlussuebersicht(klasse.id).faecher.find((f) => f.id === matheId).teiltabelle;
+  assert.deepEqual(abTt.spalten.map((x) => x.name), ['Gleichungen', 'Geometrie']);
+  assert.match(abTt.werte.get(annaId)[0].titel, /^3\. Hj\.: /);
+  html = await (await admin(`/teacher/klassen/${klasseId}/abschluss`)).text();
+  assert.match(html, /<details class="teiltabelle">[\s\S]*Durchschnitt je Bestandteil/);
+
+  // Klassenleitungs-Seite: beide Reiter enthalten die Untertabelle
+  html = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr&hj=${enc(HJ3)}`)).text();
+  assert.match(html, /<details class="teiltabelle">\s*<summary>⚙ Zusammensetzung Mathe/);
+  html = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=abschluss`)).text();
+  assert.match(html, /<details class="teiltabelle">[\s\S]*Durchschnitt je Bestandteil/);
+
   // SPA: Komponenten des LF3 mit ihren Anteilen
   const sj = db.prepare('SELECT id FROM schuljahre ORDER BY id DESC').get().id;
   await form(admin, '/teacher/klassen/neu', { schuljahr_id: String(sj), name: '13SPAZ', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_PIA', einschulung_jahr: '2023' });
@@ -514,6 +536,10 @@ test('Zusammensetzung der Fächer steht in den Spaltenköpfen der Halbjahres- un
   html = await (await admin(`/teacher/klassen/${spaId}/abschluss`)).text();
   assert.match(gesamt, /Bericht \(2\.–3\. Hj\.\)/);
   assert.match(html, /zusammensetzung-kopf">⚙ Pädagogik/);
+  const spaTt = ladeHalbjahresuebersicht(spaKlasse, HJ1).faecher.find((f) => f.id === lf3.id).teiltabelle;
+  assert.deepEqual(spaTt.spalten.map((x) => `${x.name} ${x.anteil}`), ['Pädagogik 40 %', 'Kunst 15 %', 'Spiel 15 %', 'Musik 15 %', 'Bewegung 15 %']);
+  assert.equal(spaTt.werte.get(db.prepare('SELECT id FROM schueler WHERE klasse_id = ?').get(spaId).id).length, 5);
+  assert.match(html, /<details class="teiltabelle">/);
 });
 
 test.after(async () => {

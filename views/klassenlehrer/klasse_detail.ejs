@@ -114,6 +114,7 @@
         <% }); %>
       </tbody>
     </table>
+    <%- await include('../partials/fach-teiltabellen', { faecher: halbjahresuebersicht.faecher, zeilen: halbjahresuebersicht.zeilen, modus: 'halbjahr' }) %>
   <% } %>
 
   <div class="card" id="fuer-loeschung">
@@ -345,6 +346,7 @@
         <% }); %>
       </tbody>
     </table>
+    <%- await include('../partials/fach-teiltabellen', { faecher: abschlussuebersicht.faecher, zeilen: abschlussuebersicht.zeilen, modus: 'abschluss' }) %>
   <% } %>
 </div>
 

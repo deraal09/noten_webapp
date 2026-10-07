@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.83.0 - 2026-10-07
+
+- **Untertabelle je Fach** in der Halbjahres- und der Abschluss-/Abgangsübersicht
+  (ausklappbar unter der Haupttabelle, „⚙ Zusammensetzung <Fach>"; auf den
+  Seiten unter „Meine Klassen" und im Klassenleitungs-Bereich): zeigt je Person
+  die **Noten der Unterfächer** bzw. die **Punkte der SPA-Komponenten**
+  (LF2/LF3) samt ihrem Anteil in der Spaltenüberschrift und der Fachnote
+  als letzte Spalte. In der Abschlussübersicht steht je Bestandteil der
+  Durchschnitt über seine Halbjahre, die Werte der einzelnen Halbjahre erscheinen
+  als Tooltip.
+
 ## 0.82.0 - 2026-10-07
 
 - **Zusammensetzung der Fächer** ist in der **Halbjahres-** und der

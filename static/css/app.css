@@ -661,3 +661,5 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .klassenfilter label { margin: 0; }
 .lehrkraefte-kopf { font-weight: 400; }
 .zusammensetzung-kopf { font-weight: 400; }
+.teiltabelle { margin-top: 0.75rem; }
+.teiltabelle > summary { cursor: pointer; font-weight: 600; padding: 0.5rem 0; }
