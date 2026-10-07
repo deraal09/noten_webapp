@@ -10,7 +10,7 @@ import { erkenneSchuelerZeile } from '../schueler-eingabe.js';
 import { ladeVorlagen, speicherbareFaecher, speichereVorlage, importiereVorlage, loescheVorlage } from '../fach-vorlagen.js';
 import {
   ladeUnterfaecher, UNTERFACH_TRENNER, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
-  halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre,
+  halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre, fachHatLehrkraftImHalbjahr,
 } from '../unterfaecher.js';
 import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, findeLaufendeKlasse, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
@@ -259,14 +259,15 @@ export default async function teacherRoutes(fastify) {
     const byKlasse = new Map();
     const kurse = [];
     for (const r of rows) {
+      // Halbjahre, in denen die Lehrkraft das Fach hat (Fach-Halbjahre geschnitten mit der Zuordnung) und die
+      // Schuljahre, in die sie fallen -- für Schuljahr-Filter und Anzeige.
+      const laufzeit = klassenLaufzeit(r.klasse_id);
+      const nummern = zuweisungsHalbjahre({ halbjahre: r.zuw_halbjahre }, { halbjahre: r.fach_halbjahre, klasse_id: r.klasse_id }, laufzeit);
+      const fachSchuljahre = [...new Set(nummern.map((n) => laufzeit.schuljahre[Math.floor((n - 1) / 2)]?.bezeichnung).filter(Boolean))];
       // Nur bei einer auf einzelne Halbjahre begrenzten Zuordnung anzeigen, in welchen Halbjahren die Lehrkraft das Fach hat.
       let halbjahreText = null;
-      if (r.zuw_halbjahre) {
-        const laufzeit = klassenLaufzeit(r.klasse_id);
-        const nummern = zuweisungsHalbjahre({ halbjahre: r.zuw_halbjahre }, { halbjahre: r.fach_halbjahre, klasse_id: r.klasse_id }, laufzeit);
-        if (nummern.length < laufzeit.anzahlHalbjahre) halbjahreText = `${nummern.map((n) => `${n}.`).join(', ')} Halbjahr`;
-      }
-      const eintrag = { id: r.id, name: r.name, klasse_id: r.klasse_id, halbjahre: r.fach_halbjahre, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls, halbjahreText };
+      if (r.zuw_halbjahre && nummern.length < laufzeit.anzahlHalbjahre) halbjahreText = `${nummern.map((n) => `${n}.`).join(', ')} Halbjahr`;
+      const eintrag = { id: r.id, name: r.name, klasse_id: r.klasse_id, halbjahre: r.fach_halbjahre, schuljahre: fachSchuljahre, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls, halbjahreText };
       if (r.ist_kurs) {
         kurse.push({ ...eintrag, notenschluessel: r.notenschluessel, schuljahr_bezeichnung: r.schuljahr_bezeichnung });
         continue;
@@ -280,9 +281,11 @@ export default async function teacherRoutes(fastify) {
 
     // Klassen alphabetisch nach Klassenname (bei gleichem Namen bleibt das neuere Schuljahr vorn).
     const klassenListe = sortiereNachName(Array.from(byKlasse.values()));
+    for (const k of klassenListe) k.schuljahre = [...new Set(k.faecher.flatMap((f) => f.schuljahre))];
+    const alleSchuljahre = sortiereSchuljahreAbsteigend([...new Set([...klassenListe.flatMap((k) => k.schuljahre), ...kurse.flatMap((f) => f.schuljahre)])].map((bezeichnung) => ({ bezeichnung })));
     for (const k of klassenListe) k.faecher = sortiereFaecher(k.faecher);
     return reply.viewEjs('teacher/dashboard.ejs', {
-      user: request.user, byKlasse: klassenListe, kurse: sortiereNachName(kurse),
+      user: request.user, byKlasse: klassenListe, kurse: sortiereNachName(kurse), alleSchuljahre: alleSchuljahre.map((s) => s.bezeichnung),
     });
   });
 
@@ -616,9 +619,6 @@ export default async function teacherRoutes(fastify) {
     if (!klasse) return reply.code(404).send({ ok: false, error: 'not found' });
     if (!userIstKlassenlehrer(request.user, klasse.id)) return reply.code(403).send({ ok: false, error: 'forbidden' });
     const halbjahr = halbjahrFuerKlasseId(klasse.id, request.body?.halbjahr);
-    if (!istHalbjahrVergangen(klassenLaufzeit(klasse.id), halbjahrNr(halbjahr), jetzt())) {
-      return reply.code(400).send({ ok: false, error: 'Die Klassenleitung kann Endnoten nur für vergangene Halbjahre direkt eintragen.' });
-    }
     const fachId = parseInt(request.body?.fach_id, 10);
     const schuelerId = parseInt(request.body?.schueler_id, 10);
     const fach = ladeFachMitUmfeld(fachId);
@@ -627,6 +627,11 @@ export default async function teacherRoutes(fastify) {
     }
     if (!fachGiltInHalbjahr(fach, halbjahr)) {
       return reply.code(400).send({ ok: false, error: 'Das Fach gilt in diesem Halbjahr nicht.' });
+    }
+    // Vergangene Halbjahre immer; sonst nur, solange dem Fach (im Halbjahr) keine Lehrkraft zugeordnet ist.
+    const laufzeitK = klassenLaufzeit(klasse.id);
+    if (!istHalbjahrVergangen(laufzeitK, halbjahrNr(halbjahr), jetzt()) && fachHatLehrkraftImHalbjahr(fach, halbjahrNr(halbjahr), laufzeitK)) {
+      return reply.code(400).send({ ok: false, error: 'Die Klassenleitung kann Endnoten nur für vergangene Halbjahre oder für Fächer ohne Lehrkraft direkt eintragen.' });
     }
     return speichereEndnote(request, reply, fach, { schuelerId, halbjahr, wert: request.body?.wert });
   });

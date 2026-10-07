@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.80.0 - 2026-10-07
+
+- **Klassenleitung: Fächer ohne Lehrkraft** lassen sich im Reiter „Endnoten
+  (Direkteingabe)" jetzt in **jedem Halbjahr** direkt ausfüllen (bisher nur in
+  vergangenen); die Werte gelten sofort und erscheinen in der
+  Halbjahresübersicht. Ist dem Fach (im Halbjahr) eine Lehrkraft zugeordnet,
+  bleibt die Direkteingabe der Klassenleitung auf vergangene Halbjahre
+  beschränkt. Wird später eine Lehrkraft eingetragen, sieht sie die Werte und
+  kann sie ändern, solange die Person nicht durch die Notenkonferenz gesperrt ist.
+- **Noteneingabe: Schuljahr-Filter.** Zusätzlich zum Klassenfilter lässt sich ein
+  Schuljahr wählen; angezeigt werden nur Klassen und Fächer, deren Halbjahre
+  (bei begrenzter Zuordnung: die eigenen Halbjahre) in diesem Schuljahr liegen.
+  Die Auswahl wird im Browser gemerkt.
+
 ## 0.79.0 - 2026-10-07
 
 - **Direkte Noteneingabe wird sofort synchronisiert:** Eine direkt eingetragene

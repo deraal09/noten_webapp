@@ -4,24 +4,36 @@
   <p>Du bist noch keinen Fächern zugewiesen. Bitte wende dich an den Admin oder lege selbst eine <a href="/teacher/klassen">Klasse</a> an.</p>
 <% } %>
 
-<% if (byKlasse.length + (kurse.length ? 1 : 0) > 1) { %>
+<% var zeigeKlassenfilter = byKlasse.length + (kurse.length ? 1 : 0) > 1; var zeigeSchuljahrfilter = alleSchuljahre.length > 1; %>
+<% if (zeigeKlassenfilter || zeigeSchuljahrfilter) { %>
   <p class="klassenfilter">
-    <label>Klasse
-      <select id="klassenfilter">
-        <option value="">Alle Klassen</option>
-        <% byKlasse.forEach(function(k) { %><option value="klasse-<%= k.id %>"><%= k.name %> (<%= klassenSchuljahrText(k.id) %>)</option><% }); %>
-        <% if (kurse.length) { %><option value="kurse">Kurse</option><% } %>
-      </select>
-    </label>
+    <% if (zeigeSchuljahrfilter) { %>
+      <label>Schuljahr
+        <select id="schuljahrfilter">
+          <option value="">Alle Schuljahre</option>
+          <% alleSchuljahre.forEach(function(sj) { %><option value="<%= sj %>"><%= sj %></option><% }); %>
+        </select>
+      </label>
+    <% } %>
+    <% if (zeigeKlassenfilter) { %>
+      <label>Klasse
+        <select id="klassenfilter">
+          <option value="">Alle Klassen</option>
+          <% byKlasse.forEach(function(k) { %><option value="klasse-<%= k.id %>"><%= k.name %> (<%= klassenSchuljahrText(k.id) %>)</option><% }); %>
+          <% if (kurse.length) { %><option value="kurse">Kurse</option><% } %>
+        </select>
+      </label>
+    <% } %>
   </p>
+  <p class="hint" id="filter-leer" hidden>Keine Klassen oder Fächer für diese Auswahl.</p>
 <% } %>
 
 <% byKlasse.forEach(function(k) { %>
-  <section class="klassen-gruppe" data-gruppe="klasse-<%= k.id %>">
+  <section class="klassen-gruppe" data-gruppe="klasse-<%= k.id %>" data-schuljahre="<%= k.schuljahre.join('|') %>">
     <h2 id="klasse-<%= k.id %>"><%= k.name %> <small>(<%= klassenSchuljahrText(k.id) %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
     <ul class="klasse-liste">
       <% k.faecher.forEach(function(f) { %>
-        <li>
+        <li class="fach-kachel" data-schuljahre="<%= f.schuljahre.join('|') %>">
           <a href="/teacher/fach/<%= f.id %>">
             <div class="kachel-zeile">
               <span class="kachel-icon-klein">📝</span>
@@ -36,11 +48,11 @@
   <% }); %>
 
   <% if (kurse.length) { %>
-  <section class="klassen-gruppe" data-gruppe="kurse">
+  <section class="klassen-gruppe" data-gruppe="kurse" data-schuljahre="<%= kurse.reduce(function(a, f) { return a.concat(f.schuljahre); }, []).join('|') %>">
     <h2>Kurse</h2>
     <ul class="klasse-liste">
       <% kurse.forEach(function(f) { %>
-        <li>
+        <li class="fach-kachel" data-schuljahre="<%= f.schuljahre.join('|') %>">
           <a href="/teacher/fach/<%= f.id %>">
             <div class="kachel-zeile">
               <span class="kachel-icon-klein">📘</span>
@@ -59,22 +71,38 @@
 
 <script>
   (function() {
-    var auswahl = document.getElementById('klassenfilter');
-    if (!auswahl) return;
-    var KEY = 'noteneingabe-klassenfilter';
+    var klasse = document.getElementById('klassenfilter');
+    var schuljahr = document.getElementById('schuljahrfilter');
+    if (!klasse && !schuljahr) return;
+    var KEY_K = 'noteneingabe-klassenfilter', KEY_S = 'noteneingabe-schuljahrfilter';
+    function hat(el, sj) { return !sj || (el.dataset.schuljahre || '').split('|').indexOf(sj) !== -1; }
     function anwenden() {
+      var k = klasse ? klasse.value : '', sj = schuljahr ? schuljahr.value : '';
+      var sichtbar = 0;
       document.querySelectorAll('.klassen-gruppe').forEach(function(g) {
-        g.hidden = auswahl.value !== '' && g.dataset.gruppe !== auswahl.value;
+        var faecher = g.querySelectorAll('.fach-kachel');
+        var treffer = 0;
+        faecher.forEach(function(f) { var ok = hat(f, sj); f.hidden = !ok; if (ok) treffer++; });
+        var zeigen = (k === '' || g.dataset.gruppe === k) && treffer > 0;
+        g.hidden = !zeigen;
+        if (zeigen) sichtbar++;
+      });
+      var leer = document.getElementById('filter-leer');
+      if (leer) leer.hidden = sichtbar > 0 || !document.querySelector('.klassen-gruppe');
+    }
+    function merke(sel, key) {
+      if (!sel) return;
+      try {
+        var v = localStorage.getItem(key);
+        if (v && Array.from(sel.options).some(function(o) { return o.value === v; })) sel.value = v;
+      } catch (e) { /* z. B. privater Modus */ }
+      sel.addEventListener('change', function() {
+        try { localStorage.setItem(key, sel.value); } catch (e) { /* ohne Speicher */ }
+        anwenden();
       });
     }
-    try {
-      var gemerkt = localStorage.getItem(KEY);
-      if (gemerkt && Array.from(auswahl.options).some(function(o) { return o.value === gemerkt; })) auswahl.value = gemerkt;
-    } catch (e) { /* z. B. privater Modus */ }
-    auswahl.addEventListener('change', function() {
-      try { localStorage.setItem(KEY, auswahl.value); } catch (e) { /* ohne Speicher */ }
-      anwenden();
-    });
+    merke(klasse, KEY_K);
+    merke(schuljahr, KEY_S);
     anwenden();
   })();
 </script>

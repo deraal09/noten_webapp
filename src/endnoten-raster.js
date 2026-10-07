@@ -12,6 +12,7 @@ import { ladeFaecherFuerKlassenleitung, berechneGesamtnotenOhneEndnoten } from '
 import { ladeEndnoten } from './halbjahr-endnoten.js';
 import { ladeSperrenFuerKlasse } from './noten-sperre.js';
 import { spaSchemaFuerFach, berechneFachFuerSchueler as berechneSpaFachFuerSchueler } from './spa-noten-service.js';
+import { fachHatLehrkraftImHalbjahr } from './unterfaecher.js';
 import { fachGiltInHalbjahr, klassenLaufzeit, halbjahrNr, istHalbjahrVergangen, jetzt } from './klassen-jahre.js';
 
 export function ladeEndnotenRaster(klasse, halbjahr) {
@@ -39,18 +40,23 @@ export function ladeEndnotenRaster(klasse, halbjahr) {
     return [f.id, proPerson];
   }));
   const direkt = new Map(faecher.map((f) => [f.id, ladeEndnoten(f.id, halbjahr)]));
+  // Vergangene Halbjahre kann die Klassenleitung immer direkt eintragen; Fächer OHNE Lehrkraft auch in jedem anderen Halbjahr.
+  const vergangen = istHalbjahrVergangen(laufzeit, hjNr, jetzt());
+  const bearbeitbarJeFach = new Map(faecher.map((f) => [f.id, vergangen || !fachHatLehrkraftImHalbjahr(f, hjNr, laufzeit)]));
   const zeilen = schueler.map((s) => ({
     schueler: s,
     gesperrt: Boolean(sperren.get(s.id)),
     zellen: faecher.map((f) => ({
       fach: f,
       teilnimmt: teilnehmer.get(f.id).has(s.id),
+      bearbeitbar: bearbeitbarJeFach.get(f.id),
       berechnet: berechnet.get(f.id).get(s.id) ?? null,
       direkt: direkt.get(f.id).get(s.id) ?? null,
     })),
   }));
   return {
     faecher, zeilen, sperren,
-    bearbeitbar: istHalbjahrVergangen(laufzeit, halbjahrNr(halbjahr), jetzt()),
+    bearbeitbar: vergangen,
+    mitFaechernOhneLehrkraft: faecher.some((f) => !vergangen && bearbeitbarJeFach.get(f.id)),
   };
 }

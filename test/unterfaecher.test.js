@@ -383,6 +383,62 @@ test('Unterfach-Seite und Zusammensetzungs-Seite bieten die direkte Noteneingabe
   assert.match(uebersicht, /Halbjahresübersicht/);
 });
 
+test('Noteneingabe: Schuljahr-Filter nach den Halbjahren der Fächer', async () => {
+  const sj = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(klasseId).schuljahr_id;
+  const fremdId = getDb().prepare("SELECT id FROM users WHERE username = 'fremd'").get().id;
+  const mk = (name, einschulung, halbjahre) => {
+    const k = getDb().prepare('INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, einschulung_jahr, abschluss_jahr) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(sj, name, 'IHK', '', einschulung, einschulung + 2).lastInsertRowid;
+    const f = getDb().prepare('INSERT INTO faecher (klasse_id, name, halbjahre) VALUES (?, ?, ?)').run(k, `Fach ${name}`, halbjahre ? JSON.stringify(halbjahre) : null).lastInsertRowid;
+    getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(fremdId, f);
+    return f;
+  };
+  mk('SJA', 2030, [1, 2]); // nur 2030/31
+  mk('SJB', 2030, [3, 4]); // nur 2031/32
+  mk('SJC', 2030, null); // alle drei Schuljahre
+  const html = await (await fremd('/teacher')).text();
+  assert.match(html, /<select id="schuljahrfilter">\s*<option value="">Alle Schuljahre<\/option>/);
+  assert.match(html, /<option value="2030\/31">2030\/31<\/option>/);
+  const attr = (name) => {
+    const pos = html.indexOf(`Fach ${name}<`);
+    const start = html.lastIndexOf('<li class="fach-kachel" data-schuljahre="', pos);
+    return html.slice(start).match(/data-schuljahre="([^"]*)"/)[1];
+  };
+  assert.equal(attr('SJA'), '2030/31');
+  assert.equal(attr('SJB'), '2031/32');
+  assert.equal(attr('SJC'), '2030/31|2031/32|2032/33');
+  assert.match(html, /data-gruppe="klasse-\d+" data-schuljahre="2030\/31\|2031\/32\|2032\/33"/);
+  assert.ok(html.indexOf('id="schuljahrfilter"') < html.indexOf('class="klassen-gruppe"'), 'Filter steht oben');
+});
+
+test('Direkteingabe der Klassenleitung: Fächer ohne Lehrkraft jederzeit, mit Lehrkraft nur in vergangenen Halbjahren; Lehrkraft sieht den Wert später', async () => {
+  const { fachHatLehrkraftImHalbjahr } = await import('../src/unterfaecher.js');
+  const db = getDb();
+  // Neues Fach OHNE Lehrkraft in der Zukunft (Klasse 2030): Klassenleitung (admin) trägt direkt ein
+  const k = db.prepare("SELECT id FROM klassen WHERE name = 'SJC'").get().id;
+  const f = db.prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(k, 'Ohne Lehrkraft').lastInsertRowid;
+  const s = db.prepare("INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, 'Rast', 'Rita')").run(k).lastInsertRowid;
+  db.prepare('INSERT INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)').run(f, s);
+  const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(f);
+  assert.equal(fachHatLehrkraftImHalbjahr(fach, 1), false);
+  const html = await (await admin(`/klassenlehrer/klasse/${k}?tab=endnoten&hj=${enc('1. Halbjahr')}`)).text();
+  assert.match(html, new RegExp(`class="endnote-raster"\\s+data-fach="${f}" data-sid="${s}"[^>]*?(?!disabled)>`));
+  assert.doesNotMatch(html.match(new RegExp(`<input[^>]*data-fach="${f}"[^>]*>`))[0], /disabled/);
+  const r = await form(admin, `/teacher/klassen/${k}/endnote`, { fach_id: String(f), schueler_id: String(s), halbjahr: '1. Halbjahr', wert: '2' });
+  assert.equal(r.status, 200);
+  assert.equal(db.prepare('SELECT note FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ?').get(f, '1. Halbjahr', s).note, 2, 'sofort in der Halbjahresübersicht');
+  // Mit Lehrkraft: Halbjahr in der Zukunft -> Klassenleitung darf nicht mehr, die Lehrkraft sieht und ändert den bestehenden Wert
+  const fremdId = db.prepare("SELECT id FROM users WHERE username = 'fremd'").get().id;
+  db.prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(fremdId, f);
+  assert.equal(fachHatLehrkraftImHalbjahr(fach, 1), true);
+  const gesperrt = await form(admin, `/teacher/klassen/${k}/endnote`, { fach_id: String(f), schueler_id: String(s), halbjahr: '1. Halbjahr', wert: '5' });
+  assert.equal(gesperrt.status, 400);
+  const seite = await (await fremd(`/teacher/fach/${f}?hj=${enc('1. Halbjahr')}`)).text();
+  assert.match(seite, /class="endnote-eingabe"[^>]*value="2"/, 'Lehrkraft sieht die eingetragene Endnote');
+  const neu = await form(fremd, `/teacher/fach/${f}/endnote`, { schueler_id: String(s), halbjahr: '1. Halbjahr', wert: '3' });
+  assert.equal(neu.status, 200);
+});
+
 test.after(async () => {
   await fastify.close();
 });

@@ -143,9 +143,10 @@
   <h2>Endnoten direkt eintragen <small>(<%= halbjahr %><% if (HALBJAHR_SCHULJAHR[halbjahr]) { %>, <%= HALBJAHR_SCHULJAHR[halbjahr] %><% } %>)</small></h2>
   <% if (!endnotenRaster.bearbeitbar) { %>
     <p class="hint">
-      Die Direkteingabe der Klassenleitung gilt für <strong>vergangene Halbjahre</strong>. Das <%= halbjahr %> läuft noch bzw.
-      liegt in der Zukunft -- dort tragen die Fachlehrkräfte die Endnote auf ihrer Fachseite ein
-      („Direkte Endnoteneingabe") bzw. sie wird aus den Leistungen berechnet. Wähle oben ein vergangenes Halbjahr.
+      Die Direkteingabe der Klassenleitung gilt für <strong>vergangene Halbjahre</strong> sowie für <strong>Fächer ohne Lehrkraft</strong>.
+      Das <%= halbjahr %> läuft noch bzw. liegt in der Zukunft -- dort tragen die Fachlehrkräfte die Endnote auf ihrer Fachseite ein
+      („Direkte Endnoteneingabe") bzw. sie wird aus den Leistungen berechnet<% if (endnotenRaster.mitFaechernOhneLehrkraft) { %>.
+      Gesperrt sind dort nur Fächer, denen eine Lehrkraft zugeordnet ist -- Fächer ohne Lehrkraft kannst du hier direkt ausfüllen<% } %>.
     </p>
   <% } else { %>
     <p class="hint">
@@ -179,7 +180,7 @@
                     value="<%= c.direkt ? (c.direkt.ntg ? 'ntg' : String(c.direkt.note).replace('.', ',')) : '' %>"
                     placeholder="<%= c.berechnet === null ? '–' : String(c.berechnet).replace('.', ',') %>"
                     title="<%= c.berechnet === null ? 'Keine berechnete Note' : 'Berechnet: ' + String(c.berechnet).replace('.', ',') %>"
-                    <%= (!endnotenRaster.bearbeitbar || z.gesperrt) ? 'disabled' : '' %>>
+                    <%= (!c.bearbeitbar || z.gesperrt) ? 'disabled' : '' %>>
                 <% } %>
               </td>
             <% }); %>

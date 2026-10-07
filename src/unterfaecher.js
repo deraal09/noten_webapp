@@ -181,6 +181,17 @@ export function setzeFachHalbjahre(fach, nummern) {
   return { ok: true };
 }
 
+/**
+ * Ist dem Fach im Halbjahr (Nummer) mindestens eine Lehrkraft zugeordnet -- direkt oder über eines
+ * seiner Unterfächer? Ohne Lehrkraft trägt die Klassenleitung die Noten selbst ein.
+ */
+export function fachHatLehrkraftImHalbjahr(fach, nr, laufzeit = klassenLaufzeit(fach.klasse_id)) {
+  const db = getDb();
+  const faecher = [fach, ...(fach.parent_fach_id ? [] : ladeUnterfaecher(fach.id))];
+  return faecher.some((f) => db.prepare('SELECT * FROM fach_zuweisungen WHERE fach_id = ?').all(f.id)
+    .some((z) => zuweisungsHalbjahre(z, f, laufzeit).includes(nr)));
+}
+
 /** Halbjahre, in denen eine Zuordnung (Zeile aus fach_zuweisungen) gilt, als Nummern. */
 export function zuweisungsHalbjahre(zuweisung, fach, laufzeit = klassenLaufzeit(fach.klasse_id)) {
   const fachHj = fachHalbjahrNummern(fach, laufzeit);
