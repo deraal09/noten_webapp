@@ -47,7 +47,7 @@
             <select name="vorhandene_klasse_id" required>
               <option value="">— wählen —</option>
               <% vorhandeneKlassen.forEach(function(k) { %>
-                <option value="<%= k.id %>"><%= k.name %> (<%= k.schuljahr_bezeichnung %>, <%= k.notenschluessel %>)</option>
+                <option value="<%= k.id %>"><%= k.name %> (<%= klassenSchuljahrText(k.id) %>, <%= k.notenschluessel %>)</option>
               <% }); %>
             </select>
           </label>

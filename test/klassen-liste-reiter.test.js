@@ -115,7 +115,7 @@ test('Klasse anlegen: Register "Vorhandene Klasse wählen" (Auswahl vorhandener 
   const vorhandenBlock = anlegenBlock.slice(selectStart, selectEnde);
   const k9A = getDb().prepare("SELECT id FROM klassen WHERE name = '9A'").get().id;
   const k5B = getDb().prepare("SELECT id FROM klassen WHERE name = '5B'").get().id;
-  assert.match(vorhandenBlock, new RegExp(`<option value="${k9A}">9A \\(${bezAktuell}, IHK\\)</option>`));
+  assert.match(vorhandenBlock, new RegExp(`<option value="${k9A}">9A \\(${bezAktuell}(–\\d{4}/\\d{2})?, IHK\\)</option>`));
   assert.match(vorhandenBlock, new RegExp(`<option value="${k5B}">5B`));
   // Nur die Auswahl: keine Einstellungen für Schuljahr/Notenschlüssel/Einschulung/Laufzeit/Freigabe
   assert.doesNotMatch(vorhandenBlock, /name="(schuljahr_id|notenschluessel|einschulung_jahr|anzahl_jahre|offen_fuer_beitritt|name)"/);

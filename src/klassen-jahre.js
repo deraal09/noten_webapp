@@ -361,3 +361,14 @@ export function findeLaufendeKlasse(name, schuljahrId) {
   return kandidaten.find((k) => k.schuljahr_id === schuljahrId
     || (start !== undefined && klasseLaeuftImSchuljahr(klassenLaufzeit(k.id), start))) ?? null;
 }
+
+/**
+ * Schuljahr-Text einer Klasse für Überschriften: ihre Laufzeit von Einschulung bis Abschluss
+ * ("2024/25–2026/27", bei einem Jahr nur "2025/26"). Folgt damit dem Einschulungsjahr und der
+ * Anzahl Jahre, nicht dem beim Anlegen gewählten Schuljahr.
+ */
+export function klassenSchuljahrText(klasseOderId) {
+  const l = klassenLaufzeit(klasseOderId);
+  if (!l) return '';
+  return l.schuljahre.length > 1 ? `${l.schuljahre[0].bezeichnung}–${l.schuljahre[l.schuljahre.length - 1].bezeichnung}` : l.schuljahre[0].bezeichnung;
+}

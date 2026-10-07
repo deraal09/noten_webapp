@@ -9,7 +9,7 @@
     <label>Klasse
       <select id="klassenfilter">
         <option value="">Alle Klassen</option>
-        <% byKlasse.forEach(function(k) { %><option value="klasse-<%= k.id %>"><%= k.name %> (<%= k.schuljahr_bezeichnung %>)</option><% }); %>
+        <% byKlasse.forEach(function(k) { %><option value="klasse-<%= k.id %>"><%= k.name %> (<%= klassenSchuljahrText(k.id) %>)</option><% }); %>
         <% if (kurse.length) { %><option value="kurse">Kurse</option><% } %>
       </select>
     </label>
@@ -18,7 +18,7 @@
 
 <% byKlasse.forEach(function(k) { %>
   <section class="klassen-gruppe" data-gruppe="klasse-<%= k.id %>">
-    <h2 id="klasse-<%= k.id %>"><%= k.name %> <small>(<%= k.schuljahr_bezeichnung %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
+    <h2 id="klasse-<%= k.id %>"><%= k.name %> <small>(<%= klassenSchuljahrText(k.id) %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
     <ul class="klasse-liste">
       <% k.faecher.forEach(function(f) { %>
         <li>

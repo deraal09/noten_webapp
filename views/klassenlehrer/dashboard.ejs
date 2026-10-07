@@ -12,7 +12,7 @@
             <span class="kachel-titel-klein"><%= k.name %></span>
           </div>
         </a>
-        <div class="kachel-sub"><%= k.schuljahr_bezeichnung %> · <%= k.notenschluessel %></div>
+        <div class="kachel-sub"><%= klassenSchuljahrText(k) %> · <%= k.notenschluessel %></div>
       </li>
     <% }); %>
   </ul>

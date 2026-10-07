@@ -1,4 +1,4 @@
-<h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<h1><%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <% if (!klasse.ist_ablage) { %>
   <p class="klassenleitung-zeile">
     🎓 <strong>Klassenleitung:</strong>

@@ -1,4 +1,4 @@
-<h1>Zeugnisübersicht: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>, SPA<%= klasse.spa_bildungsgang === 'SPA_PIA' ? ' PiA' : '' %>)</small></h1>
+<h1>Zeugnisübersicht: <%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>, SPA<%= klasse.spa_bildungsgang === 'SPA_PIA' ? ' PiA' : '' %>)</small></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
 </p>

@@ -1,4 +1,4 @@
-<h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<h1><%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/admin/schuljahre/<%= klasse.schuljahr_id %>">← Schuljahr</a>
   <a class="btn" href="/admin/klassen/<%= klasse.id %>/notenschluessel">Notenschlüssel</a>

@@ -176,6 +176,19 @@ test('Klassenseite zeigt das Laufzeit-Formular (Einschulungsjahr festlegen) und 
   assert.doesNotMatch(kl, /Laufzeit der Klasse/);
 });
 
+test('Überschrift zeigt die Laufzeit der Klasse und folgt dem Einschulungsjahr', async () => {
+  const sj = getDb().prepare('SELECT id FROM schuljahre ORDER BY id LIMIT 1').get().id;
+  await form(admin, '/teacher/klassen/neu', { schuljahr_id: String(sj), name: 'LZ1', notenschluessel: 'IHK' });
+  const id = getDb().prepare("SELECT id FROM klassen WHERE name = 'LZ1'").get().id;
+  const h1 = async () => (await (await admin(`/teacher/klassen/${id}`)).text()).match(/<h1>LZ1 <small>\(([^)]*)\)<\/small><\/h1>/)?.[1];
+  await form(admin, `/teacher/klassen/${id}/laufzeit`, { einschulung_jahr: '2023', anzahl_jahre: '3', zurueck: 'klasse' });
+  assert.equal(await h1(), '2023/24–2025/26');
+  await form(admin, `/teacher/klassen/${id}/laufzeit`, { einschulung_jahr: '2024', anzahl_jahre: '2', zurueck: 'klasse' });
+  assert.equal(await h1(), '2024/25–2025/26');
+  await form(admin, `/teacher/klassen/${id}/laufzeit`, { einschulung_jahr: '2025', anzahl_jahre: '1', zurueck: 'klasse' });
+  assert.equal(await h1(), '2025/26', 'bei einem Jahr nur dieses Schuljahr');
+});
+
 test('Buttons zur Noteneingabe: auf "Meine Klassen" (oben und je Klasse) und auf der Klassenseite', async () => {
   const liste = await (await admin('/teacher/klassen')).text();
   assert.match(liste, /<a class="btn" href="\/teacher">📝 Zur Noteneingabe<\/a>/);

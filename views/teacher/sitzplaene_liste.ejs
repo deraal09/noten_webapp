@@ -13,7 +13,7 @@
             <span class="kachel-titel-klein"><%= k.name %></span>
           </div>
         </a>
-        <div class="kachel-sub"><%= k.schuljahr_bezeichnung %></div>
+        <div class="kachel-sub"><%= klassenSchuljahrText(k) %></div>
         <% if (k.raeume.length) { %>
           <div class="kachel-sub">
             <% k.raeume.forEach(function(r, i) { %><%= i ? ' · ' : '' %><a href="/teacher/klassen/<%= k.id %>/sitzplan?raum=<%= encodeURIComponent(r.raum) %>"><%= r.raum || 'ohne Raumangabe' %></a><% }); %>

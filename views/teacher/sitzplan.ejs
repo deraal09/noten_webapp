@@ -1,4 +1,4 @@
-<h1>Sitzplan: <%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<h1>Sitzplan: <%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <p class="kopf-aktionen"><a class="btn" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a></p>
 
 <p class="hint">

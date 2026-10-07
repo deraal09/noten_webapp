@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.76.1 - 2026-10-07
+
+- Fix: Hinter dem Klassennamen stand nach einer Änderung des Einschulungsjahres
+  weiter das beim Anlegen gewählte Schuljahr. Jetzt zeigen die Überschriften
+  (Klassenansicht, Klassenleitung, Sitzplan, Konferenz, Halbjahres-/Abschluss-
+  übersicht, Zeugnis, Noteneingabe, Klassenlisten) die **Laufzeit der Klasse**,
+  z. B. „2024/25–2026/27" (bei einem Jahr nur „2025/26"), und folgen damit
+  Einschulungsjahr und Anzahl Jahre.
+
 ## 0.76.0 - 2026-10-07
 
 - Klassenansicht („Meine Klassen"): In der obersten Zeile unter dem Titel steht

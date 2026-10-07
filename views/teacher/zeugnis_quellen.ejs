@@ -1,5 +1,5 @@
 <h1>Abschlusszeugnis zusammenstellen: <%= schueler.nachname %>, <%= schueler.vorname %>
-  <small>(<%= klasse.name %>, <%= klasse.schuljahr_bezeichnung %>)</small></h1>
+  <small>(<%= klasse.name %>, <%= klassenSchuljahrText(klasse) %>)</small></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen/<%= klasse.id %>/zeugnis?hj=4">← Zur Zeugnisübersicht</a>
 </p>
