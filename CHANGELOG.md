@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.61.1 - 2026-10-07
+
+- Fix: Rote Buttons (🗑 Löschen im Aktionsmenü, ✕ bei Lehrkräften und Fächern)
+  hatten roten Text auf rotem Grund und waren unleserlich. Jetzt roter Text/Rand
+  auf transparentem Grund, beim Überfahren weiße Schrift auf Rot.
+
 ## 0.61.0 - 2026-10-07
 
 - SPA: Die **Zusammensetzung der Fächer** (Komponenten der Lernfelder, z. B. LF3:
