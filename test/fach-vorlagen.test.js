@@ -103,10 +103,9 @@ test('Import in neue Klasse gleichen Notenschlüssels: Fächer, Halbjahre, Gewic
   const kind = getDb().prepare('SELECT * FROM faecher WHERE parent_fach_id = ?').get(deutsch.id);
   assert.equal(kind.name, 'Deutsch › Lesen');
   assert.equal(kind.gewicht, 2);
-  // Zuordnung: nur die importierende Person (Admin), nicht die Lehrkraft aus Klasse A
-  const zugewiesen = getDb().prepare('SELECT user_id FROM fach_zuweisungen WHERE fach_id IN (?, ?)').all(mathe.id, deutsch.id).map((z) => z.user_id);
-  assert.ok(!zugewiesen.includes(lehrerId));
-  assert.equal(new Set(zugewiesen).size, 1);
+  // Keine Zuordnung: weder die Lehrkraft aus Klasse A noch die importierende Person -- alle Fächer starten leer
+  const zugewiesen = getDb().prepare('SELECT user_id FROM fach_zuweisungen WHERE fach_id IN (?, ?, ?)').all(mathe.id, deutsch.id, kind.id);
+  assert.equal(zugewiesen.length, 0);
   // Nochmal importieren: nichts doppelt
   await form(admin, `/teacher/klassen/${klasseB}/vorlagen/importieren`, { vorlage_id: String(v) });
   assert.equal(faecher(klasseB).filter((f) => !f.parent_fach_id).length, 2);

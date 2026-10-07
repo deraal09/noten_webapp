@@ -1998,7 +1998,7 @@ export default async function teacherRoutes(fastify) {
       const teile = [];
       if (ergebnis.angelegt.length) teile.push(`${ergebnis.angelegt.length} Fächer importiert`);
       if (ergebnis.uebersprungen.length) teile.push(`übersprungen, weil es sie schon gibt: ${ergebnis.uebersprungen.join(', ')}`);
-      request.flash?.(ergebnis.angelegt.length ? 'success' : 'error', `${teile.join('; ') || 'Die Vorlage enthält keine Fächer.'}. Lehrkräfte bitte neu zuordnen.`);
+      request.flash?.(ergebnis.angelegt.length ? 'success' : 'error', `${teile.join('; ') || 'Die Vorlage enthält keine Fächer.'}. Die Fächer haben noch keine Lehrkraft -- bitte neu zuordnen.`);
     }
     return reply.redirect(`/teacher/klassen/${klasse.id}#faecher-lehrkraefte`);
   });

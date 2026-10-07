@@ -3,8 +3,8 @@
  * Halbjahre, Unterfach-Gewichte, Verrechnung) lässt sich unter einem Namen
  * speichern und bei jeder neuen Klasse mit demselben Notenschlüssel wieder
  * importieren. Die Lehrkraftzuordnung gehört bewusst NICHT zur Vorlage -- sie
- * wird bei jeder Klasse neu vergeben (der Import weist wie beim Anlegen eines
- * Fachs nur die importierende Person zu). Vorlagen gehören der Lehrkraft, die
+ * wird bei jeder Klasse neu vergeben (der Import legt alle Fächer ohne Lehrkraft
+ * an). Vorlagen gehören der Lehrkraft, die
  * sie gespeichert hat.
  */
 
@@ -74,7 +74,7 @@ function nummernFuerKlasse(roh, laufzeit) {
 
 /**
  * Legt die Fächer einer Vorlage in der Klasse an (bestehende Fächer gleichen Namens bleiben
- * unberührt). Die importierende Person wird den neuen Fächern zugewiesen, sonst niemand.
+ * unberührt). Es wird niemand zugeordnet -- alle Fächer starten ohne Lehrkraft.
  * @param {{mitVerrechnung: boolean}} optionen Verrechnung nur übernehmen, wenn die Person sie setzen darf
  * @returns {{ok: true, angelegt: string[], uebersprungen: string[]} | {ok: false, fehler: string}}
  */
@@ -97,7 +97,6 @@ export function importiereVorlage(vorlageId, userId, klasse, { mitVerrechnung = 
       const info = db.prepare('INSERT INTO faecher (klasse_id, name, halbjahre, verrechnung) VALUES (?, ?, ?, ?)')
         .run(klasse.id, e.name, nummern ? JSON.stringify(nummern) : null, mitVerrechnung ? e.verrechnung : null);
       const fachId = Number(info.lastInsertRowid);
-      db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(userId, fachId);
       seedeTeilnehmerAusKlasse(fachId, klasse.id);
       angelegt.push(e.name);
       const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);

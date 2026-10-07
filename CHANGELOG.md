@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.77.0 - 2026-10-07
+
+- **Fächer aus Vorlage importieren** trägt die importierende Lehrkraft nicht mehr
+  automatisch ein: Alle importierten Fächer (und Unterfächer) starten **ohne
+  Lehrkraft** und werden danach über die Klassenseite neu zugeordnet.
+
 ## 0.76.1 - 2026-10-07
 
 - Fix: Hinter dem Klassennamen stand nach einer Änderung des Einschulungsjahres
