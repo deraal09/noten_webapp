@@ -29,6 +29,7 @@
         <% faecher.forEach(function(f) { %>
           <th>
             <%= f.name %><br>
+            <small class="hint lehrkraefte-kopf"><%= f.lehrkraefte.length ? '🎓 ' + f.lehrkraefte.join(', ') : 'keine Lehrkraft' %></small><br>
             <small>
               <% var m = syncMeta.get(f.id); %>
               <% if (m) { %>zuletzt sync.: <%= formatZeitLokal(m.synced_at) %><% } else { %>noch nie synchronisiert<% } %>

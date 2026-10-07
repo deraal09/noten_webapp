@@ -118,9 +118,9 @@ test('ladeAbschlussuebersicht: enthält alle Fächer der Laufzeit alphabetisch, 
 
 test('Seite /teacher/klassen/:id/abschluss zeigt alle Fächer, eingeschränkte mit Halbjahren und Schuljahr(en) in der Überschrift', async () => {
   const html = await (await lehrerA(`/teacher/klassen/${klasseId}/abschluss`)).text();
-  assert.match(html, /<th>Physik<br><small>läuft<\/small><\/th>/, 'Fach über alle Halbjahre ohne Zusatz, noch laufend');
-  assert.match(html, /<th>Biologie <small class="hint">\(1\.–2\. Halbjahr, 2023\/24\)<\/small><br><small>abgeschlossen<\/small><\/th>/);
-  assert.match(html, /<th>Chemie <small class="hint">\(1\.–4\. Halbjahr, 2023\/24–2024\/25\)<\/small><br><small>abgeschlossen<\/small><\/th>/);
+  assert.match(html, /<th>Physik<br><small class="hint lehrkraefte-kopf">🎓 Lehrer A<\/small><br><small>läuft<\/small><\/th>/, 'Fach über alle Halbjahre ohne Zusatz, noch laufend');
+  assert.match(html, /<th>Biologie <small class="hint">\(1\.–2\. Halbjahr, 2023\/24\)<\/small><br><small class="hint lehrkraefte-kopf">🎓 Lehrer A<\/small><br><small>abgeschlossen<\/small><\/th>/);
+  assert.match(html, /<th>Chemie <small class="hint">\(1\.–4\. Halbjahr, 2023\/24–2024\/25\)<\/small><br><small class="hint lehrkraefte-kopf">🎓 Lehrer A<\/small><br><small>abgeschlossen<\/small><\/th>/);
 });
 
 test('Derselbe Reiter auf der Klassenleitungsübersicht zeigt dieselben Fächer', async () => {

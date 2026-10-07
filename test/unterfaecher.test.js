@@ -464,6 +464,17 @@ test('Halbjahresübersicht zeigt direkt eingetragene Endnoten der Klassenleitung
   assert.equal(zelle(s1, mitLehrkraft), 3);
   assert.equal(zelle(s2, mitLehrkraft), null, 'Endnote der Fachlehrkraft erscheint erst mit deren Sync');
   assert.equal(zelle(s3, leer), null);
+  // Zugeordnete Lehrkräfte stehen an den Fächern (Halbjahres- und Abschlussübersicht)
+  const lk = (u2, id) => u2.faecher.find((x) => x.id === id).lehrkraefte;
+  assert.deepEqual(lk(u, mitLehrkraft), ['fremd']);
+  assert.deepEqual(lk(u, leer), []);
+  const { ladeAbschlussuebersicht } = await import('../src/fach-abschluss.js');
+  const ab = ladeAbschlussuebersicht(klasse.id);
+  assert.deepEqual(lk(ab, mitLehrkraft), ['fremd']);
+  assert.deepEqual(lk(ab, leer), []);
+  const html = await (await admin(`/teacher/klassen/${klasse.id}/uebersicht?hj=${enc('1. Halbjahr')}`)).text();
+  assert.match(html, /🎓 fremd/);
+  assert.match(html, /keine Lehrkraft/);
 });
 
 test.after(async () => {

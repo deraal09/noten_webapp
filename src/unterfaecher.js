@@ -192,6 +192,26 @@ export function fachHatLehrkraftImHalbjahr(fach, nr, laufzeit = klassenLaufzeit(
     .some((z) => zuweisungsHalbjahre(z, f, laufzeit).includes(nr)));
 }
 
+/**
+ * Namen der Lehrkräfte eines Fachs (alphabetisch): direkt zugeordnete und die der Unterfächer (dann mit
+ * "(Unterfach)"). Mit `nr` nur die Zuordnungen, die in diesem Halbjahr gelten, sonst alle.
+ */
+export function lehrkraefteDesFachs(fach, nr = null, laufzeit = klassenLaufzeit(fach.klasse_id)) {
+  const db = getDb();
+  const namen = new Set();
+  const sammle = (f, zusatz) => {
+    for (const z of db.prepare(`
+      SELECT fz.*, u.display_name, u.username FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id WHERE fz.fach_id = ?
+    `).all(f.id)) {
+      if (nr !== null && !zuweisungsHalbjahre(z, f, laufzeit).includes(nr)) continue;
+      namen.add(`${z.display_name || z.username}${zusatz}`);
+    }
+  };
+  sammle(fach, '');
+  if (!fach.parent_fach_id) for (const u of ladeUnterfaecher(fach.id)) sammle(u, ` (${u.kurzname || u.name})`);
+  return [...namen].sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' }));
+}
+
 /** Halbjahre, in denen eine Zuordnung (Zeile aus fach_zuweisungen) gilt, als Nummern. */
 export function zuweisungsHalbjahre(zuweisung, fach, laufzeit = klassenLaufzeit(fach.klasse_id)) {
   const fachHj = fachHalbjahrNummern(fach, laufzeit);

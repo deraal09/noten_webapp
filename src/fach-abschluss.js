@@ -8,6 +8,7 @@
  */
 
 import { sortiereNachName } from './format.js';
+import { lehrkraefteDesFachs } from './unterfaecher.js';
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
 import { gesamtnoteJahr, NTG } from './grade-calc.js';
@@ -60,7 +61,7 @@ export function ladeAbschlussuebersicht(klasseId) {
   const db = getDb();
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasseId);
   const laufzeit = klassenLaufzeit(klasseId);
-  const faecher = ladeFaecherFuerKlassenleitung(klasseId).map((f) => ({ ...f, schuljahrLabel: fachHalbjahrLabel(f, laufzeit) }));
+  const faecher = ladeFaecherFuerKlassenleitung(klasseId).map((f) => ({ ...f, schuljahrLabel: fachHalbjahrLabel(f, laufzeit), lehrkraefte: lehrkraefteDesFachs(f, null, laufzeit) }));
   const abschlussByFach = new Map(faecher.map((f) => [f.id, f.abgeschlossen ? ladeAbschlussnoten(f) : new Map()]));
 
   const zeilen = schueler.map((s) => {

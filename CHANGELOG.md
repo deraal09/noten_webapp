@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.81.0 - 2026-10-07
+
+- **Halbjahresübersicht und Abschluss-/Abgangsübersicht** zeigen unter jedem
+  Fachnamen die **zugeordneten Lehrkräfte** („🎓 Name, …", bzw. „keine
+  Lehrkraft"). In der Halbjahresübersicht zählen die Zuordnungen, die im
+  gewählten Halbjahr gelten; in der Abschlussübersicht alle. Lehrkräfte von
+  Unterfächern erscheinen mit dem Zusatz „(Unterfach)". Gilt für die Seiten
+  unter „Meine Klassen" und im Klassenleitungs-Bereich.
+
 ## 0.80.1 - 2026-10-07
 
 - Fix: Direkt eingetragene Endnoten der Klassenleitung (z. B. für vergangene

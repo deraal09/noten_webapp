@@ -659,3 +659,4 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .fach-kachel[hidden], .klassen-gruppe[hidden] { display: none !important; }
 .klassenfilter { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
 .klassenfilter label { margin: 0; }
+.lehrkraefte-kopf { font-weight: 400; }
