@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.84.1 - 2026-10-07
+
+- **Direkte Endnoteneingabe** (Fachseite) ist beim Öffnen der Seite **eingeklappt**.
+  Beim **Wechsel des Halbjahres** bleibt sie offen, wenn sie offen war.
+- Der Knopf zeigt deutlicher, dass die Eingabe offen ist: dunkel hinterlegt, fett,
+  mit Unterstrich und Pfeil (▸ zu / ▾ offen).
+
 ## 0.84.0 - 2026-10-07
 
 - **SPA-Fächervorgabe komplett editierbar, als Vorlage ablegbar.** Neue Seite

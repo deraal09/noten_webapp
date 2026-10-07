@@ -731,22 +731,27 @@
       refresh();
     }, 400));
   });
-  // Direkte Endnoteneingabe: Tabelle ein-/ausklappen (Zustand je Fach und Halbjahr
-  // gemerkt) und beim Verlassen eines Feldes speichern.
+  // Direkte Endnoteneingabe: Tabelle ein-/ausklappen und beim Verlassen eines Feldes speichern.
+  // Beim Öffnen der Seite ist sie eingeklappt; nur beim Wechsel des Halbjahres bleibt sie offen
+  // (dafür merkt sich der Klick auf einen Halbjahr-Reiter den offenen Zustand für genau einen Seitenaufruf).
   (function() {
     const knopf = document.getElementById('endnoten-toggle');
     const box = document.getElementById('endnoten-direkt');
     if (!knopf || !box) return;
-    const KEY = 'endnoten-offen-' + FACH_ID_END + '-' + HJ_END;
+    const KEY = 'endnoten-bleibt-offen-' + FACH_ID_END;
     function setze(offen) {
       box.hidden = !offen;
       knopf.setAttribute('aria-expanded', offen ? 'true' : 'false');
       knopf.classList.toggle('aktiv', offen);
-      try { sessionStorage.setItem(KEY, offen ? '1' : '0'); } catch (e) { /* ignorieren */ }
     }
     let offen = false;
-    try { offen = sessionStorage.getItem(KEY) === '1'; } catch (e) { /* ignorieren */ }
+    try { offen = sessionStorage.getItem(KEY) === '1'; sessionStorage.removeItem(KEY); } catch (e) { /* ignorieren */ }
     setze(offen);
+    document.querySelectorAll('.hj-tabs a.hj-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        try { if (!box.hidden) sessionStorage.setItem(KEY, '1'); } catch (e) { /* ignorieren */ }
+      });
+    });
     knopf.addEventListener('click', function() { setze(box.hidden); });
     box.querySelectorAll('input.endnote-eingabe').forEach(function(inp) {
       inp.addEventListener('change', async function() {

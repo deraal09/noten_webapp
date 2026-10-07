@@ -551,7 +551,9 @@ table.tafel input.note-datum.ist-na { background: var(--bg-header); color: var(-
 /* Direkte Endnoteneingabe (Fachseite). */
 input.endnote-eingabe { width: 5rem; text-align: center; }
 td.gesamt-cell.direkt::after { content: " ✎"; font-size: 0.8em; opacity: 0.8; }
-#endnoten-toggle.aktiv { background: var(--bg-tint); border-color: var(--accent); }
+#endnoten-toggle::before { content: '▸ '; }
+#endnoten-toggle.aktiv { background: var(--primary); color: var(--on-dark); border-color: var(--primary); font-weight: 600; box-shadow: inset 0 -3px 0 var(--accent); }
+#endnoten-toggle.aktiv::before { content: '▾ '; }
 
 .hj-auswahl { border: 1px solid var(--border); border-radius: 6px; margin: 0.5rem 0; padding: 0.5rem 0.75rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
 .hj-auswahl legend { font-size: 0.8rem; color: var(--text-muted); padding: 0 0.25rem; }
