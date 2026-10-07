@@ -135,7 +135,7 @@ export function berechneGesamtnoten(fachId, halbjahr) {
 export function berechneGesamtnotenOhneEndnoten(fachId, halbjahr) {
   const roh = berechneRohnoten(fachId, halbjahr);
   const fach = ladeFachMitUmfeld(fachId);
-  if (!fach || fach.spa_fach_key) return roh;
+  if (!fach) return roh;
   const prozent = verrechnungsProzent(fach.klasse_id, halbjahr, fach);
   if (!prozent) return roh;
   const vorher = berechneGesamtnoten(fachId, halbjahrText(halbjahrNr(halbjahr) - 1));

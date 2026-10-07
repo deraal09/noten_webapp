@@ -308,8 +308,9 @@ im **aktuellen Halbjahr** nach Datum (in Tests ist „heute" eingefroren,
 - **Verrechnung:** `faecher.verrechnung` (JSON `{ "1": 50 }`) = Prozent der
   Note aus Halbjahr n, die in Halbjahr n+1 einfließen (Einstellung je Fach auf
   der Klassenseite, einklappbarer Abschnitt oberhalb der Fächer, Dialog je Fach;
-  nicht für Unterfächer und SPA-Fächer). Fächer ohne eigene Einstellung nutzen
-  die ältere Klassen-Vorgabe `klassen.verrechnung`.
+  nicht für Unterfächer). SPA-Fächer stellen sie einzeln auf ihrer Fachseite ein
+  (Leistungspunkte des Vorhalbjahres). Fächer ohne eigene Einstellung nutzen
+  die ältere Klassen-Vorgabe `klassen.verrechnung` (nicht SPA).
 - **SPA:** Die Fachseite ist die normale Noteneingabe (Klausuren/Unterrichtsleistung
   in Punkten); die SPA-Tabelle mit Komponenten/Vorwerten ist die „Direkte
   Endnoteneingabe" (`?ansicht=endnoten`).

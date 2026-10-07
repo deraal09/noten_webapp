@@ -15,16 +15,25 @@
 
 import { berechneGesamtnoteEinerPerson } from './noten-service.js';
 import { tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
+import { verrechnungsProzent, wendeVerrechnungAn } from './klassen-jahre.js';
 
 /** Tendenznote (1+ ... 6) zu Punkten 0-15 nach der SPA-Notenskala; null bei fehlendem Wert. */
 export function spaTendenz(punkte) {
   return punkte === null || punkte === undefined ? null : tendenzAusEndpunkten(punkte, STANDARD_NOTENSKALA);
 }
 
-/** Leistungspunkte einer Person in einem SPA-Fach/Halbjahr (1-4) -- oder null, wenn nichts bepunktet ist. */
+/**
+ * Leistungspunkte einer Person in einem SPA-Fach/Halbjahr (1-4) -- oder null, wenn nichts bepunktet ist.
+ * Mit eingestellter Verrechnung (siehe verrechnungsProzent, je Fach) fließen zu diesem Prozentsatz die
+ * (selbst schon verrechneten) Leistungspunkte des Vorhalbjahres ein.
+ */
 export function leistungsPunkte(db, fachId, halbjahrNr, schuelerId) {
   const punkte = berechneGesamtnoteEinerPerson(fachId, `${halbjahrNr}. Halbjahr`, schuelerId);
-  return punkte === null ? null : Math.round(punkte * 100) / 100;
+  if (punkte === null) return null;
+  const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
+  const prozent = fach ? verrechnungsProzent(fach.klasse_id, `${halbjahrNr}. Halbjahr`, fach) : 0;
+  const vorher = prozent ? leistungsPunkte(db, fachId, halbjahrNr - 1, schuelerId) : null;
+  return Math.round(wendeVerrechnungAn(punkte, vorher, prozent) * 100) / 100;
 }
 
 /** Gewählte Komponente, in die die Leistungsnote bei Fächern mit Komponenten einfließt (oder null). */

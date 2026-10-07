@@ -337,6 +337,10 @@ export default async function teacherRoutes(fastify) {
       spaLeistung = {
         hjNr, schemaHj, ziel: leistungsZiel(getDb(), fach.id, hjNr), endpunkte,
         komponentenNamen: KOMPONENTEN_NAMEN, darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
+        verrechnungEinstellung: {
+          werte: ladeVerrechnungFuerFach(fach), anzahlHalbjahre: klassenLaufzeit(fach.klasse_id).anzahlHalbjahre,
+          darfAendern: userIstKlassenlehrer(request.user, fach.klasse_id),
+        },
       };
     } else if (fach.spa_komponente) {
       // Vorgegebene SPA-Komponente (Unterfach): bewertet in Punkten; die Punkte füttern die Komponente des Elternfachs.
@@ -1278,18 +1282,21 @@ export default async function teacherRoutes(fastify) {
   // ---------- Verrechnung der Halbjahresnoten je Fach (Prozent je Übergang) ----------
   // p_<n> = Prozent der Note aus Halbjahr n, die in Halbjahr n+1 einfließen
   // (0 = gar nicht). Gilt für das Fach (nicht für Unterfächer -- sie fließen
-  // gewichtet ins Fach, das selbst verrechnet -- und nicht für SPA-Fächer, die
-  // ihr eigenes Vorwert-Schema haben). Mit "fuer_alle" für alle Fächer der
-  // Klasse. Nur Klassenleitung/Admin.
+  // gewichtet ins Fach, das selbst verrechnet). SPA-Fächer: die Leistungspunkte
+  // des Vorhalbjahres fließen ein (siehe src/spa-leistung.js), nur je Fach.
+  // Mit "fuer_alle" für alle Nicht-SPA-Fächer der Klasse. Nur Klassenleitung/Admin.
   fastify.post('/faecher/:id/verrechnung', async (request, reply) => {
     const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(request.params.id);
     if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
     if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin dürfen die Verrechnung ändern.' });
     }
-    const zurueck = `/teacher/klassen/${fach.klasse_id}#verrechnung`;
-    if (fach.parent_fach_id || fach.spa_fach_key) {
-      request.flash?.('error', 'Für Unterfächer und SPA-Fächer gibt es keine Verrechnung.');
+    // SPA-Fächer stellen die Verrechnung auf ihrer Fachseite (Noteneingabe) ein, alle anderen auf der Klassenseite.
+    const zurueck = fach.spa_fach_key
+      ? `/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahrFuerFach(fach, request.body?.halbjahr))}`
+      : `/teacher/klassen/${fach.klasse_id}#verrechnung`;
+    if (fach.parent_fach_id) {
+      request.flash?.('error', 'Für Unterfächer gibt es keine eigene Verrechnung -- sie gilt für das Fach.');
       return reply.redirect(zurueck);
     }
     const laufzeit = klassenLaufzeit(fach.klasse_id);

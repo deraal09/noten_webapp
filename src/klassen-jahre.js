@@ -268,13 +268,14 @@ export function ladeVerrechnung(klasseId) {
 
 /**
  * Verrechnung eines Fachs: die eigene Einstellung (faecher.verrechnung), sonst
- * die Vorgabe der Klasse. SPA-Fächer (eigenes Vorwert-Schema) und Unterfächer
- * (ihre Noten fließen gewichtet ins Fach, das selbst verrechnet) haben keine.
+ * die Vorgabe der Klasse. Unterfächer (ihre Noten fließen gewichtet ins Fach,
+ * das selbst verrechnet) haben keine. SPA-Fächer kennen nur die eigene
+ * Einstellung (je Fach auf der Fachseite), nie die Klassen-Vorgabe.
  */
 export function ladeVerrechnungFuerFach(fach) {
-  if (fach.spa_fach_key || fach.parent_fach_id) return {};
+  if (fach.parent_fach_id) return {};
   if (fach.verrechnung !== null && fach.verrechnung !== undefined) return parseVerrechnung(fach.verrechnung);
-  return ladeVerrechnung(fach.klasse_id);
+  return fach.spa_fach_key ? {} : ladeVerrechnung(fach.klasse_id);
 }
 
 /**

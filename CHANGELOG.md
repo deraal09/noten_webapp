@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.64.0 - 2026-10-07
+
+- **Verrechnung der Halbjahre auch für SPA-Fächer**, je Fach einzeln auf der
+  Fachseite (Noteneingabe): einklappbarer Abschnitt „Verrechnung der Halbjahre"
+  (ändern nur Klassenleitung). Zu den eingestellten Prozent fließen die
+  Leistungspunkte des Vorhalbjahres in die des Halbjahres ein; sie speisen wie
+  bisher Direktwert bzw. Komponente und damit die Endpunkte. SPA-Fächer erben
+  keine Klassen-Vorgabe (Standard: keine Verrechnung).
+
 ## 0.63.0 - 2026-10-07
 
 - Die Abschnitte **„Laufzeit der Klasse"** und **„Verrechnung der Halbjahre"**

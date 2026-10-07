@@ -30,6 +30,33 @@
       fließen im <%= halbjahr %> in die Endnotentabelle dieses Fachs ein -- ein dort von Hand eingetragener
       Wert („Direkte Endnoteneingabe") hat Vorrang. Nur das Zeugnis folgt danach dem SPA-Bewertungssystem.
     </p>
+    <% if (spaLeistung.verrechnungEinstellung && spaLeistung.verrechnungEinstellung.anzahlHalbjahre >= 2) { var ve = spaLeistung.verrechnungEinstellung; %>
+      <details id="verrechnung" class="verrechnung-einstellung">
+        <summary>Verrechnung der Halbjahre <small class="hint">(<%
+          var veTeile = [];
+          for (var vn = 1; vn < ve.anzahlHalbjahre; vn++) { if (ve.werte[String(vn)]) veTeile.push(vn + '. → ' + (vn + 1) + '.: ' + String(ve.werte[String(vn)]).replace('.', ',') + ' %'); }
+        %><%= veTeile.length ? veTeile.join(' · ') : 'keine' %>)</small></summary>
+        <p class="hint">
+          Zu wie viel Prozent die Leistungspunkte eines Halbjahres in das <strong>nächste</strong> Halbjahr einfließen
+          (0 % = gar nicht), nur für dieses Fach.
+        </p>
+        <% if (ve.darfAendern) { %>
+          <form method="post" action="/teacher/faecher/<%= fach.id %>/verrechnung">
+            <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+            <div class="verrechnung-raster">
+              <% for (var vn2 = 1; vn2 < ve.anzahlHalbjahre; vn2++) { %>
+                <label class="feld"><%= vn2 %>. → <%= vn2 + 1 %>. Halbjahr
+                  <span class="feld-mit-einheit"><input type="number" name="p_<%= vn2 %>" min="0" max="100" step="1" value="<%= ve.werte[String(vn2)] || 0 %>">%</span>
+                </label>
+              <% } %>
+            </div>
+            <button type="submit">Verrechnung speichern</button>
+          </form>
+        <% } else { %>
+          <p class="hint">Nur die Klassenleitung kann die Verrechnung ändern.</p>
+        <% } %>
+      </details>
+    <% } %>
     <% if (spaLeistung.schemaHj && spaLeistung.schemaHj.halbjahrModus === 'komponenten_gewichtet') { %>
       <form method="post" action="/teacher/fach/<%= fach.id %>/spa/leistung-ziel" class="inline">
         <input type="hidden" name="halbjahr" value="<%= spaLeistung.hjNr %>">

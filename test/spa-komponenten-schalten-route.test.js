@@ -24,6 +24,9 @@ const { getDb } = await import('../src/db.js');
 const { ladeEingabeAnzeige } = await import('../src/spa-noten-service.js');
 const { spaSchemaFuerFach } = await import('../src/spa-noten-service.js');
 const { berechneZwischennote } = await import('../src/spa-grade-calc.js');
+const { leistungsPunkte } = await import('../src/spa-leistung.js');
+const { ladeVerrechnungFuerFach } = await import('../src/klassen-jahre.js');
+const J_ladeFuerFach = (id) => ladeVerrechnungFuerFach(getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(id));
 
 const fastify = await buildApp({ logger: false });
 const base = await fastify.listen({ port: 0, host: '127.0.0.1' });
@@ -182,6 +185,39 @@ test('Komponenten lassen sich komplett abwählen (kein Halbjahr) und wieder zusc
   await form(admin, `/teacher/faecher/${komp('kunst').id}/halbjahre`, { halbjahre: ['1', '2', '3', '4'], zurueck: 'klasse' });
   assert.equal(getDb().prepare("SELECT COUNT(*) AS c FROM spa_deaktivierte_komponenten WHERE komponente_schluessel = 'kunst'").get().c, 0);
   assert.ok((await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text()).includes('data-feld="komponente:kunst"'));
+});
+
+test('SPA: Verrechnung der Halbjahre je Fach auf der Fachseite (Leistungspunkte des Vorhalbjahres fließen ein)', async () => {
+  const db = getDb();
+  const lf1 = db.prepare("SELECT id FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF1'").get(klasseId).id;
+  const lf4 = db.prepare("SELECT id FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF4'").get(klasseId).id;
+  const schuelerId = db.prepare("SELECT id FROM schueler WHERE nachname = 'Musterfrau'").get().id;
+  const klausur = async (hj, punkteAnteil) => {
+    await form(admin, `/teacher/fach/${lf1}/klausuren/neu`, { name: `K${hj}`, aufgaben: '1', halbjahr: `${hj}. Halbjahr` });
+    const k = db.prepare('SELECT id, max_punkte_pro_aufgabe FROM klausuren WHERE fach_id = ? AND halbjahr = ?').get(lf1, `${hj}. Halbjahr`);
+    await form(admin, `/teacher/klausuren/${k.id}/gewichtung`, { gewichtung: '100', halbjahr: `${hj}. Halbjahr` });
+    await form(admin, `/teacher/klausuren/${k.id}/punkte`, { schueler_id: String(schuelerId), aufgabe_idx: '0', wert: String(JSON.parse(k.max_punkte_pro_aufgabe)[0] * punkteAnteil) });
+  };
+  await klausur(1, 1);
+  await klausur(2, 0.5);
+  const ohne = leistungsPunkte(db, lf1, 2, schuelerId);
+  assert.ok(ohne !== null && ohne < leistungsPunkte(db, lf1, 1, schuelerId));
+  // Fachseite zeigt die Einstellung; Klassenleitung (Admin) kann sie ändern, Fachlehrkraft nicht
+  const seite = await (await admin(`/teacher/fach/${lf1}?hj=1`)).text();
+  assert.match(seite, /<details id="verrechnung" class="verrechnung-einstellung">/);
+  assert.match(seite, new RegExp(`action="/teacher/faecher/${lf1}/verrechnung"`));
+  assert.equal((await form(fachlehrkraft, `/teacher/faecher/${lf1}/verrechnung`, { p_1: '50' })).status, 403);
+  const r = await form(admin, `/teacher/faecher/${lf1}/verrechnung`, { p_1: '50', halbjahr: '2. Halbjahr' });
+  assert.equal(r.status, 302);
+  assert.match(decodeURIComponent(r.headers.get('location')), new RegExp(`/teacher/fach/${lf1}\\?hj=2`));
+  const punkte1 = leistungsPunkte(db, lf1, 1, schuelerId);
+  const mit = leistungsPunkte(db, lf1, 2, schuelerId);
+  assert.equal(mit, Math.round(((ohne + punkte1) / 2) * 100) / 100, '50 % Vorhalbjahr, 50 % Halbjahr');
+  assert.match(await (await admin(`/teacher/fach/${lf1}?hj=2`)).text(), /1\. → 2\.: 50 %/);
+  // Nur das Fach mit Einstellung ist betroffen; die Klassenseite führt SPA-Fächer nicht im Verrechnungs-Abschnitt
+  assert.deepEqual(J_ladeFuerFach(lf4), {});
+  const klassenHtml = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  assert.ok(!klassenHtml.includes(`data-verrechnung-dialog data-fach-id="${lf1}"`));
 });
 
 test.after(async () => {
