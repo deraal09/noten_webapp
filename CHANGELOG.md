@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.70.0 - 2026-10-07
+
+- Der Reiter **„Teilnehmer/innen"** ist aus der Noteneingabe entfernt. Die
+  Verwaltung (Personen entfernen, per Suche oder manuell hinzufügen) liegt jetzt
+  bei „Meine Klassen": Button 👥 an jedem Fach der Klassenseite, bei Kursen in
+  der Kursliste (eigene Seite je Fach).
+- **Berechtigung:** Solange sich niemand als Klassenleitung der Klasse
+  eingetragen hat, darf jede Lehrkraft mit Zugriff auf die Klasse die Teilnehmer
+  verwalten; danach nur noch die Klassenleitung (und der Admin). Kurse:
+  die ihnen zugeordneten Lehrkräfte.
+
 ## 0.69.0 - 2026-10-07
 
 - **Manuelle Noten entfernt:** Der Reiter „Manuelle Noten", die Spalten

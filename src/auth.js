@@ -274,6 +274,27 @@ export function userIstKlassenlehrer(user, klasseId) {
   return Boolean(alt);
 }
 
+/** Hat die Klasse (mindestens) eine eingetragene Klassenleitung? */
+export function klasseHatKlassenleitung(klasseId) {
+  const db = getDb();
+  return Boolean(db.prepare('SELECT 1 FROM klassenleitung WHERE klasse_id = ?').get(klasseId)
+    || db.prepare('SELECT 1 FROM klassen_lehrkraefte WHERE klasse_id = ?').get(klasseId));
+}
+
+/**
+ * Darf die Teilnehmerliste eines Fachs (Personen aufnehmen/entfernen) verwalten?
+ *  - Admin: immer.
+ *  - Kurs (klassenübergreifend, ohne Klassenleitung): wer dem Kurs zugeordnet ist.
+ *  - Fach einer Klasse: solange sich niemand als Klassenleitung eingetragen hat, jede
+ *    Lehrkraft mit Zugriff auf die Klasse; danach nur noch die Klassenleitung.
+ */
+export function userDarfTeilnehmerVerwalten(user, fach) {
+  if (user.isAdmin) return true;
+  if (fach.ist_kurs) return userHatFachZgriff(user, fach.id);
+  if (klasseHatKlassenleitung(fach.klasse_id)) return userIstKlassenlehrer(user, fach.klasse_id);
+  return userHatKlassenZugriff(user, fach.klasse_id);
+}
+
 /**
  * Darf sich selbst eine neue Klasse anlegen (und wird damit automatisch
  * deren Ersteller/in mit vollem Zugriff)? Nur Admin und Lehrkräfte mit

@@ -480,10 +480,12 @@ Teilnehmerliste (`fach_teilnehmer`, `src/fach-teilnehmer.js`) statt implizit
   automatisch mit allen aktuellen (und später neu hinzukommenden)
   Schüler/innen dieser Klasse vorbefüllt — für ein normales Fach ändert
   sich dadurch nichts.
-- Auf der Fach-Seite (Reiter „Teilnehmer/innen") lässt sich die Liste
-  anpassen: einzelne Personen entfernen, oder über **Suche** (Name ODER
-  Klassenname, über alle Klassen desselben Schuljahres) weitere
-  hinzufügen.
+- Auf der Klassenseite („Meine Klassen", Button 👥 am Fach; bei Kursen in der
+  Kursliste) lässt sich die Liste anpassen: einzelne Personen entfernen, oder
+  über **Suche** (Name ODER Klassenname, über alle Klassen desselben
+  Schuljahres) weitere hinzufügen. Das darf jede Lehrkraft der Klasse, solange
+  sich niemand als Klassenleitung eingetragen hat; danach nur noch die
+  Klassenleitung. In der Noteneingabe gibt es diese Verwaltung nicht mehr.
 - **Absicherung gegen gemischten Notenschlüssel:** Eine Person aus einer
   Klasse mit abweichendem Notenschlüssel (IHK/BG) lässt sich nicht
   hinzufügen — die Fehlermeldung sagt das explizit, statt Klausurpunkte

@@ -647,3 +647,4 @@ button.fach-name-knopf:hover { background: var(--bg-tint); text-decoration: unde
 .unterfaecher-liste button.fach-name-knopf { font-weight: 500; }
 .fo-aktionen { display: flex; flex-direction: column; gap: 0.6rem; }
 .fo-aktionen .btn, .fo-aktionen button { width: 100%; text-align: center; }
+a.icon-knopf { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }

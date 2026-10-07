@@ -12,7 +12,7 @@ import {
 } from '../unterfaecher.js';
 import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
-  requireAuth, userHatFachZgriff, erlaubteHalbjahreImFach, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
+  requireAuth, userHatFachZgriff, erlaubteHalbjahreImFach, userDarfTeilnehmerVerwalten, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
   userDarfFachLoeschen, userDarfKlasseVerwalten,
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
@@ -1658,7 +1658,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, klassenVerrechnung: ladeVerrechnung(klasse.id),
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
@@ -2139,7 +2139,7 @@ export default async function teacherRoutes(fastify) {
         .run(huelle.lastInsertRowid, name);
       db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
         .run(request.user.id, info.lastInsertRowid);
-      return reply.redirect(`/teacher/fach/${info.lastInsertRowid}?tab=teilnehmer`);
+      return reply.redirect(`/teacher/fach/${info.lastInsertRowid}/teilnehmer`);
     } catch (e) {
       request.flash?.('error', 'Kurs konnte nicht angelegt werden -- bitte Schuljahr prüfen.');
       return reply.redirect('/teacher/klassen');
@@ -2176,27 +2176,45 @@ export default async function teacherRoutes(fastify) {
   // Ein Fach bleibt an eine Heimat-Klasse gebunden (Notenschlüssel, Anlegerecht),
   // die tatsächliche Teilnehmerliste kann aber darüber hinausgehen -- siehe
   // src/fach-teilnehmer.js.
-  fastify.get('/fach/:id/teilnehmer/suche', async (request, reply) => {
+  // Verwaltung der Teilnehmerliste: eigene Seite (erreichbar über "Meine Klassen"), nicht Teil der
+  // Noteneingabe. Berechtigung siehe userDarfTeilnehmerVerwalten in src/auth.js.
+  const teilnehmerSeite = (fachId) => `/teacher/fach/${fachId}/teilnehmer`;
+  const ladeTeilnehmerFach = (request, reply, ajax = false) => {
     const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach) return reply.code(404).send({ error: 'not found' });
-    if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
+    if (!fach || fach.parent_fach_id || fach.spa_fach_key) {
+      if (ajax) reply.code(404).send({ ok: false, error: 'Fach nicht gefunden.' });
+      else reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+      return null;
+    }
+    if (!userDarfTeilnehmerVerwalten(request.user, fach)) {
+      const message = 'Die Teilnehmer/innen kann nur die Klassenleitung verwalten.';
+      if (ajax) reply.code(403).send({ ok: false, error: message });
+      else reply.code(403).viewEjs('error.ejs', { code: 403, message });
+      return null;
+    }
+    return fach;
+  };
+
+  fastify.get('/fach/:id/teilnehmer', async (request, reply) => {
+    const fach = ladeTeilnehmerFach(request, reply);
+    if (!fach) return reply;
+    return reply.viewEjs('teacher/fach_teilnehmer.ejs', {
+      user: request.user, fach, teilnehmer: ladeTeilnehmerMitHerkunft(fach),
+    });
+  });
+
+  fastify.get('/fach/:id/teilnehmer/suche', async (request, reply) => {
+    const fach = ladeTeilnehmerFach(request, reply, true);
+    if (!fach) return reply;
     const treffer = sucheSchuelerFuerFach(fach, request.query?.q);
     return reply.send({ treffer });
   });
 
   fastify.post('/fach/:id/teilnehmer/hinzufuegen', async (request, reply) => {
     const istAjax = Boolean(request.headers.accept?.includes('application/json'));
-    const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach) {
-      if (istAjax) return reply.code(404).send({ ok: false, error: 'Fach nicht gefunden.' });
-      return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
-    }
-    if (!userHatFachZgriff(request.user, fach.id)) {
-      if (istAjax) return reply.code(403).send({ ok: false, error: 'Keine Berechtigung.' });
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
-    }
+    const fach = ladeTeilnehmerFach(request, reply, istAjax);
+    if (!fach) return reply;
     const schuelerId = parseInt(request.body?.schueler_id, 10);
-    const halbjahr = halbjahrFuerFach(fach, request.body?.halbjahr);
     const ergebnis = fuegeTeilnehmerHinzu(fach, schuelerId);
     const meldungen = {
       'nicht-gefunden': 'Schüler/in nicht gefunden.',
@@ -2207,7 +2225,7 @@ export default async function teacherRoutes(fastify) {
     if (!ergebnis.ok) {
       if (istAjax) return reply.code(400).send({ ok: false, error: meldungen[ergebnis.fehler] || 'Hinzufügen fehlgeschlagen.' });
       request.flash?.('error', meldungen[ergebnis.fehler] || 'Hinzufügen fehlgeschlagen.');
-      return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
+      return reply.redirect(teilnehmerSeite(fach.id));
     }
     if (istAjax) {
       const s = getDb().prepare(`
@@ -2216,14 +2234,12 @@ export default async function teacherRoutes(fastify) {
       `).get(fach.klasse_id, schuelerId);
       return reply.send({ ok: true, teilnehmer: { ...s, fremd: Boolean(s.fremd) } });
     }
-    return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
+    return reply.redirect(teilnehmerSeite(fach.id));
   });
 
   fastify.post('/fach/:id/teilnehmer/manuell', async (request, reply) => {
-    const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
-    if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
-    const halbjahr = halbjahrFuerFach(fach, request.body?.halbjahr);
+    const fach = ladeTeilnehmerFach(request, reply);
+    if (!fach) return reply;
     const ergebnis = legeManuellenTeilnehmerAn(fach, {
       nachname: request.body?.nachname, vorname: request.body?.vorname, klassenName: request.body?.klasse,
     });
@@ -2235,15 +2251,14 @@ export default async function teacherRoutes(fastify) {
       };
       request.flash?.('error', meldungen[ergebnis.fehler] || 'Hinzufügen fehlgeschlagen.');
     }
-    return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
+    return reply.redirect(teilnehmerSeite(fach.id));
   });
 
   fastify.post('/fach/:id/teilnehmer/entfernen', async (request, reply) => {
-    if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
-    const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
-    const schuelerId = parseInt(request.body?.schueler_id, 10);
-    entferneTeilnehmer(request.params.id, schuelerId);
-    return reply.redirect(`/teacher/fach/${request.params.id}?hj=${encodeURIComponent(halbjahr)}`);
+    const fach = ladeTeilnehmerFach(request, reply);
+    if (!fach) return reply;
+    entferneTeilnehmer(fach.id, parseInt(request.body?.schueler_id, 10));
+    return reply.redirect(teilnehmerSeite(fach.id));
   });
 
   // ---------- Einladungen für externe Lehrkräfte (nicht mehr nur Admin) ----------

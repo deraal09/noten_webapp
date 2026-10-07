@@ -249,7 +249,7 @@
                 <%= k.teilnehmer_anzahl %> Teilnehmer/in<%= k.teilnehmer_anzahl === 1 ? '' : 'nen' %>
               </div>
               <div class="kachel-aktionen">
-                <a href="/teacher/fach/<%= k.id %>?tab=teilnehmer">👥 Teilnehmer/innen</a>
+                <a href="/teacher/fach/<%= k.id %>/teilnehmer">👥 Teilnehmer/innen</a>
                 <% if (k.darfLoeschen) { %>
                   <form method="post" action="/teacher/faecher/<%= k.id %>/loeschen" class="inline" onsubmit="return confirm('Kurs löschen?')">
                     <button type="submit" class="danger">🗑 Löschen</button>

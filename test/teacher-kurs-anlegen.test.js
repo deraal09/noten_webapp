@@ -108,7 +108,7 @@ test('Lokales Konto ohne LDAP-Zugang darf keinen Kurs anlegen', async () => {
 let kursId;
 let huelleId;
 
-test('LDAP-Konto legt einen Kurs OHNE Ausgangsklasse an -- leere Teilnehmerliste, Redirect auf Teilnehmer-Reiter', async () => {
+test('LDAP-Konto legt einen Kurs OHNE Ausgangsklasse an -- leere Teilnehmerliste, Redirect auf die Teilnehmer-Seite', async () => {
   const r = await form(lehrerLdap, '/teacher/kurse/neu', {
     schuljahr_id: String(sjId), name: 'Musikkurs Test', notenschluessel: 'IHK',
   });
@@ -118,7 +118,7 @@ test('LDAP-Konto legt einen Kurs OHNE Ausgangsklasse an -- leere Teilnehmerliste
   assert.equal(fach.ist_kurs, 1);
   kursId = fach.id;
   huelleId = fach.klasse_id;
-  assert.equal(r.headers.get('location'), `/teacher/fach/${fach.id}?tab=teilnehmer`);
+  assert.equal(r.headers.get('location'), `/teacher/fach/${fach.id}/teilnehmer`);
 
   const huelle = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(huelleId);
   assert.equal(huelle.ist_kurs_huelle, 1);
@@ -141,7 +141,7 @@ test('Der Kurs erscheint in "Meine Klassen" unter Kurse (nicht nur als Platzhalt
   // irgendwo auf der Seite -- das Anlege-Formular hat zufällig denselben
   // Beispieltext "Spanisch AG" im placeholder stehen, das würde einen Bug
   // in der Auflistung selbst sonst unbemerkt lassen.
-  assert.ok(html.includes(`/teacher/fach/${kursId}?tab=teilnehmer`), 'Kurs sollte als anklickbarer Listeneintrag erscheinen');
+  assert.ok(html.includes(`/teacher/fach/${kursId}/teilnehmer`), 'Kurs sollte als anklickbarer Listeneintrag erscheinen');
   assert.ok(!html.includes('Keine Kurse im Schuljahr'), 'die Kurse-Liste sollte nicht mehr leer sein');
   assert.ok(html.includes('Musikkurs Test'));
   assert.ok(!html.includes(getDb().prepare('SELECT name FROM klassen WHERE id = ?').get(huelleId).name));

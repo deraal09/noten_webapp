@@ -292,6 +292,41 @@ test('Manuelle Noten sind entfernt: kein Reiter, keine Spalten, keine Routen, ke
   assert.doesNotMatch(csv, /\(manuell\)/);
 });
 
+test('Teilnehmer: nicht mehr in der Noteneingabe, Verwaltung über die Klassenseite -- offen für alle, bis es eine Klassenleitung gibt', async () => {
+  const fachSeite = await (await admin(`/teacher/fach/${matheId}?hj=${enc('5. Halbjahr')}`)).text();
+  assert.doesNotMatch(fachSeite, /panel-teilnehmer|teilnehmer-tabelle-body|Teilnehmer\/innen<\/button>/);
+  const klassenSeite = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  assert.ok(klassenSeite.includes(`href="/teacher/fach/${matheId}/teilnehmer"`), 'Link 👥 auf der Klassenseite');
+  const seite = await admin(`/teacher/fach/${matheId}/teilnehmer`);
+  assert.equal(seite.status, 200);
+  assert.match(await seite.text(), /id="teilnehmer-tabelle-body"/);
+
+  // Neue Klasse ohne Klassenleitung (angelegt von "fremd", eine Lehrkraft)
+  const sj = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(klasseId).schuljahr_id;
+  const k = getDb().prepare('INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id) VALUES (?, ?, ?, ?, ?)')
+    .run(sj, 'TN1', 'IHK', '', getDb().prepare("SELECT id FROM users WHERE username = 'fremd'").get().id).lastInsertRowid;
+  const f = getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(k, 'Sozi').lastInsertRowid;
+  const s1 = getDb().prepare("INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, 'Test', 'Tina')").run(k).lastInsertRowid;
+  getDb().prepare('INSERT INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)').run(f, s1);
+  getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES ((SELECT id FROM users WHERE username = ?), ?)').run('lehrer', f);
+  // keine Klassenleitung: jede Lehrkraft mit Klassenzugriff (Ersteller 'fremd', zugewiesene 'lehrer') darf entfernen
+  let r = await form(lehrer, `/teacher/fach/${f}/teilnehmer/entfernen`, { schueler_id: String(s1) });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM fach_teilnehmer WHERE fach_id = ?').get(f).c, 0);
+  getDb().prepare('INSERT INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)').run(f, s1);
+  // sobald jemand Klassenleitung ist, darf es nur noch die Klassenleitung
+  getDb().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(k, getDb().prepare("SELECT id FROM users WHERE username = 'fremd'").get().id);
+  r = await form(lehrer, `/teacher/fach/${f}/teilnehmer/entfernen`, { schueler_id: String(s1) });
+  assert.equal(r.status, 403);
+  assert.equal((await lehrer(`/teacher/fach/${f}/teilnehmer`)).status, 403);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM fach_teilnehmer WHERE fach_id = ?').get(f).c, 1);
+  r = await form(fremd, `/teacher/fach/${f}/teilnehmer/entfernen`, { schueler_id: String(s1) });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM fach_teilnehmer WHERE fach_id = ?').get(f).c, 0);
+  // Admin darf immer
+  assert.equal((await admin(`/teacher/fach/${f}/teilnehmer`)).status, 200);
+});
+
 test.after(async () => {
   await fastify.close();
 });

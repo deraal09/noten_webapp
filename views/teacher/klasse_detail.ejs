@@ -456,6 +456,9 @@ Meier, Carla"></textarea>
             <button type="submit">Speichern</button>
           </form>
         </details>
+        <% if (teilnehmerVerwaltbar && !f.spa_fach_key) { %>
+          <a class="icon-knopf" href="/teacher/fach/<%= f.id %>/teilnehmer" title="Teilnehmer/innen des Fachs verwalten" aria-label="Teilnehmer/innen verwalten: <%= f.name %>">👥</a>
+        <% } %>
         <% if (istKlassenlehrer) { %>
           <% if (eintrag.freieHj.length) { %>
             <button type="button" class="icon-knopf" data-lehrkraft-dialog data-fach-id="<%= f.id %>" data-fach-name="<%= f.name %>" data-erlaubt="<%= eintrag.freieHj.join(',') %>" title="Lehrkraft zuordnen<%= eintrag.kinder.length ? ' (nur in Halbjahren ohne Unterfächer)' : '' %>" aria-label="Lehrkraft zuordnen: <%= f.name %>">🎓</button>

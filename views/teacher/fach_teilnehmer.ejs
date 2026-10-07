@@ -1,0 +1,145 @@
+<h1>
+  Teilnehmer/innen: <%= fach.name %><% if (!fach.ist_kurs) { %> – <%= fach.klasse_name %><% } %>
+  <small>(<%= fach.schuljahr_bezeichnung %>, <%= fach.notenschluessel %><% if (fach.ist_kurs) { %>, Kurs<% } %>)</small>
+</h1>
+<p class="kopf-aktionen">
+  <% if (fach.ist_kurs) { %>
+    <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
+  <% } else { %>
+    <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zur Klasse <%= fach.klasse_name %></a>
+  <% } %>
+  <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
+</p>
+
+<p class="hint">
+  Diese Liste bestimmt, wer in diesem Fach benotet wird
+  <% if (fach.ist_kurs) { %>
+    — ein Kurs startet ohne eigene Schüler/innen. Hier lassen sich Personen aus einer
+    bestehenden Klasse desselben Schuljahres auswählen (der Notenschlüssel muss
+    übereinstimmen), oder manuell mit Name und Klasse eintragen -- gibt es diese Klasse noch
+    nicht, wird sie dabei still angelegt.
+  <% } else { %>
+    — beim Anlegen standardmäßig alle Schüler/innen von <%= fach.klasse_name %>. Für einen
+    klassenübergreifenden Kurs lassen sich hier zusätzlich Schüler/innen aus anderen Klassen
+    desselben Schuljahres aufnehmen (der Notenschlüssel muss übereinstimmen), ohne dafür eine
+    eigene Klasse anzulegen.
+  <% } %>
+  Solange sich niemand als Klassenleitung eingetragen hat, kann das jede Lehrkraft der Klasse,
+  danach nur noch die Klassenleitung.
+</p>
+
+<table class="data">
+  <thead><tr><th>Schüler/in</th><th>Klasse</th><th>Aktion</th></tr></thead>
+  <tbody id="teilnehmer-tabelle-body">
+    <% teilnehmer.forEach(function(t) { %>
+      <tr>
+        <td class="name"><%= t.nachname %>, <%= t.vorname %></td>
+        <td><%= t.klasse_name %><% if (!t.fremd) { %> <small class="hint">(Heimat-Klasse)</small><% } %></td>
+        <td>
+          <form method="post" action="/teacher/fach/<%= fach.id %>/teilnehmer/entfernen" class="inline" onsubmit="return confirm('Aus diesem Fach entfernen?')">
+            <input type="hidden" name="schueler_id" value="<%= t.id %>">
+            <button type="submit" class="danger" title="Aus dem Fach entfernen" aria-label="<%= t.nachname %>, <%= t.vorname %> aus dem Fach entfernen">🗑</button>
+          </form>
+        </td>
+      </tr>
+    <% }); %>
+    <% if (!teilnehmer.length) { %><tr><td colspan="3" class="hint">Noch keine Teilnehmer/innen.</td></tr><% } %>
+  </tbody>
+</table>
+
+<div class="card">
+  <h2>Person aus einer Klasse hinzufügen</h2>
+  <label class="feld">Suche (Name oder Klasse)
+    <input type="text" id="teilnehmer-suche-eingabe" placeholder="z. B. Müller oder 10B" autocomplete="off">
+  </label>
+  <ul class="klasse-liste" id="teilnehmer-suche-ergebnisse"></ul>
+</div>
+
+<div class="card">
+  <h2>Manuell anlegen</h2>
+  <p class="hint">
+    Für Schüler/innen, die noch gar nicht im System sind. Klasse ist
+    Pflicht: Existiert sie im Schuljahr dieses Fachs noch nicht, wird sie
+    automatisch als leere Klasse mit demselben Notenschlüssel angelegt —
+    eine später beitretende Klassenleitung findet sie dann schon vor und
+    muss nur noch die übrigen Schüler/innen ergänzen.
+  </p>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/teilnehmer/manuell">
+    <div class="erstellen-felder">
+      <label class="feld">Nachname
+        <input type="text" name="nachname" required>
+      </label>
+      <label class="feld">Vorname
+        <input type="text" name="vorname" required>
+      </label>
+      <label class="feld">Klasse
+        <input type="text" name="klasse" placeholder="z. B. 10B" required>
+      </label>
+    </div>
+    <button type="submit">+ Hinzufügen</button>
+  </form>
+</div>
+
+<script>
+  // Ergebnisse werden per DOM-API statt innerHTML eingefügt (Namen kommen aus der Datenbank).
+  // Hinzufügen läuft per fetch(), damit Suchfeld und Trefferliste stehen bleiben und mehrere
+  // Personen nacheinander angeklickt werden können.
+  (function() {
+    function debounce(fn, ms) { var t; return function() { var a = arguments; clearTimeout(t); t = setTimeout(function() { fn.apply(null, a); }, ms); }; }
+    var eingabe = document.getElementById('teilnehmer-suche-eingabe');
+    var ergebnisListe = document.getElementById('teilnehmer-suche-ergebnisse');
+    var tabelle = document.getElementById('teilnehmer-tabelle-body');
+
+    function neueZeile(t) {
+      var tr = document.createElement('tr');
+      var nameZelle = document.createElement('td'); nameZelle.className = 'name'; nameZelle.textContent = t.nachname + ', ' + t.vorname;
+      var klasseZelle = document.createElement('td'); klasseZelle.textContent = t.klasse_name;
+      if (!t.fremd) { var h = document.createElement('small'); h.className = 'hint'; h.textContent = ' (Heimat-Klasse)'; klasseZelle.appendChild(h); }
+      var aktionZelle = document.createElement('td');
+      var form = document.createElement('form');
+      form.method = 'post'; form.action = '/teacher/fach/<%= fach.id %>/teilnehmer/entfernen'; form.className = 'inline';
+      form.addEventListener('submit', function(e) { if (!confirm('Aus diesem Fach entfernen?')) e.preventDefault(); });
+      var sid = document.createElement('input'); sid.type = 'hidden'; sid.name = 'schueler_id'; sid.value = t.id;
+      var del = document.createElement('button'); del.type = 'submit'; del.className = 'danger'; del.textContent = '🗑';
+      form.appendChild(sid); form.appendChild(del); aktionZelle.appendChild(form);
+      tr.appendChild(nameZelle); tr.appendChild(klasseZelle); tr.appendChild(aktionZelle);
+      var leer = tabelle.querySelector('td[colspan]');
+      if (leer) leer.parentNode.remove();
+      tabelle.appendChild(tr);
+    }
+
+    eingabe.addEventListener('input', debounce(async function() {
+      var q = eingabe.value.trim();
+      ergebnisListe.textContent = '';
+      if (!q) return;
+      var r = await fetch('/teacher/fach/<%= fach.id %>/teilnehmer/suche?q=' + encodeURIComponent(q));
+      if (!r.ok) return;
+      var data = await r.json();
+      if (!data.treffer.length) {
+        var li0 = document.createElement('li'); li0.textContent = 'Keine Treffer.'; ergebnisListe.appendChild(li0); return;
+      }
+      data.treffer.forEach(function(t) {
+        var li = document.createElement('li');
+        var btn = document.createElement('button'); btn.type = 'button';
+        btn.textContent = '+ ' + t.nachname + ', ' + t.vorname + ' (' + t.klasse_name + ')'
+          + (t.notenschluessel !== '<%= fach.notenschluessel %>' ? ' — anderer Notenschlüssel' : '');
+        btn.addEventListener('click', async function() {
+          btn.disabled = true;
+          var body = new URLSearchParams(); body.append('schueler_id', t.id);
+          var res = await fetch('/teacher/fach/<%= fach.id %>/teilnehmer/hinzufuegen', { method: 'POST', headers: { Accept: 'application/json' }, body: body });
+          var resData = await res.json().catch(function() { return {}; });
+          if (res.ok && resData.ok) {
+            btn.textContent = '✓ ' + t.nachname + ', ' + t.vorname + ' hinzugefügt';
+            neueZeile(resData.teilnehmer);
+          } else {
+            btn.disabled = false;
+            var fehler = li.querySelector('.err');
+            if (!fehler) { fehler = document.createElement('div'); fehler.className = 'err'; li.appendChild(fehler); }
+            fehler.textContent = resData.error || 'Hinzufügen fehlgeschlagen.';
+          }
+        });
+        li.appendChild(btn); ergebnisListe.appendChild(li);
+      });
+    }, 300));
+  })();
+</script>
