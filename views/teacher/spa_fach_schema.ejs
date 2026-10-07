@@ -1,0 +1,12 @@
+<h1>Bewertungsschema: <%= fach.name %> <small>(<%= fach.klasse_name %>)</small></h1>
+<p class="kopf-aktionen"><a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a></p>
+<% if (typeof fehler !== 'undefined' && fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
+<p class="hint">
+  Gilt nur für dieses Fach dieser Klasse; die Vorlage bleibt unverändert. Bereits eingetragene Punkte
+  bleiben erhalten und werden nach dem neuen Schema berechnet. Wird eine Komponente umbenannt oder entfernt,
+  gehören ihre eingetragenen Werte nicht mehr dazu.
+</p>
+<form method="post" action="/teacher/faecher/<%= fach.id %>/spa-schema" class="spa-editor">
+  <%- await include('../partials/spa-fach-editor', { modell: modell, alleFaecher: alleFaecher, einzeln: true }) %>
+  <div class="form-actions"><button type="submit">💾 Schema speichern</button></div>
+</form>

@@ -374,6 +374,18 @@ CREATE TABLE IF NOT EXISTS fach_vorlagen_faecher (
     verrechnung TEXT
 );
 
+-- SPA-Vorlagen (je Lehrkraft): die komplette, frei editierbare Fächervorgabe für SPA-Klassen
+-- (Fächer mit Bewertungsschema je Halbjahr) als JSON, siehe src/spa-vorlagen.js.
+CREATE TABLE IF NOT EXISTS spa_vorlagen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    bildungsgang TEXT NOT NULL,
+    konfig TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS klassen_lehrkraefte (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -780,6 +792,8 @@ function migrate(db) {
   ensureColumn(db, 'klassen', 'spa_bildungsgang', 'spa_bildungsgang TEXT');
   ensureColumn(db, 'faecher', 'spa_fach_key', 'spa_fach_key TEXT');
   ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
+  // Kopie des Bewertungsschemas eines SPA-Fachs (JSON); NULL = Standard aus src/spa-schema.js.
+  ensureColumn(db, 'faecher', 'spa_schema', 'spa_schema TEXT');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
   // Laufzeit einer Klasse in Schuljahren (Startjahr, z. B. 2025 für 2025/26): siehe src/klassen-jahre.js.

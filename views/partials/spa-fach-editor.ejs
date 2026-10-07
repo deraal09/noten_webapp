@@ -1,0 +1,110 @@
+<%# Fach-Karten des SPA-Editors (Vorlage bzw. einzelnes Fach). Erwartet: modell, alleFaecher, einzeln (true = ein Fach der Klasse). %>
+<% modell.forEach(function(f, i) { var istNeu = !f.name && !f.schluessel; %>
+  <details class="spa-fach card" <%= (einzeln || istNeu || modell.length === 1) ? 'open' : '' %> <%= istNeu ? 'id=neues-fach' : '' %>>
+    <summary><strong><%= f.name || 'Neues Fach' %></strong>
+      <small class="hint">(<%= f.typ === 'LF' ? 'Lernfeld' : 'Fach' %><%= f.schluessel ? ', ' + f.schluessel : '' %>)</small></summary>
+    <input type="hidden" name="fach_idx" value="<%= i %>">
+    <input type="hidden" name="f<%= i %>_key" value="<%= f.schluessel %>">
+    <div class="spa-fach-kopf">
+      <label>Name
+        <input type="text" name="f<%= i %>_name" value="<%= f.name %>" maxlength="100" <%= istNeu ? '' : 'required' %>>
+      </label>
+      <% if (!einzeln) { %>
+        <label>Art
+          <select name="f<%= i %>_typ">
+            <option value="FACH" <%= f.typ === 'FACH' ? 'selected' : '' %>>Fach</option>
+            <option value="LF" <%= f.typ === 'LF' ? 'selected' : '' %>>Lernfeld</option>
+          </select>
+        </label>
+        <label class="spa-entfernen"><input type="checkbox" name="f<%= i %>_entfernen" value="1"> Fach aus der Vorlage entfernen</label>
+      <% } %>
+    </div>
+    <div class="spa-halbjahre">
+      <% f.halbjahre.forEach(function(h) { var p = 'f' + i + '_h' + h.hj + '_'; %>
+        <fieldset class="spa-hj" data-hj>
+          <legend><%= h.hj %>. Halbjahr</legend>
+          <label>Das Fach ist in diesem Halbjahr
+            <select name="<%= p %>status">
+              <option value="aktiv" <%= h.status === 'aktiv' ? 'selected' : '' %>>aktiv (zählt, steht im Zeugnis)</option>
+              <option value="inaktiv" <%= h.status === 'inaktiv' ? 'selected' : '' %>>vorhanden, aber inaktiv</option>
+              <option value="fehlt" <%= h.status === 'fehlt' ? 'selected' : '' %>>nicht vorhanden</option>
+            </select>
+          </label>
+          <label>Bewertung
+            <select name="<%= p %>modus" data-steuert="modus">
+              <option value="direkt" <%= h.modus === 'direkt' ? 'selected' : '' %>>ein Punktwert (direkt)</option>
+              <option value="komponenten_gewichtet" <%= h.modus === 'komponenten_gewichtet' ? 'selected' : '' %>>aus Komponenten gewichtet</option>
+            </select>
+          </label>
+          <label data-wenn-modus="komponenten_gewichtet">Komponenten (eine pro Zeile: <em>Name; Prozent</em> oder <em>Name; Rest</em>)
+            <textarea name="<%= p %>komp" rows="4" placeholder="Pädagogik; 40&#10;Kunst; Rest"><%= h.komp %></textarea>
+            <small class="hint">„Rest“ teilt sich den Rest bis 100 % gleichmäßig; feste Prozente zusammen höchstens 100 %.</small>
+          </label>
+          <label>Verrechnung mit Vorwerten
+            <select name="<%= p %>kum" data-steuert="kum">
+              <option value="keine" <%= h.kum === 'keine' ? 'selected' : '' %>>keine</option>
+              <option value="fortlaufend_50_50" <%= h.kum === 'fortlaufend_50_50' ? 'selected' : '' %>>fortlaufend 50 % Vorwert / 50 % neu</option>
+              <option value="gewichtet_vorgaenger" <%= h.kum === 'gewichtet_vorgaenger' ? 'selected' : '' %>>gewichtet mit einer Quelle</option>
+              <option value="mittelwert_halbjahre" <%= h.kum === 'mittelwert_halbjahre' ? 'selected' : '' %>>Mittelwert aus Halbjahren</option>
+            </select>
+          </label>
+          <div data-wenn-kum="mittelwert_halbjahre" class="spa-mw">
+            Mittelwert aus:
+            <% [1, 2, 3, 4].forEach(function(n) { %>
+              <label class="inline"><input type="checkbox" name="<%= p %>mw" value="<%= n %>" <%= h.mw.indexOf(n) >= 0 ? 'checked' : '' %>> <%= n %>. Hj.</label>
+            <% }); %>
+          </div>
+          <div data-wenn-kum="gewichtet_vorgaenger" class="spa-quelle">
+            <label>Quelle
+              <select name="<%= p %>quelle" data-steuert="quelle">
+                <option value="vorgaenger" <%= h.quelle === 'vorgaenger' ? 'selected' : '' %>>vorheriges Halbjahr (30 % / 70 %)</option>
+                <option value="fach" <%= h.quelle === 'fach' ? 'selected' : '' %>>Halbjahr eines anderen Fachs</option>
+                <option value="pruefung" <%= h.quelle === 'pruefung' ? 'selected' : '' %>>Prüfungsnote dieses Fachs</option>
+              </select>
+            </label>
+            <span data-wenn-quelle="fach">
+              <label>Fach
+                <select name="<%= p %>extfach">
+                  <% alleFaecher.forEach(function(a) { if (a.schluessel === f.schluessel || !a.name) return; %>
+                    <option value="<%= a.schluessel %>" <%= h.extFach === a.schluessel ? 'selected' : '' %>><%= a.name %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <label>Halbjahr
+                <select name="<%= p %>exthj">
+                  <% [1, 2, 3, 4].forEach(function(n) { %><option value="<%= n %>" <%= Number(h.extHj) === n ? 'selected' : '' %>><%= n %>. Hj.</option><% }); %>
+                </select>
+              </label>
+            </span>
+            <span data-wenn-quelle="fach pruefung">
+              <label>Anteil der Quelle
+                <span class="feld-mit-einheit"><input type="text" inputmode="decimal" name="<%= p %>extpct" value="<%= h.extPct %>" size="4">%</span>
+              </label>
+            </span>
+          </div>
+          <div class="spa-haken">
+            <label class="inline"><input type="checkbox" name="<%= p %>abschluss" value="1" <%= h.abschluss ? 'checked' : '' %>> im Abschlusszeugnis zeigen</label>
+            <label class="inline"><input type="checkbox" name="<%= p %>pruefung" value="1" <%= h.pruefung ? 'checked' : '' %>> mit Prüfung</label>
+            <label class="inline"><input type="checkbox" name="<%= p %>deakt" value="1" <%= h.deakt ? 'checked' : '' %>> „n/a“ je Person möglich</label>
+            <label class="inline"><input type="checkbox" name="<%= p %>komma" value="1" <%= h.komma ? 'checked' : '' %>> als Komma-Note (z. B. 3,0)</label>
+          </div>
+        </fieldset>
+      <% }); %>
+    </div>
+  </details>
+<% }); %>
+<script>
+  // Blendet Felder aus, die zur gewählten Bewertung/Verrechnung/Quelle nicht passen.
+  (function() {
+    function aktualisieren(fs) {
+      var wert = function(n) { var s = fs.querySelector('[data-steuert="' + n + '"]'); return s ? s.value : ''; };
+      fs.querySelectorAll('[data-wenn-modus]').forEach(function(e) { e.hidden = e.getAttribute('data-wenn-modus') !== wert('modus'); });
+      fs.querySelectorAll('[data-wenn-kum]').forEach(function(e) { e.hidden = e.getAttribute('data-wenn-kum') !== wert('kum'); });
+      fs.querySelectorAll('[data-wenn-quelle]').forEach(function(e) { e.hidden = e.getAttribute('data-wenn-quelle').split(' ').indexOf(wert('quelle')) < 0; });
+    }
+    document.querySelectorAll('fieldset[data-hj]').forEach(function(fs) {
+      fs.addEventListener('change', function() { aktualisieren(fs); });
+      aktualisieren(fs);
+    });
+  })();
+</script>

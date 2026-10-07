@@ -6,6 +6,29 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.84.0 - 2026-10-07
+
+- **SPA-Fächervorgabe komplett editierbar, als Vorlage ablegbar.** Neue Seite
+  „SPA-Vorlagen" (erreichbar über das Anlegeformular für SPA-Klassen und die
+  Klassenseite): Fächer/Lernfelder anlegen, umbenennen, entfernen; je Halbjahr
+  festlegen, ob das Fach vorhanden/aktiv ist, ob es mit einem Punktwert oder
+  aus gewichteten Komponenten bewertet wird (Komponenten frei benennbar, feste
+  Prozente oder „Rest"), wie mit Vorwerten verrechnet wird (50/50, gewichtet mit
+  Vorgänger-Halbjahr, anderem Fach oder Prüfungsnote, Mittelwert aus Halbjahren)
+  sowie Abschlusszeugnis, Prüfung, „n/a" und Komma-Note. Eine neue Vorlage startet
+  als Kopie der Standard-Vorgabe (SPA regulär/PiA), einer eigenen Vorlage oder leer.
+  Ungültiges (z. B. mehr als 100 %, Fächer, die sich im Kreis verrechnen) wird
+  mit Meldung abgelehnt.
+- **Beim Anlegen einer SPA-Klasse** lässt sich die Standard-Vorgabe (wie bisher
+  vorbelegt), eine eigene Vorlage oder **keine Vorlage** wählen; die Fächer können
+  später über „SPA-Fächervorgabe laden" (Klassenseite, Klassenleitung) nachgeladen
+  werden -- dabei entstehen nur Fächer, die es noch nicht gibt. Die Fächer einer
+  Klasse lassen sich auch als Vorlage ablegen.
+- Die Klasse bekommt eine **Kopie** des Schemas (je Fach); spätere Änderungen an
+  der Vorlage ändern bestehende Klassen nicht. Das Schema eines einzelnen Fachs
+  lässt sich in der Klasse mit ⚙ anpassen (Klassenleitung). Bestehende Klassen
+  folgen unverändert der Standard-Vorgabe.
+
 ## 0.83.0 - 2026-10-07
 
 - **Untertabelle je Fach** in der Halbjahres- und der Abschluss-/Abgangsübersicht

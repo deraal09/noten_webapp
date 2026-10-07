@@ -98,6 +98,16 @@
           <% bildungsgaenge.forEach(function(bg) { %>
             <label><input type="radio" name="spa_bildungsgang" value="<%= bg.schluessel %>"> <%= bg.bezeichnung %></label>
           <% }); %>
+          <label>Fächervorgabe
+            <select name="spa_vorlage">
+              <option value="standard">Standard-Vorgabe des Bildungsgangs laden</option>
+              <% spaVorlagen.forEach(function(v) { %>
+                <option value="<%= v.id %>" data-bildungsgang="<%= v.bildungsgang %>">Vorlage „<%= v.name %>“ laden (<%= v.bildungsgang === 'SPA_PIA' ? 'PiA' : 'regulär' %>)</option>
+              <% }); %>
+              <option value="keine">Keine Vorlage -- Fächer später laden</option>
+            </select>
+          </label>
+          <p class="hint"><a href="/teacher/spa-vorlagen">SPA-Vorlagen bearbeiten oder neu erstellen</a></p>
         </div>
         <label>
           <input type="checkbox" name="offen_fuer_beitritt" value="1" checked>
@@ -253,5 +263,22 @@
     };
     select.addEventListener('change', aktualisieren);
     aktualisieren();
+  });
+
+  // Von den SPA-Vorlagen nur die zum gewählten Bildungsgang anbieten.
+  document.querySelectorAll('.spa-bildungsgang-auswahl').forEach(function(block) {
+    var vorlagen = block.querySelector('select[name="spa_vorlage"]');
+    if (!vorlagen) return;
+    var filtern = function() {
+      var radio = block.querySelector('input[name="spa_bildungsgang"]:checked');
+      Array.prototype.forEach.call(vorlagen.options, function(o) {
+        var bg = o.getAttribute('data-bildungsgang');
+        var passt = !bg || !radio || bg === radio.value;
+        o.hidden = !passt; o.disabled = !passt;
+        if (!passt && o.selected) vorlagen.value = 'standard';
+      });
+    };
+    block.addEventListener('change', filtern);
+    filtern();
   });
 </script>

@@ -44,11 +44,15 @@ import {
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr } from '../schuljahr-utils.js';
-import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
+import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
+import {
+  ladeSpaVorlagen, ladeSpaVorlage, speichereSpaVorlage, loescheSpaVorlage, freierVorlagenName, ladeSpaVorlageInKlasse,
+  editorModell, neuesFach, leseFaecherAusFormular,
+} from '../spa-vorlagen.js';
 import {
   berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer,
   ladeEingabeAnzeige as ladeSpaEingabeAnzeige,
-  seedeSpaFaecher, spaSchemaFuerFach, spaKomponentenKonfig, spaSetzeKomponenteAktiv, spaKomponentenHalbjahre, seedeKomponentenUnterfaecher,
+  seedeSpaFaecher, spaSchemaFuerFach, spaKlassenKonfig, spaBasisSchemaVon, synchronisiereKomponentenUnterfaecher, spaKomponentenKonfig, spaSetzeKomponenteAktiv, spaKomponentenHalbjahre, seedeKomponentenUnterfaecher,
 } from '../spa-noten-service.js';
 import {
   zeugnisMitQuellen, ladeQuellenSeite, speichereQuellenAuswahl, loescheQuellenAuswahl,
@@ -1139,7 +1143,7 @@ export default async function teacherRoutes(fastify) {
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
       user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen: sichtbareKlassen,
-      kurseNachSchuljahr, bildungsgaenge: BILDUNGSGAENGE, jahresOptionen: jahresOptionen(),
+      kurseNachSchuljahr, bildungsgaenge: BILDUNGSGAENGE, spaVorlagen: ladeSpaVorlagen(request.user.id), jahresOptionen: jahresOptionen(),
       kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), vorhandeneKlassen,
     });
   });
@@ -1181,6 +1185,12 @@ export default async function teacherRoutes(fastify) {
     }
     // Erlaubt anderen Lehrkräften später einen sofortigen Beitritt bei
     // Namenskollision, ohne Zustimmung einzuholen (siehe klassen-verknuepfung.js).
+    // SPA: Fächervorgabe laden -- 'standard' (Vorgabe des Bildungsgangs, Vorbelegung), eine eigene Vorlage oder 'keine'.
+    const spaQuelle = ns === 'SPA' ? String(request.body?.spa_vorlage || 'standard') : 'keine';
+    if (ns === 'SPA' && !['standard', 'keine'].includes(spaQuelle) && !ladeSpaVorlage(parseInt(spaQuelle, 10), request.user.id)) {
+      request.flash?.('error', 'Die gewählte SPA-Vorlage gibt es nicht.');
+      return reply.redirect('/teacher/klassen');
+    }
     const offenFuerBeitritt = request.body?.offen_fuer_beitritt === '1' ? 1 : 0;
     if (!schuljahrId || !name) {
       request.flash?.('error', 'Schuljahr und Name sind erforderlich.');
@@ -1208,7 +1218,7 @@ export default async function teacherRoutes(fastify) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns] || '', request.user.id, offenFuerBeitritt, spaBildungsgang, einschulungJahr, abschlussJahr);
       const klasseId = info.lastInsertRowid;
-      if (ns === 'SPA') seedeSpaFaecher(getDb(), klasseId, spaBildungsgang, request.user.id);
+      if (ns === 'SPA') ladeSpaVorlageInKlasse({ id: klasseId, notenschluessel: 'SPA', spa_bildungsgang: spaBildungsgang }, spaQuelle, request.user.id);
       return reply.redirect(`/teacher/klassen/${klasseId}`);
     } catch (e) {
       // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zum
@@ -1666,7 +1676,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), klassenleitungNamen: klasse.ist_ablage ? [] : ladeKlassenleitungNamen(klasse.id), vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), klassenleitungNamen: klasse.ist_ablage ? [] : ladeKlassenleitungNamen(klasse.id), vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), spaVorlagen: klasse.notenschluessel === 'SPA' ? ladeSpaVorlagen(request.user.id) : [], speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
@@ -2017,6 +2027,138 @@ export default async function teacherRoutes(fastify) {
     const klasseId = parseInt(request.body?.klasse_id, 10);
     request.flash?.('success', 'Vorlage gelöscht.');
     return reply.redirect(Number.isInteger(klasseId) ? `/teacher/klassen/${klasseId}#faecher-lehrkraefte` : '/teacher/klassen');
+  });
+
+  // ---------- SPA-Vorlagen: frei editierbare Fächervorgabe (siehe src/spa-vorlagen.js) ----------
+  const bildungsgangName = (b) => BILDUNGSGAENGE.find((x) => x.schluessel === b)?.bezeichnung ?? b;
+
+  fastify.get('/spa-vorlagen', async (request, reply) => {
+    return reply.viewEjs('teacher/spa_vorlagen.ejs', {
+      user: request.user, vorlagen: ladeSpaVorlagen(request.user.id), bildungsgaenge: BILDUNGSGAENGE, bildungsgangName,
+    });
+  });
+
+  fastify.post('/spa-vorlagen/neu', async (request, reply) => {
+    const bildungsgang = String(request.body?.bildungsgang || '');
+    if (!BILDUNGSGAENGE.some((b) => b.schluessel === bildungsgang)) {
+      request.flash?.('error', 'Bitte einen Bildungsgang wählen.');
+      return reply.redirect('/teacher/spa-vorlagen');
+    }
+    // Basis: Standard des Bildungsgangs, eine eigene Vorlage (Kopie) oder ganz leer.
+    const basis = String(request.body?.basis || 'standard');
+    let faecher;
+    let basisName = `Eigene Vorlage ${bildungsgangName(bildungsgang)}`;
+    if (basis === 'leer') faecher = [];
+    else if (basis === 'standard') { faecher = standardKonfig(bildungsgang); basisName = `Standard ${bildungsgangName(bildungsgang)}`; }
+    else {
+      const quelle = ladeSpaVorlage(parseInt(basis, 10), request.user.id);
+      if (!quelle) { request.flash?.('error', 'Vorlage nicht gefunden.'); return reply.redirect('/teacher/spa-vorlagen'); }
+      faecher = quelle.faecher; basisName = quelle.name;
+    }
+    const wunsch = String(request.body?.name || '').trim();
+    const name = wunsch || freierVorlagenName(request.user.id, basis === 'leer' || basis === 'standard' ? basisName : `${basisName} (Kopie)`);
+    const res = speichereSpaVorlage(request.user.id, { name, bildungsgang, faecher });
+    if (!res.ok) { request.flash?.('error', res.fehler); return reply.redirect('/teacher/spa-vorlagen'); }
+    return reply.redirect(`/teacher/spa-vorlagen/${res.id}`);
+  });
+
+  const zeigeVorlagenEditor = (reply, request, vorlage, faecher, extra = {}) => reply.viewEjs('teacher/spa_vorlage.ejs', {
+    user: request.user, vorlage, bildungsgaenge: BILDUNGSGAENGE, modell: editorModell(faecher),
+    alleFaecher: faecher.map((f) => ({ schluessel: f.schluessel, name: f.name })), ...extra,
+  });
+
+  fastify.get('/spa-vorlagen/:id', async (request, reply) => {
+    const vorlage = ladeSpaVorlage(parseInt(request.params.id, 10), request.user.id);
+    if (!vorlage) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Vorlage nicht gefunden.' });
+    // ?neu=1: zusätzlich eine leere Fach-Karte zum Ausfüllen (nach "Fach hinzufügen").
+    const faecher = request.query?.neu ? [...vorlage.faecher, { ...neuesFach(), name: '' }] : vorlage.faecher;
+    return zeigeVorlagenEditor(reply, request, vorlage, faecher, { neuesFachOffen: Boolean(request.query?.neu) });
+  });
+
+  fastify.post('/spa-vorlagen/:id', async (request, reply) => {
+    const vorlage = ladeSpaVorlage(parseInt(request.params.id, 10), request.user.id);
+    if (!vorlage) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Vorlage nicht gefunden.' });
+    const body = request.body || {};
+    const faecher = leseFaecherAusFormular(body);
+    if (body.aktion === 'fach_neu') faecher.push({ ...neuesFach(), name: '' });
+    const bildungsgang = String(body.bildungsgang || vorlage.bildungsgang);
+    const name = String(body.name || '').trim();
+    // Neu hinzugefügte, noch unbenannte Fächer blockieren das Speichern nicht -- sie bleiben im Formular.
+    const speicherbar = faecher.filter((f) => f.name);
+    const res = speichereSpaVorlage(request.user.id, { id: vorlage.id, name, bildungsgang, faecher: speicherbar });
+    if (!res.ok) return zeigeVorlagenEditor(reply, request, { ...vorlage, name, bildungsgang }, faecher, { fehler: res.fehler });
+    if (body.aktion === 'fach_neu') return reply.redirect(`/teacher/spa-vorlagen/${vorlage.id}?neu=1#neues-fach`);
+    request.flash?.('success', 'Vorlage gespeichert.');
+    return reply.redirect(`/teacher/spa-vorlagen/${vorlage.id}`);
+  });
+
+  fastify.post('/spa-vorlagen/:id/loeschen', async (request, reply) => {
+    loescheSpaVorlage(parseInt(request.params.id, 10), request.user.id);
+    request.flash?.('success', 'Vorlage gelöscht.');
+    return reply.redirect('/teacher/spa-vorlagen');
+  });
+
+  // Vorlage (oder Standard) in eine bestehende SPA-Klasse laden: legt nur Fächer an, die es noch nicht gibt.
+  fastify.post('/klassen/:id/spa-vorlage/laden', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung darf die Fächervorgabe laden.' });
+    const res = ladeSpaVorlageInKlasse(klasse, String(request.body?.quelle || 'standard'), request.user.id);
+    if (!res.ok) request.flash?.('error', res.fehler);
+    else request.flash?.(res.angelegt.length ? 'success' : 'error', res.angelegt.length ? `Fächer angelegt: ${res.angelegt.join(', ')}.` : 'Es wurden keine Fächer angelegt -- die Fächer der Vorlage gibt es in dieser Klasse schon.');
+    return reply.redirect(`/teacher/klassen/${klasse.id}#faecher-lehrkraefte`);
+  });
+
+  // Die Fächervorgabe dieser Klasse (Fächer samt Schema) als eigene Vorlage ablegen.
+  fastify.post('/klassen/:id/spa-vorlage/speichern', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse || klasse.notenschluessel !== 'SPA') return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'SPA-Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung darf die Fächervorgabe als Vorlage ablegen.' });
+    const faecher = spaKlassenKonfig(getDb(), klasse.id).faecher.map((f) => ({ schluessel: f.schluessel, name: f.name, typ: /^LF\d/.test(f.schluessel) ? 'LF' : 'FACH', schema: f.schema }));
+    const res = faecher.length
+      ? speichereSpaVorlage(request.user.id, { name: String(request.body?.name || '').trim(), bildungsgang: klasse.spa_bildungsgang, faecher })
+      : { ok: false, fehler: 'Die Klasse hat noch keine Fächer, die sich als Vorlage ablegen ließen.' };
+    if (!res.ok) { request.flash?.('error', res.fehler); return reply.redirect(`/teacher/klassen/${klasse.id}#spa-vorlage-laden`); }
+    request.flash?.('success', 'Fächervorgabe als Vorlage gespeichert.');
+    return reply.redirect(`/teacher/spa-vorlagen/${res.id}`);
+  });
+
+  // Bewertungsschema eines einzelnen SPA-Fachs der Klasse bearbeiten (Klassenleitung): wie ein Fach der Vorlage.
+  const ladeSchemaFach = (request, reply) => {
+    const fach = getDb().prepare('SELECT f.*, k.name AS klasse_name, k.spa_bildungsgang FROM faecher f JOIN klassen k ON k.id = f.klasse_id WHERE f.id = ?').get(request.params.id);
+    if (!fach || !fach.spa_fach_key) { reply.code(404).viewEjs('error.ejs', { code: 404, message: 'SPA-Fach nicht gefunden.' }); return null; }
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) { reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung darf das Bewertungsschema ändern.' }); return null; }
+    return fach;
+  };
+  const klassenFaecherModell = (fach, ersatz) => spaKlassenKonfig(getDb(), fach.klasse_id).faecher
+    .map((f) => (f.fachId === fach.id ? ersatz : { schluessel: f.schluessel, name: f.name, typ: 'FACH', schema: f.schema }));
+
+  fastify.get('/faecher/:id/spa-schema', async (request, reply) => {
+    const fach = ladeSchemaFach(request, reply); if (!fach) return;
+    const eigenes = { schluessel: fach.spa_fach_key, name: fach.name, typ: 'FACH', schema: spaBasisSchemaVon(fach, fach.spa_bildungsgang) };
+    return reply.viewEjs('teacher/spa_fach_schema.ejs', {
+      user: request.user, fach, modell: editorModell([eigenes]), alleFaecher: klassenFaecherModell(fach, eigenes).map((f) => ({ schluessel: f.schluessel, name: f.name })),
+    });
+  });
+
+  fastify.post('/faecher/:id/spa-schema', async (request, reply) => {
+    const fach = ladeSchemaFach(request, reply); if (!fach) return;
+    const body = { ...(request.body || {}), fach_idx: '0', f0_key: fach.spa_fach_key };
+    const [eingabe] = leseFaecherAusFormular(body);
+    const alle = klassenFaecherModell(fach, eingabe);
+    const pruefung = pruefeKonfig(alle);
+    const doppelt = getDb().prepare('SELECT 1 FROM faecher WHERE klasse_id = ? AND name = ? AND id != ?').get(fach.klasse_id, eingabe.name, fach.id);
+    if (!pruefung.ok || doppelt) {
+      return reply.viewEjs('teacher/spa_fach_schema.ejs', {
+        user: request.user, fach, modell: editorModell([eingabe]), alleFaecher: alle.map((f) => ({ schluessel: f.schluessel, name: f.name })),
+        fehler: doppelt ? `Es gibt in der Klasse schon ein Fach „${eingabe.name}“.` : pruefung.fehler,
+      });
+    }
+    const neu = pruefung.faecher.find((f) => f.schluessel === fach.spa_fach_key);
+    getDb().prepare('UPDATE faecher SET name = ?, spa_schema = ? WHERE id = ?').run(neu.name, JSON.stringify(neu.schema), fach.id);
+    synchronisiereKomponentenUnterfaecher(getDb(), fach.id);
+    request.flash?.('success', 'Bewertungsschema gespeichert.');
+    return reply.redirect(`/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte`);
   });
 
   // Halbjahre ändern, in denen ein Fach gilt. Nicht entfernen, wenn in einem

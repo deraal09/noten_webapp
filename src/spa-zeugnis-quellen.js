@@ -12,10 +12,9 @@
 
 import { ladeFaecherEinerPerson, ladeFachNotenEintraege } from './fach-abschluss.js';
 import {
-  berechneFachFuerSchueler, zeugnisFuerKlasse, ausweisTendenz,
+  berechneFachFuerSchueler, zeugnisFuerKlasse, ausweisTendenz, spaKlassenKonfig,
 } from './spa-noten-service.js';
 import { tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
-import { spaSchemaFuer } from './spa-schema.js';
 
 const begrenze = (x) => Math.max(0, Math.min(15, x));
 
@@ -85,7 +84,7 @@ export function wendeQuellenAn(db, klasse, zeilen) {
       const werte = quellen
         .map((q) => punkteFuerQuelle(db, q, zeile.schuelerId, Number(hj), cache))
         .filter((w) => w !== null);
-      const istKomma = spaSchemaFuer(fachKey, klasse.spa_bildungsgang).some((s) => s.kommaNote);
+      const istKomma = spaKlassenKonfig(db, klasse.id).schemaFuer(fachKey).some((s) => s.kommaNote);
       const mittel = werte.length ? werte.reduce((a, b) => a + b, 0) / werte.length : null;
       zelle.endpunkte = mittel;
       zelle.tendenz = mittel === null ? null : ausweisTendenz(istKomma, tendenzAusEndpunkten(mittel, STANDARD_NOTENSKALA));

@@ -1,0 +1,48 @@
+<h1>SPA-Vorlagen</h1>
+<p class="kopf-aktionen"><a class="btn" href="/teacher/klassen">← Meine Klassen</a></p>
+<p class="hint">
+  Eine SPA-Vorlage ist die komplette Fächervorgabe einer SPA-Klasse -- Fächer, Lernfelder, Komponenten, Gewichte
+  und Verrechnung -- und lässt sich vollständig bearbeiten. Beim Anlegen einer SPA-Klasse kann eine Vorlage geladen
+  werden (oder die Standard-Vorgabe, oder keine); in einer bestehenden SPA-Klasse lädt die Klassenleitung sie über
+  „Fächer und Lehrkräfte“.
+</p>
+
+<div class="card">
+  <h2>Neue Vorlage</h2>
+  <form method="post" action="/teacher/spa-vorlagen/neu">
+    <label>Name (optional)
+      <input type="text" name="name" maxlength="100" placeholder="z. B. SPA Jahrgang 2026">
+    </label>
+    <label>Bildungsgang
+      <select name="bildungsgang">
+        <% bildungsgaenge.forEach(function(b) { %><option value="<%= b.schluessel %>"><%= b.bezeichnung %></option><% }); %>
+      </select>
+    </label>
+    <label>Ausgangspunkt
+      <select name="basis">
+        <option value="standard">Standard-Vorgabe des Bildungsgangs (Kopie zum Bearbeiten)</option>
+        <option value="leer">Leer -- alle Fächer selbst anlegen</option>
+        <% vorlagen.forEach(function(v) { %><option value="<%= v.id %>">Kopie von „<%= v.name %>“</option><% }); %>
+      </select>
+    </label>
+    <button type="submit">+ Vorlage anlegen und bearbeiten</button>
+  </form>
+</div>
+
+<h2>Meine Vorlagen</h2>
+<% if (!vorlagen.length) { %>
+  <p class="hint">Noch keine eigene Vorlage. Oben die Standard-Vorgabe kopieren, um sie anzupassen.</p>
+<% } else { %>
+  <% vorlagen.forEach(function(v) { %>
+    <div class="card vorlage-eintrag">
+      <strong><%= v.name %></strong> <small class="hint">(<%= bildungsgangName(v.bildungsgang) %>)</small><br>
+      <small class="hint"><%= v.faecher.length ? v.faecher.map(function(f) { return f.name; }).join(', ') : 'noch keine Fächer' %></small>
+      <div class="form-actions">
+        <a class="btn" href="/teacher/spa-vorlagen/<%= v.id %>">✏️ Bearbeiten</a>
+        <form method="post" action="/teacher/spa-vorlagen/<%= v.id %>/loeschen" class="inline" onsubmit="return confirm('Vorlage wirklich löschen?');">
+          <button type="submit" class="danger">🗑 Löschen</button>
+        </form>
+      </div>
+    </div>
+  <% }); %>
+<% } %>

@@ -1,0 +1,29 @@
+<h1>SPA-Vorlage: <%= vorlage.name %></h1>
+<p class="kopf-aktionen"><a class="btn" href="/teacher/spa-vorlagen">← Alle SPA-Vorlagen</a></p>
+<% if (typeof fehler !== 'undefined' && fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
+<p class="hint">
+  Die Vorlage legt fest, welche Fächer/Lernfelder eine SPA-Klasse bekommt und wie sie bewertet werden.
+  Eine Klasse übernimmt beim Laden eine <strong>Kopie</strong> -- spätere Änderungen an der Vorlage wirken
+  nicht auf bereits angelegte Klassen.
+</p>
+<form method="post" action="/teacher/spa-vorlagen/<%= vorlage.id %>" class="spa-editor">
+  <div class="card">
+    <label>Name der Vorlage
+      <input type="text" name="name" value="<%= vorlage.name %>" maxlength="100" required>
+    </label>
+    <label>Bildungsgang
+      <select name="bildungsgang">
+        <% bildungsgaenge.forEach(function(b) { %><option value="<%= b.schluessel %>" <%= vorlage.bildungsgang === b.schluessel ? 'selected' : '' %>><%= b.bezeichnung %></option><% }); %>
+      </select>
+    </label>
+  </div>
+  <% if (!modell.length) { %><p class="hint">Diese Vorlage hat noch kein Fach. Mit „Fach hinzufügen“ beginnen.</p><% } %>
+  <%- await include('../partials/spa-fach-editor', { modell: modell, alleFaecher: alleFaecher, einzeln: false }) %>
+  <div class="form-actions">
+    <button type="submit">💾 Vorlage speichern</button>
+    <button type="submit" name="aktion" value="fach_neu">+ Fach hinzufügen</button>
+  </div>
+</form>
+<form method="post" action="/teacher/spa-vorlagen/<%= vorlage.id %>/loeschen" onsubmit="return confirm('Vorlage wirklich löschen? Bereits angelegte Klassen bleiben unverändert.');">
+  <button type="submit" class="danger">🗑 Vorlage löschen</button>
+</form>

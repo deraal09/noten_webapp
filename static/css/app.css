@@ -663,3 +663,13 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .zusammensetzung-kopf { font-weight: 400; }
 .teiltabelle { margin-top: 0.75rem; }
 .teiltabelle > summary { cursor: pointer; font-weight: 600; padding: 0.5rem 0; }
+
+/* SPA-Vorlagen-Editor */
+.spa-fach summary { cursor: pointer; padding: 0.4rem 0; font-size: 1.05rem; }
+.spa-fach-kopf { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 0.5rem 0; }
+.spa-halbjahre { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 0.75rem; }
+.spa-hj { border: 1px solid var(--border, #ccc); border-radius: 6px; padding: 0.5rem 0.75rem; }
+.spa-hj label { display: block; margin: 0.4rem 0; }
+.spa-hj label.inline { display: inline-block; margin-right: 0.75rem; }
+.spa-hj textarea { width: 100%; }
+.spa-haken { margin-top: 0.5rem; }

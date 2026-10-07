@@ -21,10 +21,11 @@
  * Berechnung unterschiedliche Komponenten.
  */
 
-import { spaSchemaFuer, spaFachName, spaFaecherFuerBildungsgang, KOMPONENTEN_NAMEN } from './spa-schema.js';
+import { spaSchemaFuer, spaFachName, standardKonfig, KOMPONENTEN_NAMEN } from './spa-schema.js';
 import { berechneFach, tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
 import { seedeTeilnehmerAusKlasse } from './fach-teilnehmer.js';
 import { leistungsPunkte, leistungsZiel } from './spa-leistung.js';
+import { halbjahreMitDaten } from './unterfaecher.js';
 
 /**
  * @typedef {import('./spa-grade-calc.js').ErgebnisHalbjahr} ErgebnisHalbjahr
@@ -32,6 +33,41 @@ import { leistungsPunkte, leistungsZiel } from './spa-leistung.js';
 
 function bildungsgangVonKlasse(db, klasseId) {
   return db.prepare('SELECT spa_bildungsgang FROM klassen WHERE id = ?').get(klasseId)?.spa_bildungsgang ?? null;
+}
+
+/**
+ * Bewertungsschema eines Fach-Datensatzes (ohne Komponenten-Abschaltungen): die gespeicherte Kopie
+ * (faecher.spa_schema, z. B. aus einer Vorlage), sonst der Standard des Bildungsgangs.
+ */
+export function spaBasisSchemaVon(fach, bildungsgang) {
+  if (fach.spa_schema) {
+    try {
+      const gespeichert = JSON.parse(fach.spa_schema);
+      if (Array.isArray(gespeichert)) return gespeichert;
+    } catch { /* kaputte Kopie: Standard */ }
+  }
+  return spaSchemaFuer(fach.spa_fach_key, bildungsgang);
+}
+
+/**
+ * Die SPA-Fächer einer Klasse in Anlegereihenfolge samt Schema -- ersetzt die feste Liste des Bildungsgangs,
+ * weil Fächer und Schemata je Klasse aus einer Vorlage stammen können.
+ * @returns {{ bildungsgang: string|null, faecher: Array<{schluessel: string, name: string, fachId: number, schema: import('./spa-grade-calc.js').SchemaHalbjahr[]}>,
+ *   schemaFuer: (schluessel: string) => import('./spa-grade-calc.js').SchemaHalbjahr[], name: (schluessel: string) => string, fachId: (schluessel: string) => number|null }}
+ */
+export function spaKlassenKonfig(db, klasseId) {
+  const bildungsgang = bildungsgangVonKlasse(db, klasseId);
+  const faecher = bildungsgang
+    ? db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND spa_fach_key IS NOT NULL AND parent_fach_id IS NULL ORDER BY id').all(klasseId)
+      .map((f) => ({ schluessel: f.spa_fach_key, name: f.name, fachId: f.id, schema: spaBasisSchemaVon(f, bildungsgang) }))
+    : [];
+  const nachSchluessel = new Map(faecher.map((f) => [f.schluessel, f]));
+  return {
+    bildungsgang, faecher,
+    schemaFuer: (schluessel) => nachSchluessel.get(schluessel)?.schema ?? [],
+    name: (schluessel) => nachSchluessel.get(schluessel)?.name ?? spaFachName(schluessel),
+    fachId: (schluessel) => nachSchluessel.get(schluessel)?.fachId ?? null,
+  };
 }
 
 function fachIdInKlasse(db, klasseId, fachSchluessel) {
@@ -59,11 +95,11 @@ function ladeDeaktivierteKomponenten(db, fachId) {
  * @returns {{ fach: {id: number, klasse_id: number, spa_fach_key: string}|null, bildungsgang: string|null, schema: import('./spa-grade-calc.js').SchemaHalbjahr[] }}
  */
 export function spaSchemaFuerFach(db, fachId) {
-  const fach = db.prepare('SELECT id, klasse_id, spa_fach_key FROM faecher WHERE id = ?').get(fachId);
+  const fach = db.prepare('SELECT id, klasse_id, spa_fach_key, spa_schema FROM faecher WHERE id = ?').get(fachId);
   if (!fach || !fach.spa_fach_key) return { fach: null, bildungsgang: null, schema: [] };
   const bildungsgang = bildungsgangVonKlasse(db, fach.klasse_id);
   if (!bildungsgang) return { fach, bildungsgang: null, schema: [] };
-  const basisSchema = spaSchemaFuer(fach.spa_fach_key, bildungsgang);
+  const basisSchema = spaBasisSchemaVon(fach, bildungsgang);
   const deaktiviert = ladeDeaktivierteKomponenten(db, fachId);
   const schema = deaktiviert.size === 0 ? basisSchema : basisSchema.map((s) => ({
     ...s,
@@ -85,11 +121,11 @@ export function spaSchemaFuerFach(db, fachId) {
  * @returns {Array<{schluessel: string, aktiv: boolean}>}
  */
 export function spaKomponentenKonfig(db, fachId, halbjahr) {
-  const fach = db.prepare('SELECT id, klasse_id, spa_fach_key FROM faecher WHERE id = ?').get(fachId);
+  const fach = db.prepare('SELECT id, klasse_id, spa_fach_key, spa_schema FROM faecher WHERE id = ?').get(fachId);
   if (!fach || !fach.spa_fach_key) return [];
   const bildungsgang = bildungsgangVonKlasse(db, fach.klasse_id);
   if (!bildungsgang) return [];
-  const schemaHj = spaSchemaFuer(fach.spa_fach_key, bildungsgang).find((s) => s.halbjahr === halbjahr);
+  const schemaHj = spaBasisSchemaVon(fach, bildungsgang).find((s) => s.halbjahr === halbjahr);
   const restKomponenten = (schemaHj?.komponenten ?? []).filter((k) => k.restAnteil);
   if (restKomponenten.length === 0) return [];
   const deaktiviert = ladeDeaktivierteKomponenten(db, fachId);
@@ -143,7 +179,8 @@ export function spaKomponentenHalbjahre(db, fach) {
   const bildungsgang = bildungsgangVonKlasse(db, fach.klasse_id);
   if (!fach.spa_fach_key || !bildungsgang) return ergebnis;
   const deaktiviert = ladeDeaktivierteKomponenten(db, fach.id);
-  for (const s of spaSchemaFuer(fach.spa_fach_key, bildungsgang)) {
+  const fachRow = fach.spa_schema === undefined ? db.prepare('SELECT * FROM faecher WHERE id = ?').get(fach.id) : fach;
+  for (const s of spaBasisSchemaVon(fachRow, bildungsgang)) {
     if (s.halbjahrModus !== 'komponenten_gewichtet') continue;
     for (const k of s.komponenten) {
       if (!ergebnis.has(k.schluessel)) ergebnis.set(k.schluessel, { alle: [], aktiv: [], schaltbar: false });
@@ -174,10 +211,15 @@ export function synchronisiereKomponentenUnterfaecher(db, fachId) {
   const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
   if (!fach || !fach.spa_fach_key) return;
   const komponenten = spaKomponentenHalbjahre(db, fach);
-  if (!komponenten.size) return;
-  const anzahlHalbjahre = Math.max(...[...komponenten.values()].flatMap((e) => e.alle));
   const vorhanden = new Map(db.prepare('SELECT * FROM faecher WHERE parent_fach_id = ? AND spa_komponente IS NOT NULL').all(fach.id)
     .map((u) => [u.spa_komponente, u]));
+  // Komponenten, die das Schema nicht mehr kennt: Unterfach entfernen, solange noch nichts darin eingetragen ist.
+  for (const [schluessel, u] of vorhanden) {
+    if (komponenten.has(schluessel)) continue;
+    if (halbjahreMitDaten(u.id).size === 0) db.prepare('DELETE FROM faecher WHERE id = ?').run(u.id);
+  }
+  if (!komponenten.size) return;
+  const anzahlHalbjahre = Math.max(...[...komponenten.values()].flatMap((e) => e.alle));
   const tx = db.transaction(() => {
     for (const [schluessel, e] of komponenten) {
       const name = KOMPONENTEN_NAMEN[schluessel] || schluessel;
@@ -214,18 +256,25 @@ export function synchronisiereKomponentenUnterfaecher(db, fachId) {
  * @param {string} bildungsgang
  * @param {number} userId
  */
-export function seedeSpaFaecher(db, klasseId, bildungsgang, userId) {
-  const insert = db.prepare('INSERT INTO faecher (klasse_id, name, spa_fach_key) VALUES (?, ?, ?)');
+export function seedeSpaFaecher(db, klasseId, bildungsgang, userId, konfig = null) {
+  const insert = db.prepare('INSERT INTO faecher (klasse_id, name, spa_fach_key, spa_schema) VALUES (?, ?, ?, ?)');
   const zuweisen = db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)');
+  const vorhandeneKeys = new Set(db.prepare('SELECT spa_fach_key FROM faecher WHERE klasse_id = ? AND spa_fach_key IS NOT NULL').all(klasseId).map((f) => f.spa_fach_key));
+  const vorhandeneNamen = new Set(db.prepare('SELECT name FROM faecher WHERE klasse_id = ?').all(klasseId).map((f) => f.name));
+  const angelegt = [];
   const tx = db.transaction(() => {
-    for (const fach of spaFaecherFuerBildungsgang(bildungsgang)) {
-      const info = insert.run(klasseId, fach.name, fach.schluessel);
+    for (const fach of konfig ?? standardKonfig(bildungsgang)) {
+      if (vorhandeneKeys.has(fach.schluessel) || vorhandeneNamen.has(fach.name)) continue;
+      // Ohne eigene Konfiguration (Standard) bleibt das Schema ungespeichert und folgt dem Code-Standard.
+      const info = insert.run(klasseId, fach.name, fach.schluessel, konfig ? JSON.stringify(fach.schema) : null);
       zuweisen.run(userId, info.lastInsertRowid);
       seedeTeilnehmerAusKlasse(info.lastInsertRowid, klasseId);
+      angelegt.push(fach.name);
     }
   });
   tx();
   seedeKomponentenUnterfaecher(db, klasseId);
+  return angelegt;
 }
 
 /** Leistungspunkte der Person im Komponenten-Unterfach (oder null, wenn es keins gibt bzw. nichts bepunktet ist). */
@@ -370,10 +419,10 @@ export function berechneFachFuerSchueler(db, fachId, schuelerId, optionen = {}) 
  */
 export function vorwerteFuer(db, klasseId, fachSchluessel, halbjahr) {
   const leer = { label: null, werte: [] };
-  const bildungsgang = bildungsgangVonKlasse(db, klasseId);
-  if (!bildungsgang) return leer;
+  const konfig = spaKlassenKonfig(db, klasseId);
+  if (!konfig.bildungsgang) return leer;
 
-  const schema = spaSchemaFuer(fachSchluessel, bildungsgang);
+  const schema = konfig.schemaFuer(fachSchluessel);
   const aktuell = schema.find((s) => s.halbjahr === halbjahr);
   if (!aktuell || !aktuell.aktiv) return leer;
 
@@ -398,7 +447,7 @@ export function vorwerteFuer(db, klasseId, fachSchluessel, halbjahr) {
     quellFachSchluessel = aktuell.externFach;
     quellHalbjahr = aktuell.externHalbjahr;
     const prozent = Math.round((aktuell.gewichtExtern ?? 0.3) * 100);
-    label = `${spaFachName(aktuell.externFach)} ${aktuell.externHalbjahr}. Hj. — fließt zu ${prozent} % ein`;
+    label = `${konfig.name(aktuell.externFach)} ${aktuell.externHalbjahr}. Hj. — fließt zu ${prozent} % ein`;
   }
 
   if (label === null || quellHalbjahr === null) return leer;
@@ -515,16 +564,12 @@ function schuelerFuerKlasse(db, klasseId) {
  * @returns {ZeugnisZeile[]}
  */
 export function zeugnisFuerKlasse(db, klasseId, halbjahr) {
-  const bildungsgang = bildungsgangVonKlasse(db, klasseId);
-  if (!bildungsgang) return [];
-  if (halbjahr === 4) return abschlusszeugnis(db, klasseId, bildungsgang);
+  const konfig = spaKlassenKonfig(db, klasseId);
+  if (!konfig.bildungsgang) return [];
+  if (halbjahr === 4) return abschlusszeugnis(db, klasseId, konfig);
 
   const fachIdVon = fachIdsInKlasse(db, klasseId);
-  const aktiveFaecher = spaFaecherFuerBildungsgang(bildungsgang).filter((f) => {
-    if (!fachIdVon.has(f.schluessel)) return false;
-    const schemaHj = spaSchemaFuer(f.schluessel, bildungsgang).find((s) => s.halbjahr === halbjahr);
-    return schemaHj?.aktiv;
-  });
+  const aktiveFaecher = konfig.faecher.filter((f) => f.schema.find((s) => s.halbjahr === halbjahr)?.aktiv);
 
   return schuelerFuerKlasse(db, klasseId).map((s) => ({
     schuelerId: s.id,
@@ -533,7 +578,7 @@ export function zeugnisFuerKlasse(db, klasseId, halbjahr) {
     faecher: aktiveFaecher.map((f) => {
       const erg = berechneFachFuerSchueler(db, fachIdVon.get(f.schluessel), s.id);
       const zelle = erg.find((e) => e.halbjahr === halbjahr);
-      const schemaHj = spaSchemaFuer(f.schluessel, bildungsgang).find((x) => x.halbjahr === halbjahr);
+      const schemaHj = f.schema.find((x) => x.halbjahr === halbjahr);
       return {
         fach: f.schluessel,
         label: f.name,
@@ -554,41 +599,41 @@ export function zeugnisFuerKlasse(db, klasseId, halbjahr) {
  * exakt an ihrer Position stehen. Zusätzlich der Prüfungsblock (`pruefung`).
  * @param {import('better-sqlite3').Database} db
  * @param {number} klasseId
- * @param {string} bildungsgang
+ * @param {ReturnType<typeof spaKlassenKonfig>} konfig
  * @returns {ZeugnisZeile[]}
  */
-function abschlusszeugnis(db, klasseId, bildungsgang) {
+function abschlusszeugnis(db, klasseId, konfig) {
   const fachIdVon = fachIdsInKlasse(db, klasseId);
-  const faecherDesBildungsgangs = spaFaecherFuerBildungsgang(bildungsgang).filter((f) => fachIdVon.has(f.schluessel));
+  const faecherDesBildungsgangs = konfig.faecher;
 
   const positionen = [];
   for (const f of faecherDesBildungsgangs) {
-    for (const s of spaSchemaFuer(f.schluessel, bildungsgang)) {
+    for (const s of f.schema) {
       if (s.abschlussZeigen) positionen.push({ fach: f.schluessel, halbjahr: s.halbjahr });
     }
   }
   const anzahlProFach = new Map();
   for (const p of positionen) anzahlProFach.set(p.fach, (anzahlProFach.get(p.fach) ?? 0) + 1);
   const posLabel = (p) => {
-    const name = spaFachName(p.fach);
+    const name = konfig.name(p.fach);
     return (anzahlProFach.get(p.fach) ?? 1) > 1 ? `${name} (${p.halbjahr}. Hj.)` : name;
   };
 
   const pruefPos = [];
   for (const f of faecherDesBildungsgangs) {
-    for (const s of spaSchemaFuer(f.schluessel, bildungsgang)) {
+    for (const s of f.schema) {
       if (s.pruefung) pruefPos.push({ fach: f.schluessel, halbjahr: s.halbjahr });
     }
   }
   const pruefLabel = (fach) => (
     fach === 'ENGLISCH' ? 'Englisch-FHR'
       : fach === 'MATHEMATIK' ? 'Mathe-FHR'
-        : `${spaFachName(fach)} (Prüfung)`
+        : `${konfig.name(fach)} (Prüfung)`
   );
 
   const kommaNoteFaecher = new Set(
     faecherDesBildungsgangs
-      .filter((f) => spaSchemaFuer(f.schluessel, bildungsgang).some((s) => s.kommaNote))
+      .filter((f) => f.schema.some((s) => s.kommaNote))
       .map((f) => f.schluessel),
   );
 

@@ -2,10 +2,11 @@
  * Feste Bewertungskonfiguration der SPA-Bildungsgänge — 1:1 portiert aus
  * dclausen01/notentabellen-spa, packages/server/src/seed/konfiguration.ts.
  *
- * Bewusst als Code statt DB-Konfiguration (siehe Klärung mit dem Nutzer):
- * die Lernfelder/Fächer/Komponenten/Gewichte sind hier fest hinterlegt statt
- * per Admin-Oberfläche pflegbar — spätere Änderungen brauchen einen Deploy,
- * dafür ist die Umsetzung deutlich schlanker.
+ * Diese Konfiguration ist der STANDARD: Fächer/Komponenten/Gewichte lassen sich
+ * als SPA-Vorlage kopieren und vollständig bearbeiten (src/spa-vorlagen.js, am
+ * Ende dieser Datei: standardKonfig/pruefeKonfig). Jede Klasse speichert die
+ * Schemata ihrer Fächer als Kopie (faecher.spa_schema); ältere Klassen ohne
+ * Kopie folgen weiter diesem Standard.
  *
  * @typedef {import('./spa-grade-calc.js').SchemaHalbjahr} SchemaHalbjahr
  * @typedef {import('./spa-grade-calc.js').KomponenteDef} KomponenteDef
@@ -210,4 +211,147 @@ export function spaSchemaFuer(fachSchluessel, bildungsgang) {
  */
 export function spaFaecherFuerBildungsgang(bildungsgang) {
   return SPA_FAECHER.filter((f) => (SCHEMATA.get(f.schluessel)?.get(bildungsgang) ?? []).length > 0);
+}
+
+// ---------------------------------------------------------------------------
+// Editierbare Fächervorgabe (Vorlagen)
+//
+// Die feste Konfiguration oben ist nur noch der Standard: eine Konfiguration
+// ("Konfig") ist eine Liste von Fach-Definitionen
+//   { schluessel, name, typ: 'LF'|'FACH', schema: SchemaHalbjahr[4] }
+// und lässt sich als Vorlage speichern (src/spa-vorlagen.js). Jedes angelegte
+// SPA-Fach trägt sein Schema als Kopie (faecher.spa_schema); Fächer ohne Kopie
+// (ältere Klassen) nutzen weiter den Standard.
+// ---------------------------------------------------------------------------
+
+const KUMULATIONSMODI = ['keine', 'fortlaufend_50_50', 'gewichtet_vorgaenger', 'mittelwert_halbjahre'];
+const HALBJAHRMODI = ['direkt', 'komponenten_gewichtet'];
+const runde = (x) => Math.round(x * 1000) / 1000;
+
+/** Anzeigename einer Komponente (eigene Komponenten nutzen ihren Namen als Schlüssel). */
+export function komponentenName(schluessel) {
+  return KOMPONENTEN_NAMEN[schluessel] || schluessel;
+}
+
+/**
+ * Standardkonfiguration eines Bildungsgangs als tiefe Kopie.
+ * @param {string} bildungsgang
+ * @returns {Array<{schluessel: string, name: string, typ: 'LF'|'FACH', schema: SchemaHalbjahr[]}>}
+ */
+export function standardKonfig(bildungsgang) {
+  return spaFaecherFuerBildungsgang(bildungsgang).map((f) => ({
+    schluessel: f.schluessel, name: f.name, typ: f.typ,
+    schema: spaSchemaFuer(f.schluessel, bildungsgang).map(({ fach, bildungsgang: bg, ...rest }) => JSON.parse(JSON.stringify(rest))),
+  }));
+}
+
+/** Gültiger Schlüssel einer eigenen Komponente: Buchstaben, Ziffern, Leerzeichen, . _ - ( ). */
+export function istKomponentenSchluessel(s) {
+  return typeof s === 'string' && /^[\p{L}\p{N}][\p{L}\p{N} ._()-]{0,39}$/u.test(s) && s === s.trim();
+}
+
+/** Schlüssel eines Fachs (ohne ':', weil Zeugnispositionen "SCHLUESSEL:HALBJAHR" heißen). */
+export function istFachSchluessel(s) {
+  return typeof s === 'string' && /^[A-Z0-9_]{1,30}$/.test(s);
+}
+
+/**
+ * Prüft und bereinigt ein Schema (4 Halbjahre) eines Fachs. `fachSchluessel` ist der eigene Schlüssel,
+ * `alleSchluessel` die Fächer, auf die sich "anderes Fach" beziehen darf.
+ * @returns {{ok: true, schema: SchemaHalbjahr[]} | {ok: false, fehler: string}}
+ */
+export function pruefeSchema(rohSchema, fachName, fachSchluessel, alleSchluessel) {
+  const fehler = (text) => ({ ok: false, fehler: `${fachName}: ${text}` });
+  if (!Array.isArray(rohSchema)) return fehler('Ungültiges Schema.');
+  const schema = [];
+  // Ein Halbjahr darf fehlen: das Fach gilt dann dort nicht (z. B. Blockpraxis PiA nur im 3. Halbjahr).
+  for (let hj = 1; hj <= 4; hj++) {
+    const r = rohSchema.find((s) => s && s.halbjahr === hj);
+    if (!r) continue;
+    const f = (text) => fehler(`${hj}. Halbjahr: ${text}`);
+    const s = { halbjahr: hj, aktiv: Boolean(r.aktiv), halbjahrModus: r.halbjahrModus, kumulationModus: r.kumulationModus, deaktivierbar: Boolean(r.deaktivierbar), komponenten: [] };
+    if (!HALBJAHRMODI.includes(s.halbjahrModus)) return f('Unbekannte Bewertungsart.');
+    if (!KUMULATIONSMODI.includes(s.kumulationModus)) return f('Unbekannte Verrechnung.');
+    if (s.halbjahrModus === 'komponenten_gewichtet') {
+      const gesehen = new Set();
+      for (const k of Array.isArray(r.komponenten) ? r.komponenten : []) {
+        if (!istKomponentenSchluessel(k?.schluessel)) return f(`Ungültiger Komponentenname „${k?.schluessel ?? ''}“.`);
+        if (gesehen.has(k.schluessel)) return f(`Komponente „${k.schluessel}“ kommt doppelt vor.`);
+        gesehen.add(k.schluessel);
+        if (k.restAnteil) s.komponenten.push({ schluessel: k.schluessel, restAnteil: true });
+        else {
+          const g = Number(k.gewichtFix);
+          if (!Number.isFinite(g) || g <= 0 || g > 1) return f(`Gewicht von „${k.schluessel}“ muss zwischen 0 und 100 % liegen.`);
+          s.komponenten.push({ schluessel: k.schluessel, gewichtFix: runde(g) });
+        }
+      }
+      if (!s.komponenten.length) return f('Bei „Komponenten gewichtet“ braucht es mindestens eine Komponente.');
+      if (s.komponenten.reduce((a, k) => a + (k.gewichtFix ?? 0), 0) > 1.0001) return f('Die festen Gewichte ergeben mehr als 100 %.');
+    }
+    if (s.kumulationModus === 'mittelwert_halbjahre') {
+      const hjs = [...new Set((Array.isArray(r.mittelwertHalbjahre) ? r.mittelwertHalbjahre : []).map(Number))].filter((h) => h >= 1 && h <= 4).sort();
+      if (!hjs.length) return f('Für den Mittelwert mindestens ein Halbjahr wählen.');
+      s.mittelwertHalbjahre = hjs;
+    }
+    if (s.kumulationModus === 'gewichtet_vorgaenger' && (r.gewichtExtern !== undefined || r.gewichtAktuell !== undefined)) {
+      const ge = Number(r.gewichtExtern);
+      if (!Number.isFinite(ge) || ge <= 0 || ge >= 1) return f('Der Anteil der zweiten Quelle muss zwischen 0 und 100 % liegen.');
+      s.gewichtExtern = runde(ge);
+      s.gewichtAktuell = runde(1 - ge);
+      if (r.externFach) {
+        if (!alleSchluessel.includes(r.externFach) || r.externFach === fachSchluessel) return f('Das andere Fach muss ein anderes Fach der Vorlage sein.');
+        const ehj = Number(r.externHalbjahr);
+        if (!Number.isInteger(ehj) || ehj < 1 || ehj > 4) return f('Halbjahr des anderen Fachs ungültig.');
+        s.externFach = r.externFach;
+        s.externHalbjahr = ehj;
+      } else if (!r.pruefungVerrechnen) {
+        return f('Bitte angeben, mit welcher Quelle verrechnet wird.');
+      }
+    }
+    s.abschlussZeigen = Boolean(r.abschlussZeigen);
+    s.pruefung = Boolean(r.pruefung);
+    s.pruefungVerrechnen = Boolean(r.pruefungVerrechnen) && s.gewichtExtern !== undefined && !s.externFach;
+    if (r.pruefungVerrechnen && !s.pruefungVerrechnen) return f('„Prüfung verrechnen“ braucht die Verrechnung „gewichtet“ mit Prüfungs-Anteil.');
+    if (s.pruefungVerrechnen) s.pruefung = true;
+    s.kommaNote = Boolean(r.kommaNote);
+    schema.push(s);
+  }
+  if (!schema.length) return fehler('Das Fach muss in mindestens einem Halbjahr gelten.');
+  return { ok: true, schema };
+}
+
+/**
+ * Prüft eine ganze Konfiguration (Namen, Schlüssel, Schemata, keine Verrechnungs-Kreise zwischen Fächern).
+ * @returns {{ok: true, faecher: Array<{schluessel: string, name: string, typ: 'LF'|'FACH', schema: SchemaHalbjahr[]}>} | {ok: false, fehler: string}}
+ */
+export function pruefeKonfig(roh) {
+  const liste = Array.isArray(roh) ? roh : roh?.faecher;
+  if (!Array.isArray(liste)) return { ok: false, fehler: 'Ungültige Fächervorgabe.' };
+  const schluessel = liste.map((f) => f?.schluessel);
+  const namen = new Set();
+  const faecher = [];
+  for (const f of liste) {
+    const name = String(f?.name ?? '').trim().slice(0, 100);
+    if (!name) return { ok: false, fehler: 'Jedes Fach braucht einen Namen.' };
+    if (namen.has(name.toLowerCase())) return { ok: false, fehler: `Der Fachname „${name}“ kommt doppelt vor.` };
+    namen.add(name.toLowerCase());
+    if (!istFachSchluessel(f.schluessel) || schluessel.filter((x) => x === f.schluessel).length > 1) return { ok: false, fehler: `${name}: ungültiger oder doppelter Schlüssel.` };
+    const res = pruefeSchema(f.schema, name, f.schluessel, schluessel);
+    if (!res.ok) return res;
+    faecher.push({ schluessel: f.schluessel, name, typ: f.typ === 'LF' ? 'LF' : 'FACH', schema: res.schema });
+  }
+  // Fach A verrechnet mit Fach B, B mit A: würde sich bei der Berechnung endlos aufrufen.
+  const kanten = new Map(faecher.map((f) => [f.schluessel, [...new Set(f.schema.map((s) => s.externFach).filter(Boolean))]]));
+  const besucht = new Set();
+  const imPfad = new Set();
+  const hatKreis = (k) => {
+    if (imPfad.has(k)) return true;
+    if (besucht.has(k)) return false;
+    besucht.add(k); imPfad.add(k);
+    const kreis = (kanten.get(k) ?? []).some(hatKreis);
+    imPfad.delete(k);
+    return kreis;
+  };
+  if (faecher.some((f) => hatKreis(f.schluessel))) return { ok: false, fehler: 'Fächer dürfen sich nicht gegenseitig (im Kreis) verrechnen.' };
+  return { ok: true, faecher };
 }

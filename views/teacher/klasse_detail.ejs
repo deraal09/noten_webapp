@@ -485,6 +485,9 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
           <% if (eintrag.freieHj.length) { %>
             <button type="button" class="icon-knopf" data-lehrkraft-dialog data-fach-id="<%= f.id %>" data-fach-name="<%= f.name %>" data-erlaubt="<%= eintrag.freieHj.join(',') %>" title="Lehrkraft zuordnen<%= eintrag.kinder.length ? ' (nur in Halbjahren ohne Unterfächer)' : '' %>" aria-label="Lehrkraft zuordnen: <%= f.name %>">🎓</button>
           <% } %>
+          <% if (f.spa_fach_key) { %>
+            <a class="icon-knopf" href="/teacher/faecher/<%= f.id %>/spa-schema" title="Bewertungsschema des Fachs bearbeiten" aria-label="Bewertungsschema bearbeiten: <%= f.name %>">⚙</a>
+          <% } %>
           <% if (!f.spa_fach_key) { %>
             <button type="button" class="icon-knopf" data-unterfach-dialog data-fach-id="<%= f.id %>" data-fach-name="<%= f.name %>" data-erlaubt="<%= f.hjNummern.join(',') %>" title="Unterfach hinzufügen" aria-label="Unterfach hinzufügen: <%= f.name %>">📖</button>
           <% } %>
@@ -540,6 +543,32 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
   <button type="button" id="vorlage-import-knopf">📥 Fächer aus Vorlage importieren</button>
   <% if (speicherbareFaecher.length) { %><button type="button" id="vorlage-speichern-knopf">💾 Fächer als Vorlage speichern</button><% } %>
 </p>
+
+<% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
+  <details class="card" id="spa-vorlage-laden">
+    <summary>📥 SPA-Fächervorgabe laden</summary>
+    <p class="hint">
+      Legt die Fächer einer Vorlage an, die es in dieser Klasse noch nicht gibt (vorhandene Fächer bleiben unverändert).
+      Das Bewertungsschema jedes Fachs lässt sich danach mit ⚙ einzeln anpassen.
+    </p>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/spa-vorlage/laden">
+      <label>Fächervorgabe
+        <select name="quelle">
+          <option value="standard">Standard-Vorgabe des Bildungsgangs</option>
+          <% spaVorlagen.forEach(function(v) { %><option value="<%= v.id %>">Vorlage „<%= v.name %>“ (<%= v.bildungsgang === 'SPA_PIA' ? 'PiA' : 'regulär' %>)</option><% }); %>
+        </select>
+      </label>
+      <button type="submit">Fächer laden</button>
+      <a href="/teacher/spa-vorlagen">SPA-Vorlagen bearbeiten oder neu erstellen</a>
+    </form>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/spa-vorlage/speichern" class="inline">
+      <label>Fächer dieser Klasse als Vorlage ablegen
+        <input type="text" name="name" maxlength="100" placeholder="Name der Vorlage" required>
+      </label>
+      <button type="submit">💾 Als Vorlage speichern</button>
+    </form>
+  </details>
+<% } %>
 
 <dialog id="vorlage-import-dialog" class="notiz-dialog">
   <h2>Fächer aus Vorlage importieren</h2>
