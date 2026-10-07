@@ -10,7 +10,7 @@ import {
   klausurNote, klausurTeilNoten, parseKlausurTeile,
   DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from './grade-calc.js';
-import { sortiereFaecher, muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
+import { mitAbschlussStatus, sortiereFaecher, muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
 import { ladeEndnoten } from './halbjahr-endnoten.js';
 import { unterfaecherImHalbjahr } from './unterfaecher.js';
 import { sortiereNachName } from './format.js';
@@ -55,14 +55,14 @@ function datumsWerteFuerSchueler(schuelerId, termine, notenMap) {
 }
 
 export function ladeFachMitUmfeld(id) {
-  return getDb().prepare(`
+  return mitAbschlussStatus(getDb().prepare(`
     SELECT f.*, k.name AS klasse_name, k.schuljahr_id, k.notenschluessel, k.spa_bildungsgang,
            s.bezeichnung AS schuljahr_bezeichnung
     FROM faecher f
     JOIN klassen k ON k.id = f.klasse_id
     JOIN schuljahre s ON s.id = k.schuljahr_id
     WHERE f.id = ?
-  `).get(id);
+  `).get(id));
 }
 
 /**
@@ -90,7 +90,7 @@ export function ladeFaecherFuerKlassenleitung(klasseId) {
       AND f.parent_fach_id IS NULL
     ORDER BY f.name
   `).all(klasseId);
-  return sortiereFaecher(rows);
+  return sortiereFaecher(rows).map(mitAbschlussStatus);
 }
 
 /** Fächer, an denen eine bestimmte Person teilnimmt (für den Konferenzmodus). */
@@ -98,7 +98,7 @@ export function ladeFaecherFuerSchueler(schuelerId) {
   return sortiereNachName(getDb().prepare(`
     SELECT f.* FROM faecher f JOIN fach_teilnehmer ft ON ft.fach_id = f.id
     WHERE ft.schueler_id = ? AND f.parent_fach_id IS NULL
-  `).all(schuelerId));
+  `).all(schuelerId)).map(mitAbschlussStatus);
 }
 
 export function getNotenschluesselCsv(fach) {

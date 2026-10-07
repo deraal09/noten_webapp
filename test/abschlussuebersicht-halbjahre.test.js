@@ -19,6 +19,7 @@ delete process.env.LDAP_URL;
 
 const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
+const J = await import('../src/klassen-jahre.js');
 const { ladeAbschlussuebersicht } = await import('../src/fach-abschluss.js');
 
 const fastify = await buildApp({ logger: false });
@@ -91,12 +92,12 @@ test('Vorbereitung: Klasse mit Einschulung 2023 (6 Halbjahre) mit Physik (alle H
   biologieId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Biologie'").get(klasseId).id;
 });
 
-test('Fach abschließen: Physik und Chemie werden abgeschlossen, Biologie läuft weiter', async () => {
-  await form(lehrerA, `/teacher/fach/${physikId}/abschliessen`, {});
-  await form(lehrerA, `/teacher/fach/${chemieId}/abschliessen`, {});
-  assert.equal(getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(physikId).abgeschlossen, 1);
-  assert.equal(getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(chemieId).abgeschlossen, 1);
-  assert.equal(getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(biologieId).abgeschlossen, 0);
+test('Abschluss ergibt sich aus den Halbjahren: Chemie (bis 4. Hj.) und Biologie (bis 2. Hj.) sind abgeschlossen, Physik (bis 6. Hj.) läuft', () => {
+  // Heute (Testdatum) ist das 5. Halbjahr der Klasse.
+  const status = (id) => getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(id);
+  assert.equal(J.istFachAbgeschlossen(status(physikId)), false);
+  assert.equal(J.istFachAbgeschlossen(status(chemieId)), true);
+  assert.equal(J.istFachAbgeschlossen(status(biologieId)), true);
 });
 
 test('ladeAbschlussuebersicht: enthält alle Fächer der Laufzeit alphabetisch, Fächer mit eingeschränkten Halbjahren mit Beschriftung', () => {
@@ -110,15 +111,15 @@ test('ladeAbschlussuebersicht: enthält alle Fächer der Laufzeit alphabetisch, 
     ],
   );
   const anna = zeilen[0];
-  assert.equal(anna.noten.find((n) => n.fach.id === physikId).fach.abgeschlossen, 1);
+  assert.equal(anna.noten.find((n) => n.fach.id === physikId).fach.abgeschlossen, 0);
   assert.equal(anna.noten.find((n) => n.fach.id === chemieId).fach.abgeschlossen, 1);
-  assert.equal(anna.noten.find((n) => n.fach.id === biologieId).fach.abgeschlossen, 0);
+  assert.equal(anna.noten.find((n) => n.fach.id === biologieId).fach.abgeschlossen, 1);
 });
 
 test('Seite /teacher/klassen/:id/abschluss zeigt alle Fächer, eingeschränkte mit Halbjahren und Schuljahr(en) in der Überschrift', async () => {
   const html = await (await lehrerA(`/teacher/klassen/${klasseId}/abschluss`)).text();
-  assert.match(html, /<th>Physik<br>/, 'Fach über alle Halbjahre ohne Zusatz');
-  assert.match(html, /<th>Biologie <small class="hint">\(1\.–2\. Halbjahr, 2023\/24\)<\/small><br><small>läuft<\/small><\/th>/);
+  assert.match(html, /<th>Physik<br><small>läuft<\/small><\/th>/, 'Fach über alle Halbjahre ohne Zusatz, noch laufend');
+  assert.match(html, /<th>Biologie <small class="hint">\(1\.–2\. Halbjahr, 2023\/24\)<\/small><br><small>abgeschlossen<\/small><\/th>/);
   assert.match(html, /<th>Chemie <small class="hint">\(1\.–4\. Halbjahr, 2023\/24–2024\/25\)<\/small><br><small>abgeschlossen<\/small><\/th>/);
 });
 

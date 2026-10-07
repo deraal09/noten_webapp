@@ -329,3 +329,19 @@ export function sortiereFaecher(liste, laufzeit = null) {
   });
   return mitGruppe.map((x) => x.f);
 }
+
+/**
+ * Ist das Fach abgeschlossen? Ergibt sich aus den Halbjahren des Fachs: sobald
+ * sein letztes Halbjahr vergangen ist (siehe istHalbjahrVergangen), gilt es als
+ * abgeschlossen und zeigt seine Fachabschlussnote.
+ */
+export function istFachAbgeschlossen(fach, heute = jetzt()) {
+  const laufzeit = klassenLaufzeit(fach.klasse_id);
+  const nummern = fachHalbjahrNummern(fach, laufzeit);
+  return Boolean(nummern.length) && istHalbjahrVergangen(laufzeit, nummern[nummern.length - 1], heute);
+}
+
+/** Fach-Zeile mit abgeleitetem `abgeschlossen`-Status (0/1) statt des früher von Hand gesetzten. */
+export function mitAbschlussStatus(fach) {
+  return fach ? { ...fach, abgeschlossen: istFachAbgeschlossen(fach) ? 1 : 0, abgeschlossen_am: null } : fach;
+}

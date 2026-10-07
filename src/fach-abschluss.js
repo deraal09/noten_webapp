@@ -1,8 +1,8 @@
 /**
- * Fachabschluss: optionales Abschließen eines Fachs (manche Fächer laufen
- * über mehrere Schuljahre und werden nie abgeschlossen). Beim Abschließen
- * wird je Schüler/in eine Fachabschlussnote als Mittelwert aus allen
- * Halbjahren berechnet, in denen das Fach gilt (siehe faecher.halbjahre) --
+ * Fachabschluss: Ein Fach gilt als abgeschlossen, sobald sein letztes Halbjahr
+ * (siehe faecher.halbjahre) vergangen ist -- ohne Knopfdruck. Die
+ * Fachabschlussnote je Schüler/in ist der Mittelwert aus allen Halbjahren,
+ * in denen das Fach gilt --
  * aus Klausuren/Unterrichtsleistung berechnet oder per direkter Endnote
  * eingetragen (siehe src/halbjahr-endnoten.js).
  */
@@ -11,57 +11,22 @@ import { sortiereNachName } from './format.js';
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
 import { gesamtnoteJahr, NTG } from './grade-calc.js';
-import { klassenLaufzeit, schuljahrDesHalbjahrs, fachHalbjahrNummern, halbjahrText } from './klassen-jahre.js';
+import { mitAbschlussStatus, klassenLaufzeit, schuljahrDesHalbjahrs, fachHalbjahrNummern, halbjahrText } from './klassen-jahre.js';
 import { ladeEndnoten } from './halbjahr-endnoten.js';
 import { parseSchuljahr } from './schuljahr-utils.js';
 import { berechneFachFuerSchueler as berechneSpaFachFuerSchueler } from './spa-noten-service.js';
 
-/** Fachabschlussnoten (eingefroren) als Map<schueler_id, note>. */
-export function ladeAbschlussnoten(fachId) {
-  const rows = getDb().prepare('SELECT schueler_id, note FROM fach_abschlussnoten WHERE fach_id = ?').all(fachId);
-  return new Map(rows.map((r) => [r.schueler_id, r.note]));
-}
-
 /**
- * Berechnet und speichert die Fachabschlussnote je Schüler/in und markiert
- * das Fach als abgeschlossen. Erneutes Aufrufen (z. B. nach einer Korrektur)
- * überschreibt die zuvor gespeicherten Werte.
+ * Fachabschlussnoten als Map<schueler_id, note>: Mittelwert aus allen
+ * Halbjahren des Fachs (berechnet oder direkt eingetragen), live berechnet.
+ * `fach` braucht id, klasse_id und halbjahre.
  */
-export function schliesseFachAb(fachId, userId) {
+export function ladeAbschlussnoten(fach) {
   const db = getDb();
-  const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
-  if (!fach) throw new Error('Fach nicht gefunden');
-  // Teilnehmerliste statt "alle Schüler/innen der Klasse" -- siehe
-  // berechneGesamtnoten in noten-service.js.
-  const schuelerListe = db.prepare(
-    'SELECT s.id FROM fach_teilnehmer ft JOIN schueler s ON s.id = ft.schueler_id WHERE ft.fach_id = ?'
-  ).all(fachId);
-
+  const schuelerListe = db.prepare('SELECT schueler_id AS id FROM fach_teilnehmer WHERE fach_id = ?').all(fach.id);
   const laufzeit = klassenLaufzeit(fach.klasse_id);
-  const hjNotenMaps = fachHalbjahrNummern(fach, laufzeit).map((nr) => berechneGesamtnoten(fachId, halbjahrText(nr)));
-
-  const upsert = db.prepare(`
-    INSERT INTO fach_abschlussnoten (fach_id, schueler_id, note)
-    VALUES (?, ?, ?)
-    ON CONFLICT(fach_id, schueler_id) DO UPDATE SET note = excluded.note
-  `);
-  const tx = db.transaction(() => {
-    for (const s of schuelerListe) {
-      const werte = hjNotenMaps.map((m) => m.get(s.id) ?? null);
-      upsert.run(fachId, s.id, gesamtnoteJahr(werte));
-    }
-    db.prepare(`
-      UPDATE faecher SET abgeschlossen = 1, abgeschlossen_am = datetime('now'), abgeschlossen_von_id = ?
-      WHERE id = ?
-    `).run(userId, fachId);
-  });
-  tx();
-}
-
-/** Öffnet ein abgeschlossenes Fach wieder (Korrektur). Die zuvor berechneten
- * Abschlussnoten bleiben gespeichert, bis das Fach erneut abgeschlossen wird. */
-export function oeffneFach(fachId) {
-  getDb().prepare('UPDATE faecher SET abgeschlossen = 0 WHERE id = ?').run(fachId);
+  const hjNotenMaps = fachHalbjahrNummern(fach, laufzeit).map((nr) => berechneGesamtnoten(fach.id, halbjahrText(nr)));
+  return new Map(schuelerListe.map((s) => [s.id, gesamtnoteJahr(hjNotenMaps.map((m) => m.get(s.id) ?? null))]));
 }
 
 /**
@@ -96,7 +61,7 @@ export function ladeAbschlussuebersicht(klasseId) {
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasseId);
   const laufzeit = klassenLaufzeit(klasseId);
   const faecher = ladeFaecherFuerKlassenleitung(klasseId).map((f) => ({ ...f, schuljahrLabel: fachHalbjahrLabel(f, laufzeit) }));
-  const abschlussByFach = new Map(faecher.map((f) => [f.id, f.abgeschlossen ? ladeAbschlussnoten(f.id) : new Map()]));
+  const abschlussByFach = new Map(faecher.map((f) => [f.id, f.abgeschlossen ? ladeAbschlussnoten(f) : new Map()]));
 
   const zeilen = schueler.map((s) => {
     const noten = faecher.map((f) => ({
@@ -131,7 +96,7 @@ export function ladeFaecherEinerPerson(schuelerId) {
     JOIN schuljahre sj ON sj.id = k.schuljahr_id
     WHERE f.id IN (SELECT fach_id FROM fach_teilnehmer WHERE schueler_id = ?)
       AND f.parent_fach_id IS NULL
-  `).all(schuelerId));
+  `).all(schuelerId).map(mitAbschlussStatus));
 }
 
 /**
@@ -172,7 +137,7 @@ export function ladeFachNotenEintraege(fach, schuelerId) {
 
   // SPA-Endpunkte haben keinen Mittelwert über Halbjahre, dort gibt es keinen "Stand".
   const stand = fach.spa_fach_key ? null : gesamtnoteJahr(eintraege.map((e) => e.note));
-  const abschlussnote = fach.abgeschlossen ? (ladeAbschlussnoten(fach.id).get(schuelerId) ?? null) : null;
+  const abschlussnote = fach.abgeschlossen ? (ladeAbschlussnoten(fach).get(schuelerId) ?? null) : null;
   return { eintraege, stand, abschlussnote };
 }
 

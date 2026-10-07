@@ -25,7 +25,7 @@ import {
 } from '../noten-service.js';
 import { syncFach, syncFallsAutoAktiv, holeSyncMeta, ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
-  ladeAbschlussnoten, schliesseFachAb, oeffneFach,
+  ladeAbschlussnoten,
   ladeAbgangszeugnisDaten, ladeAbschlussuebersicht,
 } from '../fach-abschluss.js';
 import {
@@ -109,18 +109,6 @@ function renderZusammensetzung(request, reply, fach, halbjahr) {
     user: request.user, fach, halbjahr, komposition, rows: uebersicht.rows, verrechnung: uebersicht.verrechnung,
     darfGewichteAendern: userDarfZusammensetzungSehen(request.user, fach),
   });
-}
-
-/**
- * Wohin nach einem Fach-Abschluss (abschliessen/oeffnen) zurückleiten: die
- * zugewiesene Lehrkraft auf die normale Fach-Seite, eine Klassenleitung ohne
- * eigene Zuweisung auf die Klassenleitungsseite der Klasse (GET
- * /teacher/fach/:id bleibt bewusst der zugewiesenen Lehrkraft vorbehalten).
- */
-function fachZielRedirect(user, fach) {
-  return userHatFachZgriff(user, fach.id)
-    ? `/teacher/fach/${fach.id}`
-    : `/klassenlehrer/klasse/${fach.klasse_id}?tab=abschluss`;
 }
 
 /**
@@ -330,7 +318,7 @@ export default async function teacherRoutes(fastify) {
     const zuweisung = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?')
       .get(fach.id, request.user.id);
     const syncMeta = holeSyncMeta(fach.id, halbjahr);
-    const abschlussnoten = fach.abgeschlossen ? ladeAbschlussnoten(fach.id) : new Map();
+    const abschlussnoten = fach.abgeschlossen ? ladeAbschlussnoten(fach) : new Map();
     // Sperren über die Schüler-IDs statt "die eine Klasse" -- bei einem
     // klassenübergreifenden Kurs liegt die Sperre bei der jeweils EIGENEN
     // Klasse einer teilnehmenden Person (siehe fach_teilnehmer).
@@ -378,7 +366,6 @@ export default async function teacherRoutes(fastify) {
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct, verrechnung: uebersicht.verrechnung,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       abschlussnoten, sperren, teilnehmer,
-      darfFachAbschliessen: userDarfFachBearbeiten(request.user, fach),
     });
   });
 
@@ -1062,29 +1049,6 @@ export default async function teacherRoutes(fastify) {
     return reply.send({ ok: true, wert, na: Boolean(na) });
   });
 
-  // ---------- Fachabschluss (optional — manche Fächer laufen über mehrere Schuljahre) ----------
-  fastify.post('/fach/:id/abschliessen', async (request, reply) => {
-    const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
-    if (!userDarfFachBearbeiten(request.user, fach)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
-    }
-    schliesseFachAb(fach.id, request.user.id);
-    request.flash?.('success', 'Fach abgeschlossen — Fachabschlussnoten berechnet.');
-    return reply.redirect(fachZielRedirect(request.user, fach));
-  });
-
-  fastify.post('/fach/:id/oeffnen', async (request, reply) => {
-    const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
-    if (!userDarfFachBearbeiten(request.user, fach)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
-    }
-    oeffneFach(fach.id);
-    request.flash?.('success', 'Fach wieder geöffnet.');
-    return reply.redirect(fachZielRedirect(request.user, fach));
-  });
-
   // ---------- Notensperre: Entsperrung anfragen (Fachlehrkraft) ----------
   fastify.post('/fach/:id/sperre/:schuelerId/anfragen', async (request, reply) => {
     const fach = ladeFachMitUmfeld(request.params.id);
@@ -1446,7 +1410,7 @@ export default async function teacherRoutes(fastify) {
   });
 
   // ---------- Abschluss-/Abgangsübersicht (Klassenleitung/Admin) ----------
-  // Fasst die Fachabschlussnoten aller (optional abgeschlossenen) Fächer
+  // Fasst die Fachabschlussnoten aller (abgeschlossenen) Fächer
   // zusammen — für Fächer, die nicht abgeschlossen wurden, gibt es keine
   // Abschlussnote (siehe src/fach-abschluss.js, bewusst optional).
   fastify.get('/klassen/:id/abschluss', async (request, reply) => {

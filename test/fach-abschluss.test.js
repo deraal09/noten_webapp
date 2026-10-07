@@ -143,36 +143,26 @@ test('Direkte Endnote (3. Halbjahr): zugewiesene Lehrkraft darf sie eintragen, o
   assert.equal(noten.find((n) => n.schueler_id === s2).note, 4);
 });
 
-test('Fach abschließen: Fachabschlussnote = Mittelwert aus allen Halbjahren (berechnet + direkte Endnote)', async () => {
-  const r = await form(lehrerA, `/teacher/fach/${fachId}/abschliessen`, {});
-  assert.equal(r.status, 302);
-
+test('Abschluss ergibt sich aus den Halbjahren (kein Button mehr): Fachabschlussnote = Mittelwert aus allen Halbjahren (berechnet + direkte Endnote)', async () => {
   const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
-  assert.equal(fach.abgeschlossen, 1);
-  assert.ok(fach.abgeschlossen_am);
+  const { istFachAbgeschlossen } = await import('../src/klassen-jahre.js');
+  const { ladeAbschlussnoten } = await import('../src/fach-abschluss.js');
+  const laufzeit = (await import('../src/klassen-jahre.js')).klassenLaufzeit(fach.klasse_id);
+  const letztes = laufzeit.anzahlHalbjahre;
+  // Das Fach gilt in allen Halbjahren der Klasse -- das letzte liegt (noch) nicht hinter uns.
+  assert.equal(istFachAbgeschlossen(fach), istFachAbgeschlossen({ ...fach, halbjahre: null }));
+  assert.ok(letztes >= 3);
 
+  const noten = ladeAbschlussnoten(fach);
   // s1: HJ1=sehr gut (10/10 -> 1), HJ2=sehr gut (10/10 -> 1), 3. Halbjahr=2 -> Mittelwert ≈ 1,33
-  const abschlussS1 = getDb().prepare('SELECT note FROM fach_abschlussnoten WHERE fach_id = ? AND schueler_id = ?').get(fachId, s1);
-  assert.ok(abschlussS1);
-  assert.ok(abschlussS1.note > 1 && abschlussS1.note < 1.5, `erwartet ~1,33, war ${abschlussS1.note}`);
-
+  assert.ok(noten.get(s1) > 1 && noten.get(s1) < 1.5, `erwartet ~1,33, war ${noten.get(s1)}`);
   // s2: HJ1=sehr gut (1), HJ2=keine Note (ignoriert), 3. Halbjahr=4 -> Mittelwert = 2,5
-  const abschlussS2 = getDb().prepare('SELECT note FROM fach_abschlussnoten WHERE fach_id = ? AND schueler_id = ?').get(fachId, s2);
-  assert.equal(abschlussS2.note, 2.5);
+  assert.equal(noten.get(s2), 2.5);
 
+  // Keine Schaltflächen/Routen zum Abschließen mehr
   const html = await (await lehrerA(`/teacher/fach/${fachId}`)).text();
-  assert.match(html, /Fach abgeschlossen/);
-  assert.match(html, /Abschlussnote/);
-});
-
-test('Fach wieder öffnen: Status zurückgesetzt, Notentafel wieder bearbeitbar', async () => {
-  let r = await form(lehrerA, `/teacher/fach/${fachId}/oeffnen`, {});
-  assert.equal(r.status, 302);
-  const fach = getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(fachId);
-  assert.equal(fach.abgeschlossen, 0);
-
-  const html = await (await lehrerA(`/teacher/fach/${fachId}`)).text();
-  assert.doesNotMatch(html, /Fach abgeschlossen/);
+  assert.doesNotMatch(html, /Fach abschließen|panel-abschluss/);
+  assert.equal((await form(lehrerA, `/teacher/fach/${fachId}/abschliessen`, {})).status, 404);
 });
 
 test.after(async () => {

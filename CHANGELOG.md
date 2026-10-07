@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.71.0 - 2026-10-07
+
+- **„Fach abschließen" entfällt** (Button, Reiter und Routen zum Abschließen und
+  Wiederöffnen). Ob ein Fach abgeschlossen ist, ergibt sich jetzt aus seinen
+  Halbjahren: Ist das letzte Halbjahr des Fachs vorbei, gilt es als
+  abgeschlossen und zeigt seine **Fachabschlussnote** (Mittelwert aus allen
+  Halbjahren, live berechnet statt eingefroren). Das gilt in der Notenübersicht,
+  der Abschluss-/Abgangsübersicht, im Abgangszeugnis und im SPA-Zeugnis.
+  Fächer, die noch laufen, zeigen „läuft" bzw. den aktuellen Stand. Früher von
+  Hand gesetzte Abschlüsse spielen keine Rolle mehr.
+
 ## 0.70.0 - 2026-10-07
 
 - Der Reiter **„Teilnehmer/innen"** ist aus der Noteneingabe entfernt. Die

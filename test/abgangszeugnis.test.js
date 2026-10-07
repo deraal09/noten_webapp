@@ -115,8 +115,6 @@ test('Vorbereitung: Klasse mit Einschulung 2023 (aktuell 5. Halbjahr, 2025/26) m
   await endnote(religionId, annaId, HJ(1), 'ntg');
   await endnote(religionId, annaId, HJ(2), '2');
 
-  // Chemie wird abgeschlossen -> es zählt nur noch die Gesamtnote.
-  await form(lehrerA, `/teacher/fach/${chemieId}/abschliessen`, {});
 });
 
 test('ladeAbgangszeugnisDaten: alle Fächer über alle Schuljahre, Einzelnoten chronologisch, Stand als Mittelwert, abgeschlossenes Fach nur mit Abschlussnote', () => {
@@ -137,16 +135,18 @@ test('ladeAbgangszeugnisDaten: alle Fächer über alle Schuljahre, Einzelnoten c
   assert.equal(religion.stand, 2, '"ntg" zählt nicht in den Stand');
 
   const chemie = zeilen.find((z) => z.fach.name === 'Chemie');
-  assert.equal(chemie.fach.abgeschlossen, 1);
-  assert.equal(chemie.abschlussnote, chemie.eintraege[0].note, 'Abschlussnote = Note des einzigen Halbjahres');
+  assert.equal(chemie.fach.abgeschlossen, 0, 'Chemie läuft noch (6. Halbjahr nicht vorbei)');
+  assert.equal(chemie.abschlussnote, null);
+  assert.equal(religion.fach.abgeschlossen, 1, 'Religion (1.-2. Halbjahr) ist automatisch abgeschlossen');
+  assert.equal(religion.abschlussnote, 2, 'Abschlussnote = Mittelwert ohne ntg');
 });
 
 test('Zeugnis-Seite: Abschlusszeugnis für aktive, abgeschlossene Fächer nur mit Gesamtnote, Fächer vergangener Halbjahre sichtbar', async () => {
   const html = await (await lehrerA(`/teacher/schueler/${annaId}/abgangszeugnis`)).text();
   assert.match(html, /<h1>Abschlusszeugnis: Adler, Anna/);
   assert.match(html, /Religion/);
-  assert.match(html, /1\. Halbjahr 2023\/24: ntg/);
-  assert.match(html, /2\. Halbjahr 2023\/24: 2/);
+  assert.match(html, /1\. Halbjahr 2023\/24: 3/, 'Einzelnoten des laufenden Fachs Physik');
+  assert.doesNotMatch(html, /2\. Halbjahr 2023\/24: 2/, 'Religion ist abgeschlossen: nur die Gesamtnote, keine Einzelnoten');
   assert.match(html, /aktueller Stand/);
   assert.match(html, /abgeschlossen -- es zählt nur die Gesamtnote/);
 });

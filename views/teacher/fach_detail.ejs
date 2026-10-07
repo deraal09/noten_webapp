@@ -91,9 +91,6 @@
       <button type="button" data-target="panel-klausuren">Klausuren</button>
       <% if (!spaLeistung) { %>
         <button type="button" data-target="panel-sync">Synchronisation</button>
-        <% if (darfFachAbschliessen) { %>
-          <button type="button" data-target="panel-abschluss">Fach abschließen</button>
-        <% } %>
       <% } %>
     </div>
   </div>
@@ -557,31 +554,6 @@
     })();
   </script>
 </div>
-
-<% if (darfFachAbschliessen) { %>
-  <div id="panel-abschluss" class="reiter-panel card">
-    <% if (fach.abgeschlossen) { %>
-      <p>
-        ✅ Fach abgeschlossen am <strong><%= formatZeitLokal(fach.abgeschlossen_am) %></strong> —
-        die Fachabschlussnote (Mittelwert aus allen Halbjahren, siehe Notenübersicht) ist eingefroren.
-      </p>
-      <form method="post" action="/teacher/fach/<%= fach.id %>/oeffnen" class="inline"
-            onsubmit="return confirm('Fach wieder öffnen? Die Fachabschlussnote bleibt bis zum nächsten Abschließen unverändert sichtbar.')">
-        <button type="submit">🔓 Fach wieder öffnen</button>
-      </form>
-    <% } else { %>
-      <p class="hint">
-        Optional: Manche Fächer laufen über mehrere Schuljahre und werden nie abgeschlossen. Beim
-        Abschließen wird je Schüler/in eine Fachabschlussnote aus allen vorhandenen Halbjahren
-        des Fachs (laut Halbjahr-Auswahl) berechnet.
-      </p>
-      <form method="post" action="/teacher/fach/<%= fach.id %>/abschliessen" class="inline"
-            onsubmit="return confirm('Fach abschließen? Für jede Schülerin/jeden Schüler wird eine Fachabschlussnote aus allen Halbjahren berechnet.')">
-        <button type="submit">✅ Fach abschließen</button>
-      </form>
-    <% } %>
-  </div>
-<% } %>
 
 <% } %>
 
