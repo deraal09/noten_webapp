@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.78.1 - 2026-10-07
+
+- Fix Klassenleitung (SPA): Im Reiter **„Endnoten (Direkteingabe)"** fehlten die
+  SPA-Fächer. Sie stehen jetzt im Raster (für Halbjahre, die das SPA-Schema des
+  Fachs kennt); als Platzhalter erscheinen die berechneten Endpunkte. Direkt
+  eingetragene Gesamtpunkte gelten als **Endpunkte** dieses Halbjahres, leer =
+  wieder berechnet.
+- Fix Klassenleitung: Beim **Wechsel des Halbjahres** bleibt jetzt das gewählte
+  Menü (Reiter) erhalten, statt jedes Mal zur Übersicht zu springen.
+
 ## 0.78.0 - 2026-10-07
 
 - **Direkte Noteneingabe bei Unterfächern:** Auch die **SPA-Komponenten-Unterfächer**

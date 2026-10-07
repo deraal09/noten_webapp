@@ -413,6 +413,12 @@
         const panel = document.getElementById(b.dataset.target);
         if (panel) panel.classList.toggle('active', b.dataset.target === targetId);
       });
+      // Halbjahres-Reiter: beim Wechseln im selben Menü bleiben (nicht jedes Mal zur Übersicht springen).
+      if (storageKey && targetId.indexOf('panel-') === 0) {
+        document.querySelectorAll('a.hj-tab').forEach(function(a) {
+          a.href = a.href.replace(/([?&])tab=[^&]*/, '$1tab=' + targetId.slice(6));
+        });
+      }
     }
     buttons.forEach(function(btn) {
       btn.addEventListener('click', function() {

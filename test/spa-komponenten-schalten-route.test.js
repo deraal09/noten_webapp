@@ -246,6 +246,27 @@ test('Komponenten-Unterfach: direkte Eingabe der Gesamtpunkte ersetzt die berech
   assert.equal(ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj).komponentenLeistung.kunst, 15, 'leer = wieder die berechneten Leistungspunkte');
 });
 
+test('Klassenleitung: SPA-Fächer stehen in der Direkteingabe; Gesamtpunkte gelten als Endpunkte des Halbjahres', async () => {
+  const db = getDb();
+  const schuelerId = db.prepare("SELECT id FROM schueler WHERE nachname = 'Musterfrau'").get().id;
+  const html = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=endnoten&hj=${encodeURIComponent('1. Halbjahr')}`)).text();
+  assert.match(html, /<table class="data" id="endnoten-raster">/);
+  assert.ok(html.includes(`data-fach="${lf3Id}"`), 'LF3 (SPA) hat eine Eingabezelle');
+  // (Die Klassenleitungs-Route gilt nur für vergangene Halbjahre; diese Klasse liegt in der Zukunft -- gleiche Speicherung über die Fach-Route.)
+  const r = await form(admin, `/teacher/fach/${lf3Id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '1. Halbjahr', wert: '9' });
+  assert.equal(r.status, 200);
+  const { berechneFachFuerSchueler } = await import('../src/spa-noten-service.js');
+  assert.equal(berechneFachFuerSchueler(db, lf3Id, schuelerId).find((e) => e.halbjahr === 1).endpunkte, 9);
+  assert.notEqual(berechneFachFuerSchueler(db, lf3Id, schuelerId, { ohneDirekteingabe: true }).find((e) => e.halbjahr === 1).endpunkte, 9);
+  await form(admin, `/teacher/fach/${lf3Id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '1. Halbjahr', wert: '' });
+});
+
+test('Klassenleitung: Halbjahres-Reiter bleiben im gewählten Menü (Link-Anpassung per Skript)', async () => {
+  const html = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=endnoten`)).text();
+  assert.match(html, /class="hj-tab[^"]*" href="\?hj=[^"]*&tab=endnoten"/);
+  assert.match(html, /a\.href = a\.href\.replace\(\/\(\[\?&\]\)tab=\[\^&\]\*\//, 'Skript hält den Menü-Namen in den Halbjahres-Links aktuell');
+});
+
 test.after(async () => {
   await fastify.close();
 });

@@ -244,8 +244,11 @@ function komponentenLeistung(db, fachId, schluessel, halbjahrNr, schuelerId) {
  * @param {import('./spa-grade-calc.js').SchemaHalbjahr[]} schema
  * @returns {import('./spa-grade-calc.js').EingabeHalbjahr[]}
  */
-function ladeEingaben(db, fachId, schuelerId, schema) {
+function ladeEingaben(db, fachId, schuelerId, schema, { ohneDirekteingabe = false } = {}) {
   const eingabenRows = db.prepare('SELECT * FROM spa_eingaben WHERE fach_id = ? AND schueler_id = ?')
+    .all(fachId, schuelerId);
+  // Von der Klassenleitung direkt eingetragene Gesamtpunkte je Halbjahr (halbjahr_endnoten): sie gelten als Endpunkte dieses Halbjahres.
+  const direktRows = ohneDirekteingabe ? [] : db.prepare('SELECT halbjahr, note FROM halbjahr_endnoten WHERE fach_id = ? AND schueler_id = ? AND ntg = 0 AND note IS NOT NULL')
     .all(fachId, schuelerId);
   const komponentenRows = db.prepare('SELECT * FROM spa_komponenten_noten WHERE fach_id = ? AND schueler_id = ?')
     .all(fachId, schuelerId);
@@ -256,6 +259,7 @@ function ladeEingaben(db, fachId, schuelerId, schema) {
       halbjahr: s.halbjahr,
       istNa: !!row?.ist_na,
       direktwert: row?.direktwert ?? null,
+      importierteEndnote: direktRows.find((r) => r.halbjahr === `${s.halbjahr}. Halbjahr`)?.note ?? null,
     };
     if (s.halbjahrModus === 'komponenten_gewichtet') {
       const komponenten = {};
@@ -333,11 +337,11 @@ function injiziereExterneWerte(db, fach, bildungsgang, schuelerId, schema, einga
  * @param {number} schuelerId
  * @returns {ErgebnisHalbjahr[]}
  */
-export function berechneFachFuerSchueler(db, fachId, schuelerId) {
+export function berechneFachFuerSchueler(db, fachId, schuelerId, optionen = {}) {
   const { fach, bildungsgang, schema } = spaSchemaFuerFach(db, fachId);
   if (!fach || !bildungsgang || schema.length === 0) return [];
 
-  const eingaben = ladeEingaben(db, fachId, schuelerId, schema);
+  const eingaben = ladeEingaben(db, fachId, schuelerId, schema, optionen);
   injiziereExterneWerte(db, fach, bildungsgang, schuelerId, schema, eingaben);
   return berechneFach({ schema, eingaben });
 }
