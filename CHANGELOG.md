@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.77.1 - 2026-10-07
+
+- Noteneingabe: Die Klassen (und damit der Klassenfilter) sind **alphabetisch
+  nach Klassenname** sortiert (deutsche Sortierung, Zahlen numerisch); bei
+  gleichem Namen steht das neuere Schuljahr vorn. Die Fächer einer Klasse
+  bleiben wie bisher nach Halbjahren und alphabetisch geordnet.
+
 ## 0.77.0 - 2026-10-07
 
 - **Fächer aus Vorlage importieren** trägt die importierende Lehrkraft nicht mehr

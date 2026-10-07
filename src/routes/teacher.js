@@ -277,7 +277,8 @@ export default async function teacherRoutes(fastify) {
       byKlasse.get(r.klasse_id).faecher.push(eintrag);
     }
 
-    const klassenListe = Array.from(byKlasse.values());
+    // Klassen alphabetisch nach Klassenname (bei gleichem Namen bleibt das neuere Schuljahr vorn).
+    const klassenListe = sortiereNachName(Array.from(byKlasse.values()));
     for (const k of klassenListe) k.faecher = sortiereFaecher(k.faecher);
     return reply.viewEjs('teacher/dashboard.ejs', {
       user: request.user, byKlasse: klassenListe, kurse: sortiereNachName(kurse),

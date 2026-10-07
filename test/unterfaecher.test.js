@@ -342,6 +342,25 @@ test('Klassenseite zeigt oben für alle, wer als Klassenleitung eingetragen ist'
   assert.match(html, /<strong>Klassenleitung:<\/strong>\s*fremd, lehrer/, 'alle Eingetragenen, auch für Lehrkräfte ohne Klassenleitung sichtbar');
 });
 
+test('Noteneingabe: Klassen stehen alphabetisch nach Klassenname (auch im Klassenfilter)', async () => {
+  const sj = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(klasseId).schuljahr_id;
+  const fremdId = getDb().prepare("SELECT id FROM users WHERE username = 'fremd'").get().id;
+  for (const name of ['ZZ9', 'aa1', 'Ökö']) {
+    const k = getDb().prepare('INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv) VALUES (?, ?, ?, ?)').run(sj, name, 'IHK', '').lastInsertRowid;
+    const f = getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(k, 'Fach').lastInsertRowid;
+    getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(fremdId, f);
+  }
+  const html = await (await fremd('/teacher')).text();
+  const ueberschriften = [...html.matchAll(/<h2 id="klasse-\d+">([^<]*?) <small>/g)].map((m) => m[1]);
+  assert.ok(ueberschriften.length >= 4);
+  const sortiert = [...ueberschriften].sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true }));
+  assert.deepEqual(ueberschriften, sortiert);
+  assert.ok(ueberschriften.indexOf('11A') < ueberschriften.indexOf('aa1') && ueberschriften.indexOf('aa1') < ueberschriften.indexOf('Ökö'), 'Ziffern vor Buchstaben, Ö bei O');
+  assert.equal(ueberschriften[ueberschriften.length - 1], 'ZZ9');
+  const optionen = [...html.matchAll(/<option value="klasse-\d+">([^<(]*?) \(/g)].map((m) => m[1]);
+  assert.deepEqual(optionen, ueberschriften, 'Klassenfilter in derselben Reihenfolge');
+});
+
 test.after(async () => {
   await fastify.close();
 });
