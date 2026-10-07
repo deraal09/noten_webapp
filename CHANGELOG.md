@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.65.0 - 2026-10-07
+
+- Fächer werden **alphabetisch** sortiert (deutsche Sortierung: Groß-/Klein-
+  schreibung egal, Umlaute wie A/O/U, Zahlen numerisch: „LF2" vor „LF10"):
+  Klassenseite (samt Unterfächern), Noteneingabe-Übersicht, Klassenleitungs-
+  Übersichten, Abschluss/Zeugnis und CSV-Export.
+
 ## 0.64.1 - 2026-10-07
 
 - SPA: Die Spalte **„Altnote (importiert)"** entfällt in der Eingabemaske; ihre

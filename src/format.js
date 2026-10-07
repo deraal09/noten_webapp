@@ -78,3 +78,16 @@ export function baueEinladungsMailtoLink(einladung, link) {
   const empfaenger = einladung.email ? encodeURIComponent(einladung.email) : '';
   return `mailto:${empfaenger}?subject=${encodeURIComponent('Einladung zur Notenverwaltung')}&body=${encodeURIComponent(text)}`;
 }
+
+// Deutsche Sortierung (Umlaute, Groß-/Kleinschreibung egal, Zahlen numerisch: "LF2" vor "LF10").
+const NAMEN_VERGLEICH = new Intl.Collator('de', { sensitivity: 'base', numeric: true });
+
+/** Vergleichsfunktion für Namen (alphabetisch, deutsch). */
+export function vergleicheNamen(a, b) {
+  return NAMEN_VERGLEICH.compare(String(a ?? ''), String(b ?? ''));
+}
+
+/** Sortiert eine Liste von Objekten alphabetisch nach `schluessel` (Standard: name); gibt eine neue Liste zurück. */
+export function sortiereNachName(liste, schluessel = 'name') {
+  return [...liste].sort((x, y) => vergleicheNamen(x[schluessel], y[schluessel]));
+}

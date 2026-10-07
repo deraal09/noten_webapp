@@ -217,6 +217,20 @@ test('Zugriff strikt je Halbjahr: nur in den Halbjahren der Zuordnung', async ()
   assert.equal((await admin(`/teacher/fach/${matheId}?hj=${enc('5. Halbjahr')}`)).status, 200);
 });
 
+test('Fächer werden alphabetisch sortiert (deutsch: Groß-/Kleinschreibung egal, Umlaute, Zahlen numerisch)', async () => {
+  for (const n of ['englisch', 'Ökonomie', 'Biologie', 'LF10', 'LF2']) {
+    await form(admin, `/teacher/klassen/${klasseId}/faecher/neu`, { name: n });
+  }
+  const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  const pos = (n) => html.indexOf(`class="fach-name" href="/teacher/fach/${getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasseId, n).id}"`);
+  const reihenfolge = ['Biologie', 'Deutsch', 'englisch', 'LF2', 'LF10', 'Mathe', 'Ökonomie'].map(pos);
+  assert.ok(reihenfolge.every((p) => p > 0), 'alle Fächer stehen auf der Seite');
+  assert.deepEqual([...reihenfolge].sort((a, b) => a - b), reihenfolge, 'Reihenfolge ist alphabetisch');
+  const { vergleicheNamen } = await import('../src/format.js');
+  assert.ok(vergleicheNamen('Ägypten', 'Zeichnen') < 0);
+  assert.ok(vergleicheNamen('b', 'A') > 0);
+});
+
 test.after(async () => {
   await fastify.close();
 });

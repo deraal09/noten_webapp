@@ -13,6 +13,7 @@ import {
 import { muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
 import { ladeEndnoten } from './halbjahr-endnoten.js';
 import { unterfaecherImHalbjahr } from './unterfaecher.js';
+import { sortiereNachName } from './format.js';
 
 /** Lädt Unterrichtstermine + eingetragene Noten für ein Fach+Halbjahr (Datumstabelle). */
 function ladeUnterrichtTermine(fachId, halbjahr) {
@@ -78,7 +79,7 @@ export function ladeFachMitUmfeld(id) {
  * Übersicht ihrer neuen Klasse auftauchen.
  */
 export function ladeFaecherFuerKlassenleitung(klasseId) {
-  return getDb().prepare(`
+  const rows = getDb().prepare(`
     SELECT DISTINCT f.* FROM faecher f
     JOIN fach_teilnehmer ft ON ft.fach_id = f.id
     JOIN schueler s ON s.id = ft.schueler_id
@@ -89,14 +90,15 @@ export function ladeFaecherFuerKlassenleitung(klasseId) {
       AND f.parent_fach_id IS NULL
     ORDER BY f.name
   `).all(klasseId);
+  return sortiereNachName(rows);
 }
 
 /** Fächer, an denen eine bestimmte Person teilnimmt (für den Konferenzmodus). */
 export function ladeFaecherFuerSchueler(schuelerId) {
-  return getDb().prepare(`
+  return sortiereNachName(getDb().prepare(`
     SELECT f.* FROM faecher f JOIN fach_teilnehmer ft ON ft.fach_id = f.id
-    WHERE ft.schueler_id = ? AND f.parent_fach_id IS NULL ORDER BY f.name
-  `).all(schuelerId);
+    WHERE ft.schueler_id = ? AND f.parent_fach_id IS NULL
+  `).all(schuelerId));
 }
 
 export function getNotenschluesselCsv(fach) {

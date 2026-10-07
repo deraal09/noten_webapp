@@ -7,6 +7,7 @@
  * separate Tabelle fehlzeiten_schule2) plus eine berechnete Summe.
  */
 
+import { sortiereNachName } from '../format.js';
 import { getDb } from '../db.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
 import { FEHLZEIT_TYPEN } from '../grade-calc.js';
@@ -118,13 +119,13 @@ export default async function klassenlehrerRoutes(fastify) {
     // Fächer ohne zugewiesene Lehrkraft -- die Klassenleitung darf sie
     // aufräumen (siehe POST /fach/:id/loeschen), z. B. versehentlich oder
     // mit falschem Namen angelegte Fächer.
-    const faecherOhneLehrkraft = getDb().prepare(`
+    const faecherOhneLehrkraft = sortiereNachName(getDb().prepare(`
       SELECT f.id, f.name
       FROM faecher f
       WHERE f.klasse_id = ? AND NOT EXISTS (SELECT 1 FROM fach_zuweisungen fz WHERE fz.fach_id = f.id)
         AND NOT EXISTS (SELECT 1 FROM faecher u WHERE u.parent_fach_id = f.id)
       ORDER BY f.name
-    `).all(klasse.id);
+    `).all(klasse.id));
 
     // ---- Direkte Endnoteneingabe (vergangene Halbjahre) ----
     const endnotenRaster = ladeEndnotenRaster(klasse, halbjahr);

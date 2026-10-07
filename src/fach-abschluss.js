@@ -7,6 +7,7 @@
  * eingetragen (siehe src/halbjahr-endnoten.js).
  */
 
+import { sortiereNachName } from './format.js';
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
 import { gesamtnoteJahr, NTG } from './grade-calc.js';
@@ -123,15 +124,14 @@ function zeugnisSortierschluessel(schuljahr, halbjahrNr) {
  * Mit Klasse und Schuljahr des Fachs (klasse_name, schuljahr_bezeichnung).
  */
 export function ladeFaecherEinerPerson(schuelerId) {
-  return getDb().prepare(`
+  return sortiereNachName(getDb().prepare(`
     SELECT f.*, k.name AS klasse_name, k.notenschluessel, sj.bezeichnung AS schuljahr_bezeichnung
     FROM faecher f
     JOIN klassen k ON k.id = f.klasse_id
     JOIN schuljahre sj ON sj.id = k.schuljahr_id
     WHERE f.id IN (SELECT fach_id FROM fach_teilnehmer WHERE schueler_id = ?)
       AND f.parent_fach_id IS NULL
-    ORDER BY f.name
-  `).all(schuelerId);
+  `).all(schuelerId));
 }
 
 /**

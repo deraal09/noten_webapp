@@ -4,7 +4,7 @@
  */
 
 import { getDb } from '../db.js';
-import { formatZeitLokal } from '../format.js';
+import { formatZeitLokal, sortiereNachName } from '../format.js';
 import { setzeEndnote, notenBereich } from '../halbjahr-endnoten.js';
 import {
   ladeUnterfaecher, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
@@ -260,8 +260,10 @@ export default async function teacherRoutes(fastify) {
       byKlasse.get(r.klasse_id).faecher.push(eintrag);
     }
 
+    const klassenListe = Array.from(byKlasse.values());
+    for (const k of klassenListe) k.faecher = sortiereNachName(k.faecher);
     return reply.viewEjs('teacher/dashboard.ejs', {
-      user: request.user, byKlasse: Array.from(byKlasse.values()), kurse,
+      user: request.user, byKlasse: klassenListe, kurse: sortiereNachName(kurse),
     });
   });
 
@@ -1655,7 +1657,7 @@ export default async function teacherRoutes(fastify) {
     // Fächer als Baum: Fächer der obersten Ebene mit ihren Unterfächern (siehe src/unterfaecher.js).
     // SPA: die Komponenten der Lernfelder erscheinen als vorgegebene Unterfächer (idempotent, auch für ältere Klassen).
     if (klasse.notenschluessel === 'SPA') seedeKomponentenUnterfaecher(getDb(), klasse.id);
-    const alleFaecher = getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+    const alleFaecher = sortiereNachName(getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ?').all(klasse.id));
     const baum = alleFaecher.filter((f) => !f.parent_fach_id).map((f) => {
       const komponenten = f.spa_fach_key ? spaKomponentenHalbjahre(getDb(), f) : new Map();
       return {

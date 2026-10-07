@@ -3,6 +3,7 @@
  * Excel-freundlich (UTF-8 BOM, ; als Trennzeichen).
  */
 
+import { sortiereNachName } from '../format.js';
 import { klassenLaufzeit, halbjahrNr, schuljahrDesHalbjahrs, muendlichProzentFuerHalbjahr } from '../klassen-jahre.js';
 import { getDb } from '../db.js';
 import { requireAuth, userDarfKlasseExportieren } from '../auth.js';
@@ -93,7 +94,7 @@ function bauReply(reply, csv, filename) {
 function baueKlasseCsv(klasse) {
   const db = getDb();
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
-  const faecher = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND parent_fach_id IS NULL ORDER BY name').all(klasse.id);
+  const faecher = sortiereNachName(db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND parent_fach_id IS NULL').all(klasse.id));
   const csv = klasse.notenschluessel_csv || '';
   const fzRows = db.prepare(`
     SELECT fz.schueler_id, fz.halbjahr, fz.typ, fz.stunden
