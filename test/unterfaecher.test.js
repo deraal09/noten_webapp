@@ -283,6 +283,15 @@ test('Fach bearbeiten: Name, Halbjahre, Verrechnung; Fach anlegen mit Verrechnun
   assert.equal(getDb().prepare("SELECT verrechnung FROM faecher WHERE name = 'Chemie'").get()?.verrechnung ?? null, null, 'ohne Klassenleitung keine Verrechnung beim Anlegen');
 });
 
+test('Manuelle Noten sind entfernt: kein Reiter, keine Spalten, keine Routen, kein CSV-Feld', async () => {
+  const html = await (await admin(`/teacher/fach/${matheId}?hj=${enc('5. Halbjahr')}`)).text();
+  assert.doesNotMatch(html, /Manuelle Noten|panel-manuell|manuell-muendlich|manuell-schriftlich|Mündliche Noten<|Schriftliche Noten</);
+  assert.match(html, /Mündliche Note<\/th>/);
+  assert.equal((await form(admin, `/teacher/fach/${matheId}/noten/hinzufuegen`, { schueler_id: '1', typ: 'muendlich', wert: '2', halbjahr: '5. Halbjahr' })).status, 404);
+  const csv = await (await admin(`/export/klasse/${klasseId}.csv`)).text();
+  assert.doesNotMatch(csv, /\(manuell\)/);
+});
+
 test.after(async () => {
   await fastify.close();
 });

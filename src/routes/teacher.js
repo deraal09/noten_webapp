@@ -17,7 +17,7 @@ import {
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
-  HALBJAHRE, NOTE_TYPEN, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE,
+  HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE,
 } from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import {
@@ -1062,49 +1062,6 @@ export default async function teacherRoutes(fastify) {
     return reply.send({ ok: true, wert, na: Boolean(na) });
   });
 
-  // ---------- Manuelle Noten ----------
-  fastify.post('/fach/:id/noten/hinzufuegen', async (request, reply) => {
-    if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
-    const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
-    const typ = NOTE_TYPEN.includes(request.body?.typ) ? request.body.typ : null;
-    const schuelerId = parseInt(request.body?.schueler_id, 10);
-    const wert = Number(request.body?.wert);
-    if (!typ || !Number.isFinite(schuelerId) || !Number.isFinite(wert)) {
-      return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
-    }
-    const fach = ladeFachMitUmfeld(request.params.id);
-    const [min, max] = fach.notenschluessel === 'BG' ? [0, 15] : [1, 6];
-    if (wert < min || wert > max) {
-      request.flash?.('error', `Note außerhalb des Bereichs ${min}–${max}.`);
-      return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
-    }
-    if (istSchuelerGesperrtInFach(request.params.id, schuelerId, halbjahr)) {
-      request.flash?.('error', 'Die Noten dieser Person sind für dieses Halbjahr gesperrt (Notenkonferenz).');
-      return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
-    }
-    const pos = getDb().prepare(
-      'SELECT COUNT(*) AS c FROM noten WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ? AND typ = ?'
-    ).get(request.params.id, halbjahr, schuelerId, typ).c;
-    getDb().prepare(
-      'INSERT INTO noten (schueler_id, fach_id, halbjahr, typ, wert, position) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(schuelerId, request.params.id, halbjahr, typ, wert, pos);
-    syncFallsAutoAktiv(request.params.id, halbjahr, request.user.id);
-    return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
-  });
-
-  fastify.post('/noten/:id/loeschen', async (request, reply) => {
-    const n = getDb().prepare('SELECT fach_id, halbjahr, schueler_id FROM noten WHERE id = ?').get(request.params.id);
-    if (!n) return reply.redirect('/teacher');
-    if (!userHatFachZgriff(request.user, n.fach_id, n.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
-    if (istSchuelerGesperrtInFach(n.fach_id, n.schueler_id, n.halbjahr)) {
-      request.flash?.('error', 'Die Noten dieser Person sind für dieses Halbjahr gesperrt (Notenkonferenz).');
-      return reply.redirect(`/teacher/fach/${n.fach_id}?hj=${encodeURIComponent(n.halbjahr)}`);
-    }
-    getDb().prepare('DELETE FROM noten WHERE id = ?').run(request.params.id);
-    syncFallsAutoAktiv(n.fach_id, n.halbjahr, request.user.id);
-    return reply.redirect(`/teacher/fach/${n.fach_id}?hj=${encodeURIComponent(n.halbjahr)}`);
-  });
-
   // ---------- Fachabschluss (optional — manche Fächer laufen über mehrere Schuljahre) ----------
   fastify.post('/fach/:id/abschliessen', async (request, reply) => {
     const fach = ladeFachMitUmfeld(request.params.id);
@@ -1288,7 +1245,7 @@ export default async function teacherRoutes(fastify) {
     const hatDaten = (tabelle) => getDb().prepare(`
       SELECT halbjahr FROM ${tabelle} t JOIN faecher f ON f.id = t.fach_id WHERE f.klasse_id = ?
     `).all(klasse.id).some((r) => (halbjahrNr(r.halbjahr) ?? 0) > neueHalbjahre);
-    if (['klausuren', 'unterrichtsleistungen', 'unterricht_termine', 'noten'].some(hatDaten)) {
+    if (['klausuren', 'unterrichtsleistungen', 'unterricht_termine'].some(hatDaten)) {
       request.flash?.('error', 'In Halbjahren, die dabei wegfallen würden, sind bereits Noten oder Leistungen eingetragen. Das Abschlussschuljahr kann nicht davor liegen.');
       return reply.redirect(zurueck);
     }

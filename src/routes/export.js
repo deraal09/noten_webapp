@@ -57,8 +57,7 @@ export default async function exportRoutes(fastify) {
 const HEADER = [
   'Schuljahr', 'Klasse', 'Notenschlüssel',
   'Fach', 'Nachname', 'Vorname', 'Halbjahr',
-  'Mündlich (manuell)', 'Mündlich (bewertet)',
-  'Schriftlich (manuell)', 'Klausuren',
+  'Mündlich (bewertet)', 'Klausuren',
   'Gesamtnote Halbjahr',
   'Fehlzeiten entschuldigt (h)', 'Fehlzeiten unentschuldigt (h)',
   'Fehlzeiten betrieblich (h)',
@@ -118,8 +117,7 @@ function baueKlasseCsv(klasse) {
         lines.push([
           schuljahrDesHalbjahrs(laufzeit, halbjahrNr(hj)) ?? klasse.schuljahr_bezeichnung, klasse.name, klasse.notenschluessel,
           f.name, s.nachname, s.vorname, hj,
-          zeile.muendlich_manuell, zeile.muendlich_bewertet,
-          zeile.schriftlich_manuell, zeile.klausuren,
+          zeile.muendlich_bewertet, zeile.klausuren,
           fmtNote(zeile.gn),
           fzHj.entschuldigt ?? '', fzHj.unentschuldigt ?? '', fzHj.betrieblich ?? '',
         ].map(escapeCell).join(';'));
@@ -176,18 +174,11 @@ function zeileFuerSchuelerFachHj(klasse, csv, fach, schueler, halbjahr) {
   const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen);
   const ulPct = muendlichProzentFuerHalbjahr(klasse.id, halbjahr, 60);
   const schriftlichPct = 100 - ulPct;
-  const manuelle = { muendlich: [], schriftlich: [] };
-  const notenRows = db.prepare(
-    'SELECT typ, wert FROM noten WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ? ORDER BY position'
-  ).all(fach.id, halbjahr, schueler.id);
-  for (const n of notenRows) manuelle[n.typ].push(n.wert);
   const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csv);
   const zusatzTeil = zusatzleistungen.filter((u) => u.note !== null)
     .map((u) => `${formatNote(u.note)}(${Math.round(u.gewichtung)}%)`).join(' | ');
   const datumsTeil = datumsDurchschnitt !== null ? `Datumstabelle-Ø ${formatNote(datumsDurchschnitt)} (${datumsWerte.length} Termine)` : '';
   return {
-    muendlich_manuell: manuelle.muendlich.map((n) => Number(n).toString()).join(', '),
-    schriftlich_manuell: manuelle.schriftlich.map((n) => Number(n).toString()).join(', '),
     muendlich_bewertet: [datumsTeil, zusatzTeil].filter(Boolean).join(' | '),
     klausuren: klausurData.filter((k) => k.note !== null).map((k) => `${formatNote(k.note)}(${Math.round(k.gewichtung)}%)`).join(' | '),
     gn,

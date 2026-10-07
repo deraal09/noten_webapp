@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.69.0 - 2026-10-07
+
+- **Manuelle Noten entfernt:** Der Reiter „Manuelle Noten", die Spalten
+  „Mündliche Noten"/„Schriftliche Noten" in der Notenübersicht, der Abschnitt in
+  der Notenbesprechung, die beiden Routen und die CSV-Spalten „Mündlich
+  (manuell)"/„Schriftlich (manuell)" entfallen -- das übernimmt die direkte
+  Noteneingabe. Die Spalten „Mündliche/Schriftliche Note" (berechnet) werden nun
+  immer angezeigt. Alte Einträge bleiben nur in der Datenbank liegen und
+  blockieren keine Halbjahres-Änderungen mehr.
+
 ## 0.68.0 - 2026-10-07
 
 - Fächer lassen sich **nachträglich bearbeiten**: Ein Klick auf den Fachnamen

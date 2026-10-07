@@ -102,7 +102,7 @@ test('Vorbereitung: Klasse mit Klassenleitung (A), zugewiesene Fachlehrkraft (B)
   await form(lehrerB, `/teacher/uls/${ulId}/maxpunkte`, { anzahl_aufgaben: '1', mp_0: '10', halbjahr: HJ });
 });
 
-test('Vor der Sperre: Fachlehrkraft kann Punkte/manuelle Noten normal eintragen', async () => {
+test('Vor der Sperre: Fachlehrkraft kann Punkte normal eintragen', async () => {
   const r = await lehrerB(`/teacher/klausuren/${klausurId}/punkte`, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ schueler_id: String(s1), aufgabe_idx: '0', wert: '5' }),
@@ -126,7 +126,7 @@ test('Sperren: nur Klassenleitung darf sperren', async () => {
   assert.match(html, /gesperrt/);
 });
 
-test('Nach der Sperre: Fachlehrkraft kann Punkte/manuelle Noten NICHT mehr für die gesperrte Person ändern', async () => {
+test('Nach der Sperre: Fachlehrkraft kann Punkte/Endnoten NICHT mehr für die gesperrte Person ändern', async () => {
   // Klausur-Punkte
   let r = await lehrerB(`/teacher/klausuren/${klausurId}/punkte`, {
     method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -143,12 +143,10 @@ test('Nach der Sperre: Fachlehrkraft kann Punkte/manuelle Noten NICHT mehr für 
   });
   assert.equal(r.status, 403);
 
-  // Manuelle Note hinzufügen
-  r = await form(lehrerB, `/teacher/fach/${fachId}/noten/hinzufuegen`, {
-    schueler_id: String(s1), typ: 'muendlich', wert: '2', halbjahr: HJ,
-  });
-  assert.equal(r.status, 302);
-  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM noten WHERE schueler_id = ?').get(s1).c, 0);
+  // Direkte Endnote
+  r = await form(lehrerB, `/teacher/fach/${fachId}/endnote`, { schueler_id: String(s1), halbjahr: HJ, wert: '2' });
+  assert.equal(r.status, 403);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM halbjahr_endnoten WHERE schueler_id = ?').get(s1).c, 0);
 
   // Andere Schüler:in (nicht gesperrt) bleibt normal bearbeitbar.
   r = await lehrerB(`/teacher/klausuren/${klausurId}/punkte`, {
@@ -158,17 +156,13 @@ test('Nach der Sperre: Fachlehrkraft kann Punkte/manuelle Noten NICHT mehr für 
   assert.equal(r.status, 200);
 });
 
-test('Löschen einer bereits vorhandenen manuellen Note ist für die gesperrte Person ebenfalls blockiert', async () => {
-  // Zuerst für s2 (nicht gesperrt) eine Note anlegen, dann s2 sperren und Löschversuch prüfen.
-  await form(lehrerB, `/teacher/fach/${fachId}/noten/hinzufuegen`, {
-    schueler_id: String(s2), typ: 'muendlich', wert: '2', halbjahr: HJ,
-  });
-  const noteId = getDb().prepare('SELECT id FROM noten WHERE schueler_id = ?').get(s2).id;
+test('Direkte Endnote: für nicht gesperrte Personen möglich, nach der Sperre geändert/gelöscht nicht', async () => {
+  let r = await form(lehrerB, `/teacher/fach/${fachId}/endnote`, { schueler_id: String(s2), halbjahr: HJ, wert: '2' });
+  assert.equal(r.status, 200);
   await form(lehrerA, `/teacher/klassen/${klasseId}/konferenz/${s2}/sperren`, { halbjahr: HJ });
-
-  const r = await form(lehrerB, `/teacher/noten/${noteId}/loeschen`, {});
-  assert.equal(r.status, 302);
-  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM noten WHERE id = ?').get(noteId).c, 1, 'gesperrte Note darf nicht gelöscht werden');
+  r = await form(lehrerB, `/teacher/fach/${fachId}/endnote`, { schueler_id: String(s2), halbjahr: HJ, wert: '5' });
+  assert.equal(r.status, 403);
+  assert.equal(getDb().prepare('SELECT note FROM halbjahr_endnoten WHERE schueler_id = ?').get(s2).note, 2, 'gesperrte Endnote bleibt unverändert');
 });
 
 test('Entsperrung anfragen (Fachlehrkraft) statt selbst zu entsperren', async () => {

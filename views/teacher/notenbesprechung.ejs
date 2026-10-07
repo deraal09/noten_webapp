@@ -93,18 +93,6 @@
   </tbody>
 </table>
 
-<h3>Manuelle Noten</h3>
-<p>
-  Mündlich:
-  <% if (!zeile.muendlich.length) { %>–<% } %>
-  <% zeile.muendlich.forEach(function(v) { %><span class="tag"><%= Number(v).toString().replace('.', ',') %></span> <% }); %>
-</p>
-<p>
-  Schriftlich:
-  <% if (!zeile.schriftlich.length) { %>–<% } %>
-  <% zeile.schriftlich.forEach(function(v) { %><span class="tag"><%= Number(v).toString().replace('.', ',') %></span> <% }); %>
-</p>
-
 <h2>Notizen</h2>
 <form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/<%= zeile.schueler_id %>/notiz" class="card">
   <input type="hidden" name="halbjahr" value="<%= halbjahr %>">

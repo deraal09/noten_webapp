@@ -581,8 +581,7 @@ Die Notentafel eines Fachs (jetzt „Noteneingabe" genannt) ist neu
 strukturiert:
 
 - **Notenübersicht** oben, direkt unter den Halbjahr-Reitern: eine Tabelle
-  mit allen Schüler/innen, ihren manuellen mündlichen/schriftlichen Noten,
-  sowie den berechneten Werten **Mündliche Note** (aus den
+  mit allen Schüler/innen sowie den berechneten Werten **Mündliche Note** (aus den
   Unterrichtsleistungen), **Schriftliche Note** (aus den Klausuren) und
   **Gesamtnote**.
 - Darunter zwei **Reiter** (nebeneinander liegende Buttons) „Klausuren" und
@@ -621,10 +620,10 @@ Der Reiter „Unterrichtsleistung" hat zwei Bereiche:
   die Zusatzleistungen (untereinander normiert), analog zur bestehenden
   „nur tatsächlich Vorhandenes zählt"-Logik bei Klausuren/Gesamtnote.
 
-Die frühere, rein dekorative „+ Manuelle Note hinzufügen"-Option
-„Mündlich" (floss nie in die Berechnung ein) ist durch die Datumstabelle
-ersetzt und aus dem Formular entfernt; bereits vorhandene alte Einträge
-bleiben unverändert sichtbar/löschbar.
+Die früheren „Manuellen Noten" (Reiter, Spalten, CSV-Felder; flossen nie in die
+Berechnung ein) sind entfernt -- direkte Noten trägt man jetzt über die
+„Direkte Endnoteneingabe" ein. Bereits gespeicherte alte Einträge bleiben nur
+in der Datenbank (Tabelle `noten`) liegen.
 
 ### Notenbesprechungsmodus
 

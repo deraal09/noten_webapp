@@ -106,11 +106,9 @@ test('Vorbereitung: zwei Schuljahre, Klasse 9A (2024/25) mit Mathematik und Note
   benId = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Berger'").get().id;
 
   // Eine Note für Anna in Mathematik der 9A -- soll den Wechsel überleben.
-  r = await form(lehrerA, `/teacher/fach/${mathId}/noten/hinzufuegen`, {
-    schueler_id: String(annaId), typ: 'schriftlich', wert: '2', halbjahr: HJ,
-  });
-  assert.equal(r.status, 302);
-  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM noten WHERE fach_id = ? AND schueler_id = ?').get(mathId, annaId).c, 1);
+  r = await form(lehrerA, `/teacher/fach/${mathId}/endnote`, { schueler_id: String(annaId), halbjahr: HJ, wert: '2' });
+  assert.equal(r.status, 200);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM halbjahr_endnoten WHERE fach_id = ? AND schueler_id = ?').get(mathId, annaId).c, 1);
 });
 
 test('Versetzen: nur wer die Klasse verwalten darf, und nur in eine Klasse mit gleichem Notenschlüssel', async () => {
@@ -129,7 +127,7 @@ test('Versetzen 9A -> 10A: dieselbe Person, Noten und alte Fach-Teilnahme bleibe
 
   const anna = getDb().prepare('SELECT * FROM schueler WHERE id = ?').get(annaId);
   assert.equal(anna.klasse_id, klasse10A, 'derselbe Datensatz, nur neue Klasse');
-  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM noten WHERE fach_id = ? AND schueler_id = ?').get(mathId, annaId).c, 1, 'Note bleibt erhalten');
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM halbjahr_endnoten WHERE fach_id = ? AND schueler_id = ?').get(mathId, annaId).c, 1, 'Note bleibt erhalten');
   assert.ok(getDb().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(mathId, annaId), 'alte Teilnahme bleibt');
   assert.ok(getDb().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(deutschId, annaId), 'neue Klasse: Teilnehmerin der Fächer');
 

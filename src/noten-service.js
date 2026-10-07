@@ -293,7 +293,7 @@ function ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler) {
       schueler_id: s.id, nachname: s.nachname, vorname: s.vorname,
       endnote, gesamtBerechnet: berechnet, gesamtOhneVerrechnung: ohneVerrechnung, vorhalbjahrNote: vorherNote,
       herkunftKlasse: s.klasse_id === fach.klasse_id ? null : s.herkunft_klasse_name,
-      klausuren: [], uls: [], terminNoten: [], muendlich: [], schriftlich: [],
+      klausuren: [], uls: [], terminNoten: [],
       schriftlicheNote: null, datumsDurchschnitt: null, naAnzahl: 0, muendlicheNote: null,
       unterfachNoten: proUnterfach.map(({ noten }) => noten.get(s.id) ?? null),
       gesamt: gn,
@@ -319,7 +319,6 @@ function ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler) {
  *
  * @returns {{ schriftlichPct: number, ulPct: number, csvStr: string,
  *   rows: Array<{schueler_id, nachname, vorname, klausuren, uls,
- *     muendlich: number[], schriftlich: number[],
  *     schriftlicheNote: number|null, muendlicheNote: number|null,
  *     gesamt: number|null, nicht_bestanden: boolean}> }}
  */
@@ -355,14 +354,6 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     const rows = db.prepare('SELECT schueler_id, punkte FROM ul_ergebnisse WHERE ul_id = ?').all(u.id);
     ulErgs.set(u.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
   }
-  const notenRows = db.prepare(
-    'SELECT schueler_id, typ, wert, id FROM noten WHERE fach_id = ? AND halbjahr = ? ORDER BY position, id'
-  ).all(fach.id, halbjahr);
-  const manuelleMap = new Map();
-  for (const n of notenRows) {
-    if (!manuelleMap.has(n.schueler_id)) manuelleMap.set(n.schueler_id, { muendlich: [], schriftlich: [] });
-    manuelleMap.get(n.schueler_id)[n.typ].push({ id: n.id, wert: n.wert });
-  }
   const { termine, noten: terminNoten, na: terminNa } = ladeUnterrichtTermine(fach.id, halbjahr);
 
   const endnoten = ladeEndnoten(fach.id, halbjahr);
@@ -385,7 +376,6 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       const note = punkte ? noteAusPunkten(punkte, JSON.parse(u.max_punkte_pro_aufgabe), csvStr) : null;
       return { id: u.id, name: u.name, gewichtung: u.gewichtung, punkte, note };
     });
-    const manuelle = manuelleMap.get(s.id) || { muendlich: [], schriftlich: [] };
     const eigeneTerminNoten = terminNoten.get(s.id) || new Map();
     const eigeneNa = terminNa.get(s.id) || new Set();
     const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null, na: eigeneNa.has(t.id) }));
@@ -404,7 +394,6 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       // Heimat-Klasse dieses Fachs stammt (klassenübergreifender Kurs).
       herkunftKlasse: s.klasse_id === fach.klasse_id ? null : s.herkunft_klasse_name,
       klausuren: klausurData, uls: ulData, terminNoten: terminZeile,
-      muendlich: manuelle.muendlich, schriftlich: manuelle.schriftlich,
       schriftlicheNote: teilNote(klausurData),
       datumsDurchschnitt,
       naAnzahl: eigeneNa.size,

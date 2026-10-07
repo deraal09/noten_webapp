@@ -16,7 +16,7 @@ import { klassenLaufzeit, fachHalbjahrNummern, halbjahrNr, halbjahrText } from '
 
 export const UNTERFACH_TRENNER = ' › ';
 
-const DATEN_TABELLEN = ['klausuren', 'unterrichtsleistungen', 'unterricht_termine', 'noten', 'halbjahr_endnoten'];
+const DATEN_TABELLEN = ['klausuren', 'unterrichtsleistungen', 'unterricht_termine', 'halbjahr_endnoten'];
 
 /** Unterfächer eines Fachs (alle Halbjahre), in Anlagereihenfolge. */
 export function ladeUnterfaecher(parentId) {

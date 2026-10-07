@@ -90,7 +90,6 @@
       <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
       <button type="button" data-target="panel-klausuren">Klausuren</button>
       <% if (!spaLeistung) { %>
-        <button type="button" data-target="panel-manuell">Manuelle Noten</button>
         <button type="button" data-target="panel-teilnehmer">Teilnehmer/innen</button>
         <button type="button" data-target="panel-sync">Synchronisation</button>
         <% if (darfFachAbschliessen) { %>
@@ -102,24 +101,9 @@
 </div>
 
 <%
-  // Manuelle Noten (Tags) und die per Datumstabelle/Klausur berechneten
-  // Noten sind zwei alternative Wege, mündlich/schriftlich zu benoten --
-  // die jeweils andere Spalte bleibt sonst leer und bläht die Übersicht
-  // unnötig auf. Solange NUR der eine Weg benutzt wird, bleibt die Spalte
-  // des anderen ausgeblendet (wird bei neuen Einträgen erst nach einem
-  // Neuladen der Seite berücksichtigt, siehe unten bei refresh()).
   var NL = spaLeistung ? 'Punkte' : 'Note'; // SPA bewertet Klausuren/UL in Punkten (0-15)
-  var hatManuelleMuendlich = rows.some(function(r) { return r.muendlich.length > 0; });
-  var hatManuelleSchriftlich = rows.some(function(r) { return r.schriftlich.length > 0; });
-  var hatUlEintraege = rows.some(function(r) {
-    return r.terminNoten.some(function(t) { return t.wert !== null || t.na; }) || r.uls.some(function(u) { return u.punkte !== null; });
-  });
-  var hatKlausurEintraege = rows.some(function(r) { return r.klausuren.some(function(k) { return k.punkte !== null; }); });
-  var zeigeMuendlicheNoteSpalte = !(hatManuelleMuendlich && !hatUlEintraege);
-  var zeigeSchriftlicheNoteSpalte = !(hatManuelleSchriftlich && !hatKlausurEintraege);
   var zeigeNaSpalte = termine.length > 0;
-  var sichtbareSpalten = 2 + (zeigeNaSpalte ? 1 : 0) + (verrechnung && verrechnung.prozent ? 1 : 0) + (hatManuelleMuendlich ? 1 : 0) + (hatManuelleSchriftlich ? 1 : 0)
-    + (zeigeMuendlicheNoteSpalte ? 1 : 0) + (zeigeSchriftlicheNoteSpalte ? 1 : 0) + (spaLeistung ? (spaLeistung.komponente ? 1 : 2) : 0) + (fach.abgeschlossen ? 1 : 0);
+  var sichtbareSpalten = 2 + (zeigeNaSpalte ? 1 : 0) + (verrechnung && verrechnung.prozent ? 1 : 0) + 2 + (spaLeistung ? (spaLeistung.komponente ? 1 : 2) : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
 <div id="panel-uebersicht" class="reiter-panel active">
   <h2>Notenübersicht</h2>
@@ -164,10 +148,8 @@
     <thead>
       <tr>
         <th>Schüler/in</th>
-        <% if (hatManuelleMuendlich) { %><th>Mündliche Noten</th><% } %>
-        <% if (hatManuelleSchriftlich) { %><th>Schriftliche Noten</th><% } %>
-        <% if (zeigeMuendlicheNoteSpalte) { %><th>Mündliche <%= NL %></th><% } %>
-        <% if (zeigeSchriftlicheNoteSpalte) { %><th>Schriftliche <%= NL %></th><% } %>
+        <th>Mündliche <%= NL %></th>
+        <th>Schriftliche <%= NL %></th>
         <% if (verrechnung && verrechnung.prozent) { %><th title="Endgültige Note des Vorhalbjahres, die zu <%= verrechnung.prozent %> % einfließt">Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
         <th>Gesamt<%= spaLeistung ? 'punkte' : 'note' %></th>
         <% if (spaLeistung) { %><th title="Tendenznote aus den Leistungspunkten (SPA-Notenskala)">Tendenz</th><% } %>
@@ -185,34 +167,8 @@
             <% if (r.herkunftKlasse) { %><small class="hint">(<%= r.herkunftKlasse %>)</small><% } %>
             <% if (sperre) { %><span title="Noten für dieses Halbjahr gesperrt (Notenkonferenz)">🔒</span><% } %>
           </td>
-          <% if (hatManuelleMuendlich) { %>
-          <td class="manuell-muendlich">
-            <% r.muendlich.forEach(function(n) { %>
-              <% if (sperre) { %>
-                <span class="tag" title="gesperrt"><%= Number(n.wert).toString().replace('.', ',') %></span>
-              <% } else { %>
-                <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
-                  <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
-                </form>
-              <% } %>
-            <% }); %>
-          </td>
-          <% } %>
-          <% if (hatManuelleSchriftlich) { %>
-          <td class="manuell-schriftlich">
-            <% r.schriftlich.forEach(function(n) { %>
-              <% if (sperre) { %>
-                <span class="tag" title="gesperrt"><%= Number(n.wert).toString().replace('.', ',') %></span>
-              <% } else { %>
-                <form method="post" action="/teacher/noten/<%= n.id %>/loeschen" class="inline">
-                  <button type="submit" class="tag" title="löschen"><%= Number(n.wert).toString().replace('.', ',') %></button>
-                </form>
-              <% } %>
-            <% }); %>
-          </td>
-          <% } %>
-          <% if (zeigeMuendlicheNoteSpalte) { %><td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td><% } %>
-          <% if (zeigeSchriftlicheNoteSpalte) { %><td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td><% } %>
+          <td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td>
+          <td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td>
           <% if (verrechnung && verrechnung.prozent) { %><td class="note-cell vorhalbjahr-zelle"><%= r.vorhalbjahrNote === null ? '–' : formatNote(r.vorhalbjahrNote) %></td><% } %>
           <td class="gesamt-cell<%= r.endnote ? ' direkt' : '' %>"<% if (r.endnote) { %> title="Direkt eingetragene Endnote"<% } %>><%= r.gesamt === null ? (r.endnote && r.endnote.ntg ? 'ntg' : '–') : formatNote(r.gesamt) %></td>
           <% if (spaLeistung) { %><td class="note-cell spa-tendenz-cell"><%= r.gesamt === null ? '–' : spaTendenz(r.gesamt) %></td><% } %>
@@ -239,27 +195,6 @@
     </tbody>
   </table>
 </div>
-
-<% if (!spaLeistung) { %>
-<div id="panel-manuell" class="reiter-panel card">
-  <h2>Manuelle Noten</h2>
-  <form method="post" action="/teacher/fach/<%= fach.id %>/noten/hinzufuegen" class="inline">
-    <select name="schueler_id" required>
-      <% schueler.filter(function(s) { return !sperren.get(s.id); }).forEach(function(s) { %>
-        <option value="<%= s.id %>"><%= s.nachname %>, <%= s.vorname %></option>
-      <% }); %>
-    </select>
-    <select name="typ" required>
-      <option value="schriftlich">Schriftlich</option>
-    </select>
-    <input type="number" name="wert" step="0.1" min="<%= fach.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= fach.notenschluessel === 'BG' ? 15 : 6 %>" required>
-    <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-    <button type="submit">+ Note</button>
-  </form>
-  <p class="hint">Für mündliche Noten die Datumstabelle im Reiter „Unterrichtsleistung" nutzen — die zählt (anders als diese Notiz hier) direkt in die Berechnung.</p>
-</div>
-
-<% } %>
 
 <div id="panel-klausuren" class="reiter-panel">
   <div class="reiter unter-reiter card" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
