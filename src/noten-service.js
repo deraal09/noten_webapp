@@ -136,7 +136,7 @@ export function berechneGesamtnotenOhneEndnoten(fachId, halbjahr) {
   const roh = berechneRohnoten(fachId, halbjahr);
   const fach = ladeFachMitUmfeld(fachId);
   if (!fach || fach.spa_fach_key) return roh;
-  const prozent = verrechnungsProzent(fach.klasse_id, halbjahr);
+  const prozent = verrechnungsProzent(fach.klasse_id, halbjahr, fach);
   if (!prozent) return roh;
   const vorher = berechneGesamtnoten(fachId, halbjahrText(halbjahrNr(halbjahr) - 1));
   for (const [schuelerId, note] of roh) roh.set(schuelerId, wendeVerrechnungAn(note, vorher.get(schuelerId) ?? null, prozent));
@@ -276,7 +276,7 @@ export function berechneGesamtnoteEinerPerson(fachId, halbjahr, schuelerId) {
  */
 function ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler) {
   const { ergebnis, proUnterfach } = berechneKompositionsnoten(fach, unterfaecher, halbjahr);
-  const verrechnungProzent = fach.spa_fach_key ? 0 : verrechnungsProzent(fach.klasse_id, halbjahr);
+  const verrechnungProzent = verrechnungsProzent(fach.klasse_id, halbjahr, fach);
   const vorhalbjahr = verrechnungProzent ? halbjahrText(halbjahrNr(halbjahr) - 1) : null;
   const vorherNoten = verrechnungProzent ? berechneGesamtnoten(fach.id, vorhalbjahr) : new Map();
   const endnoten = ladeEndnoten(fach.id, halbjahr);
@@ -365,7 +365,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
 
   const endnoten = ladeEndnoten(fach.id, halbjahr);
   // Verrechnung mit dem Vorhalbjahr (Einstellung der Klasse, siehe verrechnungsProzent).
-  const verrechnungProzent = fach.spa_fach_key ? 0 : verrechnungsProzent(fach.klasse_id, halbjahr);
+  const verrechnungProzent = verrechnungsProzent(fach.klasse_id, halbjahr, fach);
   const vorhalbjahr = verrechnungProzent ? halbjahrText(halbjahrNr(halbjahr) - 1) : null;
   const vorherNoten = verrechnungProzent ? berechneGesamtnoten(fach.id, vorhalbjahr) : new Map();
   const rows = schueler.map((s) => {

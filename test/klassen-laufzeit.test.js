@@ -166,13 +166,14 @@ test('Mündlich-Anteil richtet sich nach dem Schuljahr des Halbjahres', async ()
   assert.equal(J.muendlichProzentFuerHalbjahr(ihkId, '6. Halbjahr'), 60);
 });
 
-test('Klassen-Seite der Klassenleitung zeigt Laufzeit-Formular und alle Halbjahre', async () => {
-  const html = await (await admin(`/klassenlehrer/klasse/${ihkId}?tab=klassenleitung`)).text();
-  assert.match(html, /Laufzeit der Klasse/);
-  assert.match(html, /aktuell <strong>6 Halbjahre<\/strong>/);
+test('Klassenseite zeigt das Laufzeit-Formular (Einschulungsjahr festlegen) und alle Halbjahre', async () => {
+  const html = await (await admin(`/teacher/klassen/${ihkId}`)).text();
+  assert.match(html, /Einschulungsjahr festlegen/);
+  assert.match(html, /6 Halbjahre/);
   assert.match(html, /name="einschulung_jahr"/);
   assert.match(html, /name="anzahl_jahre"/);
-  assert.match(html, />6\. Halbjahr</);
+  const kl = await (await admin(`/klassenlehrer/klasse/${ihkId}?tab=klassenleitung`)).text();
+  assert.doesNotMatch(kl, /Laufzeit der Klasse/);
 });
 
 test('Buttons zur Noteneingabe: auf "Meine Klassen" (oben und je Klasse) und auf der Klassenseite', async () => {

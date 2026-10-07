@@ -347,56 +347,6 @@
 </div>
 
 <div id="panel-klassenleitung" class="reiter-panel <%= aktiverTab === 'klassenleitung' ? 'active' : '' %>">
-  <h2>Laufzeit der Klasse</h2>
-  <p class="hint">
-    Die Klasse läuft ab dem Einschulungsjahr die eingestellte Anzahl Jahre (Abschlussschuljahr: <strong><%= laufzeit.schuljahre[laufzeit.schuljahre.length - 1].bezeichnung %></strong>); die Halbjahre werden über diese
-    Schuljahre durchgezählt (aktuell <strong><%= laufzeit.anzahlHalbjahre %> Halbjahre</strong>:
-    <%= laufzeit.schuljahre.map(function(sj) { return sj.bezeichnung; }).join(', ') %>).
-    Ohne Abschlussschuljahr gilt die Standarddauer (SPA 2, BG/IHK 3 Jahre).
-  </p>
-  <% var optionenJahre = jahresOptionen.map(function(j) { return j.jahr; });
-     var alleJahre = jahresOptionen.slice();
-     [laufzeit.einschulungJahr, laufzeit.abschlussJahr].forEach(function(jahr) {
-       if (optionenJahre.indexOf(jahr) === -1) { alleJahre.push({ jahr: jahr, bezeichnung: jahr + '/' + String((jahr + 1) % 100).padStart(2, '0') }); optionenJahre.push(jahr); }
-     });
-     alleJahre.sort(function(a, b) { return a.jahr - b.jahr; }); %>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/laufzeit" class="inline">
-    <label>Einschulungsschuljahr
-      <select name="einschulung_jahr">
-        <% alleJahre.forEach(function(j) { %><option value="<%= j.jahr %>" <%= j.jahr === laufzeit.einschulungJahr ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
-      </select>
-    </label>
-    <label>Anzahl Jahre an der Schule
-      <select name="anzahl_jahre">
-        <option value="" <%= laufzeit.abschlussIstStandard ? 'selected' : '' %>>Standard (<%= klasse.notenschluessel === 'SPA' ? 2 : 3 %> Jahre)</option>
-        <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>" <%= (!laufzeit.abschlussIstStandard && laufzeit.jahre === aj) ? 'selected' : '' %>><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
-      </select>
-    </label>
-    <button type="submit">Laufzeit speichern</button>
-  </form>
-
-  <h2>Verrechnung der Halbjahre</h2>
-  <p class="hint">
-    Legt fest, zu wie viel Prozent die Note eines Halbjahres in das <strong>nächste</strong> Halbjahr einfließt
-    (0 % = gar nicht). Beispiel: 50 % bei „1. → 2. Halbjahr" – die 2.-Halbjahres-Note besteht je zur Hälfte aus den
-    Leistungen des 2. Halbjahres und der (endgültigen) Note des 1. Halbjahres; „3. → 4." bleibt bei 0 %, dann zählt
-    das 4. Halbjahr nur für sich. Gilt für alle Fächer der Klasse außer SPA.
-  </p>
-  <% if (laufzeit.anzahlHalbjahre < 2) { %>
-    <p class="hint">Mit nur einem Halbjahr gibt es keine Verrechnung.</p>
-  <% } else { %>
-    <form method="post" action="/teacher/klassen/<%= klasse.id %>/verrechnung" class="card">
-      <div class="verrechnung-raster">
-        <% for (var vn = 1; vn < laufzeit.anzahlHalbjahre; vn++) { %>
-          <label class="feld"><%= vn %>. → <%= vn + 1 %>. Halbjahr
-            <span class="feld-mit-einheit"><input type="number" name="p_<%= vn %>" min="0" max="100" step="1" value="<%= verrechnung[String(vn)] || 0 %>">%</span>
-          </label>
-        <% } %>
-      </div>
-      <button type="submit">Verrechnung speichern</button>
-    </form>
-  <% } %>
-
   <h2>Weitere Klassenlehrkräfte</h2>
   <p class="hint">
     Alle hier eingetragenen Personen sind gleichberechtigte Klassenleitung — sie sehen alle Noten

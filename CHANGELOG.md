@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.63.0 - 2026-10-07
+
+- Die Abschnitte **„Laufzeit der Klasse"** und **„Verrechnung der Halbjahre"**
+  sind aus dem Klassenleitungs-Bereich verschwunden. Die Laufzeit stellt die
+  Klassenleitung im Menü „Einschulungsjahr festlegen" auf der Klassenseite ein
+  (Meine Klassen).
+- Die **Verrechnung der Halbjahre** gilt jetzt **je Fach** (nicht für
+  Unterfächer und SPA-Fächer): auf der Klassenseite gibt es oberhalb der Fächer
+  einen einklappbaren Abschnitt „Verrechnung der Halbjahre" (nur Klassenleitung)
+  mit einem Dialog je Fach (⚖️) und der Option „Für alle Fächer der Klasse
+  übernehmen". Bisherige Klassen-Einstellungen gelten weiter für Fächer ohne
+  eigene Einstellung.
+- Fix: Unterfächer wurden bisher zusätzlich selbst verrechnet, obwohl das Fach
+  die gewichteten Unterfach-Noten schon verrechnet (doppelte Verrechnung).
+
 ## 0.62.1 - 2026-10-07
 
 - SPA: Die Komponenten-Unterfächer (Rest-Anteil-Komponenten, z. B. Kunst/Spiel/

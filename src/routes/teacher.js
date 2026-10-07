@@ -10,7 +10,7 @@ import {
   ladeUnterfaecher, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
   halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre,
 } from '../unterfaecher.js';
-import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
+import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
   requireAuth, userHatFachZgriff, erlaubteHalbjahreImFach, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
   userDarfFachLoeschen, userDarfKlasseVerwalten,
@@ -1244,7 +1244,7 @@ export default async function teacherRoutes(fastify) {
     if (!userIstKlassenlehrer(request.user, klasse.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin dürfen die Laufzeit ändern.' });
     }
-    const zurueck = request.body?.zurueck === 'klasse' ? `/teacher/klassen/${klasse.id}` : `/klassenlehrer/klasse/${klasse.id}?tab=klassenleitung`;
+    const zurueck = `/teacher/klassen/${klasse.id}`;
     const heimat = parseSchuljahr(getDb().prepare('SELECT bezeichnung FROM schuljahre WHERE id = ?').get(klasse.schuljahr_id)?.bezeichnung)?.startJahr ?? null;
     const einschulung = parseJahrEingabe(request.body?.einschulung_jahr) ?? heimat;
     // Dauer in Jahren (z. B. 2 oder 3) hat Vorrang vor einem direkt gewählten Abschlussschuljahr; leer = Standard.
@@ -1275,17 +1275,24 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(zurueck);
   });
 
-  // ---------- Verrechnung der Halbjahresnoten (Prozent je Übergang) ----------
+  // ---------- Verrechnung der Halbjahresnoten je Fach (Prozent je Übergang) ----------
   // p_<n> = Prozent der Note aus Halbjahr n, die in Halbjahr n+1 einfließen
-  // (0 = gar nicht). Gilt für alle Fächer der Klasse (außer SPA-Fächern, die
-  // ihr eigenes Vorwert-Schema haben). Nur Klassenleitung/Admin.
-  fastify.post('/klassen/:id/verrechnung', async (request, reply) => {
-    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
-    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
-    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+  // (0 = gar nicht). Gilt für das Fach (nicht für Unterfächer -- sie fließen
+  // gewichtet ins Fach, das selbst verrechnet -- und nicht für SPA-Fächer, die
+  // ihr eigenes Vorwert-Schema haben). Mit "fuer_alle" für alle Fächer der
+  // Klasse. Nur Klassenleitung/Admin.
+  fastify.post('/faecher/:id/verrechnung', async (request, reply) => {
+    const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin dürfen die Verrechnung ändern.' });
     }
-    const laufzeit = klassenLaufzeit(klasse.id);
+    const zurueck = `/teacher/klassen/${fach.klasse_id}#verrechnung`;
+    if (fach.parent_fach_id || fach.spa_fach_key) {
+      request.flash?.('error', 'Für Unterfächer und SPA-Fächer gibt es keine Verrechnung.');
+      return reply.redirect(zurueck);
+    }
+    const laufzeit = klassenLaufzeit(fach.klasse_id);
     const werte = {};
     for (let n = 1; n < laufzeit.anzahlHalbjahre; n++) {
       const roh = String(request.body?.[`p_${n}`] ?? '').trim().replace(',', '.');
@@ -1293,14 +1300,20 @@ export default async function teacherRoutes(fastify) {
       const p = Number(roh);
       if (!Number.isFinite(p) || p < 0 || p > 100) {
         request.flash?.('error', `Ungültiger Prozentwert für Halbjahr ${n} → ${n + 1} (erlaubt: 0 bis 100).`);
-        return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?tab=klassenleitung`);
+        return reply.redirect(zurueck);
       }
       if (p > 0) werte[n] = Math.round(p * 10) / 10;
     }
-    getDb().prepare('UPDATE klassen SET verrechnung = ? WHERE id = ?').run(Object.keys(werte).length ? JSON.stringify(werte) : null, klasse.id);
-    // Die Sync-Stände der Fächer sind damit veraltet -- Fachlehrkräfte mit Auto-Sync aktualisieren sich bei der nächsten Eingabe.
-    request.flash?.('success', 'Verrechnung gespeichert.');
-    return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?tab=klassenleitung`);
+    // Immer als eigene Einstellung speichern ("{}" = bewusst keine Verrechnung), damit die Klassen-Vorgabe nicht durchschlägt.
+    const json = JSON.stringify(werte);
+    if (request.body?.fuer_alle === '1') {
+      getDb().prepare('UPDATE faecher SET verrechnung = ? WHERE klasse_id = ? AND parent_fach_id IS NULL AND spa_fach_key IS NULL').run(json, fach.klasse_id);
+    } else {
+      getDb().prepare('UPDATE faecher SET verrechnung = ? WHERE id = ?').run(json, fach.id);
+    }
+    // Die Sync-Stände sind damit veraltet -- Fachlehrkräfte mit Auto-Sync aktualisieren sich bei der nächsten Eingabe.
+    request.flash?.('success', request.body?.fuer_alle === '1' ? 'Verrechnung für alle Fächer gespeichert.' : `Verrechnung für „${fach.name}" gespeichert.`);
+    return reply.redirect(zurueck);
   });
 
   // ---------- Beitritt zu einer bereits bestehenden Klasse (Namenskollision) ----------
@@ -1649,6 +1662,10 @@ export default async function teacherRoutes(fastify) {
       };
     });
     const zuweisungenProFach = Object.fromEntries(ladeZuweisungenDerKlasse(klasse.id, alleFaecher, laufzeit));
+    // Verrechnung je Fach (ohne Unterfächer und SPA-Fächer): wirksame Einstellung und ob sie eine eigene ist.
+    const verrechnungProFach = Object.fromEntries(alleFaecher.filter((f) => !f.parent_fach_id && !f.spa_fach_key).map((f) => [
+      f.id, { werte: ladeVerrechnungFuerFach(f), eigene: f.verrechnung !== null },
+    ]));
     // Löschen/Abgang/Abgangszeugnis nur anzeigen, wenn die Aktion auch
     // durchgeht (dieselbe Regel wie in den Routen, siehe userDarfKlasseVerwalten).
     const darfVerwalten = userDarfKlasseVerwalten(request.user, klasse.id);
@@ -1665,7 +1682,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach,
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach,
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),

@@ -353,6 +353,73 @@ Meier, Carla"></textarea>
   <% } %>
 <% } %>
 
+<% var verrechenbareFaecher = baum.filter(function(e) { return verrechnungProFach[e.fach.id]; }); %>
+<% if (istKlassenlehrer && laufzeit.anzahlHalbjahre >= 2 && verrechenbareFaecher.length) { %>
+<details class="card" id="verrechnung">
+  <summary>Verrechnung der Halbjahre</summary>
+  <p class="hint">
+    Legt je Fach fest, zu wie viel Prozent die Note eines Halbjahres in das <strong>nächste</strong> Halbjahr einfließt
+    (0 % = gar nicht). Beispiel: 50 % bei „1. → 2. Halbjahr" – die Note des 2. Halbjahres besteht je zur Hälfte aus den
+    Leistungen des 2. Halbjahres und der (endgültigen) Note des 1. Halbjahres. Gilt für Fächer, nicht für Unterfächer
+    (die fließen gewichtet ins Fach) und nicht für SPA-Fächer.
+  </p>
+  <table class="data">
+    <thead><tr><th>Fach</th><th>Verrechnung</th><th></th></tr></thead>
+    <tbody>
+      <% verrechenbareFaecher.forEach(function(e) {
+           var v = verrechnungProFach[e.fach.id];
+           var teile = [];
+           for (var vn = 1; vn < laufzeit.anzahlHalbjahre; vn++) { if (v.werte[String(vn)]) teile.push(vn + '. → ' + (vn + 1) + '.: ' + String(v.werte[String(vn)]).replace('.', ',') + ' %'); } %>
+        <tr>
+          <td><%= e.fach.name %></td>
+          <td><%= teile.length ? teile.join(' · ') : 'keine' %><% if (!v.eigene && teile.length) { %> <small class="hint">(Vorgabe der Klasse)</small><% } %></td>
+          <td><button type="button" class="icon-knopf" data-verrechnung-dialog data-fach-id="<%= e.fach.id %>" data-fach-name="<%= e.fach.name %>" data-werte="<%= JSON.stringify(v.werte) %>" title="Verrechnung einstellen" aria-label="Verrechnung einstellen: <%= e.fach.name %>">⚖️</button></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</details>
+
+<dialog id="verrechnung-dialog" class="notiz-dialog">
+  <form method="post" id="verrechnung-form" action="">
+    <h2>Verrechnung der Halbjahre</h2>
+    <p class="hint" id="vr-fach-name"></p>
+    <div class="verrechnung-raster">
+      <% for (var vn2 = 1; vn2 < laufzeit.anzahlHalbjahre; vn2++) { %>
+        <label class="feld"><%= vn2 %>. → <%= vn2 + 1 %>. Halbjahr
+          <span class="feld-mit-einheit"><input type="number" name="p_<%= vn2 %>" min="0" max="100" step="1" value="0">%</span>
+        </label>
+      <% } %>
+    </div>
+    <label class="hj-check"><input type="checkbox" name="fuer_alle" value="1"> Für alle Fächer der Klasse übernehmen</label>
+    <div class="form-actions">
+      <button type="submit">Speichern</button>
+      <button type="button" id="vr-zu">Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+<script>
+  (function() {
+    var dialog = document.getElementById('verrechnung-dialog');
+    var form = document.getElementById('verrechnung-form');
+    document.querySelectorAll('[data-verrechnung-dialog]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var werte = {};
+        try { werte = JSON.parse(b.dataset.werte || '{}'); } catch (e) { /* leer */ }
+        form.action = '/teacher/faecher/' + b.dataset.fachId + '/verrechnung';
+        document.getElementById('vr-fach-name').textContent = b.dataset.fachName;
+        form.querySelectorAll('input[type=number]').forEach(function(i) {
+          i.value = werte[i.name.replace('p_', '')] || 0;
+        });
+        form.querySelector('input[name="fuer_alle"]').checked = false;
+        dialog.showModal();
+      });
+    });
+    document.getElementById('vr-zu').addEventListener('click', function() { dialog.close(); });
+  })();
+</script>
+<% } %>
+
 <ul class="faecher-baum">
   <% baum.forEach(function(eintrag) {
        var f = eintrag.fach; %>

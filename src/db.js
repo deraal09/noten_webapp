@@ -776,6 +776,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'kurzname', 'kurzname TEXT');
   ensureColumn(db, 'faecher', 'gewicht', 'gewicht REAL');
   // SPA: Unterfach, das eine vorgegebene Komponente (z. B. 'kunst') des Elternfachs abbildet (siehe src/spa-noten-service.js).
+  // Verrechnung der Halbjahre je Fach (JSON { vonHalbjahr: prozent }); NULL = Vorgabe der Klasse (klassen.verrechnung).
+  ensureColumn(db, 'faecher', 'verrechnung', 'verrechnung TEXT');
   ensureColumn(db, 'faecher', 'spa_komponente', 'spa_komponente TEXT');
   // Halbjahre, in denen die Lehrkraft dem Fach/Unterfach zugeordnet ist (JSON-Array der Halbjahr-Nummern); NULL = alle Halbjahre des Fachs.
   ensureColumn(db, 'fach_zuweisungen', 'halbjahre', 'halbjahre TEXT');

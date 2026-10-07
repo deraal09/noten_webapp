@@ -62,7 +62,8 @@ const fremd = client();
 let klasseId, fachId, annaId, bertaId;
 const enc = encodeURIComponent;
 const HJ = (n) => `${n}. Halbjahr`;
-const verrechnung = (req, werte) => req(`/teacher/klassen/${klasseId}/verrechnung`, {
+const fachRow = (id = fachId) => getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(id);
+const verrechnung = (req, werte, id = fachId) => req(`/teacher/faecher/${id}/verrechnung`, {
   method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(werte),
 });
 const endnote = (sid, wert, hj) => admin(`/teacher/fach/${fachId}/endnote`, {
@@ -108,24 +109,61 @@ test('wendeVerrechnungAn: Mischung, ohne Vorwert/Aktuell unverändert', () => {
 
 test('Ohne Einstellung gibt es keine Verrechnung', () => {
   assert.deepEqual(J.ladeVerrechnung(klasseId), {});
-  assert.equal(J.verrechnungsProzent(klasseId, HJ(2)), 0);
+  assert.deepEqual(J.ladeVerrechnungFuerFach(fachRow()), {});
+  assert.equal(J.verrechnungsProzent(klasseId, HJ(2), fachRow()), 0);
 });
 
-test('Einstellung speichern (nur Klassenleitung), Ungültiges wird abgelehnt', async () => {
+test('Einstellung je Fach speichern (nur Klassenleitung), Ungültiges wird abgelehnt', async () => {
   let r = await verrechnung(admin, { p_1: '50', p_2: '0', p_3: '' });
   assert.equal(r.status, 302);
-  assert.deepEqual(J.ladeVerrechnung(klasseId), { 1: 50 });
-  assert.equal(J.verrechnungsProzent(klasseId, HJ(2)), 50);
-  assert.equal(J.verrechnungsProzent(klasseId, HJ(3)), 0);
-  assert.equal(J.verrechnungsProzent(klasseId, HJ(1)), 0, 'das 1. Halbjahr hat kein Vorhalbjahr');
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}#verrechnung`);
+  assert.deepEqual(J.ladeVerrechnungFuerFach(fachRow()), { 1: 50 });
+  assert.equal(J.verrechnungsProzent(klasseId, HJ(2), fachRow()), 50);
+  assert.equal(J.verrechnungsProzent(klasseId, HJ(3), fachRow()), 0);
+  assert.equal(J.verrechnungsProzent(klasseId, HJ(1), fachRow()), 0, 'das 1. Halbjahr hat kein Vorhalbjahr');
+  assert.deepEqual(J.ladeVerrechnung(klasseId), {}, 'die Klassen-Vorgabe bleibt unberührt');
   await verrechnung(admin, { p_1: '150' });
-  assert.deepEqual(J.ladeVerrechnung(klasseId), { 1: 50 }, 'ungültig -> unverändert');
+  assert.deepEqual(J.ladeVerrechnungFuerFach(fachRow()), { 1: 50 }, 'ungültig -> unverändert');
   r = await verrechnung(fremd, { p_1: '10' });
   assert.equal(r.status, 403);
-  assert.deepEqual(J.ladeVerrechnung(klasseId), { 1: 50 });
-  const html = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=klassenleitung`)).text();
-  assert.match(html, /Verrechnung der Halbjahre/);
-  assert.match(html, /name="p_1" min="0" max="100" step="1" value="50"/);
+  assert.deepEqual(J.ladeVerrechnungFuerFach(fachRow()), { 1: 50 });
+});
+
+test('Klassenseite: einklappbare Verrechnung oberhalb der Fächer mit Dialog je Fach; nicht mehr auf der Klassenleitungs-Seite', async () => {
+  const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /<details class="card" id="verrechnung">\s*<summary>Verrechnung der Halbjahre<\/summary>/);
+  assert.match(html, /<dialog id="verrechnung-dialog"/);
+  assert.match(html, new RegExp(`data-verrechnung-dialog data-fach-id="${fachId}"`));
+  assert.match(html, /1\. → 2\.: 50 %/);
+  assert.ok(html.indexOf('id="verrechnung"') < html.indexOf('class="faecher-baum"'), 'oberhalb der Fächer');
+  const kl = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=klassenleitung`)).text();
+  assert.doesNotMatch(kl, /Verrechnung der Halbjahre/);
+  assert.doesNotMatch(kl, /Laufzeit der Klasse/);
+});
+
+test('Unterfächer und SPA-Fächer haben keine Verrechnung; "für alle Fächer" und Klassen-Vorgabe', async () => {
+  await form(admin, `/teacher/faecher/${fachId}/unterfaecher`, { name: 'Grammatik', halbjahre: ['5', '6'] });
+  const kind = getDb().prepare('SELECT id FROM faecher WHERE parent_fach_id = ?').get(fachId).id;
+  const r = await verrechnung(admin, { p_1: '30' }, kind);
+  assert.equal(r.status, 302);
+  assert.equal(fachRow(kind).verrechnung, null, 'Unterfach bleibt ohne eigene Einstellung');
+  assert.deepEqual(J.ladeVerrechnungFuerFach(fachRow(kind)), {});
+  assert.equal((await (await admin(`/teacher/klassen/${klasseId}`)).text()).includes(`data-verrechnung-dialog data-fach-id="${kind}"`), false);
+  getDb().prepare('DELETE FROM faecher WHERE id = ?').run(kind);
+  // Klassen-Vorgabe gilt für Fächer ohne eigene Einstellung
+  await form(admin, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Deutsch' });
+  const deutsch = getDb().prepare("SELECT id FROM faecher WHERE name = 'Deutsch'").get().id;
+  getDb().prepare('UPDATE klassen SET verrechnung = ? WHERE id = ?').run(JSON.stringify({ 2: 20 }), klasseId);
+  assert.equal(J.verrechnungsProzent(klasseId, HJ(3), fachRow(deutsch)), 20);
+  assert.equal(J.verrechnungsProzent(klasseId, HJ(3), fachRow()), 0, 'das Fach mit eigener Einstellung ignoriert die Vorgabe');
+  // Für alle Fächer übernehmen
+  await verrechnung(admin, { p_1: '10', p_2: '40', fuer_alle: '1' }, deutsch);
+  assert.deepEqual(J.ladeVerrechnungFuerFach(fachRow(deutsch)), { 1: 10, 2: 40 });
+  assert.deepEqual(J.ladeVerrechnungFuerFach(fachRow()), { 1: 10, 2: 40 });
+  getDb().prepare('UPDATE klassen SET verrechnung = NULL WHERE id = ?').run(klasseId);
+  await verrechnung(admin, { p_1: '50', p_2: '0' });
+  await verrechnung(admin, { p_1: '50', p_2: '0' }, deutsch);
+  getDb().prepare('DELETE FROM faecher WHERE id = ?').run(deutsch);
 });
 
 test('Halbjahr 2 besteht zu 50 % aus der Note des Halbjahres 1', async () => {

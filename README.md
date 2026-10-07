@@ -305,9 +305,11 @@ im **aktuellen Halbjahr** nach Datum (in Tests ist „heute" eingefroren,
   `ntg`) ersetzt die berechnete Halbjahresnote. Fachseite: Button „Direkte
   Endnoteneingabe"; Klassenleitung: Reiter „Endnoten (Direkteingabe)" für
   vergangene Halbjahre. Eine Notenkonferenz-Sperre muss vorher aufgehoben werden.
-- **Verrechnung:** `klassen.verrechnung` (JSON `{ "1": 50 }`) = Prozent der
-  Note aus Halbjahr n, die in Halbjahr n+1 einfließen (Einstellung je Klasse
-  im Klassenleitungsbereich).
+- **Verrechnung:** `faecher.verrechnung` (JSON `{ "1": 50 }`) = Prozent der
+  Note aus Halbjahr n, die in Halbjahr n+1 einfließen (Einstellung je Fach auf
+  der Klassenseite, einklappbarer Abschnitt oberhalb der Fächer, Dialog je Fach;
+  nicht für Unterfächer und SPA-Fächer). Fächer ohne eigene Einstellung nutzen
+  die ältere Klassen-Vorgabe `klassen.verrechnung`.
 - **SPA:** Die Fachseite ist die normale Noteneingabe (Klausuren/Unterrichtsleistung
   in Punkten); die SPA-Tabelle mit Komponenten/Vorwerten ist die „Direkte
   Endnoteneingabe" (`?ansicht=endnoten`).

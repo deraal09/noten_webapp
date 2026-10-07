@@ -245,9 +245,8 @@ export function aktuelleHalbjahrNummern(laufzeit, heute = jetzt()) {
 
 // ---------- Verrechnung der Halbjahresnoten ----------
 
-/** Verrechnung der Klasse als { [vonHalbjahrNr]: prozent }. */
-export function ladeVerrechnung(klasseId) {
-  const roh = getDb().prepare('SELECT verrechnung FROM klassen WHERE id = ?').get(klasseId)?.verrechnung;
+/** Verrechnung aus der Speicherform (JSON) als { [vonHalbjahrNr]: prozent }. */
+export function parseVerrechnung(roh) {
   if (!roh) return {};
   try {
     const obj = JSON.parse(roh);
@@ -262,14 +261,32 @@ export function ladeVerrechnung(klasseId) {
   }
 }
 
+/** Verrechnung der Klasse (Vorgabe für Fächer ohne eigene Einstellung) als { [vonHalbjahrNr]: prozent }. */
+export function ladeVerrechnung(klasseId) {
+  return parseVerrechnung(getDb().prepare('SELECT verrechnung FROM klassen WHERE id = ?').get(klasseId)?.verrechnung);
+}
+
+/**
+ * Verrechnung eines Fachs: die eigene Einstellung (faecher.verrechnung), sonst
+ * die Vorgabe der Klasse. SPA-Fächer (eigenes Vorwert-Schema) und Unterfächer
+ * (ihre Noten fließen gewichtet ins Fach, das selbst verrechnet) haben keine.
+ */
+export function ladeVerrechnungFuerFach(fach) {
+  if (fach.spa_fach_key || fach.parent_fach_id) return {};
+  if (fach.verrechnung !== null && fach.verrechnung !== undefined) return parseVerrechnung(fach.verrechnung);
+  return ladeVerrechnung(fach.klasse_id);
+}
+
 /**
  * Prozent der Note aus dem VORHERIGEN Halbjahr, die in dieses Halbjahr
- * einfließen (0 beim 1. Halbjahr oder wenn nicht eingestellt).
+ * einfließen (0 beim 1. Halbjahr oder wenn nicht eingestellt). Mit `fach` gilt
+ * dessen Einstellung (siehe ladeVerrechnungFuerFach), sonst die der Klasse.
  */
-export function verrechnungsProzent(klasseId, halbjahr) {
+export function verrechnungsProzent(klasseId, halbjahr, fach = null) {
   const nr = halbjahrNr(halbjahr);
   if (!nr || nr < 2) return 0;
-  return ladeVerrechnung(klasseId)[String(nr - 1)] ?? 0;
+  const einstellung = fach ? ladeVerrechnungFuerFach(fach) : ladeVerrechnung(klasseId);
+  return einstellung[String(nr - 1)] ?? 0;
 }
 
 /** Mischt die Note des Halbjahres mit der des Vorhalbjahres: (1-p)*aktuell + p*vorher, auf 2 Stellen gerundet. */
