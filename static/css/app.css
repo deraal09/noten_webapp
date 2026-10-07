@@ -564,3 +564,4 @@ input.endnote-raster { width: 4.5rem; text-align: center; }
 
 .verrechnung-raster { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-bottom: 0.5rem; }
 .verrechnung-raster input[type=number] { width: 4.5rem; }
+.hj-auswahl .hj-check, details.hj-bearbeiten .hj-check { display: inline-flex; flex-direction: row; align-items: center; gap: 0.35rem; }
