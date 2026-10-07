@@ -6,6 +6,22 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.82.0 - 2026-10-07
+
+- **Zusammensetzung der Fächer** ist in der **Halbjahres-** und der
+  **Abschluss-/Abgangsübersicht** sichtbar (unter dem Fachnamen, „⚙ …"; auf den
+  Seiten unter „Meine Klassen" und im Klassenleitungs-Bereich), für alle
+  Notenschlüssel:
+  - Fach mit Unterfächern (IHK/BG/SPA): Halbjahresübersicht zeigt die im
+    Halbjahr geltenden Unterfächer mit ihrem Anteil an der Fachnote
+    („Algebra 75 % · Geometrie 25 %"); die Abschlussübersicht zeigt alle
+    Unterfächer, bei Teilzeiträumen mit den Halbjahren („Algebra (3.–4. Hj.)").
+  - SPA-Fächer mit Komponenten (LF2, LF3): die im Halbjahr aktiven Komponenten
+    mit ihren Prozentwerten (abgewählte Komponenten fehlen); in der
+    Abschlussübersicht alle Komponenten.
+  - Fächer ohne Unterfächer, bzw. Halbjahre mit direkter Bewertung, zeigen
+    nichts an.
+
 ## 0.81.0 - 2026-10-07
 
 - **Halbjahresübersicht und Abschluss-/Abgangsübersicht** zeigen unter jedem

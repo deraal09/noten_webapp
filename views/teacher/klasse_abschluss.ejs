@@ -19,7 +19,7 @@
       <tr>
         <th>Schüler/in</th>
         <% faecher.forEach(function(f) { %>
-          <th><%= f.name %><% if (f.schuljahrLabel) { %> <small class="hint">(<%= f.schuljahrLabel %>)</small><% } %><br><small class="hint lehrkraefte-kopf"><%= f.lehrkraefte.length ? '🎓 ' + f.lehrkraefte.join(', ') : 'keine Lehrkraft' %></small><br><small><%= f.abgeschlossen ? 'abgeschlossen' : 'läuft' %></small></th>
+          <th><%= f.name %><% if (f.schuljahrLabel) { %> <small class="hint">(<%= f.schuljahrLabel %>)</small><% } %><br><small class="hint lehrkraefte-kopf"><%= f.lehrkraefte.length ? '🎓 ' + f.lehrkraefte.join(', ') : 'keine Lehrkraft' %></small><br><% if (f.zusammensetzung) { %><small class="hint zusammensetzung-kopf">⚙ <%= f.zusammensetzung %></small><br><% } %><small><%= f.abgeschlossen ? 'abgeschlossen' : 'läuft' %></small></th>
         <% }); %>
         <th>Ø Abschluss</th>
         <th>Aktion</th>

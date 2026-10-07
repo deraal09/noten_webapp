@@ -30,6 +30,7 @@
           <th>
             <%= f.name %><br>
             <small class="hint lehrkraefte-kopf"><%= f.lehrkraefte.length ? '🎓 ' + f.lehrkraefte.join(', ') : 'keine Lehrkraft' %></small><br>
+            <% if (f.zusammensetzung) { %><small class="hint zusammensetzung-kopf">⚙ <%= f.zusammensetzung %></small><br><% } %>
             <small>
               <% var m = syncMeta.get(f.id); %>
               <% if (m) { %>zuletzt sync.: <%= formatZeitLokal(m.synced_at) %><% } else { %>noch nie synchronisiert<% } %>

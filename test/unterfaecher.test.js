@@ -477,6 +477,45 @@ test('Halbjahresübersicht zeigt direkt eingetragene Endnoten der Klassenleitung
   assert.match(html, /keine Lehrkraft/);
 });
 
+test('Zusammensetzung der Fächer steht in den Spaltenköpfen der Halbjahres- und Abschlussübersicht (Unterfächer und SPA-Komponenten)', async () => {
+  const { zusammensetzungImHalbjahr, zusammensetzungGesamt } = await import('../src/fach-zusammensetzung.js');
+  const { ladeHalbjahresuebersicht } = await import('../src/noten-sync.js');
+  const { ladeAbschlussuebersicht } = await import('../src/fach-abschluss.js');
+  const db = getDb();
+  const mathe = db.prepare('SELECT * FROM faecher WHERE id = ?').get(matheId);
+  // Gleichungen:Geometrie = 3:1 (siehe oben) im 3. Halbjahr, im 1. Halbjahr wird Mathe direkt bewertet
+  assert.equal(zusammensetzungImHalbjahr(mathe, 3), 'Gleichungen 75 % · Geometrie 25 %');
+  assert.equal(zusammensetzungImHalbjahr(mathe, 1), '');
+  assert.equal(zusammensetzungGesamt(mathe), 'Gleichungen (3. Hj.) · Geometrie (3. Hj.)');
+  const klasse = db.prepare('SELECT * FROM klassen WHERE id = ?').get(klasseId);
+  const zus = (u) => u.faecher.find((f) => f.id === matheId).zusammensetzung;
+  assert.equal(zus(ladeHalbjahresuebersicht(klasse, HJ3)), 'Gleichungen 75 % · Geometrie 25 %');
+  assert.equal(zus(ladeHalbjahresuebersicht(klasse, HJ1)), '');
+  assert.equal(zus(ladeAbschlussuebersicht(klasse.id)), 'Gleichungen (3. Hj.) · Geometrie (3. Hj.)');
+  let html = await (await admin(`/teacher/klassen/${klasseId}/uebersicht?hj=${enc(HJ3)}`)).text();
+  assert.match(html, /zusammensetzung-kopf">⚙ Gleichungen 75 % · Geometrie 25 %</);
+  html = await (await admin(`/teacher/klassen/${klasseId}/abschluss`)).text();
+  assert.match(html, /zusammensetzung-kopf">⚙ Gleichungen \(3\. Hj\.\) · Geometrie \(3\. Hj\.\)</);
+
+  // SPA: Komponenten des LF3 mit ihren Anteilen
+  const sj = db.prepare('SELECT id FROM schuljahre ORDER BY id DESC').get().id;
+  await form(admin, '/teacher/klassen/neu', { schuljahr_id: String(sj), name: '13SPAZ', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_PIA', einschulung_jahr: '2023' });
+  const spaId = db.prepare("SELECT id FROM klassen WHERE name = '13SPAZ'").get().id;
+  await form(admin, `/teacher/klassen/${spaId}/schueler/neu`, { nachname: 'Spa', vorname: 'Sina' });
+  const spaKlasse = db.prepare('SELECT * FROM klassen WHERE id = ?').get(spaId);
+  const lf3 = db.prepare("SELECT * FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF3'").get(spaId);
+  const inHj = zusammensetzungImHalbjahr(lf3, 1);
+  const gesamt = zusammensetzungGesamt(lf3);
+  const ab = ladeAbschlussuebersicht(spaId);
+  assert.equal(ab.faecher.find((f) => f.id === lf3.id).zusammensetzung, gesamt);
+  assert.equal(ladeHalbjahresuebersicht(spaKlasse, HJ1).faecher.find((f) => f.id === lf3.id).zusammensetzung, inHj);
+  assert.equal(inHj, 'Pädagogik 40 % · Kunst 15 % · Spiel 15 % · Musik 15 % · Bewegung 15 %');
+  assert.match(zusammensetzungImHalbjahr(lf3, 2), /^Pädagogik 20 % · Bericht 20 % · Bewegung 15 %/);
+  html = await (await admin(`/teacher/klassen/${spaId}/abschluss`)).text();
+  assert.match(gesamt, /Bericht \(2\.–3\. Hj\.\)/);
+  assert.match(html, /zusammensetzung-kopf">⚙ Pädagogik/);
+});
+
 test.after(async () => {
   await fastify.close();
 });

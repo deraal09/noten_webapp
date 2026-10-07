@@ -14,6 +14,7 @@ import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-serv
 import { ladeSperrenFuerKlasse } from './noten-sperre.js';
 import { fachGiltInHalbjahr, verrechnungsProzent, halbjahrNr, halbjahrText, klassenLaufzeit } from './klassen-jahre.js';
 import { fachHatLehrkraftImHalbjahr, lehrkraefteDesFachs } from './unterfaecher.js';
+import { zusammensetzungImHalbjahr } from './fach-zusammensetzung.js';
 
 /** Schreibt den aktuellen Notenstand eines Fachs/Halbjahrs in den Sync-Stand. */
 export function syncFach(fachId, halbjahr, userId) {
@@ -112,7 +113,7 @@ export function ladeHalbjahresuebersicht(klasse, halbjahr) {
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
   const hjLaufzeit = klassenLaufzeit(klasse.id);
   const faecher = ladeFaecherFuerKlassenleitung(klasse.id).filter((f) => fachGiltInHalbjahr(f, halbjahr))
-    .map((f) => ({ ...f, lehrkraefte: lehrkraefteDesFachs(f, halbjahrNr(halbjahr), hjLaufzeit) }));
+    .map((f) => ({ ...f, lehrkraefte: lehrkraefteDesFachs(f, halbjahrNr(halbjahr), hjLaufzeit), zusammensetzung: zusammensetzungImHalbjahr(f, halbjahrNr(halbjahr)) }));
   const syncMeta = new Map(faecher.map((f) => [f.id, holeSyncMeta(f.id, halbjahr)]));
   const standRows = faecher.length ? db.prepare(`
     SELECT fach_id, schueler_id, note, konferenz_note FROM fach_sync_stand
