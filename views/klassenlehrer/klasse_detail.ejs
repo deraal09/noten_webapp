@@ -349,7 +349,7 @@
 <div id="panel-klassenleitung" class="reiter-panel <%= aktiverTab === 'klassenleitung' ? 'active' : '' %>">
   <h2>Laufzeit der Klasse</h2>
   <p class="hint">
-    Die Klasse läuft vom Einschulungs- bis zum Abschlussschuljahr; die Halbjahre werden über diese
+    Die Klasse läuft ab dem Einschulungsjahr die eingestellte Anzahl Jahre (Abschlussschuljahr: <strong><%= laufzeit.schuljahre[laufzeit.schuljahre.length - 1].bezeichnung %></strong>); die Halbjahre werden über diese
     Schuljahre durchgezählt (aktuell <strong><%= laufzeit.anzahlHalbjahre %> Halbjahre</strong>:
     <%= laufzeit.schuljahre.map(function(sj) { return sj.bezeichnung; }).join(', ') %>).
     Ohne Abschlussschuljahr gilt die Standarddauer (SPA 2, BG/IHK 3 Jahre).
@@ -366,10 +366,10 @@
         <% alleJahre.forEach(function(j) { %><option value="<%= j.jahr %>" <%= j.jahr === laufzeit.einschulungJahr ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
       </select>
     </label>
-    <label>Abschlussschuljahr
-      <select name="abschluss_jahr">
+    <label>Anzahl Jahre an der Schule
+      <select name="anzahl_jahre">
         <option value="" <%= laufzeit.abschlussIstStandard ? 'selected' : '' %>>Standard (<%= klasse.notenschluessel === 'SPA' ? 2 : 3 %> Jahre)</option>
-        <% alleJahre.filter(function(j) { return j.jahr >= laufzeit.einschulungJahr; }).forEach(function(j) { %><option value="<%= j.jahr %>" <%= (!laufzeit.abschlussIstStandard && j.jahr === laufzeit.abschlussJahr) ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
+        <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>" <%= (!laufzeit.abschlussIstStandard && laufzeit.jahre === aj) ? 'selected' : '' %>><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
       </select>
     </label>
     <button type="submit">Laufzeit speichern</button>

@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS klassen (
     -- Nur gesetzt bei notenschluessel = 'SPA': 'SPA_REGULAR' oder 'SPA_PIA'
     -- (siehe src/spa-schema.js) -- bestimmt, welche Fächer/Komponenten/
     -- Gewichte gelten. Eine SPA-Klasse läuft durchgehend über 4 Halbjahre
-    -- (2 Schuljahre) OHNE "Klasse ins nächste Schuljahr übertragen".
+    -- (2 Schuljahre) (die frühere Funktion "Klasse ins nächste Schuljahr übertragen" entfällt).
     spa_bildungsgang TEXT,
     -- Interne, unsichtbare Hülle für einen Kurs OHNE Ausgangsklasse (siehe
     -- routes/teacher.js /kurse/neu): ein Kurs bleibt technisch an eine

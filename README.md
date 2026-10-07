@@ -287,8 +287,11 @@ August–Juli, siehe `aktuellesStartjahr()`).
 ## Klassen über mehrere Schuljahre, Halbjahre und Endnoten
 
 Eine Klasse läuft vom **Einschulungs- bis zum Abschlussschuljahr**
-(`klassen.einschulung_jahr`/`abschluss_jahr`, Startjahre; änderbar im
-Klassenleitungsbereich unter „Laufzeit der Klasse"). Ohne Abschlussjahr gilt
+(`klassen.einschulung_jahr`/`abschluss_jahr`, Startjahre; einstellbar als
+„Einschulungsjahr festlegen" auf der Klassenseite bzw. unter „Laufzeit der
+Klasse" im Klassenleitungsbereich, jeweils mit der **Anzahl Jahre**, z. B. 2
+oder 3). Die frühere Funktion „Klasse ins nächste Schuljahr übertragen" gibt
+es nicht mehr. Ohne Angabe gilt
 die Standarddauer: BG/IHK drei Jahre, SPA zwei Jahre. Die **Halbjahre** werden
 über die Laufzeit durchgezählt (`1. Halbjahr` … `N. Halbjahr`, siehe
 `src/klassen-jahre.js`); die Schlüssel sind weiterhin Texte, sodass

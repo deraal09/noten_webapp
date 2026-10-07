@@ -171,6 +171,7 @@ test('Klassen-Seite der Klassenleitung zeigt Laufzeit-Formular und alle Halbjahr
   assert.match(html, /Laufzeit der Klasse/);
   assert.match(html, /aktuell <strong>6 Halbjahre<\/strong>/);
   assert.match(html, /name="einschulung_jahr"/);
+  assert.match(html, /name="anzahl_jahre"/);
   assert.match(html, />6\. Halbjahr</);
 });
 
@@ -180,6 +181,37 @@ test('Buttons zur Noteneingabe: auf "Meine Klassen" (oben und je Klasse) und auf
   assert.match(liste, new RegExp(`<a href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
   const klasse = await (await admin(`/teacher/klassen/${ihkId}`)).text();
   assert.match(klasse, new RegExp(`<a class="btn" href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
+});
+
+test('Einschulungsjahr festlegen (Klassenseite): Anzahl Jahre 2 oder 3 einstellbar, Standard wiederherstellbar, Rücksprung zur Klasse', async () => {
+  const xId = getDb().prepare("SELECT id FROM klassen WHERE name = '12X'").get().id; // ohne eingetragene Leistungen
+  const html = await (await admin(`/teacher/klassen/${xId}`)).text();
+  assert.match(html, /<summary>Einschulungsjahr festlegen/);
+  assert.doesNotMatch(html, /Klasse ins nächste Schuljahr übertragen/);
+  assert.match(html, /name="anzahl_jahre"/);
+  let r = await form(admin, `/teacher/klassen/${xId}/laufzeit`, { einschulung_jahr: '2025', anzahl_jahre: '2', zurueck: 'klasse' });
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${xId}`);
+  let l = J.klassenLaufzeit(xId);
+  assert.deepEqual([l.jahre, l.anzahlHalbjahre, l.abschlussJahr, l.abschlussIstStandard], [2, 4, 2026, false]);
+  const nach2 = await (await admin(`/teacher/klassen/${xId}`)).text();
+  assert.match(nach2, /<option value="2" selected>2 Jahre<\/option>/);
+  await form(admin, `/teacher/klassen/${xId}/laufzeit`, { einschulung_jahr: '2025', anzahl_jahre: '3' });
+  assert.equal(J.klassenLaufzeit(xId).anzahlHalbjahre, 6);
+  await form(admin, `/teacher/klassen/${xId}/laufzeit`, { einschulung_jahr: '2025', anzahl_jahre: '' });
+  l = J.klassenLaufzeit(xId);
+  assert.deepEqual([l.jahre, l.abschlussIstStandard], [3, true], 'leer = Standard');
+  // Anzahl Jahre gilt ab dem gewählten Einschulungsjahr
+  await form(admin, `/teacher/klassen/${xId}/laufzeit`, { einschulung_jahr: '2024', anzahl_jahre: '2' });
+  assert.deepEqual(J.klassenLaufzeit(xId).schuljahre.map((x) => x.bezeichnung), ['2024/25', '2025/26']);
+  await form(admin, `/teacher/klassen/${xId}/laufzeit`, { einschulung_jahr: '2025', anzahl_jahre: '' });
+});
+
+test('Anlegen mit Anzahl Jahre', async () => {
+  await form(admin, '/teacher/klassen/neu', { schuljahr_id: String(sj1), name: '12Y', notenschluessel: 'BG', anzahl_jahre: '2' });
+  const k = getDb().prepare("SELECT id, einschulung_jahr, abschluss_jahr FROM klassen WHERE name = '12Y'").get();
+  assert.deepEqual([k.einschulung_jahr, k.abschluss_jahr], [2025, 2026]);
+  assert.equal(J.klassenLaufzeit(k.id).anzahlHalbjahre, 4);
 });
 
 test.after(async () => {

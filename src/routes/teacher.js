@@ -28,7 +28,6 @@ import {
   istSchuelerGesperrtInFach, sperren, entsperren, aufhebungAnfragen,
   ladeSperrenFuerSchueler, holeSperre,
 } from '../noten-sperre.js';
-import { uebertrageKlasseInSchuljahr } from '../klassen-uebertragung.js';
 import {
   ladeVersetzZiele, versetzeSchueler, loescheKlasseMitSchuelerUebernahme, ladeAblagePersonen, uebernehmeAusAblage,
 } from '../klassenwechsel.js';
@@ -1068,33 +1067,6 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
   });
 
-  // ---------- Klasse ins nächste Schuljahr übertragen ----------
-  fastify.post('/klassen/:id/naechstes-schuljahr', async (request, reply) => {
-    const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
-    if (!klasse) return reply.redirect('/teacher/klassen');
-    if (!userIstKlassenlehrer(request.user, klasse.id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann die Klasse übertragen.' });
-    }
-    const zielSchuljahrId = parseInt(request.body?.ziel_schuljahr_id, 10);
-    if (!Number.isFinite(zielSchuljahrId)) {
-      request.flash?.('error', 'Bitte ein Ziel-Schuljahr auswählen.');
-      return reply.redirect(`/teacher/klassen/${klasse.id}`);
-    }
-    const mitFaechern = request.body?.mit_faechern === '1';
-    try {
-      const neueKlasseId = uebertrageKlasseInSchuljahr(
-        klasse.id, zielSchuljahrId, request.body?.neuer_name, mitFaechern, request.user.id,
-      );
-      request.flash?.('success', 'Klasse ins neue Schuljahr übertragen.');
-      return reply.redirect(`/teacher/klassen/${neueKlasseId}`);
-    } catch (e) {
-      request.flash?.('error', e.message.includes('UNIQUE')
-        ? 'In diesem Schuljahr gibt es bereits eine Klasse mit diesem Namen.'
-        : 'Übertragung fehlgeschlagen: ' + e.message);
-      return reply.redirect(`/teacher/klassen/${klasse.id}`);
-    }
-  });
-
   // ---------- Selbstbedienung: Klassen anlegen/verwalten ohne Admin-Zuweisung ----------
   // Jede angemeldete Lehrkraft kann eigene Klassen anlegen (Ersteller/in
   // behält automatisch Zugriff, siehe userHatKlassenZugriff). Eine spätere
@@ -1185,7 +1157,10 @@ export default async function teacherRoutes(fastify) {
       // Laufzeit: Einschulung (Standard: gewähltes Schuljahr) und Abschluss (Standard: SPA 2, sonst 3 Jahre).
       const heimatJahr = parseSchuljahr(getDb().prepare('SELECT bezeichnung FROM schuljahre WHERE id = ?').get(schuljahrId)?.bezeichnung)?.startJahr ?? null;
       const einschulungJahr = parseJahrEingabe(request.body?.einschulung_jahr) ?? heimatJahr;
-      let abschlussJahr = parseJahrEingabe(request.body?.abschluss_jahr);
+      const dauer = parseInt(request.body?.anzahl_jahre, 10);
+      let abschlussJahr = Number.isFinite(dauer) && dauer >= 1 && einschulungJahr !== null
+        ? einschulungJahr + dauer - 1
+        : parseJahrEingabe(request.body?.abschluss_jahr);
       if (abschlussJahr !== null && einschulungJahr !== null && (abschlussJahr < einschulungJahr || abschlussJahr >= einschulungJahr + MAX_SCHULJAHRE)) abschlussJahr = null;
       const info = getDb().prepare(`
         INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id, offen_fuer_beitritt, spa_bildungsgang, einschulung_jahr, abschluss_jahr)
@@ -1215,10 +1190,14 @@ export default async function teacherRoutes(fastify) {
     if (!userIstKlassenlehrer(request.user, klasse.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin dürfen die Laufzeit ändern.' });
     }
-    const zurueck = `/klassenlehrer/klasse/${klasse.id}?tab=klassenleitung`;
+    const zurueck = request.body?.zurueck === 'klasse' ? `/teacher/klassen/${klasse.id}` : `/klassenlehrer/klasse/${klasse.id}?tab=klassenleitung`;
     const heimat = parseSchuljahr(getDb().prepare('SELECT bezeichnung FROM schuljahre WHERE id = ?').get(klasse.schuljahr_id)?.bezeichnung)?.startJahr ?? null;
     const einschulung = parseJahrEingabe(request.body?.einschulung_jahr) ?? heimat;
-    const abschluss = parseJahrEingabe(request.body?.abschluss_jahr);
+    // Dauer in Jahren (z. B. 2 oder 3) hat Vorrang vor einem direkt gewählten Abschlussschuljahr; leer = Standard.
+    const anzahlJahre = parseInt(request.body?.anzahl_jahre, 10);
+    const abschluss = Number.isFinite(anzahlJahre) && anzahlJahre >= 1 && einschulung !== null
+      ? einschulung + anzahlJahre - 1
+      : parseJahrEingabe(request.body?.abschluss_jahr);
     if (einschulung === null) {
       request.flash?.('error', 'Einschulungsschuljahr ungültig.');
       return reply.redirect(zurueck);
@@ -1628,17 +1607,13 @@ export default async function teacherRoutes(fastify) {
       `).all(klasse.id);
     }
 
-    const andereSchuljahre = istKlassenlehrer
-      ? sortiereSchuljahreAbsteigend(getDb().prepare('SELECT * FROM schuljahre WHERE id != ?').all(klasse.schuljahr_id))
-      : [];
-
     const laufzeit = klassenLaufzeit(klasse.id);
     const faecherMitHj = faecher.map((f) => ({ ...f, hjNummern: fachHalbjahrNummern(f, laufzeit) }));
     return reply.viewEjs('teacher/klasse_detail.ejs', {
       laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit),
       user: request.user, klasse, schueler, faecher: faecherMitHj, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
-      andereSchuljahre,
+      jahresOptionen: jahresOptionen(),
       darfVersetzen: darfVerwalten || Boolean(klasse.ist_ablage),
       versetzZiele: darfVerwalten || klasse.ist_ablage ? ladeVersetzZiele(klasse) : [],
       ablagePersonen: darfVerwalten && !klasse.ist_ablage ? ladeAblagePersonen() : [],

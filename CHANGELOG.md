@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.57.0 - 2026-10-07
+
+- "Klasse ins nächste Schuljahr übertragen" heißt jetzt "Einschulungsjahr
+  festlegen" (Klassenseite): Einschulungsjahr wählen und die **Anzahl Jahre**
+  an der Schule einstellen (1 bis 6, z. B. 2 oder 3; leer = Standard, SPA 2,
+  BG/IHK 3). Dieselbe Einstellung gibt es beim Anlegen einer Klasse und im
+  Klassenleitungsbereich unter "Laufzeit der Klasse" (dort statt des
+  Abschlussschuljahres). Das Kopieren einer Klasse in ein anderes Schuljahr
+  entfällt, da eine Klasse über ihre ganze Laufzeit in derselben Klasse bleibt.
+
 ## 0.56.1 - 2026-10-07
 
 - "Meine Klassen": Button "Zur Noteneingabe" oben, je Klasse ein Link

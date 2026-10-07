@@ -61,16 +61,16 @@
               <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
             </select>
           </label>
-          <label>Einschulungsschuljahr (optional)
+          <label>Einschulungsjahr (optional)
           <select name="einschulung_jahr">
             <option value="">wie gewähltes Schuljahr</option>
             <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
           </select>
         </label>
-        <label>Abschlussschuljahr (optional)
-          <select name="abschluss_jahr">
+        <label>Anzahl Jahre an der Schule (optional)
+          <select name="anzahl_jahre">
             <option value="">Standard (SPA 2 Jahre, sonst 3 Jahre)</option>
-            <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
+            <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>"><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
           </select>
         </label>
         <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>
@@ -114,16 +114,16 @@
             <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
           </select>
         </label>
-        <label>Einschulungsschuljahr (optional)
+        <label>Einschulungsjahr (optional)
           <select name="einschulung_jahr">
             <option value="">wie gewähltes Schuljahr</option>
             <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
           </select>
         </label>
-        <label>Abschlussschuljahr (optional)
-          <select name="abschluss_jahr">
+        <label>Anzahl Jahre an der Schule (optional)
+          <select name="anzahl_jahre">
             <option value="">Standard (SPA 2 Jahre, sonst 3 Jahre)</option>
-            <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
+            <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>"><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
           </select>
         </label>
         <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>

@@ -39,35 +39,33 @@
     })();
   </script>
 
-  <details class="card">
-    <summary>Klasse ins nächste Schuljahr übertragen</summary>
-    <% if (!andereSchuljahre.length) { %>
-      <p class="hint">Es gibt noch kein weiteres Schuljahr — bitte den Admin bitten, zuerst eins anzulegen.</p>
-    <% } else { %>
-      <p class="hint">
-        Legt eine neue Klasse im gewählten Schuljahr an und übernimmt die Schüler/innen (als neue
-        Datensätze — diese Klasse mit ihren Noten bleibt unverändert erhalten). Optional werden auch
-        die Fächer samt zugeordneten Lehrkräften übernommen (ohne Klausuren/ULs/Noten — die neuen
-        Fächer starten leer).
-      </p>
-      <form method="post" action="/teacher/klassen/<%= klasse.id %>/naechstes-schuljahr">
-        <label>Ziel-Schuljahr
-          <select name="ziel_schuljahr_id" required>
-            <% andereSchuljahre.forEach(function(sj) { %>
-              <option value="<%= sj.id %>"><%= sj.bezeichnung %></option>
-            <% }); %>
-          </select>
-        </label>
-        <label>Name der neuen Klasse
-          <input type="text" name="neuer_name" value="<%= klasse.name %>" required>
-        </label>
-        <label>
-          <input type="checkbox" name="mit_faechern" value="1" checked>
-          Fächer (mit Lehrkraft-Zuordnung) übernehmen
-        </label>
-        <button type="submit">→ Übertragen</button>
-      </form>
-    <% } %>
+  <details class="card" id="einschulungsjahr-festlegen">
+    <summary>Einschulungsjahr festlegen <small class="hint">(aktuell <%= laufzeit.schuljahre[0].bezeichnung %>, <%= laufzeit.jahre %> Jahre bis <%= laufzeit.schuljahre[laufzeit.schuljahre.length - 1].bezeichnung %>)</small></summary>
+    <p class="hint">
+      Eine Klasse läuft über mehrere Schuljahre; die Halbjahre werden ab dem Einschulungsjahr durchgezählt
+      (<%= laufzeit.anzahlHalbjahre %> Halbjahre). Lege fest, in welchem Schuljahr die Klasse an die Schule
+      gekommen ist und wie viele Jahre sie dort bleibt (z. B. 2 oder 3). Ohne Angabe gilt die Standarddauer
+      (SPA 2, BG/IHK 3 Jahre).
+    </p>
+    <% var optionenJahre = jahresOptionen.map(function(j) { return j.jahr; });
+       var alleJahre = jahresOptionen.slice();
+       if (optionenJahre.indexOf(laufzeit.einschulungJahr) === -1) { alleJahre.push({ jahr: laufzeit.einschulungJahr, bezeichnung: laufzeit.schuljahre[0].bezeichnung }); }
+       alleJahre.sort(function(a, b) { return a.jahr - b.jahr; }); %>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/laufzeit">
+      <input type="hidden" name="zurueck" value="klasse">
+      <label>Einschulungsjahr
+        <select name="einschulung_jahr">
+          <% alleJahre.forEach(function(j) { %><option value="<%= j.jahr %>" <%= j.jahr === laufzeit.einschulungJahr ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
+        </select>
+      </label>
+      <label>Anzahl Jahre an der Schule
+        <select name="anzahl_jahre">
+          <option value="" <%= laufzeit.abschlussIstStandard ? 'selected' : '' %>>Standard (<%= klasse.notenschluessel === 'SPA' ? 2 : 3 %> Jahre)</option>
+          <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>" <%= (!laufzeit.abschlussIstStandard && laufzeit.jahre === aj) ? 'selected' : '' %>><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
+        </select>
+      </label>
+      <button type="submit">Speichern</button>
+    </form>
   </details>
 <% } else if (kannSelbstAlsKlassenlehrerEintragen) { %>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenlehrer/eintragen" class="inline">
