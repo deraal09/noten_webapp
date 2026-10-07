@@ -326,19 +326,6 @@ Meier, Carla"></textarea>
     }).join(' ');
   }
 %>
-<form method="post" action="/teacher/klassen/<%= klasse.id %>/faecher/neu" class="card">
-  <label>Name des Fachs
-    <input type="text" name="name" placeholder="z. B. Mathematik" required>
-  </label>
-  <fieldset class="hj-auswahl">
-    <legend>Gilt in diesen Halbjahren</legend>
-    <% laufzeit.halbjahre.forEach(function(h, i) { %>
-      <label class="hj-check"><input type="checkbox" name="halbjahre" value="<%= i + 1 %>" <%= vorbelegungHj.indexOf(i + 1) !== -1 ? 'checked' : '' %>>
-        <%= i + 1 %>. Halbjahr <small>(<%= laufzeit.schuljahre[Math.floor(i / 2)].bezeichnung %>)</small></label>
-    <% }); %>
-  </fieldset>
-  <button type="submit">+ Fach anlegen</button>
-</form>
 
 <% function zeigeLehrkraefte(fachId, erlaubtFuerBearbeiten) { %>
   <% var liste = zuweisungenProFach[fachId] || []; %>
@@ -432,6 +419,39 @@ Meier, Carla"></textarea>
   <% }); %>
   <% if (!baum.length) { %><li class="hint">Noch keine Fächer.</li><% } %>
 </ul>
+
+<p><button type="button" id="fach-neu-knopf">+ Neues Fach anlegen</button></p>
+
+<dialog id="fach-neu-dialog" class="notiz-dialog">
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/faecher/neu">
+    <h2>Neues Fach anlegen</h2>
+    <label>Name des Fachs
+      <input type="text" name="name" placeholder="z. B. Mathematik" maxlength="100" required>
+    </label>
+    <fieldset class="hj-auswahl">
+      <legend>Gilt in diesen Halbjahren</legend>
+      <% laufzeit.halbjahre.forEach(function(h, i) { %>
+        <label class="hj-check"><input type="checkbox" name="halbjahre" value="<%= i + 1 %>" <%= vorbelegungHj.indexOf(i + 1) !== -1 ? 'checked' : '' %>>
+          <%= i + 1 %>. Halbjahr <small>(<%= laufzeit.schuljahre[Math.floor(i / 2)].bezeichnung %>)</small></label>
+      <% }); %>
+    </fieldset>
+    <div class="form-actions">
+      <button type="submit">+ Fach anlegen</button>
+      <button type="button" id="fach-neu-zu">Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+<script>
+  (function() {
+    var dialog = document.getElementById('fach-neu-dialog');
+    document.getElementById('fach-neu-knopf').addEventListener('click', function() {
+      dialog.showModal();
+      var feld = dialog.querySelector('input[name="name"]');
+      if (feld) feld.focus();
+    });
+    document.getElementById('fach-neu-zu').addEventListener('click', function() { dialog.close(); });
+  })();
+</script>
 
 <% if (istKlassenlehrer) { %>
 <dialog id="lehrkraft-dialog" class="notiz-dialog">

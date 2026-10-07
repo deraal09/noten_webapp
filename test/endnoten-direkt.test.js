@@ -235,6 +235,9 @@ test('Halbjahre eines Fachs ändern; Entfernen eines Halbjahrs mit Daten wird ve
 test('Klassen-Seite zeigt Halbjahres-Auswahl beim Anlegen und die Halbjahre je Fach', async () => {
   const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
   assert.match(html, /Gilt in diesen Halbjahren/);
+  assert.match(html, /<button type="button" id="fach-neu-knopf">\+ Neues Fach anlegen<\/button>/);
+  assert.match(html, /<dialog id="fach-neu-dialog"[\s\S]*?faecher\/neu/);
+  assert.doesNotMatch(html, /<form method="post" action="[^"]*faecher\/neu" class="card">/);
   assert.match(html, /name="halbjahre" value="5" checked/);
   assert.match(html, /name="halbjahre" value="1" >/);
   assert.match(html, /<summary title="Halbjahre des Fachs ändern">3–4\. Hj\.<\/summary>/);

@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.62.0 - 2026-10-07
+
+- Klassenseite: Das Formular zum Anlegen neuer Fächer oberhalb der Fächerliste
+  entfällt. Stattdessen steht unter allen Fächern der Button **„+ Neues Fach
+  anlegen"**, der einen Dialog (Name und Halbjahre) öffnet.
+
 ## 0.61.1 - 2026-10-07
 
 - Fix: Rote Buttons (🗑 Löschen im Aktionsmenü, ✕ bei Lehrkräften und Fächern)
