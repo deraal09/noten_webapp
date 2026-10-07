@@ -182,6 +182,41 @@ test('Halbjahre ändern: Elternfach entfernt Halbjahr auch bei Unterfächern, Ha
   assert.equal(U.setzeFachHalbjahre(mathe(), []).ok, false, 'mindestens ein Halbjahr');
 });
 
+test('Zugriff strikt je Halbjahr: nur in den Halbjahren der Zuordnung', async () => {
+  const alg = unterId('Algebra');
+  // fremd: Algebra nur im 3. Halbjahr
+  let r = await fremd(`/teacher/fach/${alg}?hj=${enc(HJ3)}`);
+  assert.equal(r.status, 200);
+  r = await fremd(`/teacher/fach/${alg}?hj=${enc('4. Halbjahr')}`);
+  assert.equal(r.status, 200, 'das 4. Halbjahr gibt es für das Unterfach nicht mehr: die Seite fällt auf das 3. zurück');
+  assert.match(await r.text(), /<a class="hj-tab active"[^>]*>3\. Halbjahr<\/a>/);
+  // lehrer: Mathe nur im 1. und 2. Halbjahr (Zuordnung [1,2]); 5. Halbjahr gehört zum Fach, ist aber nicht zugeordnet
+  r = await lehrer(`/teacher/fach/${matheId}?hj=${enc('5. Halbjahr')}`);
+  assert.equal(r.status, 302, 'wird auf ein erlaubtes Halbjahr umgeleitet');
+  assert.match(r.headers.get("location"), /hj=2\.\+Halbjahr/);
+  r = await lehrer(`/teacher/fach/${matheId}?hj=${enc('1. Halbjahr')}`);
+  assert.equal(r.status, 200);
+  const tabs = (await r.text()).match(/<a class="hj-tab[^"]*"/g) || [];
+  assert.equal(tabs.length, 2, 'nur zwei Reiter (1. und 2. Halbjahr)');
+  // Schreibende Routen mit Halbjahr: außerhalb der Zuordnung verboten, innerhalb erlaubt
+  r = await form(lehrer, `/teacher/fach/${matheId}/klausuren/neu`, { name: 'K5', aufgaben: '1', halbjahr: '5. Halbjahr' });
+  assert.equal(r.status, 403);
+  r = await form(lehrer, `/teacher/fach/${matheId}/klausuren/neu`, { name: 'K1', aufgaben: '1', halbjahr: HJ1 });
+  assert.equal(r.status, 302);
+  const k = getDb().prepare("SELECT id, halbjahr FROM klausuren WHERE name = 'K1'").get();
+  assert.equal(k.halbjahr, HJ1);
+  // Klausur eines anderen Halbjahres per Ressourcen-Route
+  getDb().prepare("INSERT INTO klausuren (fach_id, halbjahr, name, max_punkte_pro_aufgabe, gewichtung) VALUES (?, '5. Halbjahr', 'K5x', '[10]', 100)").run(matheId);
+  const k5 = getDb().prepare("SELECT id FROM klausuren WHERE name = 'K5x'").get().id;
+  r = await form(lehrer, `/teacher/klausuren/${k5}/gewichtung`, { gewichtung: '50', halbjahr: '5. Halbjahr' });
+  assert.equal(r.status, 403);
+  // Dashboard zeigt die Halbjahre der Zuordnung
+  const dash = await (await lehrer('/teacher')).text();
+  assert.match(dash, /1\., 2\. Halbjahr/);
+  // Admin und unbeschränkte Zuordnungen bleiben unberührt
+  assert.equal((await admin(`/teacher/fach/${matheId}?hj=${enc('5. Halbjahr')}`)).status, 200);
+});
+
 test.after(async () => {
   await fastify.close();
 });

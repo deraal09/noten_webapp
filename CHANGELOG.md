@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.60.0 - 2026-10-07
+
+- Lehrkräfte arbeiten **strikt je Halbjahr**: Ist eine Zuordnung auf bestimmte
+  Halbjahre begrenzt, sieht die Lehrkraft nur dort die Fachseite (Reiter nur
+  für ihre Halbjahre; ein nicht erlaubtes Halbjahr führt auf das nächstliegende
+  erlaubte) und kann nur dort Klausuren, Unterrichtsleistung, Noten, Endnoten,
+  Notizen u. a. bearbeiten. Das Dashboard zeigt bei begrenzter Zuordnung die
+  Halbjahre an. Zuordnungen ohne Einschränkung und Admins sind unverändert.
+
 ## 0.59.0 - 2026-10-07
 
 - Klassenseite: Fächeranlage und Lehrkraftzuordnung stehen jetzt in einem

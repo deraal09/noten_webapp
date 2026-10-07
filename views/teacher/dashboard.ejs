@@ -15,7 +15,7 @@
               <span class="kachel-titel-klein"><%= f.name %></span>
             </div>
           </a>
-          <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)</div>
+          <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)<% if (f.halbjahreText) { %> · <%= f.halbjahreText %><% } %></div>
         </li>
       <% }); %>
     </ul>
@@ -34,7 +34,7 @@
           </a>
           <div class="kachel-sub">
             <%= f.schuljahr_bezeichnung %>, Notenschlüssel: <%= f.notenschluessel %> ·
-            <%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)
+            <%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)<% if (f.halbjahreText) { %> · <%= f.halbjahreText %><% } %>
           </div>
         </li>
       <% }); %>

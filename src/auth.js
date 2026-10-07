@@ -216,13 +216,45 @@ export async function requireAdmin(request, reply) {
  * Die soll nicht permanent live in fremde Notentafeln schauen können,
  * sondern nur über den Sync-Stand (siehe noten-sync.js, Halbjahresübersicht
  * unter /teacher/klassen/:id/uebersicht).
+ *
+ * Mit `halbjahr` (Text "N. Halbjahr" oder Nummer) zusätzlich strikt je
+ * Halbjahr: eine auf bestimmte Halbjahre begrenzte Zuordnung
+ * (fach_zuweisungen.halbjahre) gilt nur dort. Ohne Angabe zählt jede Zuordnung.
  */
-export function userHatFachZgriff(user, fachId) {
+export function userHatFachZgriff(user, fachId, halbjahr = null) {
   if (user.isAdmin) return true;
   const row = getDb()
-    .prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
+    .prepare('SELECT halbjahre FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
     .get(user.id, fachId);
-  return Boolean(row);
+  if (!row) return false;
+  if (halbjahr === null || halbjahr === undefined || !row.halbjahre) return true;
+  const nr = typeof halbjahr === 'number' ? halbjahr : parseInt(String(halbjahr), 10);
+  if (!Number.isInteger(nr)) return true; // kein erkennbares Halbjahr: nur die Zuordnung zum Fach prüfen
+  return halbjahrNummernDerZuordnung(row.halbjahre).includes(nr);
+}
+
+/** Halbjahr-Nummern einer Zuordnung (fach_zuweisungen.halbjahre, JSON-Array); leer bei defektem Wert. */
+function halbjahrNummernDerZuordnung(roh) {
+  try {
+    const arr = JSON.parse(roh);
+    return Array.isArray(arr) ? arr.filter((n) => Number.isInteger(n)) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Halbjahre, in denen die Lehrkraft in diesem Fach arbeiten darf: null = alle
+ * (Admin oder Zuordnung ohne Halbjahres-Einschränkung), sonst die Nummern der
+ * Zuordnung; leer, wenn keine Zuordnung besteht.
+ */
+export function erlaubteHalbjahreImFach(user, fachId) {
+  if (user.isAdmin) return null;
+  const row = getDb()
+    .prepare('SELECT halbjahre FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
+    .get(user.id, fachId);
+  if (!row) return [];
+  return row.halbjahre ? halbjahrNummernDerZuordnung(row.halbjahre) : null;
 }
 
 /**
