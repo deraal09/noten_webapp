@@ -23,6 +23,7 @@ const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
 const { ladeEingabeAnzeige } = await import('../src/spa-noten-service.js');
 const { spaSchemaFuerFach } = await import('../src/spa-noten-service.js');
+const { berechneZwischennote } = await import('../src/spa-grade-calc.js');
 
 const fastify = await buildApp({ logger: false });
 const base = await fastify.listen({ port: 0, host: '127.0.0.1' });
@@ -161,6 +162,26 @@ test('Leistungspunkte eines Komponenten-Unterfachs füttern die Komponente des L
   assert.equal(anzeige.komponenten.kunst, null, 'die Leistung ist Platzhalter, kein Handwert');
   const lf3Html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=2`)).text();
   assert.match(lf3Html, /placeholder="15"/);
+});
+
+test('Komponenten lassen sich komplett abwählen (kein Halbjahr) und wieder zuschalten; feste Gewichte werden hochgerechnet', async () => {
+  for (const k of ['kunst', 'spiel', 'musik', 'bewegung']) {
+    const r = await form(admin, `/teacher/faecher/${komp(k).id}/halbjahre`, { zurueck: 'klasse' });
+    assert.equal(r.status, 302);
+  }
+  assert.equal(getDb().prepare("SELECT COUNT(*) AS c FROM spa_deaktivierte_komponenten WHERE komponente_schluessel IN ('kunst','spiel','musik','bewegung')").get().c, 16);
+  const klassenHtml = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  assert.ok((klassenHtml.match(/abgeschaltet/g) || []).length >= 4, 'Klassenseite zeigt die Komponenten als abgeschaltet');
+  const html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
+  for (const k of ['kunst', 'spiel', 'musik', 'bewegung']) assert.ok(!html.includes(`data-feld="komponente:${k}"`));
+  assert.ok(html.includes('data-feld="komponente:paedagogik"'));
+  // Nur Pädagogik (Gewicht 0,4) bleibt: 10 Punkte ergeben 10, nicht 4
+  const schemaHj = spaSchemaFuerFach(getDb(), lf3Id).schema.find((x) => x.halbjahr === 1);
+  assert.equal(berechneZwischennote(schemaHj, { halbjahr: 1, komponenten: { paedagogik: 10 } }), 10);
+  // Wieder zuschalten
+  await form(admin, `/teacher/faecher/${komp('kunst').id}/halbjahre`, { halbjahre: ['1', '2', '3', '4'], zurueck: 'klasse' });
+  assert.equal(getDb().prepare("SELECT COUNT(*) AS c FROM spa_deaktivierte_komponenten WHERE komponente_schluessel = 'kunst'").get().c, 0);
+  assert.ok((await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text()).includes('data-feld="komponente:kunst"'));
 });
 
 test.after(async () => {

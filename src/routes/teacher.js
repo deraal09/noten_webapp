@@ -1981,11 +1981,10 @@ export default async function teacherRoutes(fastify) {
       const gewaehlt = halbjahreAusFormular(request.body?.halbjahre, fach.klasse_id) ?? [];
       if (!info?.schaltbar) {
         request.flash?.('error', 'Diese Komponente hat ein festes Gewicht und lässt sich nicht abschalten.');
-      } else if (!gewaehlt.some((n) => info.alle.includes(n))) {
-        request.flash?.('error', 'Bitte mindestens ein Halbjahr auswählen.');
       } else {
+        // Auch "kein Halbjahr" ist erlaubt: die Komponente ist dann komplett abgewählt.
         for (const nr of info.alle) spaSetzeKomponenteAktiv(getDb(), eltern.id, nr, fach.spa_komponente, gewaehlt.includes(nr));
-        request.flash?.('success', 'Zusammensetzung gespeichert.');
+        request.flash?.('success', gewaehlt.some((n) => info.alle.includes(n)) ? 'Zusammensetzung gespeichert.' : 'Komponente komplett abgewählt.');
       }
       return reply.redirect(ziel);
     }

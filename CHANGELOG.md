@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.62.1 - 2026-10-07
+
+- SPA: Die Komponenten-Unterfächer (Rest-Anteil-Komponenten, z. B. Kunst/Spiel/
+  Musik/Bewegung) lassen sich jetzt **komplett abwählen**: im Halbjahres-Menü
+  einfach kein Halbjahr ankreuzen. Sind in einem Halbjahr alle Rest-Komponenten
+  abgewählt, werden die festen Gewichte auf 100 % hochgerechnet (sonst bliebe
+  ein Restbudget ungenutzt). Feste Komponenten (z. B. Pädagogik) bleiben
+  weiterhin immer aktiv.
+
 ## 0.62.0 - 2026-10-07
 
 - Klassenseite: Das Formular zum Anlegen neuer Fächer oberhalb der Fächerliste

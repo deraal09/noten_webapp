@@ -126,13 +126,17 @@ export function berechneZwischennote(schema, eingabe) {
 
   const festeSumme = aktive.reduce((s, k) => s + (k.gewichtFix ?? 0), 0);
   const restKomponenten = aktive.filter((k) => k.restAnteil);
+  // Sind im Schema ALLE Rest-Komponenten abgewählt, bleibt sonst ein Restbudget ungenutzt:
+  // die festen Gewichte werden dann auf 100 % hochgerechnet.
+  const festeSchema = schema.komponenten.reduce((s, k) => s + (k.gewichtFix ?? 0), 0);
+  const skalierung = !schema.komponenten.some((k) => k.restAnteil) && festeSchema > 0 ? 1 / festeSchema : 1;
   const restBudget = Math.max(0, 1 - festeSumme);
   const restGewicht = restKomponenten.length > 0 ? restBudget / restKomponenten.length : 0;
 
   let summe = 0;
   for (const k of aktive) {
     const gewicht = k.gewichtFix ?? (k.restAnteil ? restGewicht : 0);
-    summe += gewicht * /** @type {number} */ (werte[k.schluessel]);
+    summe += gewicht * skalierung * /** @type {number} */ (werte[k.schluessel]);
   }
   return summe;
 }
