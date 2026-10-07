@@ -48,6 +48,14 @@ function notenschluesselVonKlasse(klasseId) {
   return getDb().prepare('SELECT notenschluessel FROM klassen WHERE id = ?').get(klasseId)?.notenschluessel;
 }
 
+/** Teilnehmer/innen eines Fachs auch bei dessen Unterfächern eintragen bzw. austragen (siehe src/unterfaecher.js). */
+function spiegleHinzu(fachId, schuelerId) {
+  getDb().prepare(`
+    INSERT OR IGNORE INTO fach_teilnehmer (fach_id, schueler_id)
+    SELECT id, ? FROM faecher WHERE parent_fach_id = ?
+  `).run(schuelerId, fachId);
+}
+
 /**
  * Fügt eine bereits existierende Schüler/in (aus beliebiger Klasse desselben
  * Schuljahres) als Teilnehmer/in hinzu. Lehnt bei unterschiedlichem
@@ -66,12 +74,15 @@ export function fuegeTeilnehmerHinzu(fach, schuelerId) {
     .get(fach.id, schuelerId);
   if (bereits) return { ok: false, fehler: 'bereits-teilnehmer' };
   db.prepare('INSERT INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)').run(fach.id, schuelerId);
+  spiegleHinzu(fach.id, schuelerId);
   return { ok: true };
 }
 
 /** Entfernt eine Person aus der Teilnehmerliste (löscht NICHT den Schüler-Datensatz selbst). */
 export function entferneTeilnehmer(fachId, schuelerId) {
-  getDb().prepare('DELETE FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').run(fachId, schuelerId);
+  const db = getDb();
+  db.prepare('DELETE FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').run(fachId, schuelerId);
+  db.prepare('DELETE FROM fach_teilnehmer WHERE schueler_id = ? AND fach_id IN (SELECT id FROM faecher WHERE parent_fach_id = ?)').run(schuelerId, fachId);
 }
 
 /**
@@ -175,5 +186,6 @@ export function legeManuellenTeilnehmerAn(fach, { nachname, vorname, klassenName
     .get(fach.id, schuelerId);
   if (bereits) return { ok: false, fehler: 'bereits-teilnehmer' };
   db.prepare('INSERT INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)').run(fach.id, schuelerId);
+  spiegleHinzu(fach.id, schuelerId);
   return { ok: true, schuelerId };
 }

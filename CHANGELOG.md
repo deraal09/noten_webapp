@@ -6,6 +6,26 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.59.0 - 2026-10-07
+
+- Klassenseite: Fächeranlage und Lehrkraftzuordnung stehen jetzt in einem
+  gemeinsamen Abschnitt **„Fächer und Lehrkräftezuordnung"**. Die Fächer sind
+  als Liste aufgeführt; die frühere Fächer-Tabelle und die Abschnitte
+  „Lehrkräfte zuordnen" samt „Lehrkräfte entfernen" entfallen.
+- Je Fach zwei Buttons: **🎓 Lehrkraft zuordnen** (nur in Halbjahren ohne
+  Unterfächer) und **📖 Unterfach hinzufügen**. Zugeordnete Lehrkräfte stehen
+  eingerückt unter dem Fach/Unterfach (mit ihren Halbjahren) und lassen sich
+  dort ändern (✎) bzw. entfernen (✕); mehrere Lehrkräfte je Fach/Unterfach sind
+  möglich. So bleibt über alle Halbjahre ersichtlich, wer wann unterrichtet.
+- **Unterfächer** (für alle Notenschlüssel): eigene Klausuren, Unterrichts-
+  leistung und Noteneingabe; die Fachnote des Halbjahres ergibt sich gewichtet
+  aus den Unterfächern (Gewichte auf der Zusammensetzungs-Seite des Fachs, leer
+  = gleiches Gewicht; noch unbenotete Unterfächer zählen nicht mit). Die
+  Halbjahreszuordnung bleibt am Fach, Unterfächer und Lehrkraftzuordnung lassen
+  sich je Halbjahr ändern. Klassenleitungs-Übersichten, Export und Zeugnis
+  zeigen weiterhin nur das Fach; der Sync eines Unterfachs aktualisiert auch
+  den Stand des Fachs.
+
 ## 0.58.0 - 2026-10-07
 
 - Klassenansicht: Die Aktionen je Person (und bei ehemaligen Schüler/innen)

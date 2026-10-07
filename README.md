@@ -106,7 +106,7 @@ Zwei Modi, einstellbar unter Admin → LDAP-Einstellungen:
   in der DB oder per Plesk-ENV-Variable konfiguriert ist** — bei reiner
   ENV-Konfiguration reicht es, hier nur den Haken zu setzen und das Feld
   „LDAP-URL" leer zu lassen. Neu angelegte Konten erscheinen danach ganz
-  normal in „Lehrkräfte zuordnen" auf der Klassenseite, sodass eine
+  normal in „Fächer und Lehrkräftezuordnung" auf der Klassenseite, sodass eine
   Klassenleitung sie zusätzlich gezielt einem Fach zuweisen kann. **Achtung:**
   Das gilt für jeden Bind, der zu Base-DN/Suchfilter passt — bei einem
   gemeinsamen Verzeichnis mit z. B. Schüler-Konten unbedingt Base-DN/Filter
@@ -402,7 +402,7 @@ bisherigen Admin-Einladungen). Der entscheidende Unterschied liegt in den
 **Rechten**: ein so entstandenes Konto (`auth_source = 'lokal'`) bekommt
 **kein** Selbstbedienungsrecht (siehe oben) — es kann ausschließlich in
 Fächern Noten eintragen, denen es von einer Klassenleitung oder dem Admin
-explizit zugewiesen wurde (Klassenseite → „Lehrkräfte zuordnen" oder als
+explizit zugewiesen wurde (Klassenseite → „Fächer und Lehrkräftezuordnung" oder als
 Co-Klassenlehrkraft). Lehrkräfte mit LDAP-Zugang sind davon nicht
 betroffen und behalten ihr volles Selbstbedienungsrecht.
 

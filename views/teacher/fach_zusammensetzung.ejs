@@ -1,0 +1,77 @@
+<h1>
+  <%= fach.name %> – <%= fach.klasse_name %>
+  <small>(<%= fach.schuljahr_bezeichnung %>, <%= fach.notenschluessel %>)</small>
+</h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher">← Meine Noteneingabe</a>
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">Fächer und Lehrkräftezuordnung</a>
+</p>
+
+<div class="hj-tabs">
+  <% HALBJAHRE.forEach(function(h) { %>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>" title="Schuljahr <%= (HALBJAHR_SCHULJAHR && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
+  <% }); %>
+</div>
+
+<div class="card">
+  <h2>Zusammensetzung im <%= halbjahr %></h2>
+  <p class="hint">
+    Die Fachnote ergibt sich in diesem Halbjahr gewichtet aus den Unterfächern. Noten, Klausuren und
+    Unterrichtsleistung werden im jeweiligen Unterfach eingetragen.
+    Noch nicht benotete Unterfächer zählen nicht mit.
+  </p>
+  <% if (darfGewichteAendern) { %>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/unterfach-gewichte" class="gewichte-form">
+      <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+      <table class="data">
+        <thead><tr><th>Unterfach</th><th>Gewicht</th><th>Anteil</th></tr></thead>
+        <tbody>
+          <% komposition.unterfaecher.forEach(function(u) { %>
+            <tr>
+              <td><% if (u.darfOeffnen) { %><a href="/teacher/fach/<%= u.id %>?hj=<%= encodeURIComponent(halbjahr) %>"><%= u.kurzname %></a><% } else { %><%= u.kurzname %><% } %></td>
+              <td><input type="number" name="gewicht_<%= u.id %>" value="<%= u.gewicht !== null ? u.gewicht : '' %>" placeholder="1" min="0.1" max="100" step="0.1" style="width:6em"></td>
+              <td><%= String(u.anteil).replace('.', ',') %> %</td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <p class="hint">Leer = Gewicht 1 (alle Unterfächer zählen gleich).</p>
+      <button type="submit">Gewichte speichern</button>
+    </form>
+  <% } else { %>
+    <ul>
+      <% komposition.unterfaecher.forEach(function(u) { %>
+        <li><%= u.kurzname %> – <%= String(u.anteil).replace('.', ',') %> %</li>
+      <% }); %>
+    </ul>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>Notenübersicht</h2>
+  <% if (!rows.length) { %>
+    <p class="hint">Keine Teilnehmer/innen.</p>
+  <% } else { %>
+    <table class="data" id="uebersicht">
+      <thead>
+        <tr>
+          <th>Schüler/in</th>
+          <% komposition.unterfaecher.forEach(function(u) { %><th><%= u.kurzname %></th><% }); %>
+          <% if (verrechnung && verrechnung.prozent) { %><th>Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
+          <th>Fachnote</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function(r) { %>
+          <tr data-schueler="<%= r.schueler_id %>">
+            <td class="name"><%= r.nachname %>, <%= r.vorname %>
+              <% if (r.herkunftKlasse) { %><small class="hint">(<%= r.herkunftKlasse %>)</small><% } %></td>
+            <% r.unterfachNoten.forEach(function(n) { %><td><%= n === null ? '–' : String(n).replace('.', ',') %></td><% }); %>
+            <% if (verrechnung && verrechnung.prozent) { %><td><%= r.vorhalbjahrNote === null ? '–' : String(r.vorhalbjahrNote).replace('.', ',') %></td><% } %>
+            <td class="gesamt<%= r.nicht_bestanden ? ' nicht-bestanden' : '' %>"><strong><%= r.endnote && r.endnote.ntg ? 'ntg' : (r.gesamt === null ? '–' : String(r.gesamt).replace('.', ',')) %></strong></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</div>

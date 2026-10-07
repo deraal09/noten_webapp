@@ -6,6 +6,10 @@
 import { getDb } from '../db.js';
 import { formatZeitLokal } from '../format.js';
 import { setzeEndnote, notenBereich } from '../halbjahr-endnoten.js';
+import {
+  ladeUnterfaecher, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
+  halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse,
+} from '../unterfaecher.js';
 import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
   requireAuth, userHatFachZgriff, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
@@ -17,7 +21,7 @@ import {
 } from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import {
-  ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerSchueler, ladeFaecherFuerKlassenleitung,
+  ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerSchueler, ladeFaecherFuerKlassenleitung, unterfaecherDesHalbjahrs,
 } from '../noten-service.js';
 import { syncFach, syncFallsAutoAktiv, holeSyncMeta, ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
@@ -87,6 +91,24 @@ function leseMultipartDatei(buffer, contentType, feldname) {
 /** Fach-assignierte Lehrkraft ODER Klassenleitung darf die Notentafel eines Fachs bearbeiten. */
 function userDarfFachBearbeiten(user, fach) {
   return userHatFachZgriff(user, fach.id) || userIstKlassenlehrer(user, fach.klasse_id);
+}
+
+/** Lehrkraft eines Unterfachs, Lehrkraft des Fachs selbst oder Klassenleitung (Zusammensetzungs-Seite). */
+function userDarfZusammensetzungSehen(user, fach) {
+  if (userHatFachZgriff(user, fach.id) || userIstKlassenlehrer(user, fach.klasse_id)) return true;
+  return ladeUnterfaecher(fach.id).some((u) => userHatFachZgriff(user, u.id));
+}
+
+function renderZusammensetzung(request, reply, fach, halbjahr) {
+  const uebersicht = ladeNotenuebersicht(fach, halbjahr);
+  const komposition = {
+    unterfaecher: uebersicht.komposition.unterfaecher.map((u) => ({ ...u, darfOeffnen: userHatFachZgriff(request.user, u.id) })),
+  };
+  return reply.viewEjs('teacher/fach_zusammensetzung.ejs', {
+    HALBJAHRE: halbjahreFuerFach(fach), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id),
+    user: request.user, fach, halbjahr, komposition, rows: uebersicht.rows, verrechnung: uebersicht.verrechnung,
+    darfGewichteAendern: userDarfZusammensetzungSehen(request.user, fach),
+  });
 }
 
 /**
@@ -230,6 +252,16 @@ export default async function teacherRoutes(fastify) {
     // Kontrolle der Fachlehrkraft (siehe src/noten-sync.js). Eine
     // Klassenleitung ohne eigene Zuweisung trägt Endnoten vergangener
     // Halbjahre im Klassenleitungsbereich ein (Reiter "Endnoten").
+    // Ausnahme: In einem Halbjahr, in dem sich das Fach aus Unterfächern
+    // zusammensetzt, ist die (rein lesende) Zusammensetzungs-Seite auch für die
+    // Lehrkräfte der Unterfächer und die Klassenleitung offen.
+    const zusammensetzungHj = halbjahrFuerFach(fach, request.query?.hj);
+    if (unterfaecherDesHalbjahrs(fach, zusammensetzungHj).length) {
+      if (!userDarfZusammensetzungSehen(request.user, fach)) {
+        return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+      }
+      return renderZusammensetzung(request, reply, fach, zusammensetzungHj);
+    }
     if (!userHatFachZgriff(request.user, fach.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
@@ -1577,12 +1609,15 @@ export default async function teacherRoutes(fastify) {
     const schueler = getDb().prepare(
       'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
     ).all(klasse.id);
-    const faecher = getDb().prepare(`
-      SELECT f.*,
-        (SELECT GROUP_CONCAT(u.display_name || COALESCE(NULLIF(' / ' || u.username, ' / '), ''), ', ')
-           FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id WHERE fz.fach_id = f.id) AS lehrer_liste
-      FROM faecher f WHERE f.klasse_id = ? ORDER BY f.name
-    `).all(klasse.id);
+    const laufzeit = klassenLaufzeit(klasse.id);
+    // Fächer als Baum: Fächer der obersten Ebene mit ihren Unterfächern (siehe src/unterfaecher.js).
+    const alleFaecher = getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
+    const baum = alleFaecher.filter((f) => !f.parent_fach_id).map((f) => ({
+      fach: { ...f, hjNummern: fachHalbjahrNummern(f, laufzeit) },
+      freieHj: halbjahreOhneUnterfaecher(f, laufzeit),
+      kinder: alleFaecher.filter((u) => u.parent_fach_id === f.id).map((u) => ({ ...u, hjNummern: fachHalbjahrNummern(u, laufzeit) })),
+    }));
+    const zuweisungenProFach = Object.fromEntries(ladeZuweisungenDerKlasse(klasse.id, alleFaecher, laufzeit));
     // Löschen/Abgang/Abgangszeugnis nur anzeigen, wenn die Aktion auch
     // durchgeht (dieselbe Regel wie in den Routen, siehe userDarfKlasseVerwalten).
     const darfVerwalten = userDarfKlasseVerwalten(request.user, klasse.id);
@@ -1592,27 +1627,16 @@ export default async function teacherRoutes(fastify) {
       && (klasse.created_by_id === request.user.id || request.user.isAdmin);
 
     let zuweisbareLehrkraefte = [];
-    let zuweisungen = [];
     if (istKlassenlehrer) {
       zuweisbareLehrkraefte = getDb().prepare(
         "SELECT id, username, display_name FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
       ).all();
-      zuweisungen = getDb().prepare(`
-        SELECT fz.id, fz.fach_id, f.name AS fach_name, u.display_name, u.username
-        FROM fach_zuweisungen fz
-        JOIN faecher f ON f.id = fz.fach_id
-        JOIN users u ON u.id = fz.user_id
-        WHERE f.klasse_id = ?
-        ORDER BY f.name, u.username
-      `).all(klasse.id);
     }
 
-    const laufzeit = klassenLaufzeit(klasse.id);
-    const faecherMitHj = faecher.map((f) => ({ ...f, hjNummern: fachHalbjahrNummern(f, laufzeit) }));
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit),
-      user: request.user, klasse, schueler, faecher: faecherMitHj, kannExportieren, darfVerwalten,
-      istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte, zuweisungen,
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach,
+      user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
+      istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
       darfVersetzen: darfVerwalten || Boolean(klasse.ist_ablage),
       versetzZiele: darfVerwalten || klasse.ist_ablage ? ladeVersetzZiele(klasse) : [],
@@ -1667,17 +1691,15 @@ export default async function teacherRoutes(fastify) {
     }
     const userId = parseInt(request.body?.user_id, 10);
     const fachId = parseInt(request.body?.fach_id, 10);
-    const fach = getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
+    const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
     if (!userId || !fach || fach.klasse_id !== Number(request.params.id)) {
       request.flash?.('error', 'Ungültige Auswahl.');
-      return reply.redirect(`/teacher/klassen/${request.params.id}`);
+      return reply.redirect(klasseAnker(request.params.id));
     }
-    try {
-      getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(userId, fachId);
-    } catch (e) {
-      request.flash?.('error', 'Diese Zuweisung besteht bereits.');
-    }
-    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+    // Halbjahre aus dem Formular; ohne Angabe gilt die Lehrkraft in allen (möglichen) Halbjahren des Fachs.
+    const ergebnis = weiseLehrkraftZu(fach, userId, halbjahreAusFormular(request.body?.halbjahre, fach.klasse_id));
+    if (!ergebnis.ok) request.flash?.('error', ergebnis.fehler);
+    return reply.redirect(klasseAnker(request.params.id));
   });
 
   fastify.post('/zuweisungen/:id/loeschen', async (request, reply) => {
@@ -1689,7 +1711,7 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Zuweisungen entfernen.' });
     }
     getDb().prepare('DELETE FROM fach_zuweisungen WHERE id = ?').run(request.params.id);
-    return reply.redirect(`/teacher/klassen/${z.klasse_id}`);
+    return reply.redirect(klasseAnker(z.klasse_id));
   });
 
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {
@@ -1917,21 +1939,69 @@ export default async function teacherRoutes(fastify) {
     }
     const laufzeit = klassenLaufzeit(fach.klasse_id);
     const neu = parseHalbjahreEingabe(request.body?.halbjahre, laufzeit);
-    const gilt = new Set(neu ?? laufzeit.halbjahre.map((_, i) => i + 1));
-    const db = getDb();
-    const belegt = new Set();
-    for (const tabelle of ['klausuren', 'unterrichtsleistungen', 'unterricht_termine', 'noten', 'halbjahr_endnoten']) {
-      for (const r of db.prepare(`SELECT DISTINCT halbjahr FROM ${tabelle} WHERE fach_id = ?`).all(fach.id)) belegt.add(halbjahrNr(r.halbjahr));
-    }
-    const betroffen = [...belegt].filter((n) => n && !gilt.has(n));
-    const ziel = request.body?.zurueck === 'klasse' ? `/teacher/klassen/${fach.klasse_id}` : `/teacher/fach/${fach.id}`;
-    if (betroffen.length) {
-      request.flash?.('error', `In ${betroffen.sort((a, b) => a - b).map((n) => `${n}. Halbjahr`).join(', ')} sind schon Leistungen oder Endnoten eingetragen -- das Fach muss dort gelten.`);
+    const ziel = request.body?.zurueck === 'klasse' ? `/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte` : `/teacher/fach/${fach.id}`;
+    const ergebnis = setzeFachHalbjahre(fach, neu);
+    if (!ergebnis.ok) {
+      request.flash?.('error', ergebnis.fehler);
       return reply.redirect(ziel);
     }
-    db.prepare('UPDATE faecher SET halbjahre = ? WHERE id = ?').run(neu ? JSON.stringify(neu) : null, fach.id);
-    request.flash?.('success', 'Halbjahre des Fachs gespeichert.');
+    request.flash?.('success', 'Halbjahre gespeichert.');
     return reply.redirect(ziel);
+  });
+
+  // ---------- Unterfächer und Lehrkraftzuordnung je Halbjahr (siehe src/unterfaecher.js) ----------
+  const klasseAnker = (klasseId) => `/teacher/klassen/${klasseId}#faecher-lehrkraefte`;
+  const halbjahreAusFormular = (roh, klasseId) => {
+    const laufzeit = klassenLaufzeit(klasseId);
+    const liste = (Array.isArray(roh) ? roh : [roh]).map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n >= 1 && n <= laufzeit.anzahlHalbjahre);
+    return liste.length ? [...new Set(liste)] : null;
+  };
+
+  fastify.post('/faecher/:id/unterfaecher', async (request, reply) => {
+    const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann Unterfächer hinzufügen.' });
+    }
+    const ergebnis = legeUnterfachAn(fach, request.body?.name, halbjahreAusFormular(request.body?.halbjahre, fach.klasse_id));
+    request.flash?.(ergebnis.ok ? 'success' : 'error', ergebnis.ok ? 'Unterfach angelegt.' : ergebnis.fehler);
+    return reply.redirect(klasseAnker(fach.klasse_id));
+  });
+
+  fastify.post('/zuweisungen/:id/halbjahre', async (request, reply) => {
+    const z = getDb().prepare(`
+      SELECT fz.id, f.klasse_id FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id WHERE fz.id = ?
+    `).get(request.params.id);
+    if (!z) return reply.redirect('/teacher/klassen');
+    if (!userIstKlassenlehrer(request.user, z.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann Zuordnungen ändern.' });
+    }
+    const nummern = halbjahreAusFormular(request.body?.halbjahre, z.klasse_id) ?? [];
+    const ergebnis = setzeZuweisungHalbjahre(z.id, nummern);
+    request.flash?.(ergebnis.ok ? 'success' : 'error', ergebnis.ok ? 'Halbjahre der Zuordnung gespeichert.' : ergebnis.fehler);
+    return reply.redirect(klasseAnker(z.klasse_id));
+  });
+
+  // Gewichte der Unterfächer in der Fachnote (leer = 1).
+  fastify.post('/fach/:id/unterfach-gewichte', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach || fach.parent_fach_id) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userDarfZusammensetzungSehen(request.user, fach)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const halbjahr = halbjahrFuerFach(fach, request.body?.halbjahr);
+    const db = getDb();
+    let fehler = false;
+    for (const u of ladeUnterfaecher(fach.id)) {
+      const roh = request.body?.[`gewicht_${u.id}`];
+      if (roh === undefined) continue;
+      const text = String(roh).trim().replace(',', '.');
+      const wert = text === '' ? null : Number(text);
+      if (wert !== null && !(wert > 0 && wert <= 100)) { fehler = true; continue; }
+      db.prepare('UPDATE faecher SET gewicht = ? WHERE id = ?').run(wert, u.id);
+    }
+    request.flash?.(fehler ? 'error' : 'success', fehler ? 'Gewichte müssen zwischen 0 und 100 liegen -- ungültige Werte wurden nicht gespeichert.' : 'Gewichte gespeichert.');
+    return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
   });
 
   // ---------- Neuen Kurs anlegen (Fach, dessen Teilnehmerliste sich aus

@@ -122,6 +122,7 @@ export default async function klassenlehrerRoutes(fastify) {
       SELECT f.id, f.name
       FROM faecher f
       WHERE f.klasse_id = ? AND NOT EXISTS (SELECT 1 FROM fach_zuweisungen fz WHERE fz.fach_id = f.id)
+        AND NOT EXISTS (SELECT 1 FROM faecher u WHERE u.parent_fach_id = f.id)
       ORDER BY f.name
     `).all(klasse.id);
 

@@ -296,20 +296,36 @@ Meier, Carla"></textarea>
 </script>
 
 <% if (!klasse.ist_ablage) { %>
-<h2>Fächer</h2>
+<h2 id="faecher-lehrkraefte">Fächer und Lehrkräftezuordnung</h2>
 <p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen.
-  <% if (istKlassenlehrer) { %>Als Klassenleitung kannst du unten weitere Lehrkräfte den Fächern zuordnen.
-  <% } else { %>Weitere Lehrkräfte kann die Klassenleitung oder der Admin zuordnen.<% } %></small></p>
-<% function hjBereiche(nummern) {
-     var teile = []; var start = null; var vor = null;
-     nummern.forEach(function(n) {
-       if (start === null) { start = n; vor = n; }
-       else if (n === vor + 1) { vor = n; }
-       else { teile.push(start === vor ? start + '' : start + '–' + vor); start = n; vor = n; }
-     });
-     if (start !== null) teile.push(start === vor ? start + '' : start + '–' + vor);
-     return teile.join(', ');
-   } %>
+  <% if (istKlassenlehrer) { %>Als Klassenleitung ordnest du Lehrkräfte je Halbjahr zu (🎓) und gliederst Fächer in Unterfächer (📖).
+  <% } else { %>Lehrkräfte kann die Klassenleitung oder der Admin zuordnen.<% } %></small></p>
+<%
+  function hjBereiche(nummern) {
+    var teile = []; var start = null; var vor = null;
+    nummern.forEach(function(n) {
+      if (start === null) { start = n; vor = n; }
+      else if (n === vor + 1) { vor = n; }
+      else { teile.push(start === vor ? start + '' : start + '–' + vor); start = n; vor = n; }
+    });
+    if (start !== null) teile.push(start === vor ? start + '' : start + '–' + vor);
+    return teile.join(', ');
+  }
+  // Beschriftung einer Halbjahres-Menge samt Schuljahr(en), z. B. "1.–2. Halbjahr (2025/26)"
+  function hjText(nummern) {
+    if (!nummern.length) return '–';
+    if (nummern.length === laufzeit.anzahlHalbjahre) return 'alle Halbjahre';
+    var sj = [];
+    nummern.forEach(function(n) { var b = laufzeit.schuljahre[Math.floor((n - 1) / 2)].bezeichnung; if (sj.indexOf(b) === -1) sj.push(b); });
+    return hjBereiche(nummern) + '. Halbjahr (' + sj.join(', ') + ')';
+  }
+  // Checkbox-Reihe für Halbjahre (name="halbjahre"), nur die erlaubten Nummern
+  function hjChecks(erlaubt, gewaehlt) {
+    return erlaubt.map(function(n) {
+      return '<label class="hj-check"><input type="checkbox" name="halbjahre" value="' + n + '"' + (gewaehlt.indexOf(n) !== -1 ? ' checked' : '') + '> ' + n + '</label>';
+    }).join(' ');
+  }
+%>
 <form method="post" action="/teacher/klassen/<%= klasse.id %>/faecher/neu" class="card">
   <label>Name des Fachs
     <input type="text" name="name" placeholder="z. B. Mathematik" required>
@@ -323,41 +339,100 @@ Meier, Carla"></textarea>
   </fieldset>
   <button type="submit">+ Fach anlegen</button>
 </form>
-<table class="data">
-  <thead><tr><th>Name</th><th>Halbjahre</th><th>Lehrkräfte</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
-  <tbody>
-    <% faecher.forEach(function(f) { %>
-      <tr>
-        <td><a href="/teacher/fach/<%= f.id %>"><%= f.name %></a></td>
-        <td>
-          <details class="hj-bearbeiten">
-            <summary><%= f.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle' : hjBereiche(f.hjNummern) %></summary>
-            <form method="post" action="/teacher/faecher/<%= f.id %>/halbjahre">
-              <input type="hidden" name="zurueck" value="klasse">
-              <% laufzeit.halbjahre.forEach(function(h, i) { %>
-                <label class="hj-check"><input type="checkbox" name="halbjahre" value="<%= i + 1 %>" <%= f.hjNummern.indexOf(i + 1) !== -1 ? 'checked' : '' %>> <%= i + 1 %></label>
-              <% }); %>
-              <button type="submit">Speichern</button>
+
+<% function zeigeLehrkraefte(fachId, erlaubtFuerBearbeiten) { %>
+  <% var liste = zuweisungenProFach[fachId] || []; %>
+  <% if (liste.length) { %>
+    <ul class="lehrkraefte-liste">
+      <% liste.forEach(function(z) { %>
+        <li>
+          <span class="lehrkraft-name">🎓 <%= z.name %></span>
+          <span class="hint lehrkraft-hj"><%= hjText(z.halbjahre) %></span>
+          <% if (istKlassenlehrer) { %>
+            <details class="hj-bearbeiten">
+              <summary title="Halbjahre ändern">✎</summary>
+              <form method="post" action="/teacher/zuweisungen/<%= z.id %>/halbjahre">
+                <%- hjChecks(erlaubtFuerBearbeiten, z.halbjahre) %>
+                <button type="submit">Speichern</button>
+              </form>
+            </details>
+            <form method="post" action="/teacher/zuweisungen/<%= z.id %>/loeschen" class="inline" onsubmit="return confirm('Zuordnung von <%= z.name.replace(/'/g, '') %> entfernen?')">
+              <button type="submit" class="icon-knopf danger" title="Lehrkraft entfernen" aria-label="Lehrkraft <%= z.name %> entfernen">✕</button>
             </form>
-          </details>
-        </td>
-        <td><%= f.lehrer_liste || '—' %></td>
-        <% if (darfVerwalten) { %>
-        <td>
-          <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen? Alle Noten dieses Fachs gehen dabei verloren.')">
-            <button type="submit" class="danger">🗑</button>
-          </form>
-        </td>
-        <% } %>
-      </tr>
-    <% }); %>
-  </tbody>
-</table>
+          <% } %>
+        </li>
+      <% }); %>
+    </ul>
+  <% } %>
 <% } %>
 
+<ul class="faecher-baum">
+  <% baum.forEach(function(eintrag) {
+       var f = eintrag.fach; %>
+    <li class="fach-eintrag">
+      <div class="fach-zeile">
+        <a class="fach-name" href="/teacher/fach/<%= f.id %>"><%= f.name %></a>
+        <details class="hj-bearbeiten">
+          <summary title="Halbjahre des Fachs ändern"><%= f.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle Halbjahre' : hjBereiche(f.hjNummern) + '. Hj.' %></summary>
+          <form method="post" action="/teacher/faecher/<%= f.id %>/halbjahre">
+            <input type="hidden" name="zurueck" value="klasse">
+            <%- hjChecks(laufzeit.halbjahre.map(function(h, i) { return i + 1; }), f.hjNummern) %>
+            <button type="submit">Speichern</button>
+          </form>
+        </details>
+        <% if (istKlassenlehrer) { %>
+          <% if (eintrag.freieHj.length) { %>
+            <button type="button" class="icon-knopf" data-lehrkraft-dialog data-fach-id="<%= f.id %>" data-fach-name="<%= f.name %>" data-erlaubt="<%= eintrag.freieHj.join(',') %>" title="Lehrkraft zuordnen<%= eintrag.kinder.length ? ' (nur in Halbjahren ohne Unterfächer)' : '' %>" aria-label="Lehrkraft zuordnen: <%= f.name %>">🎓</button>
+          <% } %>
+          <button type="button" class="icon-knopf" data-unterfach-dialog data-fach-id="<%= f.id %>" data-fach-name="<%= f.name %>" data-erlaubt="<%= f.hjNummern.join(',') %>" title="Unterfach hinzufügen" aria-label="Unterfach hinzufügen: <%= f.name %>">📖</button>
+        <% } %>
+        <% if (darfVerwalten) { %>
+          <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen? Alle Noten dieses Fachs und seiner Unterfächer gehen dabei verloren.')">
+            <button type="submit" class="icon-knopf danger" title="Fach löschen" aria-label="Fach <%= f.name %> löschen">🗑</button>
+          </form>
+        <% } %>
+      </div>
+      <% zeigeLehrkraefte(f.id, eintrag.freieHj); %>
+      <% if (eintrag.kinder.length) { %>
+        <ul class="unterfaecher-liste">
+          <% eintrag.kinder.forEach(function(u) { %>
+            <li class="fach-eintrag unterfach">
+              <div class="fach-zeile">
+                <span class="hint">📖</span>
+                <a class="fach-name" href="/teacher/fach/<%= u.id %>"><%= u.kurzname || u.name %></a>
+                <details class="hj-bearbeiten">
+                  <summary title="Halbjahre des Unterfachs ändern"><%= u.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle Halbjahre' : hjBereiche(u.hjNummern) + '. Hj.' %></summary>
+                  <form method="post" action="/teacher/faecher/<%= u.id %>/halbjahre">
+                    <input type="hidden" name="zurueck" value="klasse">
+                    <%- hjChecks(f.hjNummern, u.hjNummern) %>
+                    <button type="submit">Speichern</button>
+                  </form>
+                </details>
+                <% if (istKlassenlehrer) { %>
+                  <button type="button" class="icon-knopf" data-lehrkraft-dialog data-fach-id="<%= u.id %>" data-fach-name="<%= u.name %>" data-erlaubt="<%= u.hjNummern.join(',') %>" title="Lehrkraft zuordnen" aria-label="Lehrkraft zuordnen: <%= u.name %>">🎓</button>
+                <% } %>
+                <% if (darfVerwalten) { %>
+                  <form method="post" action="/teacher/faecher/<%= u.id %>/loeschen" class="inline" onsubmit="return confirm('Unterfach löschen? Alle Noten dieses Unterfachs gehen dabei verloren.')">
+                    <button type="submit" class="icon-knopf danger" title="Unterfach löschen" aria-label="Unterfach <%= u.kurzname || u.name %> löschen">🗑</button>
+                  </form>
+                <% } %>
+              </div>
+              <% zeigeLehrkraefte(u.id, u.hjNummern); %>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </li>
+  <% }); %>
+  <% if (!baum.length) { %><li class="hint">Noch keine Fächer.</li><% } %>
+</ul>
+
 <% if (istKlassenlehrer) { %>
-  <h2>Lehrkräfte zuordnen</h2>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/zuweisungen/neu" class="card">
+<dialog id="lehrkraft-dialog" class="notiz-dialog">
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/zuweisungen/neu">
+    <h2>Lehrkraft zuordnen</h2>
+    <p class="hint" id="lk-fach-name"></p>
+    <input type="hidden" name="fach_id" id="lk-fach-id">
     <label>Lehrkraft
       <select name="user_id" required>
         <option value="">— wählen —</option>
@@ -366,32 +441,70 @@ Meier, Carla"></textarea>
         <% }); %>
       </select>
     </label>
-    <label>Fach
-      <select name="fach_id" required>
-        <option value="">— wählen —</option>
-        <% faecher.forEach(function(f) { %>
-          <option value="<%= f.id %>"><%= f.name %></option>
-        <% }); %>
-      </select>
-    </label>
-    <button type="submit">+ Zuweisen</button>
+    <fieldset class="hj-auswahl"><legend>Unterrichtet in Halbjahr</legend><span id="lk-halbjahre"></span></fieldset>
+    <div class="form-actions">
+      <button type="submit">+ Zuordnen</button>
+      <button type="button" data-dialog-zu>Abbrechen</button>
+    </div>
   </form>
-  <table class="data">
-    <thead><tr><th>Lehrkraft</th><th>Fach</th><th>Aktion</th></tr></thead>
-    <tbody>
-      <% zuweisungen.forEach(function(z) { %>
-        <tr>
-          <td><%= z.display_name || z.username %></td>
-          <td><%= z.fach_name %></td>
-          <td>
-            <form method="post" action="/teacher/zuweisungen/<%= z.id %>/loeschen" class="inline" onsubmit="return confirm('Zuweisung entfernen?')">
-              <button type="submit" class="danger">🗑</button>
-            </form>
-          </td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
+</dialog>
+
+<dialog id="unterfach-dialog" class="notiz-dialog">
+  <form method="post" id="unterfach-form" action="">
+    <h2>Unterfach hinzufügen</h2>
+    <p class="hint" id="uf-fach-name"></p>
+    <label>Name des Unterfachs
+      <input type="text" name="name" maxlength="60" placeholder="z. B. Musik" required>
+    </label>
+    <fieldset class="hj-auswahl"><legend>Gilt in Halbjahr</legend><span id="uf-halbjahre"></span></fieldset>
+    <div class="form-actions">
+      <button type="submit">+ Unterfach anlegen</button>
+      <button type="button" data-dialog-zu>Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  (function() {
+    var SCHULJAHR = <%- jsonFuerSkript(laufzeit.schuljahre.map(function(s) { return s.bezeichnung; })) %>;
+    var VORBELEGT = <%- jsonFuerSkript(vorbelegungHj) %>;
+    function checks(ziel, erlaubt) {
+      var vorgewaehlt = erlaubt.filter(function(n) { return VORBELEGT.indexOf(n) !== -1; });
+      if (!vorgewaehlt.length) vorgewaehlt = erlaubt;
+      ziel.textContent = '';
+      erlaubt.forEach(function(n) {
+        var l = document.createElement('label'); l.className = 'hj-check';
+        var i = document.createElement('input'); i.type = 'checkbox'; i.name = 'halbjahre'; i.value = String(n);
+        i.checked = vorgewaehlt.indexOf(n) !== -1;
+        l.appendChild(i);
+        l.appendChild(document.createTextNode(' ' + n + '. Halbjahr '));
+        var s = document.createElement('small'); s.textContent = '(' + SCHULJAHR[Math.floor((n - 1) / 2)] + ')'; l.appendChild(s);
+        ziel.appendChild(l);
+      });
+    }
+    function liste(roh) { return String(roh || '').split(',').filter(Boolean).map(Number); }
+    document.querySelectorAll('[data-lehrkraft-dialog]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        document.getElementById('lk-fach-id').value = b.dataset.fachId;
+        document.getElementById('lk-fach-name').textContent = b.dataset.fachName;
+        checks(document.getElementById('lk-halbjahre'), liste(b.dataset.erlaubt));
+        document.getElementById('lehrkraft-dialog').showModal();
+      });
+    });
+    document.querySelectorAll('[data-unterfach-dialog]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        document.getElementById('unterfach-form').action = '/teacher/faecher/' + b.dataset.fachId + '/unterfaecher';
+        document.getElementById('uf-fach-name').textContent = b.dataset.fachName;
+        checks(document.getElementById('uf-halbjahre'), liste(b.dataset.erlaubt));
+        document.getElementById('unterfach-dialog').showModal();
+      });
+    });
+    document.querySelectorAll('[data-dialog-zu]').forEach(function(b) {
+      b.addEventListener('click', function() { b.closest('dialog').close(); });
+    });
+  })();
+</script>
+<% } %>
 <% } %>
 
 <script>

@@ -129,6 +129,7 @@ export function ladeFaecherEinerPerson(schuelerId) {
     JOIN klassen k ON k.id = f.klasse_id
     JOIN schuljahre sj ON sj.id = k.schuljahr_id
     WHERE f.id IN (SELECT fach_id FROM fach_teilnehmer WHERE schueler_id = ?)
+      AND f.parent_fach_id IS NULL
     ORDER BY f.name
   `).all(schuelerId);
 }

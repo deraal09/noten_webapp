@@ -768,6 +768,15 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'halbjahre', 'halbjahre TEXT');
   // Verrechnung der Halbjahresnoten: JSON {"1": 50, ...} = Prozent der Note aus Halbjahr n, die in Halbjahr n+1 einfließen (fehlt = 0).
   ensureColumn(db, 'klassen', 'verrechnung', 'verrechnung TEXT');
+  // Unterfächer: ein Fach kann sich je Halbjahr aus Unterfächern zusammensetzen. Ein Unterfach ist
+  // technisch ein ganz normales Fach (eigene Noteneingabe, Teilnehmerliste, Lehrkräfte) mit
+  // parent_fach_id; `kurzname` ist sein Name ohne Elternfach-Präfix, `gewicht` der Anteil an der
+  // Fachnote in Prozent (NULL = gleichmäßig auf alle Unterfächer des Halbjahres verteilt).
+  ensureColumn(db, 'faecher', 'parent_fach_id', 'parent_fach_id INTEGER REFERENCES faecher(id) ON DELETE CASCADE');
+  ensureColumn(db, 'faecher', 'kurzname', 'kurzname TEXT');
+  ensureColumn(db, 'faecher', 'gewicht', 'gewicht REAL');
+  // Halbjahre, in denen die Lehrkraft dem Fach/Unterfach zugeordnet ist (JSON-Array der Halbjahr-Nummern); NULL = alle Halbjahre des Fachs.
+  ensureColumn(db, 'fach_zuweisungen', 'halbjahre', 'halbjahre TEXT');
   for (const k of db.prepare('SELECT k.id, s.bezeichnung FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.einschulung_jahr IS NULL').all()) {
     const jahr = parseSchuljahr(k.bezeichnung)?.startJahr;
     if (jahr) db.prepare('UPDATE klassen SET einschulung_jahr = ? WHERE id = ?').run(jahr, k.id);

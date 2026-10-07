@@ -578,3 +578,20 @@ input.endnote-raster { width: 4.5rem; text-align: center; }
 .menue-eintrag:hover, .menue-eintrag:focus-visible { background: var(--bg-tint); }
 .menue-eintrag.danger { color: var(--danger); }
 #versetzen-dialog select { width: 100%; margin: 0.5rem 0; }
+
+/* Fächer, Unterfächer und Lehrkräfte als eingerückte Liste (Klassenseite). */
+.faecher-baum, .unterfaecher-liste, .lehrkraefte-liste { list-style: none; margin: 0; padding: 0; }
+.faecher-baum > .fach-eintrag { padding: 0.6rem 0.25rem; border-bottom: 1px solid var(--border-subtle); }
+.fach-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.fach-name { font-weight: 600; }
+.unterfaecher-liste { margin: 0.35rem 0 0 1.6rem; border-left: 2px solid var(--border-subtle); padding-left: 0.75rem; }
+.unterfaecher-liste .fach-eintrag { padding: 0.3rem 0; }
+.unterfaecher-liste .fach-name { font-weight: 500; }
+.lehrkraefte-liste { margin: 0.25rem 0 0.25rem 1.6rem; }
+.lehrkraefte-liste li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; padding: 0.1rem 0; font-size: 0.92rem; }
+.unterfaecher-liste .lehrkraefte-liste { margin-left: 1.4rem; }
+.lehrkraft-hj { white-space: nowrap; }
+.icon-knopf { padding: 0.15rem 0.45rem; background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 1rem; line-height: 1.3; cursor: pointer; color: var(--text); }
+.icon-knopf:hover, .icon-knopf:focus-visible { background: var(--bg-tint); border-color: var(--accent); }
+.icon-knopf.danger { color: var(--danger); }
+.lehrkraefte-liste details.hj-bearbeiten { display: inline-block; }

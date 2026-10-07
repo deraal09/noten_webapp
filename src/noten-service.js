@@ -12,6 +12,7 @@ import {
 } from './grade-calc.js';
 import { muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
 import { ladeEndnoten } from './halbjahr-endnoten.js';
+import { unterfaecherImHalbjahr } from './unterfaecher.js';
 
 /** Lädt Unterrichtstermine + eingetragene Noten für ein Fach+Halbjahr (Datumstabelle). */
 function ladeUnterrichtTermine(fachId, halbjahr) {
@@ -85,6 +86,7 @@ export function ladeFaecherFuerKlassenleitung(klasseId) {
     JOIN klassen k ON k.id = s.klasse_id
     WHERE s.klasse_id = ?
       AND (f.klasse_id = s.klasse_id OR fk.schuljahr_id = k.schuljahr_id)
+      AND f.parent_fach_id IS NULL
     ORDER BY f.name
   `).all(klasseId);
 }
@@ -93,7 +95,7 @@ export function ladeFaecherFuerKlassenleitung(klasseId) {
 export function ladeFaecherFuerSchueler(schuelerId) {
   return getDb().prepare(`
     SELECT f.* FROM faecher f JOIN fach_teilnehmer ft ON ft.fach_id = f.id
-    WHERE ft.schueler_id = ? ORDER BY f.name
+    WHERE ft.schueler_id = ? AND f.parent_fach_id IS NULL ORDER BY f.name
   `).all(schuelerId);
 }
 
@@ -141,11 +143,43 @@ export function berechneGesamtnotenOhneEndnoten(fachId, halbjahr) {
   return roh;
 }
 
-/** Rein aus Klausuren/Unterrichtsleistung berechnete Halbjahresnote (ohne Verrechnung, ohne Endnoten). */
+/**
+ * Unterfächer, aus denen sich das Fach im Halbjahr zusammensetzt (leer = Fach
+ * wird direkt bewertet). Ein Unterfach selbst hat nie Unterfächer.
+ */
+export function unterfaecherDesHalbjahrs(fach, halbjahr) {
+  if (!fach || fach.parent_fach_id) return [];
+  const nr = halbjahrNr(halbjahr);
+  return nr === null ? [] : unterfaecherImHalbjahr(fach, nr);
+}
+
+/** Gewicht eines Unterfachs in der Zusammensetzung (ohne Angabe = 1). */
+export function unterfachGewicht(unterfach) {
+  return unterfach.gewicht > 0 ? unterfach.gewicht : 1;
+}
+
+/**
+ * Halbjahresnote eines Fachs mit Unterfächern: gewichteter Schnitt der
+ * Unterfach-Halbjahresnoten (jeweils inkl. deren Verrechnung/Endnote); noch
+ * nicht benotete Unterfächer zählen nicht mit.
+ */
+function berechneKompositionsnoten(fach, unterfaecher, halbjahr) {
+  const proUnterfach = unterfaecher.map((u) => ({ u, noten: berechneGesamtnoten(u.id, halbjahr) }));
+  const teilnehmer = getDb().prepare('SELECT schueler_id FROM fach_teilnehmer WHERE fach_id = ?').all(fach.id);
+  const ergebnis = new Map();
+  for (const { schueler_id: id } of teilnehmer) {
+    ergebnis.set(id, teilNote(proUnterfach.map(({ u, noten }) => ({ note: noten.get(id) ?? null, gewichtung: unterfachGewicht(u) }))));
+  }
+  return { ergebnis, proUnterfach };
+}
+
+/** Rein aus Klausuren/Unterrichtsleistung (bzw. den Unterfächern) berechnete Halbjahresnote (ohne Verrechnung, ohne Endnoten). */
 export function berechneRohnoten(fachId, halbjahr) {
   const fach = ladeFachMitUmfeld(fachId);
   const ergebnis = new Map();
   if (!fach) return ergebnis;
+  const unterfaecher = unterfaecherDesHalbjahrs(fach, halbjahr);
+  if (unterfaecher.length) return berechneKompositionsnoten(fach, unterfaecher, halbjahr).ergebnis;
   const db = getDb();
   // Teilnehmerliste statt "alle Schüler/innen der Klasse" -- deckt sowohl den
   // Normalfall (beim Anlegen mit der ganzen Heimat-Klasse vorbefüllt) als
@@ -234,6 +268,48 @@ export function berechneGesamtnoteEinerPerson(fachId, halbjahr, schuelerId) {
 }
 
 /**
+ * Notenübersicht eines Fachs, das sich im Halbjahr aus Unterfächern
+ * zusammensetzt: je Person die Note jedes Unterfachs und die gewichtete
+ * Fachnote (inkl. Verrechnung bzw. Endnote). Die Zeilen haben dieselbe Form
+ * wie bei direkt bewerteten Fächern, nur ohne Einzelleistungen.
+ */
+function ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler) {
+  const { ergebnis, proUnterfach } = berechneKompositionsnoten(fach, unterfaecher, halbjahr);
+  const verrechnungProzent = fach.spa_fach_key ? 0 : verrechnungsProzent(fach.klasse_id, halbjahr);
+  const vorhalbjahr = verrechnungProzent ? halbjahrText(halbjahrNr(halbjahr) - 1) : null;
+  const vorherNoten = verrechnungProzent ? berechneGesamtnoten(fach.id, vorhalbjahr) : new Map();
+  const endnoten = ladeEndnoten(fach.id, halbjahr);
+  const gesamtGewicht = proUnterfach.reduce((a, { u }) => a + unterfachGewicht(u), 0);
+  const rows = schueler.map((s) => {
+    const ohneVerrechnung = ergebnis.get(s.id) ?? null;
+    const vorherNote = vorherNoten.get(s.id) ?? null;
+    const berechnet = wendeVerrechnungAn(ohneVerrechnung, vorherNote, verrechnungProzent);
+    const endnote = endnoten.get(s.id) ?? null;
+    const gn = endnote ? (endnote.ntg ? null : endnote.note) : berechnet;
+    return {
+      schueler_id: s.id, nachname: s.nachname, vorname: s.vorname,
+      endnote, gesamtBerechnet: berechnet, gesamtOhneVerrechnung: ohneVerrechnung, vorhalbjahrNote: vorherNote,
+      herkunftKlasse: s.klasse_id === fach.klasse_id ? null : s.herkunft_klasse_name,
+      klausuren: [], uls: [], terminNoten: [], muendlich: [], schriftlich: [],
+      schriftlicheNote: null, datumsDurchschnitt: null, naAnzahl: 0, muendlicheNote: null,
+      unterfachNoten: proUnterfach.map(({ noten }) => noten.get(s.id) ?? null),
+      gesamt: gn,
+      nicht_bestanden: gn !== null ? nichtBestanden(gn, fach.notenschluessel === 'SPA' ? 'BG' : fach.notenschluessel) : false,
+    };
+  });
+  return {
+    schriftlichPct: 0, ulPct: 0, csvStr: getNotenschluesselCsv(fach), uls: [], termine: [], schueler, rows,
+    verrechnung: { prozent: verrechnungProzent, vorhalbjahr }, klausuren: [],
+    komposition: {
+      unterfaecher: proUnterfach.map(({ u }) => ({
+        id: u.id, name: u.name, kurzname: u.kurzname || u.name, gewicht: u.gewicht > 0 ? u.gewicht : null,
+        anteil: gesamtGewicht ? Math.round((unterfachGewicht(u) / gesamtGewicht) * 1000) / 10 : 0,
+      })),
+    },
+  };
+}
+
+/**
  * Vollständige Notenübersicht für ein Fach + Halbjahr — von der
  * SSR-Erstladung UND der JSON-Live-API (/teacher/fach/:id/noten) genutzt,
  * damit beide exakt dieselben Werte liefern.
@@ -258,6 +334,8 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     WHERE ft.fach_id = ?
     ORDER BY s.nachname, s.vorname
   `).all(fach.id);
+  const unterfaecher = unterfaecherDesHalbjahrs(fach, halbjahr);
+  if (unterfaecher.length) return ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler);
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
   const csvStr = getNotenschluesselCsv(fach);

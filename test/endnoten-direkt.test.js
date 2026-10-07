@@ -237,7 +237,7 @@ test('Klassen-Seite zeigt Halbjahres-Auswahl beim Anlegen und die Halbjahre je F
   assert.match(html, /Gilt in diesen Halbjahren/);
   assert.match(html, /name="halbjahre" value="5" checked/);
   assert.match(html, /name="halbjahre" value="1" >/);
-  assert.match(html, /<summary>3–4<\/summary>/);
+  assert.match(html, /<summary title="Halbjahre des Fachs ändern">3–4\. Hj\.<\/summary>/);
 });
 
 test.after(async () => {

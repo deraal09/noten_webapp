@@ -36,6 +36,9 @@ export function syncFach(fachId, halbjahr, userId) {
     `).run(fachId, halbjahr, userId);
   });
   tx();
+  // Ein Unterfach fließt in die Fachnote seines Elternfachs ein: dessen Stand mit aktualisieren.
+  const elternId = db.prepare('SELECT parent_fach_id FROM faecher WHERE id = ?').get(fachId)?.parent_fach_id;
+  if (elternId) syncFach(elternId, halbjahr, userId);
   // Fließt diese Halbjahresnote per Verrechnung ins nächste Halbjahr ein und
   // wurde dieses schon einmal synchronisiert, wird dessen Stand mit aktualisiert.
   const fach = db.prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
