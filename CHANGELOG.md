@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.72.0 - 2026-10-07
+
+- **Fächer-Vorlagen:** Neben „+ Neues Fach anlegen" gibt es auf der Klassenseite
+  zwei weitere Buttons. **„💾 Fächer als Vorlage speichern"** sichert die
+  gewählten Fächer samt Unterfächern, Halbjahren, Unterfach-Gewichten und
+  Verrechnung unter einem Namen. **„📥 Fächer aus Vorlage importieren"** legt
+  diese Fächer in jeder neuen Klasse mit demselben Notenschlüssel an
+  (bestehende Fächer bleiben unberührt; Halbjahre jenseits der Laufzeit der
+  Klasse entfallen). Die **Lehrkraftzuordnung ist nicht Teil der Vorlage** –
+  beim Import wird nur die importierende Person zugeordnet, alle anderen
+  ordnet die Klassenleitung neu zu. Vorlagen gehören der speichernden Lehrkraft
+  und lassen sich im Import-Dialog löschen.
+
 ## 0.71.0 - 2026-10-07
 
 - **„Fach abschließen" entfällt** (Button, Reiter und Routen zum Abschließen und

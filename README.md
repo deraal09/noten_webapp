@@ -305,6 +305,10 @@ im **aktuellen Halbjahr** nach Datum (in Tests ist „heute" eingefroren,
   `ntg`) ersetzt die berechnete Halbjahresnote. Fachseite: Button „Direkte
   Endnoteneingabe"; Klassenleitung: Reiter „Endnoten (Direkteingabe)" für
   vergangene Halbjahre. Eine Notenkonferenz-Sperre muss vorher aufgehoben werden.
+- **Fächer-Vorlagen:** Auf der Klassenseite lassen sich Fächer samt Unterfächern,
+  Halbjahren, Gewichten und Verrechnung als Vorlage speichern (je Lehrkraft und
+  Notenschlüssel, Tabellen `fach_vorlagen`/`fach_vorlagen_faecher`) und bei neuen
+  Klassen importieren -- ohne Lehrkraftzuordnung.
 - **Verrechnung:** `faecher.verrechnung` (JSON `{ "1": 50 }`) = Prozent der
   Note aus Halbjahr n, die in Halbjahr n+1 einfließen (Einstellung je Fach auf
   der Klassenseite, einklappbarer Abschnitt oberhalb der Fächer, Dialog je Fach;

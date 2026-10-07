@@ -352,6 +352,28 @@ CREATE TABLE IF NOT EXISTS fach_zuweisungen (
     UNIQUE (user_id, fach_id)
 );
 
+-- Fächer-Vorlagen (je Lehrkraft und Notenschlüssel): die Fächerstruktur einer
+-- Klasse (Fächer, Unterfächer, Halbjahre, Gewichte, Verrechnung) zum Wiederverwenden
+-- bei neuen Klassen -- bewusst OHNE Lehrkraftzuordnung (siehe src/fach-vorlagen.js).
+CREATE TABLE IF NOT EXISTS fach_vorlagen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    notenschluessel TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, notenschluessel, name)
+);
+
+CREATE TABLE IF NOT EXISTS fach_vorlagen_faecher (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vorlage_id INTEGER NOT NULL REFERENCES fach_vorlagen(id) ON DELETE CASCADE,
+    parent_id INTEGER REFERENCES fach_vorlagen_faecher(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    halbjahre TEXT,
+    gewicht REAL,
+    verrechnung TEXT
+);
+
 CREATE TABLE IF NOT EXISTS klassen_lehrkraefte (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

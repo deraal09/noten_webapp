@@ -6,6 +6,7 @@
 import { getDb } from '../db.js';
 import { formatZeitLokal, sortiereNachName } from '../format.js';
 import { setzeEndnote, notenBereich } from '../halbjahr-endnoten.js';
+import { ladeVorlagen, speicherbareFaecher, speichereVorlage, importiereVorlage, loescheVorlage } from '../fach-vorlagen.js';
 import {
   ladeUnterfaecher, UNTERFACH_TRENNER, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
   halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre,
@@ -1622,7 +1623,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
@@ -1925,6 +1926,42 @@ export default async function teacherRoutes(fastify) {
       }
     }
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
+  });
+
+  // ---------- Fächer-Vorlagen (siehe src/fach-vorlagen.js) ----------
+  const alsIdListe = (roh) => (Array.isArray(roh) ? roh : [roh]).map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n));
+
+  fastify.post('/klassen/:id/vorlagen/speichern', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userHatKlassenZugriff(request.user, klasse.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    const ergebnis = speichereVorlage(request.user.id, klasse, request.body?.name, alsIdListe(request.body?.fach_ids));
+    request.flash?.(ergebnis.ok ? 'success' : 'error', ergebnis.ok ? `Vorlage gespeichert (${ergebnis.anzahl} Fächer).` : ergebnis.fehler);
+    return reply.redirect(`/teacher/klassen/${klasse.id}#faecher-lehrkraefte`);
+  });
+
+  fastify.post('/klassen/:id/vorlagen/importieren', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userHatKlassenZugriff(request.user, klasse.id)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    const ergebnis = importiereVorlage(parseInt(request.body?.vorlage_id, 10), request.user.id, klasse, {
+      mitVerrechnung: userIstKlassenlehrer(request.user, klasse.id),
+    });
+    if (!ergebnis.ok) request.flash?.('error', ergebnis.fehler);
+    else {
+      const teile = [];
+      if (ergebnis.angelegt.length) teile.push(`${ergebnis.angelegt.length} Fächer importiert`);
+      if (ergebnis.uebersprungen.length) teile.push(`übersprungen, weil es sie schon gibt: ${ergebnis.uebersprungen.join(', ')}`);
+      request.flash?.(ergebnis.angelegt.length ? 'success' : 'error', `${teile.join('; ') || 'Die Vorlage enthält keine Fächer.'}. Lehrkräfte bitte neu zuordnen.`);
+    }
+    return reply.redirect(`/teacher/klassen/${klasse.id}#faecher-lehrkraefte`);
+  });
+
+  fastify.post('/vorlagen/:id/loeschen', async (request, reply) => {
+    loescheVorlage(parseInt(request.params.id, 10), request.user.id);
+    const klasseId = parseInt(request.body?.klasse_id, 10);
+    request.flash?.('success', 'Vorlage gelöscht.');
+    return reply.redirect(Number.isInteger(klasseId) ? `/teacher/klassen/${klasseId}#faecher-lehrkraefte` : '/teacher/klassen');
   });
 
   // Halbjahre ändern, in denen ein Fach gilt. Nicht entfernen, wenn in einem

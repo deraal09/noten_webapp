@@ -513,7 +513,73 @@ Meier, Carla"></textarea>
   <% if (!baum.length) { %><li class="hint">Noch keine Fächer.</li><% } %>
 </ul>
 
-<p><button type="button" id="fach-neu-knopf">+ Neues Fach anlegen</button></p>
+<p class="knopf-leiste">
+  <button type="button" id="fach-neu-knopf">+ Neues Fach anlegen</button>
+  <button type="button" id="vorlage-import-knopf">📥 Fächer aus Vorlage importieren</button>
+  <% if (speicherbareFaecher.length) { %><button type="button" id="vorlage-speichern-knopf">💾 Fächer als Vorlage speichern</button><% } %>
+</p>
+
+<dialog id="vorlage-import-dialog" class="notiz-dialog">
+  <h2>Fächer aus Vorlage importieren</h2>
+  <% if (!vorlagen.length) { %>
+    <p class="hint">Es gibt noch keine Vorlage für den Notenschlüssel <%= klasse.notenschluessel %>. Lege Fächer an und speichere sie mit „Fächer als Vorlage speichern".</p>
+  <% } else { %>
+    <p class="hint">
+      Importiert die Fächer (mit Unterfächern, Halbjahren und Gewichten) der gewählten Vorlage in diese Klasse.
+      Bereits vorhandene Fächer bleiben unverändert. Die Lehrkraftzuordnung ist nicht Teil der Vorlage –
+      du wirst den neuen Fächern zugeordnet, alle anderen ordnest du danach neu zu.
+    </p>
+    <% vorlagen.forEach(function(v) { %>
+      <div class="vorlage-eintrag">
+        <form method="post" action="/teacher/klassen/<%= klasse.id %>/vorlagen/importieren">
+          <input type="hidden" name="vorlage_id" value="<%= v.id %>">
+          <strong><%= v.name %></strong>
+          <div class="hint"><%= v.faecher.map(function(f) { return f.name + (f.unterfaecher.length ? ' (' + f.unterfaecher.join(', ') + ')' : ''); }).join(' · ') %></div>
+          <button type="submit">Importieren</button>
+        </form>
+        <form method="post" action="/teacher/vorlagen/<%= v.id %>/loeschen" class="inline" onsubmit="return confirm('Vorlage „<%= v.name.replace(/'/g, '') %>“ löschen?')">
+          <input type="hidden" name="klasse_id" value="<%= klasse.id %>">
+          <button type="submit" class="icon-knopf danger" title="Vorlage löschen" aria-label="Vorlage <%= v.name %> löschen">🗑</button>
+        </form>
+      </div>
+    <% }); %>
+  <% } %>
+  <div class="form-actions"><button type="button" data-vorlage-zu>Schließen</button></div>
+</dialog>
+
+<% if (speicherbareFaecher.length) { %>
+<dialog id="vorlage-speichern-dialog" class="notiz-dialog">
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/vorlagen/speichern">
+    <h2>Fächer als Vorlage speichern</h2>
+    <p class="hint">Speichert Fächer, Unterfächer, Halbjahre, Gewichte und Verrechnung – ohne Lehrkräfte. Eine Vorlage mit gleichem Namen wird ersetzt.</p>
+    <label>Name der Vorlage
+      <input type="text" name="name" maxlength="100" placeholder="z. B. Fachinformatiker 3 Jahre" required>
+    </label>
+    <fieldset class="hj-auswahl"><legend>Fächer</legend>
+      <% speicherbareFaecher.forEach(function(f) { %>
+        <label class="hj-check"><input type="checkbox" name="fach_ids" value="<%= f.id %>" checked> <%= f.name %></label>
+      <% }); %>
+    </fieldset>
+    <div class="form-actions">
+      <button type="submit">Als Vorlage speichern</button>
+      <button type="button" data-vorlage-zu>Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+<% } %>
+<script>
+  (function() {
+    function oeffne(knopfId, dialogId) {
+      var k = document.getElementById(knopfId), d = document.getElementById(dialogId);
+      if (k && d) k.addEventListener('click', function() { d.showModal(); });
+    }
+    oeffne('vorlage-import-knopf', 'vorlage-import-dialog');
+    oeffne('vorlage-speichern-knopf', 'vorlage-speichern-dialog');
+    document.querySelectorAll('[data-vorlage-zu]').forEach(function(b) {
+      b.addEventListener('click', function() { b.closest('dialog').close(); });
+    });
+  })();
+</script>
 
 <dialog id="fach-neu-dialog" class="notiz-dialog">
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/faecher/neu">
