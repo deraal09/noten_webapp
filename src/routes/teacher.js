@@ -184,6 +184,17 @@ function alsGueltigesDatumOderNull(wert) {
 const KLASSE_VERWALTEN_NUR = 'Das darf nur die Klassenleitung, die Lehrkraft, die die Klasse angelegt hat, oder der Admin — '
   + 'es betrifft auch Fächer und Noten anderer Lehrkräfte.';
 
+/** Namen aller eingetragenen Klassenlehrkräfte einer Klasse (beide Quellen, siehe userIstKlassenlehrer), alphabetisch. */
+function ladeKlassenleitungNamen(klasseId) {
+  const rows = getDb().prepare(`
+    SELECT u.display_name, u.username FROM users u WHERE u.id IN (
+      SELECT user_id FROM klassenleitung WHERE klasse_id = ?
+      UNION SELECT user_id FROM klassen_lehrkraefte WHERE klasse_id = ?
+    )
+  `).all(klasseId, klasseId);
+  return sortiereNachName(rows.map((r) => ({ name: r.display_name || r.username }))).map((r) => r.name);
+}
+
 /**
  * Verrechnung aus einem Formular (p_<n> = Prozent der Note aus Halbjahr n, die in n+1 einfließen).
  * @returns {{werte: Object<string, number>} | {fehler: string}} leere Felder und 0 zählen nicht
@@ -1646,7 +1657,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), klassenleitungNamen: klasse.ist_ablage ? [] : ladeKlassenleitungNamen(klasse.id), vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),

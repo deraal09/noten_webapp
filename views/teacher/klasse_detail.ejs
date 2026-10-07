@@ -1,4 +1,10 @@
 <h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
+<% if (!klasse.ist_ablage) { %>
+  <p class="klassenleitung-zeile">
+    🎓 <strong>Klassenleitung:</strong>
+    <% if (klassenleitungNamen.length) { %><%= klassenleitungNamen.join(', ') %><% } else { %><span class="hint">noch niemand eingetragen</span><% } %>
+  </p>
+<% } %>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
   <% if (!klasse.ist_ablage) { %><a class="btn" href="/teacher#klasse-<%= klasse.id %>">📝 Noteneingabe</a><% } %>

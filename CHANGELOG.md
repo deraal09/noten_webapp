@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.76.0 - 2026-10-07
+
+- Klassenansicht („Meine Klassen"): In der obersten Zeile unter dem Titel steht
+  für alle mit Zugriff auf die Klasse, **wer als Klassenleitung eingetragen
+  ist** (alle Klassenlehrkräfte, alphabetisch) bzw. „noch niemand eingetragen".
+
 ## 0.75.0 - 2026-10-07
 
 - Fächer aus Vorlage importieren: ab zwei Vorlagen gibt es oben im Dialog ein

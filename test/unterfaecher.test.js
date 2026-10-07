@@ -327,6 +327,21 @@ test('Teilnehmer: nicht mehr in der Noteneingabe, Verwaltung über die Klassense
   assert.equal((await admin(`/teacher/fach/${f}/teilnehmer`)).status, 200);
 });
 
+test('Klassenseite zeigt oben für alle, wer als Klassenleitung eingetragen ist', async () => {
+  const sj = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(klasseId).schuljahr_id;
+  const k = getDb().prepare('INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id) VALUES (?, ?, ?, ?, ?)')
+    .run(sj, 'KL1', 'IHK', '', getDb().prepare("SELECT id FROM users WHERE username = 'fremd'").get().id).lastInsertRowid;
+  getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES ((SELECT id FROM users WHERE username = ?), (SELECT id FROM faecher WHERE klasse_id = ? LIMIT 1))')
+    .run('lehrer', getDb().prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(k, 'Fach').lastInsertRowid && k);
+  let html = await (await lehrer(`/teacher/klassen/${k}`)).text();
+  assert.match(html, /<strong>Klassenleitung:<\/strong>\s*<span class="hint">noch niemand eingetragen<\/span>/);
+  assert.ok(html.indexOf('klassenleitung-zeile') < html.indexOf('class="kopf-aktionen"'), 'oberste Zeile direkt unter dem Titel');
+  getDb().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(k, getDb().prepare("SELECT id FROM users WHERE username = 'fremd'").get().id);
+  getDb().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(k, getDb().prepare("SELECT id FROM users WHERE username = 'lehrer'").get().id);
+  html = await (await lehrer(`/teacher/klassen/${k}`)).text();
+  assert.match(html, /<strong>Klassenleitung:<\/strong>\s*fremd, lehrer/, 'alle Eingetragenen, auch für Lehrkräfte ohne Klassenleitung sichtbar');
+});
+
 test.after(async () => {
   await fastify.close();
 });
