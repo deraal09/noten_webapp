@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.66.0 - 2026-10-07
+
+- Noteneingabe: Oben gibt es einen **Klassenfilter** (Auswahl „Alle Klassen",
+  einzelne Klasse oder „Kurse"), sobald Fächer in mehr als einer Klasse bzw.
+  in Klassen und Kursen liegen. Die Auswahl wird im Browser gemerkt.
+
 ## 0.65.0 - 2026-10-07
 
 - Fächer werden **alphabetisch** sortiert (deutsche Sortierung: Groß-/Klein-

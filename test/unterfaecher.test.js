@@ -231,6 +231,23 @@ test('Fächer werden alphabetisch sortiert (deutsch: Groß-/Kleinschreibung egal
   assert.ok(vergleicheNamen('b', 'A') > 0);
 });
 
+test('Noteneingabe: Klassenfilter oben, sobald Fächer in mehreren Klassen/Kursen liegen', async () => {
+  const einzel = await (await lehrer('/teacher')).text();
+  assert.doesNotMatch(einzel, /id="klassenfilter"/, 'bei nur einer Klasse kein Filter');
+  const sj = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(klasseId).schuljahr_id;
+  await form(admin, '/teacher/klassen/neu', { schuljahr_id: String(sj), name: '11B', notenschluessel: 'IHK' });
+  const b = getDb().prepare("SELECT id FROM klassen WHERE name = '11B'").get().id;
+  await form(admin, `/teacher/klassen/${b}/faecher/neu`, { name: 'Sport' });
+  const sport = getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ?').get(b).id;
+  getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES ((SELECT id FROM users WHERE username = ?), ?)').run('fremd', sport);
+  const html = await (await fremd('/teacher')).text();
+  assert.match(html, /<select id="klassenfilter">\s*<option value="">Alle Klassen<\/option>/);
+  assert.match(html, new RegExp(`<option value="klasse-${b}">11B`));
+  assert.match(html, new RegExp(`<option value="klasse-${klasseId}">11A`));
+  assert.match(html, new RegExp(`data-gruppe="klasse-${b}"`));
+  assert.ok(html.indexOf('id="klassenfilter"') < html.indexOf('class="klassen-gruppe"'), 'Filter steht oberhalb der Klassen');
+});
+
 test.after(async () => {
   await fastify.close();
 });
