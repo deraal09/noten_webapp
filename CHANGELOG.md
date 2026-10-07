@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.75.0 - 2026-10-07
+
+- Fächer aus Vorlage importieren: ab zwei Vorlagen gibt es oben im Dialog ein
+  **Filterfeld**. Es durchsucht Vorlagenname, Fächer und Unterfächer (mehrere
+  Suchbegriffe müssen alle passen) und blendet nicht passende Vorlagen aus; das
+  Feld ist beim Öffnen sofort bedienbar.
+
 ## 0.74.0 - 2026-10-07
 
 - **Mehrere Schüler/innen auf einmal:** Neben dem Komma sind jetzt auch

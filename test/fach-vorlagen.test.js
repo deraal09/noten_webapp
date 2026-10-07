@@ -128,6 +128,18 @@ test('Vorlagen sind je Notenschlüssel und je Lehrkraft; Löschen nur eigener Vo
   assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM fach_vorlagen_faecher').get().c, 0, 'Einträge verschwinden mit der Vorlage');
 });
 
+test('Import-Dialog: Filter erscheint ab zwei Vorlagen und durchsucht Name und Fächer', async () => {
+  await form(admin, `/teacher/klassen/${klasseA}/vorlagen/speichern`, { name: 'Informatik 3 Jahre', fach_ids: [String(fachNamed(klasseA, 'Mathe').id)] });
+  let html = await (await admin(`/teacher/klassen/${klasseB}`)).text();
+  assert.doesNotMatch(html, /id="vorlage-filter"/, 'bei nur einer Vorlage kein Filter');
+  await form(admin, `/teacher/klassen/${klasseA}/vorlagen/speichern`, { name: 'Pflege', fach_ids: [String(fachNamed(klasseA, 'Deutsch').id)] });
+  html = await (await admin(`/teacher/klassen/${klasseB}`)).text();
+  assert.match(html, /<input type="search" id="vorlage-filter"/);
+  assert.match(html, /data-suche="informatik 3 jahre mathe /);
+  assert.match(html, /data-suche="pflege deutsch lesen/, 'Fachnamen und Unterfächer sind durchsuchbar');
+  assert.match(html, /id="vorlage-filter-leer" hidden/);
+});
+
 test.after(async () => {
   await fastify.close();
 });

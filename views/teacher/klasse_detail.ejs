@@ -545,8 +545,14 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
       Bereits vorhandene Fächer bleiben unverändert. Die Lehrkraftzuordnung ist nicht Teil der Vorlage –
       du wirst den neuen Fächern zugeordnet, alle anderen ordnest du danach neu zu.
     </p>
+    <% if (vorlagen.length > 1) { %>
+      <label class="vorlage-filter">Vorlagen filtern
+        <input type="search" id="vorlage-filter" placeholder="Name oder Fach, z. B. Informatik" autocomplete="off">
+      </label>
+      <p class="hint" id="vorlage-filter-leer" hidden>Keine passende Vorlage.</p>
+    <% } %>
     <% vorlagen.forEach(function(v) { %>
-      <div class="vorlage-eintrag">
+      <div class="vorlage-eintrag" data-suche="<%= (v.name + ' ' + v.faecher.map(function(f) { return f.name + ' ' + f.unterfaecher.join(' '); }).join(' ')).toLowerCase() %>">
         <form method="post" action="/teacher/klassen/<%= klasse.id %>/vorlagen/importieren">
           <input type="hidden" name="vorlage_id" value="<%= v.id %>">
           <strong><%= v.name %></strong>
@@ -591,6 +597,21 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
     }
     oeffne('vorlage-import-knopf', 'vorlage-import-dialog');
     oeffne('vorlage-speichern-knopf', 'vorlage-speichern-dialog');
+    var filter = document.getElementById('vorlage-filter');
+    if (filter) {
+      var hinweis = document.getElementById('vorlage-filter-leer');
+      filter.addEventListener('input', function() {
+        var begriffe = filter.value.toLowerCase().split(/\s+/).filter(Boolean);
+        var treffer = 0;
+        document.querySelectorAll('.vorlage-eintrag').forEach(function(e) {
+          var passt = begriffe.every(function(b) { return (e.dataset.suche || '').indexOf(b) !== -1; });
+          e.hidden = !passt;
+          if (passt) treffer++;
+        });
+        hinweis.hidden = treffer > 0;
+      });
+      document.getElementById('vorlage-import-knopf').addEventListener('click', function() { setTimeout(function() { filter.focus(); }, 0); });
+    }
     document.querySelectorAll('[data-vorlage-zu]').forEach(function(b) {
       b.addEventListener('click', function() { b.closest('dialog').close(); });
     });

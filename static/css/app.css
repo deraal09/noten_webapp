@@ -652,3 +652,6 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .knopf-leiste { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .vorlage-eintrag { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 0; border-top: 1px solid var(--border-subtle); }
 .vorlage-eintrag > form:first-child { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+.vorlage-filter { display: block; margin: 0.5rem 0; }
+.vorlage-filter input { width: 100%; min-height: 2.75rem; font-size: 1rem; padding: 0.5rem 0.7rem; }
+.vorlage-eintrag[hidden] { display: none; }
