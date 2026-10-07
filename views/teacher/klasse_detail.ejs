@@ -93,13 +93,29 @@
 </div>
 
 <div id="schueler-mehrere" class="reiter-panel unter-panel card">
-  <p class="hint">Eine Zeile je Person, Format: <code>Nachname, Vorname</code></p>
+  <p class="hint">
+    Eine Zeile je Person, immer <strong>Nachname zuerst</strong>, getrennt durch Komma, Semikolon, Tab oder Leerzeichen
+    (z. B. <code>Müller, Anna</code>, <code>Müller Anna</code> oder aus einer Tabelle kopiert).
+    Bei Doppelnamen bitte ein <strong>Komma direkt nach dem Nachnamen</strong> setzen
+    (<code>Müller Schmidt, Anna Maria</code>) – sonst ist nicht erkennbar, wo der Nachname endet.
+  </p>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/bulk">
-    <textarea name="text" rows="6" placeholder="Müller, Anna
-Schmidt, Bernd
-Meier, Carla"></textarea>
+    <textarea name="text" rows="6" id="bulk-text" placeholder="Müller, Anna
+Schmidt Bernd
+Meier;Carla"><%= bulkVorbelegung %></textarea>
     <button type="submit">Alle anlegen</button>
   </form>
+  <% if (bulkVorbelegung) { %>
+    <script>
+      // Zur Korrektur zurückgegebene Zeilen: direkt dieses Register öffnen.
+      document.addEventListener('DOMContentLoaded', function() {
+        var knopf = document.querySelector('.unter-reiter button[data-target="schueler-mehrere"]');
+        if (knopf) knopf.click();
+        var feld = document.getElementById('bulk-text');
+        if (feld) { feld.focus(); feld.setSelectionRange(0, 0); }
+      });
+    </script>
+  <% } %>
 </div>
 
 <div id="schueler-csv" class="reiter-panel unter-panel card">

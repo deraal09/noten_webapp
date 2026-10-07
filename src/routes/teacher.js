@@ -6,6 +6,7 @@
 import { getDb } from '../db.js';
 import { formatZeitLokal, sortiereNachName } from '../format.js';
 import { setzeEndnote, notenBereich } from '../halbjahr-endnoten.js';
+import { erkenneSchuelerZeile } from '../schueler-eingabe.js';
 import { ladeVorlagen, speicherbareFaecher, speichereVorlage, importiereVorlage, loescheVorlage } from '../fach-vorlagen.js';
 import {
   ladeUnterfaecher, UNTERFACH_TRENNER, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
@@ -1645,7 +1646,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
@@ -1798,17 +1799,29 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const text = String(request.body?.text || '');
+    // Zeilen mit unklarer Namensreihenfolge (Doppelnamen ohne Komma) werden nicht angelegt, sondern zur Korrektur zurückgegeben.
+    const mehrdeutig = [];
     const tx = getDb().transaction((lines) => {
       let uebersprungen = 0;
+      let angelegt = 0;
       for (const line of lines) {
-        const [nn, vn] = line.split(',', 2).map((s) => s.trim());
-        if (!nn) continue;
-        if (!fuegeSchuelerHinzuFallsNeu(request.params.id, nn, vn || '')) uebersprungen++;
+        const e = erkenneSchuelerZeile(line);
+        if (e.typ === 'leer') continue;
+        if (e.typ === 'mehrdeutig') { mehrdeutig.push(e.zeile); continue; }
+        if (fuegeSchuelerHinzuFallsNeu(request.params.id, e.nachname, e.vorname)) angelegt++;
+        else uebersprungen++;
       }
-      return uebersprungen;
+      return { uebersprungen, angelegt };
     });
-    const uebersprungen = tx(text.split(/\r?\n/));
+    const { uebersprungen, angelegt } = tx(text.split(/\r?\n/));
     if (uebersprungen) request.flash?.('info', `${uebersprungen} bereits vorhandene(r) Schüler/in übersprungen — nicht doppelt angelegt.`);
+    if (mehrdeutig.length) {
+      request.flash?.('error', `Bei ${mehrdeutig.length === 1 ? 'dieser Zeile' : 'diesen Zeilen'} ist nicht sicher erkennbar, was Nach- und Vorname ist (Doppelname?): `
+        + `${mehrdeutig.map((z) => `„${z}“`).join(', ')}. Bitte direkt nach dem Nachnamen ein Komma setzen, z. B. „Müller Schmidt, Anna“. `
+        + `${mehrdeutig.length === 1 ? 'Die Zeile steht' : 'Die Zeilen stehen'} unten im Feld „Mehrere auf einmal" zur Korrektur bereit`
+        + `${angelegt ? `; die übrigen ${angelegt} wurden angelegt` : ''}.`);
+      return reply.redirect(`/teacher/klassen/${request.params.id}?bulk=${encodeURIComponent(mehrdeutig.join('\n').slice(0, 2000))}`);
+    }
     return reply.redirect(`/teacher/klassen/${request.params.id}`);
   });
 

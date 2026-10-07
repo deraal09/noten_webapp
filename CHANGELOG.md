@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.74.0 - 2026-10-07
+
+- **Mehrere Schüler/innen auf einmal:** Neben dem Komma sind jetzt auch
+  **Semikolon, Tab und Leerzeichen** als Trenner zwischen Nach- und Vorname
+  erlaubt (immer Nachname zuerst) -- z. B. aus einer Tabelle kopiert.
+  Nach einem Komma/Semikolon/Tab ist alles Weitere der Vorname (auch mehrteilig).
+- **Doppelnamen-Erkennung:** Zeilen nur mit Leerzeichen und mehr als zwei Wörtern
+  (z. B. „Müller Schmidt Anna") sind nicht eindeutig. Sie werden nicht
+  angelegt, sondern mit Hinweis angezeigt: bitte direkt nach dem Nachnamen ein
+  Komma setzen („Müller Schmidt, Anna"). Die Zeilen stehen im Feld zur
+  Korrektur bereit, alle übrigen Personen werden sofort angelegt.
+
 ## 0.73.1 - 2026-10-07
 
 - Fix: Dieselbe Klasse konnte **doppelt** entstehen (zwei Klassen mit gleichem
