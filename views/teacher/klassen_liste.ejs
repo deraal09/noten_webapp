@@ -28,7 +28,7 @@
   <% } else if (!schuljahre.length) { %>
     <p>Noch kein Schuljahr angelegt. Bitte den Admin bitten, zuerst ein Schuljahr anzulegen.</p>
   <% } else { %>
-    <% var hatBekannteNamen = bekannteKlassennamen.length > 0; %>
+    <% var hatBekannteNamen = vorhandeneKlassen.length > 0; %>
     <div class="reiter unter-reiter" data-storage-key="klassen-anlegen-modus">
       <% if (hatBekannteNamen) { %>
         <button type="button" class="active" data-target="klasse-anlegen-vorhanden">Vorhandene Klasse wählen</button>
@@ -38,58 +38,20 @@
 
     <% if (hatBekannteNamen) { %>
       <div id="klasse-anlegen-vorhanden" class="reiter-panel unter-panel card active">
+        <p class="hint">
+          Eine bereits angelegte Klasse auswählen und ihr beitreten. Schuljahr, Notenschlüssel, Einschulungsjahr
+          und Anzahl der Schuljahre werden von dieser Klasse übernommen und lassen sich hier nicht ändern.
+        </p>
         <form method="post" action="/teacher/klassen/neu">
-          <label>Schuljahr
-            <select name="schuljahr_id">
-              <% schuljahre.forEach(function(s) { %>
-                <option value="<%= s.id %>"><%= s.bezeichnung %></option>
-              <% }); %>
-            </select>
-          </label>
           <label>Klasse
-            <select name="name" required>
+            <select name="vorhandene_klasse_id" required>
               <option value="">— wählen —</option>
-              <% bekannteKlassennamen.forEach(function(n) { %>
-                <option value="<%= n %>"><%= n %></option>
+              <% vorhandeneKlassen.forEach(function(k) { %>
+                <option value="<%= k.id %>"><%= k.name %> (<%= k.schuljahr_bezeichnung %>, <%= k.notenschluessel %>)</option>
               <% }); %>
             </select>
           </label>
-          <label>Notenschlüssel
-            <select name="notenschluessel" class="ns-auswahl">
-              <option value="IHK" selected>IHK (1–6)</option>
-              <option value="BG">BG (0–15 Punkte)</option>
-              <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
-            </select>
-          </label>
-          <label>Einschulungsjahr (optional)
-          <select name="einschulung_jahr">
-            <option value="">wie gewähltes Schuljahr</option>
-            <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
-          </select>
-        </label>
-        <label>Anzahl Jahre an der Schule (optional)
-          <select name="anzahl_jahre">
-            <option value="">Standard (SPA 2 Jahre, sonst 3 Jahre)</option>
-            <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>"><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
-          </select>
-        </label>
-        <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>
-          <div class="spa-bildungsgang-auswahl" style="display:none;">
-            <p class="hint">
-              SPA-Klassen laufen durchgehend über 4 Halbjahre (2 Schuljahre) mit fest vorgegebenen
-              Lernfeldern/Fächern — der Bildungsgang bestimmt, welche Fächer/Gewichte gelten, und
-              lässt sich danach nicht mehr ändern.
-            </p>
-            <% bildungsgaenge.forEach(function(bg) { %>
-              <label><input type="radio" name="spa_bildungsgang" value="<%= bg.schluessel %>"> <%= bg.bezeichnung %></label>
-            <% }); %>
-          </div>
-          <label>
-            <input type="checkbox" name="offen_fuer_beitritt" value="1">
-            Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben
-            Klassennamen anlegt, bekommt sofort Zugriff, ohne Rückfrage)
-          </label>
-          <button type="submit">+ Klasse anlegen</button>
+          <button type="submit">Klasse wählen</button>
         </form>
       </div>
     <% } %>
@@ -138,7 +100,7 @@
           <% }); %>
         </div>
         <label>
-          <input type="checkbox" name="offen_fuer_beitritt" value="1">
+          <input type="checkbox" name="offen_fuer_beitritt" value="1" checked>
           Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben
           Klassennamen anlegt, bekommt sofort Zugriff, ohne Rückfrage)
         </label>

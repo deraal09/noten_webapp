@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.73.0 - 2026-10-07
+
+- „Neue Klasse anlegen" → **„Vorhandene Klasse wählen"**: Es gibt nur noch die
+  Auswahl bereits vorhandener Klassen (Name, Schuljahr, Notenschlüssel; ohne die
+  eigenen). Schuljahr, Notenschlüssel, Einschulungsjahr und Anzahl der
+  Schuljahre kommen von der gewählten Klasse und lassen sich dort nicht mehr
+  einstellen; auch das Freigabe-Häkchen entfällt, da die Klasse schon freigegeben
+  ist. Die Auswahl führt in den Beitritt zu dieser Klasse.
+- Bei **„Neue Klasse anlegen"** ist der Haken „Automatisch für andere Lehrkräfte
+  freigeben" jetzt standardmäßig gesetzt.
+
 ## 0.72.0 - 2026-10-07
 
 - **Fächer-Vorlagen:** Neben „+ Neues Fach anlegen" gibt es auf der Klassenseite

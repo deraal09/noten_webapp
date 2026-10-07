@@ -1107,18 +1107,19 @@ export default async function teacherRoutes(fastify) {
     for (const sj of schuljahreReiter) kurseNachSchuljahr.set(sj.id, []);
     for (const k of kurse) kurseNachSchuljahr.get(k.schuljahr_id)?.push(k);
 
-    // Alle im System bereits verwendeten Klassennamen, schuljahresübergreifend
-    // -- Vorschlagsliste beim Anlegen, damit dieselbe Klasse in einem neuen
-    // Schuljahr konsistent geschrieben wird (z. B. immer "12BFI1"), statt sie
-    // jedes Mal neu einzutippen. Kurs-Hüllen (siehe /kurse/neu) sind keine
-    // echten Klassen und tauchen hier daher nicht auf.
-    const bekannteKlassennamen = db.prepare('SELECT DISTINCT name FROM klassen WHERE ist_kurs_huelle = 0 AND ist_ablage = 0 ORDER BY name').all()
-      .map((r) => r.name);
+    // Bereits vorhandene Klassen (aller Lehrkräfte), denen man noch nicht angehört -- "Vorhandene Klasse wählen"
+    // übernimmt Schuljahr, Notenschlüssel, Einschulungsjahr und Laufzeit dieser Klasse unverändert und führt
+    // in den Beitritt (siehe klassen-verknuepfung.js). Kurs-Hüllen sind keine echten Klassen.
+    const vorhandeneKlassen = db.prepare(`
+      SELECT k.id, k.name, k.notenschluessel, s.bezeichnung AS schuljahr_bezeichnung
+      FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id
+      WHERE k.ist_kurs_huelle = 0 AND k.ist_ablage = 0 ORDER BY s.bezeichnung DESC, k.name
+    `).all().filter((k) => !userHatKlassenZugriff(request.user, k.id));
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
       user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen: sichtbareKlassen,
       kurseNachSchuljahr, bildungsgaenge: BILDUNGSGAENGE, jahresOptionen: jahresOptionen(),
-      kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), bekannteKlassennamen,
+      kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), vorhandeneKlassen,
     });
   });
 
@@ -1126,6 +1127,19 @@ export default async function teacherRoutes(fastify) {
     if (!userDarfSelbstKlasseAnlegen(request.user)) {
       request.flash?.('error', 'Nur Lehrkräfte mit LDAP-Zugang können eigene Klassen anlegen. Bitte eine Klassenleitung oder den Admin bitten, dich einem Fach zuzuweisen.');
       return reply.redirect('/teacher/klassen');
+    }
+    // "Vorhandene Klasse wählen": nichts wird neu angelegt oder eingestellt -- Schuljahr, Notenschlüssel,
+    // Einschulungsjahr und Laufzeit gehören der bestehenden Klasse, man tritt ihr bei.
+    if (request.body?.vorhandene_klasse_id !== undefined) {
+      const vorhanden = getDb().prepare('SELECT id FROM klassen WHERE id = ? AND ist_kurs_huelle = 0 AND ist_ablage = 0')
+        .get(parseInt(request.body.vorhandene_klasse_id, 10));
+      if (!vorhanden) {
+        request.flash?.('error', 'Bitte eine vorhandene Klasse auswählen.');
+        return reply.redirect('/teacher/klassen');
+      }
+      return reply.redirect(userHatKlassenZugriff(request.user, vorhanden.id)
+        ? `/teacher/klassen/${vorhanden.id}`
+        : `/teacher/klassen/${vorhanden.id}/verknuepfen`);
     }
     const schuljahrId = parseInt(request.body?.schuljahr_id, 10);
     const name = String(request.body?.name || '').trim();

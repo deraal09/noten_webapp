@@ -96,11 +96,11 @@ test('Vorbereitung: Admin, Schuljahr, drei LDAP-Lehrkräfte', async () => {
   }
 });
 
-test('Die Freigabe für automatischen Beitritt ist beim Anlegen nicht vorbelegt', async () => {
+test('Die Freigabe für automatischen Beitritt ist beim Anlegen einer neuen Klasse vorbelegt (Haken gesetzt)', async () => {
   const html = await (await ersteller('/teacher/klassen')).text();
   const checkboxen = html.match(/<input[^>]*name="offen_fuer_beitritt"[^>]*>/g) || [];
   assert.ok(checkboxen.length >= 1, 'Testannahme: das Anlegeformular hat die Checkbox');
-  for (const c of checkboxen) assert.ok(!/\bchecked\b/.test(c), `vorbelegt: ${c}`);
+  for (const c of checkboxen) assert.ok(/\bchecked\b/.test(c), `nicht vorbelegt: ${c}`);
 });
 
 test('Ohne Freigabe kann niemand einfach beitreten', async () => {

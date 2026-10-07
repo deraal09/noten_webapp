@@ -93,28 +93,44 @@ test('"Neue Klasse anlegen" ist als Reiter-Button neben "Neuen Kurs anlegen" vor
   assert.match(html, /<div id="panel-klasse-anlegen" class="reiter-panel">/);
 });
 
-test('Klasse anlegen: Register "Vorhandene Klasse wählen" (Select mit bekannten Namen) vor "Neue Klasse anlegen"', async () => {
-  // Aus der Vorbereitung existieren bereits die Klassen "9A" und "5B".
-  const html = await (await lehrerA('/teacher/klassen')).text();
+test('Klasse anlegen: Register "Vorhandene Klasse wählen" (Auswahl vorhandener Klassen, ohne weitere Einstellungen) vor "Neue Klasse anlegen"', async () => {
+  // Aus der Vorbereitung existieren bereits die Klassen "9A" und "5B" (von Lehrer A) -- eine zweite LDAP-Lehrkraft wählt eine davon.
+  const lehrerB = client();
+  await form(admin, '/admin/einladungen/neu', { display_name: 'Lehrer B', ttl_days: '14' });
+  const inv = getDb().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
+  await form(lehrerB, `/einladung/${inv.token}`, { username: 'lehrerb', display_name: 'Lehrer B', password: 'passwortB1', password2: 'passwortB1' });
+  getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrerb'").run();
+
+  const html = await (await lehrerB('/teacher/klassen')).text();
   const anlegenBlock = html.slice(html.indexOf('data-storage-key="klassen-anlegen-modus"'), html.indexOf('<h2>Vorhandene Klassen</h2>'));
 
   const buttonZiele = Array.from(anlegenBlock.matchAll(/data-target="([^"]+)"/g)).map((m) => m[1]);
   assert.deepEqual(buttonZiele, ['klasse-anlegen-vorhanden', 'klasse-anlegen-neu'],
     '"Vorhandene Klasse wählen" muss vor "Neue Klasse anlegen" stehen');
-  assert.match(anlegenBlock, /id="klasse-anlegen-vorhanden" class="reiter-panel unter-panel card active"/,
-    'das Register mit den bekannten Namen ist initial aktiv');
+  assert.match(anlegenBlock, /id="klasse-anlegen-vorhanden" class="reiter-panel unter-panel card active"/);
   assert.match(anlegenBlock, /id="klasse-anlegen-neu" class="reiter-panel unter-panel card"/);
 
-  // Select im ersten Register enthält beide bereits bekannten Klassennamen.
   const selectStart = anlegenBlock.indexOf('id="klasse-anlegen-vorhanden"');
   const selectEnde = anlegenBlock.indexOf('id="klasse-anlegen-neu"');
-  const selectBlock = anlegenBlock.slice(selectStart, selectEnde);
-  assert.match(selectBlock, /<option value="9A">9A<\/option>/);
-  assert.match(selectBlock, /<option value="5B">5B<\/option>/);
+  const vorhandenBlock = anlegenBlock.slice(selectStart, selectEnde);
+  const k9A = getDb().prepare("SELECT id FROM klassen WHERE name = '9A'").get().id;
+  const k5B = getDb().prepare("SELECT id FROM klassen WHERE name = '5B'").get().id;
+  assert.match(vorhandenBlock, new RegExp(`<option value="${k9A}">9A \\(${bezAktuell}, IHK\\)</option>`));
+  assert.match(vorhandenBlock, new RegExp(`<option value="${k5B}">5B`));
+  // Nur die Auswahl: keine Einstellungen für Schuljahr/Notenschlüssel/Einschulung/Laufzeit/Freigabe
+  assert.doesNotMatch(vorhandenBlock, /name="(schuljahr_id|notenschluessel|einschulung_jahr|anzahl_jahre|offen_fuer_beitritt|name)"/);
 
-  // Freies Textfeld für einen neuen Namen bleibt im zweiten Register erhalten.
+  // Freies Textfeld für einen neuen Namen und die vorbelegte Freigabe nur im zweiten Register.
   const neuBlock = anlegenBlock.slice(selectEnde);
   assert.match(neuBlock, /<input type="text" name="name" placeholder="z\. B\. 12BFI1" required>/);
+  assert.match(neuBlock, /name="offen_fuer_beitritt" value="1" checked/);
+
+  // Auswahl führt in den Beitritt der bestehenden Klasse (nichts wird neu angelegt)
+  const vorher = getDb().prepare('SELECT COUNT(*) AS c FROM klassen').get().c;
+  const r = await form(lehrerB, '/teacher/klassen/neu', { vorhandene_klasse_id: String(k9A) });
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${k9A}/verknuepfen`);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM klassen').get().c, vorher);
+  assert.equal((await form(lehrerB, '/teacher/klassen/neu', { vorhandene_klasse_id: '99999' })).headers.get('location'), '/teacher/klassen');
 });
 
 test('Der Untis-Import wurde entfernt (Route existiert nicht mehr)', async () => {
