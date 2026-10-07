@@ -439,6 +439,33 @@ test('Direkteingabe der Klassenleitung: Fächer ohne Lehrkraft jederzeit, mit Le
   assert.equal(neu.status, 200);
 });
 
+test('Halbjahresübersicht zeigt direkt eingetragene Endnoten der Klassenleitung auch ohne Sync (Fach ohne Lehrkraft bzw. von der Klassenleitung eingetragen)', async () => {
+  const { ladeHalbjahresuebersicht } = await import('../src/noten-sync.js');
+  const db = getDb();
+  const klasse = db.prepare("SELECT * FROM klassen WHERE name = 'SJA'").get();
+  const adminId = db.prepare("SELECT id FROM users WHERE username = 'admin'").get().id;
+  const fremdId = db.prepare("SELECT id FROM users WHERE username = 'fremd'").get().id;
+  const sid = (n) => db.prepare('INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, ?, ?)').run(klasse.id, n, 'X').lastInsertRowid;
+  const [s1, s2, s3] = [sid('Eins'), sid('Zwei'), sid('Drei')];
+  const mkFach = (name) => {
+    const f = db.prepare('INSERT INTO faecher (klasse_id, name) VALUES (?, ?)').run(klasse.id, name).lastInsertRowid;
+    for (const s of [s1, s2, s3]) db.prepare('INSERT INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)').run(f, s);
+    return f;
+  };
+  const leer = mkFach('Leer'); const mitLehrkraft = mkFach('MitLehrkraft');
+  db.prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(fremdId, mitLehrkraft);
+  const direkt = (fach, s, note, von) => db.prepare("INSERT INTO halbjahr_endnoten (fach_id, schueler_id, halbjahr, note, ntg, eingetragen_von_id) VALUES (?, ?, '1. Halbjahr', ?, 0, ?)").run(fach, s, note, von);
+  direkt(leer, s1, 2, fremdId); // Fach ohne Lehrkraft: zählt, egal wer es eingetragen hat
+  direkt(mitLehrkraft, s1, 3, adminId); // Klassenleitung (Admin) trägt ein: zählt
+  direkt(mitLehrkraft, s2, 5, fremdId); // Fachlehrkraft, nicht synchronisiert: noch nicht sichtbar
+  const u = ladeHalbjahresuebersicht(klasse, '1. Halbjahr');
+  const zelle = (s, f) => u.zeilen.find((z) => z.schueler.id === s).noten[u.faecher.findIndex((x) => x.id === f)].note;
+  assert.equal(zelle(s1, leer), 2);
+  assert.equal(zelle(s1, mitLehrkraft), 3);
+  assert.equal(zelle(s2, mitLehrkraft), null, 'Endnote der Fachlehrkraft erscheint erst mit deren Sync');
+  assert.equal(zelle(s3, leer), null);
+});
+
 test.after(async () => {
   await fastify.close();
 });

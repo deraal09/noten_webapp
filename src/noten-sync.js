@@ -12,7 +12,8 @@
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
 import { ladeSperrenFuerKlasse } from './noten-sperre.js';
-import { fachGiltInHalbjahr, verrechnungsProzent, halbjahrNr, halbjahrText } from './klassen-jahre.js';
+import { fachGiltInHalbjahr, verrechnungsProzent, halbjahrNr, halbjahrText, klassenLaufzeit } from './klassen-jahre.js';
+import { fachHatLehrkraftImHalbjahr } from './unterfaecher.js';
 
 /** Schreibt den aktuellen Notenstand eines Fachs/Halbjahrs in den Sync-Stand. */
 export function syncFach(fachId, halbjahr, userId) {
@@ -122,6 +123,36 @@ export function ladeHalbjahresuebersicht(klasse, halbjahr) {
   for (const r of standRows) {
     const ueberschrieben = r.konferenz_note !== null && r.konferenz_note !== undefined;
     stand.get(r.schueler_id)?.set(r.fach_id, { note: ueberschrieben ? r.konferenz_note : r.note, ueberschrieben });
+  }
+
+  // Direkt eingetragene Endnoten der Klassenleitung (und in Fächern ohne Lehrkraft) gelten sofort -- auch wenn
+  // sie vor der Sofort-Synchronisation eingetragen wurden oder nie jemand "synchronisiert" hat. Eine Konferenznote
+  // hat weiterhin Vorrang; Endnoten einer Fachlehrkraft erscheinen erst mit deren Sync.
+  if (faecher.length) {
+    const nr = halbjahrNr(halbjahr);
+    const laufzeit = klassenLaufzeit(klasse.id);
+    const eigeneKlasse = new Set(schueler.map((s) => s.id));
+    const von = db.prepare(`
+      SELECT e.fach_id, e.schueler_id, e.note, e.ntg, e.eingetragen_von_id FROM halbjahr_endnoten e
+      WHERE e.halbjahr = ? AND e.fach_id IN (${faecher.map(() => '?').join(',')})
+    `).all(halbjahr, ...faecher.map((f) => f.id));
+    const istKlassenleitung = (userId) => {
+      if (!userId) return false;
+      return Boolean(db.prepare("SELECT 1 FROM users WHERE id = ? AND role = 'admin'").get(userId)
+        || db.prepare('SELECT 1 FROM klassenleitung WHERE user_id = ? AND klasse_id = ?').get(userId, klasse.id)
+        || db.prepare('SELECT 1 FROM klassen_lehrkraefte WHERE user_id = ? AND klasse_id = ?').get(userId, klasse.id));
+    };
+    const fachById = new Map(faecher.map((f) => [f.id, f]));
+    const ohneLehrkraft = new Map();
+    for (const e of von) {
+      if (!eigeneKlasse.has(e.schueler_id) || !stand.has(e.schueler_id)) continue;
+      const vorhanden = stand.get(e.schueler_id).get(e.fach_id);
+      if (vorhanden?.ueberschrieben) continue; // Konferenznote
+      if (!ohneLehrkraft.has(e.fach_id)) ohneLehrkraft.set(e.fach_id, !fachHatLehrkraftImHalbjahr(fachById.get(e.fach_id), nr, laufzeit));
+      if (ohneLehrkraft.get(e.fach_id) || istKlassenleitung(e.eingetragen_von_id)) {
+        stand.get(e.schueler_id).set(e.fach_id, { note: e.ntg ? null : e.note, ueberschrieben: false });
+      }
+    }
   }
 
   const notizRows = schueler.length ? db.prepare(`

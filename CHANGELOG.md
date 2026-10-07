@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.80.1 - 2026-10-07
+
+- Fix: Direkt eingetragene Endnoten der Klassenleitung (z. B. für vergangene
+  Halbjahre) fehlten in der **Halbjahresübersicht**, solange das Fach keine
+  Lehrkraft hatte oder nie synchronisiert wurde -- sie standen nur im Raster und
+  in der Abschlussübersicht. Die Halbjahresübersicht zeigt sie jetzt immer,
+  wenn die Klassenleitung sie eingetragen hat oder dem Fach (im Halbjahr) keine
+  Lehrkraft zugeordnet ist, auch für früher eingetragene Werte. Endnoten einer
+  Fachlehrkraft erscheinen weiter erst mit deren Synchronisation; eine
+  Konferenznote hat Vorrang.
+
 ## 0.80.0 - 2026-10-07
 
 - **Klassenleitung: Fächer ohne Lehrkraft** lassen sich im Reiter „Endnoten
