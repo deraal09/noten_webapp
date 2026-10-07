@@ -54,7 +54,6 @@
       <% } %>
       <% if (schemaHj.pruefung) { %><th>Prüfung</th><% } %>
       <% if (schemaHj.deaktivierbar) { %><th>n/a</th><% } %>
-      <th title="Überschreibt die Berechnung -- für übernommene Altnoten (z. B. vor Einführung dieser App)">Altnote (importiert)</th>
       <% if (vorwertLabel) { %><th>Vorwert</th><% } %>
       <th>Zwischennote</th>
       <th>Endpunkte</th>
@@ -105,12 +104,6 @@
                    <%= eingabe.istNa ? 'checked' : '' %> <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
           </td>
         <% } %>
-        <td>
-          <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
-                 data-sid="<%= s.id %>" data-feld="importierte_endnote"
-                 value="<%= eingabe.importierteEndnote === null ? '' : eingabe.importierteEndnote %>"
-                 <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
-        </td>
         <% if (vorwertLabel) { %>
           <td class="hint vorwert-cell" data-sid="<%= s.id %>">
             <%= z.vorwert && z.vorwert.endpunkte !== null ? z.vorwert.endpunkte + ' (' + z.vorwert.tendenz + ')' : '–' %>

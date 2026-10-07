@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.64.1 - 2026-10-07
+
+- SPA: Die Spalte **„Altnote (importiert)"** entfällt in der Eingabemaske; ihre
+  Aufgabe übernimmt der **Vorwert**. Bereits gespeicherte Altnoten werden bei der
+  Berechnung nicht mehr berücksichtigt, das Feld wird nicht mehr angenommen.
+
 ## 0.64.0 - 2026-10-07
 
 - **Verrechnung der Halbjahre auch für SPA-Fächer**, je Fach einzeln auf der

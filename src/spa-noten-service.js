@@ -256,7 +256,6 @@ function ladeEingaben(db, fachId, schuelerId, schema) {
       halbjahr: s.halbjahr,
       istNa: !!row?.ist_na,
       direktwert: row?.direktwert ?? null,
-      importierteEndnote: row?.importierte_endnote ?? null,
     };
     if (s.halbjahrModus === 'komponenten_gewichtet') {
       const komponenten = {};
@@ -440,7 +439,6 @@ export function ladeEingabeAnzeige(db, fachId, schuelerId, halbjahr, schemaHalbj
   const ergebnis = {
     direktwert: row?.direktwert ?? null,
     pruefungswert: row?.pruefungswert ?? null,
-    importierteEndnote: row?.importierte_endnote ?? null,
     istNa: !!row?.ist_na,
     komponenten: null,
   };

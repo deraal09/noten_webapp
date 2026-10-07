@@ -220,6 +220,15 @@ test('SPA: Verrechnung der Halbjahre je Fach auf der Fachseite (Leistungspunkte 
   assert.ok(!klassenHtml.includes(`data-verrechnung-dialog data-fach-id="${lf1}"`));
 });
 
+test('SPA-Eingabemaske hat keine Altnote (importiert) mehr; das Feld wird nicht mehr angenommen', async () => {
+  const html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
+  assert.ok(!html.includes('Altnote'));
+  assert.ok(!html.includes('importierte_endnote'));
+  const schuelerId = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Musterfrau'").get().id;
+  const r = await form(admin, `/teacher/fach/${lf3Id}/spa/eingabe`, { schueler_id: String(schuelerId), halbjahr: '1', feld: 'importierte_endnote', wert: '9' });
+  assert.equal(r.status, 400);
+});
+
 test.after(async () => {
   await fastify.close();
 });

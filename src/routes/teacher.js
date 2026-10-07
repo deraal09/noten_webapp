@@ -435,7 +435,7 @@ export default async function teacherRoutes(fastify) {
       ON CONFLICT(fach_id, schueler_id, halbjahr) DO NOTHING
     `).run(fach.id, schuelerId, halbjahr);
 
-    if (feld === 'direktwert' || feld === 'pruefungswert' || feld === 'importierte_endnote') {
+    if (feld === 'direktwert' || feld === 'pruefungswert') {
       const wert = parsePunktwert();
       if (wert === undefined) return reply.code(400).send({ ok: false, error: 'Punktwert außerhalb 0–15.' });
       sicherstellenZeile();
