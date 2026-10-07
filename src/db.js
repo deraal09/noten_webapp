@@ -775,6 +775,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'parent_fach_id', 'parent_fach_id INTEGER REFERENCES faecher(id) ON DELETE CASCADE');
   ensureColumn(db, 'faecher', 'kurzname', 'kurzname TEXT');
   ensureColumn(db, 'faecher', 'gewicht', 'gewicht REAL');
+  // SPA: Unterfach, das eine vorgegebene Komponente (z. B. 'kunst') des Elternfachs abbildet (siehe src/spa-noten-service.js).
+  ensureColumn(db, 'faecher', 'spa_komponente', 'spa_komponente TEXT');
   // Halbjahre, in denen die Lehrkraft dem Fach/Unterfach zugeordnet ist (JSON-Array der Halbjahr-Nummern); NULL = alle Halbjahre des Fachs.
   ensureColumn(db, 'fach_zuweisungen', 'halbjahre', 'halbjahre TEXT');
   for (const k of db.prepare('SELECT k.id, s.bezeichnung FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.einschulung_jahr IS NULL').all()) {

@@ -1,9 +1,10 @@
 /**
- * End-to-End-Test der SPA-Komponenten-Konfigurierbarkeit über die echte
- * Route (POST /teacher/fach/:id/spa/komponente): nur die Klassenleitung
- * darf schalten (enger als die normale Noteneingabe-Berechtigung), nur
- * schaltbare (Rest-Anteil-)Komponenten lassen sich schalten, und die
- * Eingabemaske zeigt/versteckt die Spalte je nach Aktiv-Status.
+ * End-to-End-Test der SPA-Komponenten als vorgegebene Unterfächer: Sie stehen auf
+ * der Klassenseite unter dem Lernfeld (Fächer und Lehrkräftezuordnung) und werden
+ * dort halbjahresweise geschaltet (POST /teacher/faecher/:id/halbjahre): nur die
+ * Klassenleitung darf schalten, nur schaltbare (Rest-Anteil-)Komponenten, und die
+ * Eingabemaske zeigt/versteckt die Spalte je nach Aktiv-Status. Die Leistungspunkte
+ * eines Komponenten-Unterfachs füttern die Komponente des Lernfelds.
  */
 
 import { test } from 'node:test';
@@ -20,6 +21,8 @@ delete process.env.LDAP_URL;
 
 const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
+const { ladeEingabeAnzeige } = await import('../src/spa-noten-service.js');
+const { spaSchemaFuerFach } = await import('../src/spa-noten-service.js');
 
 const fastify = await buildApp({ logger: false });
 const base = await fastify.listen({ port: 0, host: '127.0.0.1' });
@@ -48,7 +51,11 @@ async function form(req, url, body) {
   return req(url, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(body),
+    body: (() => {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(body)) for (const w of Array.isArray(v) ? v : [v]) params.append(k, w);
+      return params;
+    })(),
   });
 }
 
@@ -78,58 +85,82 @@ test('Vorbereitung: SPA_REGULAR-Klasse (auto-geseedete Fächer, inkl. LF3), eine
     .run('fachlehrkraft', lf3Id);
 });
 
-test('GET /teacher/fach/:id (LF3) zeigt die Komponenten-Einstellung nur der Klassenleitung als Formular, sonst nur informativ', async () => {
-  const adminHtml = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
-  assert.ok(adminHtml.includes('Zusammensetzung für diese Klasse'));
-  assert.ok(adminHtml.includes('/spa/komponente'));
+const komp = (schluessel) => getDb().prepare('SELECT * FROM faecher WHERE parent_fach_id = ? AND spa_komponente = ?').get(lf3Id, schluessel);
 
-  const lehrkraftHtml = await (await fachlehrkraft(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
-  assert.ok(!lehrkraftHtml.includes('/spa/komponente'), 'einfache Fachlehrkraft darf keine Schalt-Formulare sehen');
+test('Klassenseite listet die Komponenten als vorgegebene Unterfächer unter dem Lernfeld (ohne Unterfach-Button, ohne Löschen)', async () => {
+  const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /Fächer und Lehrkräftezuordnung/);
+  for (const k of ['kunst', 'musik', 'spiel', 'bewegung', 'paedagogik', 'bericht']) assert.ok(komp(k), `Unterfach ${k} wurde angelegt`);
+  assert.ok(html.includes(`/teacher/fach/${komp('musik').id}`));
+  assert.ok(!html.includes(`data-unterfach-dialog data-fach-id="${lf3Id}"`), 'SPA-Lernfelder bekommen keine freien Unterfächer');
+  assert.ok(!html.includes(`/teacher/faecher/${komp('musik').id}/loeschen`), 'vorgegebene Komponenten lassen sich nicht löschen');
+  // Lernfeld-Lehrkraft bleibt am Lernfeld selbst
+  assert.ok(html.includes(`data-lehrkraft-dialog data-fach-id="${lf3Id}"`));
+  const r = await form(admin, `/teacher/faecher/${komp('musik').id}/loeschen`, {});
+  assert.equal(r.status, 302);
+  assert.ok(komp('musik'), 'Löschen wird abgewiesen');
 });
 
 test('Fachlehrkraft ohne Klassenleitung darf keine Komponente schalten', async () => {
-  const r = await form(fachlehrkraft, `/teacher/fach/${lf3Id}/spa/komponente`, {
-    halbjahr: '1', komponente: 'musik', aktiv: '0',
-  });
+  const r = await form(fachlehrkraft, `/teacher/faecher/${komp('musik').id}/halbjahre`, { halbjahre: ['2', '3', '4'], zurueck: 'klasse' });
   assert.equal(r.status, 403);
   assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM spa_deaktivierte_komponenten').get().c, 0);
 });
 
-test('Admin (zählt als Klassenleitung) kann Musik im 1. Hj. abschalten -- Eingabemaske verliert die Spalte', async () => {
-  let r = await form(admin, `/teacher/fach/${lf3Id}/spa/komponente`, {
-    halbjahr: '1', komponente: 'musik', aktiv: '0',
-  });
-  assert.equal(r.status, 302, 'Formular-Post führt zurück zur Seite statt JSON anzuzeigen');
-  assert.equal(r.headers.get('location'), `/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`);
+test('Admin (zählt als Klassenleitung) schaltet Musik im 1. Hj. ab -- Eingabemaske verliert die Spalte', async () => {
+  const r = await form(admin, `/teacher/faecher/${komp('musik').id}/halbjahre`, { halbjahre: ['2', '3', '4'], zurueck: 'klasse' });
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}#faecher-lehrkraefte`);
+  assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM spa_deaktivierte_komponenten WHERE komponente_schluessel = ?').get('musik').c, 1);
+  assert.equal(komp('musik').halbjahre, '[2,3,4]');
 
   const html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
   assert.ok(!html.includes('data-feld="komponente:musik"'), 'deaktivierte Komponente darf keine Eingabespalte mehr haben');
   assert.ok(html.includes('data-feld="komponente:kunst"'), 'andere Komponenten bleiben unverändert');
-  assert.ok(html.includes('komponente-inaktiv'), 'Musik-Umschalter zeigt sich als inaktiv');
-
-  // 2. Hj. ist von der Deaktivierung im 1. Hj. nicht betroffen.
   const htmlHj2 = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=2`)).text();
-  assert.ok(htmlHj2.includes('data-feld="komponente:musik"'));
+  assert.ok(htmlHj2.includes('data-feld="komponente:musik"'), '2. Hj. ist von der Deaktivierung im 1. Hj. nicht betroffen');
+  // Klassenseite zeigt die Halbjahre der Komponente
+  const klassenHtml = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(klassenHtml, /Musik/);
 });
 
-test('Fokus/Scroll-Position bleiben beim Schalten erhalten; Notenpunkte-Felder ohne Pfeile', async () => {
-  const html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
-  assert.ok(html.includes("spa-komponente-fokus"), 'merkt Scroll-Position und Umschalter über den Reload');
-  const css = fs.readFileSync(new URL('../static/css/app.css', import.meta.url), 'utf8');
-  assert.match(css, /#spa-tabelle input\[type=number\]::-webkit-inner-spin-button/);
-});
-
-test('Einfache Fachlehrkraft sieht den deaktivierten Status informativ, ohne ihn ändern zu können', async () => {
+test('Einfache Fachlehrkraft sieht den abgeschalteten Status informativ, ohne ihn ändern zu können', async () => {
   const html = await (await fachlehrkraft(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
-  assert.ok(html.includes('deaktiviert'));
+  assert.ok(html.includes('abgeschaltet'));
   assert.ok(!html.includes('/spa/komponente'));
 });
 
-test('Feste Komponente (Pädagogik) lässt sich nicht schalten', async () => {
-  const r = await form(admin, `/teacher/fach/${lf3Id}/spa/komponente`, {
-    halbjahr: '1', komponente: 'paedagogik', aktiv: '0',
+test('Feste Komponente (Pädagogik) lässt sich nicht abschalten', async () => {
+  const r = await form(admin, `/teacher/faecher/${komp('paedagogik').id}/halbjahre`, { halbjahre: ['2', '3', '4'], zurueck: 'klasse' });
+  assert.equal(r.status, 302);
+  assert.equal(getDb().prepare("SELECT COUNT(*) AS c FROM spa_deaktivierte_komponenten WHERE komponente_schluessel = 'paedagogik'").get().c, 0);
+});
+
+test('Leistungspunkte eines Komponenten-Unterfachs füttern die Komponente des Lernfelds (Handeingabe hat Vorrang)', async () => {
+  const kunst = komp('kunst');
+  const schuelerId = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Musterfrau'").get().id;
+  // Lehrkraft für das Unterfach Kunst
+  await form(admin, `/teacher/klassen/${klasseId}/zuweisungen/neu`, {
+    user_id: String(getDb().prepare("SELECT id FROM users WHERE username = 'fachlehrkraft'").get().id), fach_id: String(kunst.id), halbjahre: ['2'],
   });
-  assert.equal(r.status, 400);
+  let page = await fachlehrkraft(`/teacher/fach/${kunst.id}?hj=${encodeURIComponent('2. Halbjahr')}`);
+  assert.equal(page.status, 200);
+  const text = await page.text();
+  assert.match(text, /Komponente <strong>Kunst<\/strong>/);
+  assert.equal((await fachlehrkraft(`/teacher/fach/${kunst.id}?hj=${encodeURIComponent('3. Halbjahr')}`)).status, 302, 'nur das zugeordnete Halbjahr');
+  // Klausur im 2. Halbjahr
+  await form(fachlehrkraft, `/teacher/fach/${kunst.id}/klausuren/neu`, { name: 'K', aufgaben: '1', halbjahr: '2. Halbjahr' });
+  const k = getDb().prepare('SELECT id, max_punkte_pro_aufgabe FROM klausuren WHERE fach_id = ?').get(kunst.id);
+  await form(fachlehrkraft, `/teacher/klausuren/${k.id}/gewichtung`, { gewichtung: '100', halbjahr: '2. Halbjahr' });
+  await form(fachlehrkraft, `/teacher/klausuren/${k.id}/punkte`, { schueler_id: String(schuelerId), aufgabe_idx: '0', wert: String(JSON.parse(k.max_punkte_pro_aufgabe)[0]) });
+  const db = getDb();
+  const schemaHj = spaSchemaFuerFach(db, lf3Id).schema.find((x) => x.halbjahr === 2);
+  const anzeige = ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj);
+  assert.equal(anzeige.komponentenLeistung.kunst, 15, 'volle Punktzahl = 15 Punkte');
+  assert.equal(anzeige.komponentenLeistung.spiel, null);
+  assert.equal(anzeige.komponenten.kunst, null, 'die Leistung ist Platzhalter, kein Handwert');
+  const lf3Html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=2`)).text();
+  assert.match(lf3Html, /placeholder="15"/);
 });
 
 test.after(async () => {

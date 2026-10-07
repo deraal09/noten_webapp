@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.61.0 - 2026-10-07
+
+- SPA: Die **Zusammensetzung der Fächer** (Komponenten der Lernfelder, z. B. LF3:
+  Kunst/Spiel/Musik/Bewegung) steht jetzt auf der Klassenseite im Abschnitt
+  „Fächer und Lehrkräftezuordnung" und erscheint als **vorgegebene Unterfächer**
+  unter dem Lernfeld. Rest-Anteil-Komponenten lassen sich dort je Halbjahr
+  abschalten (nur Klassenleitung), feste Komponenten (z. B. Pädagogik) sind
+  markiert. Der alte Schalter auf der Fachseite und die Route
+  `/fach/:id/spa/komponente` entfallen.
+- Komponenten-Unterfächer können wie alle Unterfächer Lehrkräfte je Halbjahr
+  haben. Deren Klausuren/Unterrichtsleistung (in Punkten) füttern die
+  Komponente des Lernfelds; ein von Hand eingetragener Komponentenwert hat
+  Vorrang. Vorgegebene Komponenten lassen sich nicht löschen, SPA-Lernfelder
+  bekommen keine freien Unterfächer.
+
 ## 0.60.0 - 2026-10-07
 
 - Lehrkräfte arbeiten **strikt je Halbjahr**: Ist eine Zuordnung auf bestimmte

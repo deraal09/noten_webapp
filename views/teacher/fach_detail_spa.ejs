@@ -34,37 +34,11 @@
   <p class="hint">Vorwert: <%= vorwertLabel %> (ausgegraut in der Spalte „Vorwert" unten).</p>
 <% } %>
 
-<% if (komponentenKonfig.length) { %>
-  <div class="card" id="komponenten-einstellungen">
-    <% if (darfKomponentenSchalten) { %>
-      <p><strong>Zusammensetzung für diese Klasse (<%= halbjahr %>. Hj.)</strong></p>
-      <p class="hint">
-        Rest-Anteil-Komponenten ein-/ausschalten -- das Restbudget verteilt sich automatisch
-        gleichmäßig auf die verbleibenden aktiven Komponenten. Wirkt sofort auf die ganze Klasse
-        und alle künftigen Berechnungen dieses Halbjahres.
-      </p>
-      <p class="knopf-reihe">
-        <% komponentenKonfig.forEach(function(k) { %>
-          <form method="post" action="/teacher/fach/<%= fach.id %>/spa/komponente" class="inline">
-            <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
-            <input type="hidden" name="komponente" value="<%= k.schluessel %>">
-            <input type="hidden" name="aktiv" value="<%= k.aktiv ? '0' : '1' %>">
-            <button type="submit" class="<%= k.aktiv ? '' : 'komponente-inaktiv' %>">
-              <%= k.aktiv ? '✅' : '⬜' %> <%= komponentenNamen[k.schluessel] || k.schluessel %>
-            </button>
-          </form>
-        <% }); %>
-      </p>
-    <% } else { %>
-      <% var inaktive = komponentenKonfig.filter(function(k) { return !k.aktiv; }); %>
-      <% if (inaktive.length) { %>
-        <p class="hint">
-          Für dieses Halbjahr deaktiviert (nur die Klassenleitung kann das ändern):
-          <%= inaktive.map(function(k) { return komponentenNamen[k.schluessel] || k.schluessel; }).join(', ') %>.
-        </p>
-      <% } %>
-    <% } %>
-  </div>
+<% if (inaktiveKomponenten.length) { %>
+  <p class="hint">
+    Für dieses Halbjahr abgeschaltet: <%= inaktiveKomponenten.map(function(k) { return komponentenNamen[k.schluessel] || k.schluessel; }).join(', ') %>.
+    Die Zusammensetzung stellt die Klassenleitung auf der <a href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">Klassenseite</a> ein (Fächer und Lehrkräftezuordnung).
+  </p>
 <% } %>
 
 <table class="data" id="spa-tabelle" data-fach="<%= fach.id %>" data-hj="<%= halbjahr %>">
@@ -104,7 +78,7 @@
               <input type="number" class="spa-eingabe" min="0" max="15" step="0.5"
                      data-sid="<%= s.id %>" data-feld="komponente:<%= k.schluessel %>"
                      value="<%= eingabe.komponenten[k.schluessel] === null ? '' : eingabe.komponenten[k.schluessel] %>"
-                     <% if (eingabe.leistung !== null && eingabe.leistungsZiel === k.schluessel) { %>placeholder="<%= eingabe.leistung %>" title="Leer = Leistungsnote aus Klausuren/Unterrichtsleistung (<%= eingabe.leistung %> Punkte)"<% } %>
+                     <% var kLeistung = eingabe.komponentenLeistung && eingabe.komponentenLeistung[k.schluessel] !== null && eingabe.komponentenLeistung[k.schluessel] !== undefined ? eingabe.komponentenLeistung[k.schluessel] : ((eingabe.leistung !== null && eingabe.leistungsZiel === k.schluessel) ? eingabe.leistung : null); %><% if (kLeistung !== null) { %>placeholder="<%= kLeistung %>" title="Leer = Leistungsnote aus Klausuren/Unterrichtsleistung (<%= kLeistung %> Punkte)"<% } %>
                      <%= (sperre || !darfBearbeiten) ? 'disabled' : '' %>>
             </td>
           <% }); %>
@@ -155,34 +129,6 @@
     <% }); %>
   </tbody>
 </table>
-
-<script>
-// Zusammensetzung (Komponenten ein-/ausschalten): Das Formular lädt die Seite
-// neu -- Scroll-Position und der angeklickte Umschalter werden gemerkt und
-// danach wiederhergestellt, damit die Ansicht nicht nach oben springt.
-(function() {
-  var KEY = 'spa-komponente-fokus';
-  var box = document.getElementById('komponenten-einstellungen');
-  if (box) {
-    box.querySelectorAll('form').forEach(function(form) {
-      form.addEventListener('submit', function() {
-        var k = form.querySelector('input[name="komponente"]');
-        try {
-          sessionStorage.setItem(KEY, JSON.stringify({ pfad: location.pathname + location.search, y: window.scrollY, komponente: k ? k.value : null }));
-        } catch (e) { /* z. B. privater Modus */ }
-      });
-    });
-  }
-  var gemerkt = null;
-  try { gemerkt = JSON.parse(sessionStorage.getItem(KEY) || 'null'); sessionStorage.removeItem(KEY); } catch (e) { return; }
-  if (!gemerkt || gemerkt.pfad.split('?')[0] !== location.pathname) return;
-  window.scrollTo(0, gemerkt.y);
-  if (!box || !gemerkt.komponente) return;
-  var ziel = Array.from(box.querySelectorAll('input[name="komponente"]')).find(function(i) { return i.value === gemerkt.komponente; });
-  var knopf = ziel && ziel.form && ziel.form.querySelector('button');
-  if (knopf) knopf.focus({ preventScroll: true });
-})();
-</script>
 
 <script>
 (function() {

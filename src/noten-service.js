@@ -148,7 +148,8 @@ export function berechneGesamtnotenOhneEndnoten(fachId, halbjahr) {
  * wird direkt bewertet). Ein Unterfach selbst hat nie Unterfächer.
  */
 export function unterfaecherDesHalbjahrs(fach, halbjahr) {
-  if (!fach || fach.parent_fach_id) return [];
+  // SPA-Fächer haben ein eigenes Bewertungsmodell: ihre Komponenten-Unterfächer füttern Komponenten, bilden keinen Schnitt.
+  if (!fach || fach.parent_fach_id || fach.spa_fach_key) return [];
   const nr = halbjahrNr(halbjahr);
   return nr === null ? [] : unterfaecherImHalbjahr(fach, nr);
 }

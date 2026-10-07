@@ -12,7 +12,16 @@
   <% } %>
 </p>
 
-<% if (spaLeistung) { %>
+<% if (spaLeistung && spaLeistung.komponente) { %>
+  <div class="card">
+    <p class="hint">
+      Klausuren und Unterrichtsleistung werden in <strong>Punkten (0-15)</strong> bewertet. Die Leistungspunkte
+      fließen im <%= halbjahr %> in die Komponente <strong><%= spaLeistung.komponente.name %></strong> des Fachs
+      <a href="/teacher/fach/<%= spaLeistung.komponente.elternId %>?ansicht=endnoten&hj=<%= spaLeistung.hjNr %>"><%= spaLeistung.komponente.elternName %></a> ein --
+      ein dort von Hand eingetragener Wert hat Vorrang.
+    </p>
+  </div>
+<% } else if (spaLeistung) { %>
   <div class="card">
     <p class="hint">
       Klausuren und Unterrichtsleistung werden wie bei IHK abgehandelt, aber in <strong>Punkten (0-15)</strong>
@@ -83,11 +92,13 @@
   var zeigeSchriftlicheNoteSpalte = !(hatManuelleSchriftlich && !hatKlausurEintraege);
   var zeigeNaSpalte = termine.length > 0;
   var sichtbareSpalten = 2 + (zeigeNaSpalte ? 1 : 0) + (verrechnung && verrechnung.prozent ? 1 : 0) + (hatManuelleMuendlich ? 1 : 0) + (hatManuelleSchriftlich ? 1 : 0)
-    + (zeigeMuendlicheNoteSpalte ? 1 : 0) + (zeigeSchriftlicheNoteSpalte ? 1 : 0) + (spaLeistung ? 2 : 0) + (fach.abgeschlossen ? 1 : 0);
+    + (zeigeMuendlicheNoteSpalte ? 1 : 0) + (zeigeSchriftlicheNoteSpalte ? 1 : 0) + (spaLeistung ? (spaLeistung.komponente ? 1 : 2) : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
 <div id="panel-uebersicht" class="reiter-panel active">
   <h2>Notenübersicht</h2>
-  <% if (spaLeistung) { %>
+  <% if (spaLeistung && spaLeistung.komponente) { %>
+    <%# Komponenten-Unterfach: keine eigene Endnote -- die Punkte fließen in die Komponente des Elternfachs. %>
+  <% } else if (spaLeistung) { %>
     <p class="kopf-aktionen">
       <a class="btn" href="/teacher/fach/<%= fach.id %>?ansicht=endnoten&hj=<%= spaLeistung.hjNr %>">✏️ Direkte Endnoteneingabe</a>
     </p>
@@ -133,7 +144,7 @@
         <% if (verrechnung && verrechnung.prozent) { %><th title="Endgültige Note des Vorhalbjahres, die zu <%= verrechnung.prozent %> % einfließt">Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
         <th>Gesamt<%= spaLeistung ? 'punkte' : 'note' %></th>
         <% if (spaLeistung) { %><th title="Tendenznote aus den Leistungspunkten (SPA-Notenskala)">Tendenz</th><% } %>
-        <% if (spaLeistung) { %><th title="Endpunkte laut Endnotentabelle (inkl. Vorwerten, Komponenten und Handeingaben)">Endpunkte <small>(Endnotentabelle)</small></th><% } %>
+        <% if (spaLeistung && !spaLeistung.komponente) { %><th title="Endpunkte laut Endnotentabelle (inkl. Vorwerten, Komponenten und Handeingaben)">Endpunkte <small>(Endnotentabelle)</small></th><% } %>
         <% if (zeigeNaSpalte) { %><th title="Summe der Termine mit n.a. (nicht anwesend) in der Datumstabelle">n.a.</th><% } %>
         <% if (fach.abgeschlossen) { %><th>Abschlussnote</th><% } %>
       </tr>
@@ -178,7 +189,7 @@
           <% if (verrechnung && verrechnung.prozent) { %><td class="note-cell vorhalbjahr-zelle"><%= r.vorhalbjahrNote === null ? '–' : formatNote(r.vorhalbjahrNote) %></td><% } %>
           <td class="gesamt-cell<%= r.endnote ? ' direkt' : '' %>"<% if (r.endnote) { %> title="Direkt eingetragene Endnote"<% } %>><%= r.gesamt === null ? (r.endnote && r.endnote.ntg ? 'ntg' : '–') : formatNote(r.gesamt) %></td>
           <% if (spaLeistung) { %><td class="note-cell spa-tendenz-cell"><%= r.gesamt === null ? '–' : spaTendenz(r.gesamt) %></td><% } %>
-          <% if (spaLeistung) { var spaE = spaLeistung.endpunkte.get(r.schueler_id); %><td class="note-cell spa-endpunkte-cell"><%= spaE && spaE.endpunkte !== null && spaE.endpunkte !== undefined ? spaE.endpunkte.toFixed(2) + ' (' + spaE.tendenz + ')' : '–' %></td><% } %>
+          <% if (spaLeistung && !spaLeistung.komponente) { var spaE = spaLeistung.endpunkte.get(r.schueler_id); %><td class="note-cell spa-endpunkte-cell"><%= spaE && spaE.endpunkte !== null && spaE.endpunkte !== undefined ? spaE.endpunkte.toFixed(2) + ' (' + spaE.tendenz + ')' : '–' %></td><% } %>
           <% if (zeigeNaSpalte) { %><td class="note-cell na-summe" data-sid="<%= r.schueler_id %>"><%= r.naAnzahl %></td><% } %>
           <% if (fach.abgeschlossen) { %>
             <td class="note-cell"><% var an = abschlussnoten.get(r.schueler_id); %><%= (an === null || an === undefined) ? '–' : formatNote(an) %></td>

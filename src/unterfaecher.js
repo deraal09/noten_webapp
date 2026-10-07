@@ -38,7 +38,8 @@ export function hatUnterfaecherImHalbjahr(parent, halbjahrText_) {
 /** Halbjahr-Nummern des Fachs, in denen es KEINE Unterfächer hat (dort darf es direkt Lehrkräfte haben). */
 export function halbjahreOhneUnterfaecher(fach, laufzeit = klassenLaufzeit(fach.klasse_id)) {
   const eigene = fachHalbjahrNummern(fach, laufzeit);
-  if (fach.parent_fach_id) return eigene;
+  // SPA-Fächer: die Komponenten-Unterfächer ersetzen die Lehrkraft des Fachs nicht (sie füttern nur Komponenten).
+  if (fach.parent_fach_id || fach.spa_fach_key) return eigene;
   const belegt = new Set();
   for (const u of ladeUnterfaecher(fach.id)) for (const n of fachHalbjahrNummern(u, laufzeit)) belegt.add(n);
   return eigene.filter((n) => !belegt.has(n));
@@ -81,6 +82,7 @@ function halbjahrNummernAusJson(roh) {
 export function legeUnterfachAn(parent, name, nummern) {
   const db = getDb();
   if (parent.parent_fach_id) return { ok: false, fehler: 'Ein Unterfach kann keine eigenen Unterfächer haben.' };
+  if (parent.spa_fach_key) return { ok: false, fehler: 'SPA-Fächer haben vorgegebene Komponenten als Unterfächer -- sie lassen sich nicht ergänzen.' };
   const kurz = String(name || '').trim().slice(0, 60);
   if (!kurz) return { ok: false, fehler: 'Bitte einen Namen für das Unterfach angeben.' };
   const laufzeit = klassenLaufzeit(parent.klasse_id);
@@ -128,6 +130,7 @@ export function legeUnterfachAn(parent, name, nummern) {
  */
 export function setzeFachHalbjahre(fach, nummern) {
   const db = getDb();
+  if (fach.spa_komponente) return { ok: false, fehler: 'Die Halbjahre einer SPA-Komponente werden über die Komponenten-Schalter des Fachs gesetzt.' };
   const laufzeit = klassenLaufzeit(fach.klasse_id);
   const alle = laufzeit.halbjahre.map((_, i) => i + 1);
   let gewaehlt = (nummern ?? alle).filter((n) => alle.includes(n));

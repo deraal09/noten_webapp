@@ -101,7 +101,7 @@ test('POST auf SPA mit Bildungsgang stellt die fächerlose Klasse um und seedet 
   assert.equal(klasse.notenschluessel, 'SPA');
   assert.equal(klasse.spa_bildungsgang, 'SPA_REGULAR');
 
-  const faecher = getDb().prepare("SELECT spa_fach_key FROM faecher WHERE klasse_id = ?").all(leereKlasseId);
+  const faecher = getDb().prepare("SELECT spa_fach_key FROM faecher WHERE klasse_id = ? AND parent_fach_id IS NULL").all(leereKlasseId);
   assert.equal(faecher.length, 11); // SPA_REGULAR ohne Blockpraxis
   assert.ok(!faecher.some((f) => f.spa_fach_key === 'BLOCKPRAXIS'));
 });

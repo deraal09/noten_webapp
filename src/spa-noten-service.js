@@ -21,7 +21,7 @@
  * Berechnung unterschiedliche Komponenten.
  */
 
-import { spaSchemaFuer, spaFachName, spaFaecherFuerBildungsgang } from './spa-schema.js';
+import { spaSchemaFuer, spaFachName, spaFaecherFuerBildungsgang, KOMPONENTEN_NAMEN } from './spa-schema.js';
 import { berechneFach, tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
 import { seedeTeilnehmerAusKlasse } from './fach-teilnehmer.js';
 import { leistungsPunkte, leistungsZiel } from './spa-leistung.js';
@@ -114,6 +114,12 @@ export function spaKomponentenKonfig(db, fachId, halbjahr) {
 export function spaSetzeKomponenteAktiv(db, fachId, halbjahr, komponenteSchluessel, aktiv) {
   const gueltig = spaKomponentenKonfig(db, fachId, halbjahr).some((k) => k.schluessel === komponenteSchluessel);
   if (!gueltig) return false;
+  schreibeKomponenteAktiv(db, fachId, halbjahr, komponenteSchluessel, aktiv);
+  synchronisiereKomponentenUnterfaecher(db, fachId);
+  return true;
+}
+
+function schreibeKomponenteAktiv(db, fachId, halbjahr, komponenteSchluessel, aktiv) {
   if (aktiv) {
     db.prepare('DELETE FROM spa_deaktivierte_komponenten WHERE fach_id = ? AND halbjahr = ? AND komponente_schluessel = ?')
       .run(fachId, halbjahr, komponenteSchluessel);
@@ -124,7 +130,74 @@ export function spaSetzeKomponenteAktiv(db, fachId, halbjahr, komponenteSchluess
       ON CONFLICT(fach_id, halbjahr, komponente_schluessel) DO NOTHING
     `).run(fachId, halbjahr, komponenteSchluessel);
   }
-  return true;
+}
+
+/**
+ * Die Komponenten eines SPA-Fachs, wie sie als vorgegebene Unterfächer
+ * erscheinen: je Komponente die Halbjahre, in denen sie im Schema vorkommt
+ * (`alle`), die davon aktiven (`aktiv`) und ob sie schaltbar ist (Rest-Anteil).
+ * @returns {Map<string, {alle: number[], aktiv: number[], schaltbar: boolean}>}
+ */
+export function spaKomponentenHalbjahre(db, fach) {
+  const ergebnis = new Map();
+  const bildungsgang = bildungsgangVonKlasse(db, fach.klasse_id);
+  if (!fach.spa_fach_key || !bildungsgang) return ergebnis;
+  const deaktiviert = ladeDeaktivierteKomponenten(db, fach.id);
+  for (const s of spaSchemaFuer(fach.spa_fach_key, bildungsgang)) {
+    if (s.halbjahrModus !== 'komponenten_gewichtet') continue;
+    for (const k of s.komponenten) {
+      if (!ergebnis.has(k.schluessel)) ergebnis.set(k.schluessel, { alle: [], aktiv: [], schaltbar: false });
+      const e = ergebnis.get(k.schluessel);
+      e.alle.push(s.halbjahr);
+      e.schaltbar = e.schaltbar || Boolean(k.restAnteil);
+      if (!(k.restAnteil && deaktiviert.has(`${s.halbjahr}:${k.schluessel}`))) e.aktiv.push(s.halbjahr);
+    }
+  }
+  return ergebnis;
+}
+
+/**
+ * Legt zu jeder Komponente der SPA-Fächer einer Klasse ein Unterfach an (falls
+ * noch nicht vorhanden) und gleicht deren Halbjahre mit den
+ * Komponenten-Einstellungen ab. Idempotent -- läuft beim Anlegen der Klasse und
+ * beim Öffnen der Klassenseite. Ein Unterfach kann Lehrkräfte haben, die dort
+ * Klausuren/Unterrichtsleistung eintragen; deren Punkte füttern die Komponente
+ * (siehe ladeEingaben).
+ */
+export function seedeKomponentenUnterfaecher(db, klasseId) {
+  for (const fach of db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND spa_fach_key IS NOT NULL').all(klasseId)) {
+    synchronisiereKomponentenUnterfaecher(db, fach.id);
+  }
+}
+
+export function synchronisiereKomponentenUnterfaecher(db, fachId) {
+  const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
+  if (!fach || !fach.spa_fach_key) return;
+  const komponenten = spaKomponentenHalbjahre(db, fach);
+  if (!komponenten.size) return;
+  const anzahlHalbjahre = Math.max(...[...komponenten.values()].flatMap((e) => e.alle));
+  const vorhanden = new Map(db.prepare('SELECT * FROM faecher WHERE parent_fach_id = ? AND spa_komponente IS NOT NULL').all(fach.id)
+    .map((u) => [u.spa_komponente, u]));
+  const tx = db.transaction(() => {
+    for (const [schluessel, e] of komponenten) {
+      const name = KOMPONENTEN_NAMEN[schluessel] || schluessel;
+      // Eine in allen Halbjahren abgeschaltete Komponente behält "alle" (ein leeres Array hieße ebenfalls "alle").
+      const halbjahre = e.aktiv.length ? e.aktiv : e.alle;
+      const json = halbjahre.length === anzahlHalbjahre ? null : JSON.stringify(halbjahre);
+      const bestehend = vorhanden.get(schluessel);
+      if (bestehend) {
+        if ((bestehend.halbjahre ?? null) !== json) db.prepare('UPDATE faecher SET halbjahre = ? WHERE id = ?').run(json, bestehend.id);
+        continue;
+      }
+      const info = db.prepare(`
+        INSERT INTO faecher (klasse_id, name, parent_fach_id, kurzname, halbjahre, spa_komponente)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(fach.klasse_id, `${fach.name} › ${name}`, fach.id, name, json, schluessel);
+      db.prepare('INSERT OR IGNORE INTO fach_teilnehmer (fach_id, schueler_id) SELECT ?, schueler_id FROM fach_teilnehmer WHERE fach_id = ?')
+        .run(info.lastInsertRowid, fach.id);
+    }
+  });
+  tx();
 }
 
 /**
@@ -152,6 +225,14 @@ export function seedeSpaFaecher(db, klasseId, bildungsgang, userId) {
     }
   });
   tx();
+  seedeKomponentenUnterfaecher(db, klasseId);
+}
+
+/** Leistungspunkte der Person im Komponenten-Unterfach (oder null, wenn es keins gibt bzw. nichts bepunktet ist). */
+function komponentenLeistung(db, fachId, schluessel, halbjahrNr, schuelerId) {
+  const kind = db.prepare('SELECT id, halbjahre FROM faecher WHERE parent_fach_id = ? AND spa_komponente = ?').get(fachId, schluessel);
+  if (!kind) return null;
+  return leistungsPunkte(db, kind.id, halbjahrNr, schuelerId);
 }
 
 /**
@@ -181,7 +262,8 @@ function ladeEingaben(db, fachId, schuelerId, schema) {
       const komponenten = {};
       for (const k of s.komponenten) {
         const kr = komponentenRows.find((r) => r.halbjahr === s.halbjahr && r.komponente_schluessel === k.schluessel);
-        komponenten[k.schluessel] = kr?.punkte ?? null;
+        // Von Hand eingetragen > Leistungspunkte des Komponenten-Unterfachs (siehe seedeKomponentenUnterfaecher).
+        komponenten[k.schluessel] = kr?.punkte ?? komponentenLeistung(db, fachId, k.schluessel, s.halbjahr, schuelerId);
       }
       eingabe.komponenten = komponenten;
     }
@@ -368,9 +450,14 @@ export function ladeEingabeAnzeige(db, fachId, schuelerId, halbjahr, schemaHalbj
       WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ?
     `).all(fachId, schuelerId, halbjahr);
     const komponenten = {};
-    for (const k of schemaHalbjahr.komponenten) komponenten[k.schluessel] = null;
+    const komponentenLeistungen = {};
+    for (const k of schemaHalbjahr.komponenten) {
+      komponenten[k.schluessel] = null;
+      komponentenLeistungen[k.schluessel] = komponentenLeistung(db, fachId, k.schluessel, halbjahr, schuelerId);
+    }
     for (const r of rows) komponenten[r.komponente_schluessel] = r.punkte;
     ergebnis.komponenten = komponenten;
+    ergebnis.komponentenLeistung = komponentenLeistungen;
   }
   // Leistungsnote aus Klausuren/UL (Punkte) und, bei Komponenten-Fächern, die
   // Komponente, die sie füttert -- für den Platzhalter in der Eingabemaske.

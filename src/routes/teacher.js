@@ -46,7 +46,7 @@ import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE } from '../spa-schema.js';
 import {
   berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer,
   ladeEingabeAnzeige as ladeSpaEingabeAnzeige,
-  seedeSpaFaecher, spaSchemaFuerFach, spaKomponentenKonfig, spaSetzeKomponenteAktiv,
+  seedeSpaFaecher, spaSchemaFuerFach, spaKomponentenKonfig, spaSetzeKomponenteAktiv, spaKomponentenHalbjahre, seedeKomponentenUnterfaecher,
 } from '../spa-noten-service.js';
 import {
   zeugnisMitQuellen, ladeQuellenSeite, speichereQuellenAuswahl, loescheQuellenAuswahl,
@@ -178,12 +178,9 @@ function renderSpaFachDetail(request, reply, fach) {
     zeilen, vorwertLabel, eingaben, sperren,
     komponentenNamen: KOMPONENTEN_NAMEN, wpkKurse: WPK_KURSE,
     darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
-    // Die Zusammensetzung der Fächer (welche Rest-Komponenten aktiv sind,
-    // z. B. bei LF3) darf nur die Klassenleitung ändern -- enger als
-    // darfBearbeiten (das reicht für die Noteneingabe, aber nicht dafür,
-    // die Bewertungsgrundlage der ganzen Klasse zu verändern).
-    darfKomponentenSchalten: userIstKlassenlehrer(request.user, fach.klasse_id),
-    komponentenKonfig: spaKomponentenKonfig(db, fach.id, halbjahr),
+    // Welche Rest-Komponenten aktiv sind (z. B. bei LF3), stellt die Klassenleitung auf der
+    // Klassenseite ein (Fächer und Lehrkräftezuordnung) -- hier nur die Anzeige der abgeschalteten.
+    inaktiveKomponenten: spaKomponentenKonfig(db, fach.id, halbjahr).filter((k) => !k.aktiv),
   });
 }
 
@@ -341,6 +338,14 @@ export default async function teacherRoutes(fastify) {
         hjNr, schemaHj, ziel: leistungsZiel(getDb(), fach.id, hjNr), endpunkte,
         komponentenNamen: KOMPONENTEN_NAMEN, darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
       };
+    } else if (fach.spa_komponente) {
+      // Vorgegebene SPA-Komponente (Unterfach): bewertet in Punkten; die Punkte füttern die Komponente des Elternfachs.
+      const eltern = getDb().prepare('SELECT id, name FROM faecher WHERE id = ?').get(fach.parent_fach_id);
+      spaLeistung = {
+        hjNr: halbjahrNr(halbjahr), schemaHj: null, ziel: null, endpunkte: new Map(),
+        komponentenNamen: KOMPONENTEN_NAMEN, darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
+        komponente: { name: fach.kurzname || fach.name, elternId: eltern.id, elternName: eltern.name },
+      };
     }
     return reply.viewEjs('teacher/fach_detail.ejs', {
       HALBJAHRE: halbjahreFuerFach(fach).filter((h) => !erlaubteHj || erlaubteHj.includes(halbjahrNr(h))),
@@ -472,25 +477,6 @@ export default async function teacherRoutes(fastify) {
     const kurs = String(request.body?.kurs || '').trim().slice(0, 100);
     getDb().prepare('UPDATE faecher SET spa_wpk_kurs = ? WHERE id = ?').run(kurs || null, fach.id);
     return reply.send({ ok: true });
-  });
-
-  // Zusammensetzung der Fächer: einzelne Rest-Anteil-Komponenten eines
-  // Lernfelds (z. B. LF3: Kunst/Spiel/Musik/Bewegung) je Klasse/Halbjahr
-  // ein-/ausschalten -- enger gefasst als die normale Noteneingabe-
-  // Berechtigung, da das die Bewertungsgrundlage der ganzen Klasse ändert,
-  // nicht nur eine einzelne Note (siehe spaSetzeKomponenteAktiv).
-  fastify.post('/fach/:id/spa/komponente', async (request, reply) => {
-    const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach || !fach.spa_fach_key) return reply.code(404).send({ ok: false, error: 'not found' });
-    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) return reply.code(403).send({ ok: false, error: 'forbidden' });
-    const halbjahr = parseInt(request.body?.halbjahr, 10);
-    const komponente = String(request.body?.komponente || '');
-    const aktiv = request.body?.aktiv === '1';
-    if (!Number.isFinite(halbjahr) || !komponente) return reply.code(400).send({ ok: false, error: 'bad params' });
-    const erfolg = spaSetzeKomponenteAktiv(getDb(), fach.id, halbjahr, komponente, aktiv);
-    if (!erfolg) return reply.code(400).send({ ok: false, error: 'unbekannte oder nicht schaltbare Komponente' });
-    // Normales Formular (kein fetch): zurück zur Endnotentabelle, sonst zeigt der Browser den JSON-Quelltext an.
-    return reply.redirect(`/teacher/fach/${fach.id}?ansicht=endnoten&hj=${halbjahr}`);
   });
 
   // ---------- Sync mit Klassenleitung ----------
@@ -1647,12 +1633,21 @@ export default async function teacherRoutes(fastify) {
     ).all(klasse.id);
     const laufzeit = klassenLaufzeit(klasse.id);
     // Fächer als Baum: Fächer der obersten Ebene mit ihren Unterfächern (siehe src/unterfaecher.js).
+    // SPA: die Komponenten der Lernfelder erscheinen als vorgegebene Unterfächer (idempotent, auch für ältere Klassen).
+    if (klasse.notenschluessel === 'SPA') seedeKomponentenUnterfaecher(getDb(), klasse.id);
     const alleFaecher = getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? ORDER BY name').all(klasse.id);
-    const baum = alleFaecher.filter((f) => !f.parent_fach_id).map((f) => ({
-      fach: { ...f, hjNummern: fachHalbjahrNummern(f, laufzeit) },
-      freieHj: halbjahreOhneUnterfaecher(f, laufzeit),
-      kinder: alleFaecher.filter((u) => u.parent_fach_id === f.id).map((u) => ({ ...u, hjNummern: fachHalbjahrNummern(u, laufzeit) })),
-    }));
+    const baum = alleFaecher.filter((f) => !f.parent_fach_id).map((f) => {
+      const komponenten = f.spa_fach_key ? spaKomponentenHalbjahre(getDb(), f) : new Map();
+      return {
+        fach: { ...f, hjNummern: fachHalbjahrNummern(f, laufzeit) },
+        freieHj: halbjahreOhneUnterfaecher(f, laufzeit),
+        kinder: alleFaecher.filter((u) => u.parent_fach_id === f.id).map((u) => {
+          const info = u.spa_komponente ? komponenten.get(u.spa_komponente) : null;
+          // Komponenten-Unterfach: angezeigt werden die aktiven Halbjahre laut Komponenten-Einstellung.
+          return { ...u, hjNummern: info ? info.aktiv : fachHalbjahrNummern(u, laufzeit), komponenteInfo: info ?? null };
+        }),
+      };
+    });
     const zuweisungenProFach = Object.fromEntries(ladeZuweisungenDerKlasse(klasse.id, alleFaecher, laufzeit));
     // Löschen/Abgang/Abgangszeugnis nur anzeigen, wenn die Aktion auch
     // durchgeht (dieselbe Regel wie in den Routen, siehe userDarfKlasseVerwalten).
@@ -1976,6 +1971,24 @@ export default async function teacherRoutes(fastify) {
     const laufzeit = klassenLaufzeit(fach.klasse_id);
     const neu = parseHalbjahreEingabe(request.body?.halbjahre, laufzeit);
     const ziel = request.body?.zurueck === 'klasse' ? `/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte` : `/teacher/fach/${fach.id}`;
+    // Vorgegebene SPA-Komponente (Unterfach): "Halbjahre" schaltet die Komponente je Halbjahr ein/aus (nur Klassenleitung).
+    if (fach.spa_komponente) {
+      if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+        return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann die Zusammensetzung ändern.' });
+      }
+      const eltern = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(fach.parent_fach_id);
+      const info = spaKomponentenHalbjahre(getDb(), eltern).get(fach.spa_komponente);
+      const gewaehlt = halbjahreAusFormular(request.body?.halbjahre, fach.klasse_id) ?? [];
+      if (!info?.schaltbar) {
+        request.flash?.('error', 'Diese Komponente hat ein festes Gewicht und lässt sich nicht abschalten.');
+      } else if (!gewaehlt.some((n) => info.alle.includes(n))) {
+        request.flash?.('error', 'Bitte mindestens ein Halbjahr auswählen.');
+      } else {
+        for (const nr of info.alle) spaSetzeKomponenteAktiv(getDb(), eltern.id, nr, fach.spa_komponente, gewaehlt.includes(nr));
+        request.flash?.('success', 'Zusammensetzung gespeichert.');
+      }
+      return reply.redirect(ziel);
+    }
     const ergebnis = setzeFachHalbjahre(fach, neu);
     if (!ergebnis.ok) {
       request.flash?.('error', ergebnis.fehler);
@@ -2082,8 +2095,12 @@ export default async function teacherRoutes(fastify) {
   });
 
   fastify.post('/faecher/:id/loeschen', async (request, reply) => {
-    const f = getDb().prepare('SELECT id, klasse_id, ist_kurs FROM faecher WHERE id = ?').get(request.params.id);
+    const f = getDb().prepare('SELECT id, klasse_id, ist_kurs, spa_komponente FROM faecher WHERE id = ?').get(request.params.id);
     if (!f) return reply.redirect('/teacher/klassen');
+    if (f.spa_komponente) {
+      request.flash?.('error', 'Vorgegebene SPA-Komponenten lassen sich nicht löschen -- nur je Halbjahr abschalten.');
+      return reply.redirect(`/teacher/klassen/${f.klasse_id}#faecher-lehrkraefte`);
+    }
     if (!userDarfFachLoeschen(request.user, f)) {
       return reply.code(403).viewEjs('error.ejs', {
         code: 403,
