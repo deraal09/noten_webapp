@@ -1,0 +1,184 @@
+/**
+ * Eine Klasse läuft über mehrere Schuljahre (Einschulungs- bis Abschluss-
+ * schuljahr, siehe klassen.einschulung_jahr/abschluss_jahr in src/db.js). Die
+ * Halbjahre werden über diese Jahre durchgezählt: bei drei Jahren 1. bis 6.
+ * Halbjahr, wobei ungerade Halbjahre die erste, gerade die zweite Hälfte
+ * eines Schuljahres sind. Die Halbjahres-Schlüssel sind wie bisher Texte
+ * ("3. Halbjahr"), damit bestehende Daten (klausuren.halbjahr, noten.halbjahr
+ * ...) unverändert gültig bleiben -- bestehende Klassen starten im
+ * Einschulungsjahr mit "1./2. Halbjahr".
+ *
+ * Fehlt der Abschluss, gilt die Standarddauer: SPA zwei, BG/IHK drei Jahre.
+ */
+
+import { getDb } from './db.js';
+import { parseSchuljahr, baueSchuljahrBezeichnung, aktuellesStartjahr } from './schuljahr-utils.js';
+
+export const STANDARD_JAHRE_SPA = 2;
+export const STANDARD_JAHRE_SONST = 3;
+/** Obergrenze, damit Fehleingaben keine endlosen Halbjahr-Listen erzeugen. */
+export const MAX_SCHULJAHRE = 6;
+
+/**
+ * "Heute" für die Berechnung des aktuellen Halbjahres. In Tests (NODE_ENV=test)
+ * ist das Datum eingefroren (1.10.2025), damit Standardwerte nicht vom
+ * Ausführungstag abhängen; NOTEN_HEUTE (YYYY-MM-DD) überschreibt das.
+ */
+export function jetzt() {
+  if (process.env.NOTEN_HEUTE) return new Date(process.env.NOTEN_HEUTE);
+  return process.env.NODE_ENV === 'test' ? new Date('2025-10-01T12:00:00') : new Date();
+}
+
+export function standardJahre(notenschluessel) {
+  return notenschluessel === 'SPA' ? STANDARD_JAHRE_SPA : STANDARD_JAHRE_SONST;
+}
+
+export function halbjahrText(nr) {
+  return `${nr}. Halbjahr`;
+}
+
+/** "3. Halbjahr" -> 3, sonst null. */
+export function halbjahrNr(text) {
+  const treffer = /^(\d{1,2})\. Halbjahr$/.exec(String(text || '').trim());
+  return treffer ? parseInt(treffer[1], 10) : null;
+}
+
+/**
+ * Lädt die für die Laufzeit nötigen Spalten einer Klasse (Zeile aus klassen
+ * oder ID) samt Startjahr des "Heimat"-Schuljahres.
+ */
+function ladeKlasse(klasseOderId) {
+  const id = typeof klasseOderId === 'object' && klasseOderId !== null ? klasseOderId.id : klasseOderId;
+  return getDb().prepare(`
+    SELECT k.id, k.notenschluessel, k.schuljahr_id, k.einschulung_jahr, k.abschluss_jahr, s.bezeichnung AS schuljahr_bezeichnung
+    FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.id = ?
+  `).get(id);
+}
+
+/**
+ * Laufzeit-Infos einer Klasse.
+ * @returns {{ einschulungJahr: number, abschlussJahr: number, jahre: number, anzahlHalbjahre: number,
+ *   halbjahre: string[], schuljahre: Array<{nr: number, startJahr: number, bezeichnung: string}>,
+ *   abschlussIstStandard: boolean } | null}
+ */
+export function klassenLaufzeit(klasseOderId) {
+  const k = ladeKlasse(klasseOderId);
+  if (!k) return null;
+  const heimat = parseSchuljahr(k.schuljahr_bezeichnung)?.startJahr ?? aktuellesStartjahr();
+  const einschulungJahr = k.einschulung_jahr ?? heimat;
+  const abschlussIstStandard = k.abschluss_jahr === null || k.abschluss_jahr === undefined || k.abschluss_jahr < einschulungJahr;
+  const abschlussJahr = abschlussIstStandard
+    ? einschulungJahr + standardJahre(k.notenschluessel) - 1
+    : Math.min(k.abschluss_jahr, einschulungJahr + MAX_SCHULJAHRE - 1);
+  const jahre = abschlussJahr - einschulungJahr + 1;
+  const schuljahre = Array.from({ length: jahre }, (_, i) => ({
+    nr: i + 1, startJahr: einschulungJahr + i, bezeichnung: baueSchuljahrBezeichnung(einschulungJahr + i),
+  }));
+  const anzahlHalbjahre = jahre * 2;
+  return {
+    einschulungJahr, abschlussJahr, jahre, anzahlHalbjahre, schuljahre, abschlussIstStandard,
+    halbjahre: Array.from({ length: anzahlHalbjahre }, (_, i) => halbjahrText(i + 1)),
+  };
+}
+
+/** Texte "1. Halbjahr" ... "N. Halbjahr" der Klasse. */
+export function halbjahreFuerKlasse(klasseOderId) {
+  return klassenLaufzeit(klasseOderId)?.halbjahre ?? ['1. Halbjahr', '2. Halbjahr'];
+}
+
+/** Gibt `roh` zurück, wenn es ein Halbjahr der Klasse ist, sonst das aktuelle Halbjahr der Klasse. */
+export function gueltigesHalbjahrFuerKlasse(klasseOderId, roh) {
+  const liste = halbjahreFuerKlasse(klasseOderId);
+  return liste.includes(roh) ? roh : standardHalbjahr(klasseOderId, liste);
+}
+
+function standardHalbjahr(klasseOderId, liste) {
+  const l = klassenLaufzeit(klasseOderId);
+  return l ? aktuellesHalbjahrDerKlasse(l, jetzt()) : liste[0];
+}
+
+/** Schuljahr-Bezeichnung ("2026/27"), in dem das n-te Halbjahr der Klasse liegt. */
+export function schuljahrDesHalbjahrs(laufzeit, nr) {
+  if (!laufzeit || !nr) return null;
+  return laufzeit.schuljahre[Math.min(laufzeit.schuljahre.length, Math.ceil(nr / 2)) - 1]?.bezeichnung ?? null;
+}
+
+/** Hälfte im Schuljahr: 1 oder 2. */
+export function haelfteDesHalbjahrs(nr) {
+  return nr % 2 === 1 ? 1 : 2;
+}
+
+/**
+ * Aktuelles Halbjahr einer Klasse nach heutigem Datum: Schuljahr nach
+ * Startjahr, ab Februar zweite Hälfte. Vor Beginn das erste, nach Ende das
+ * letzte Halbjahr.
+ */
+export function aktuellesHalbjahrDerKlasse(laufzeit, heute = new Date()) {
+  const idx = aktuellesStartjahr(heute) - laufzeit.einschulungJahr;
+  if (idx < 0) return halbjahrText(1);
+  if (idx >= laufzeit.jahre) return halbjahrText(laufzeit.anzahlHalbjahre);
+  const monat = heute.getMonth(); // 0-basiert
+  const zweite = monat >= 1 && monat <= 6; // Februar bis Juli
+  return halbjahrText(idx * 2 + (zweite ? 2 : 1));
+}
+
+/** Liegt das Schuljahr (Startjahr) im Laufzeit-Zeitraum der Klasse? */
+export function klasseLaeuftImSchuljahr(laufzeit, startJahr) {
+  return Boolean(laufzeit) && startJahr >= laufzeit.einschulungJahr && startJahr <= laufzeit.abschlussJahr;
+}
+
+/**
+ * Ist das Halbjahr der Klasse vergangen (sein Schuljahr ist abgeschlossen oder
+ * das laufende Halbjahr ist schon vorbei)? Grundlage für die Direkteingabe der
+ * Klassenleitung.
+ */
+export function istHalbjahrVergangen(laufzeit, nr, heute = new Date()) {
+  const aktuell = halbjahrNr(aktuellesHalbjahrDerKlasse(laufzeit, heute));
+  if (aktuellesStartjahr(heute) > laufzeit.abschlussJahr) return true;
+  return nr < aktuell;
+}
+
+/**
+ * Halbjahr aus Query/Body: akzeptiert "3. Halbjahr" und nur die Ziffer ("3",
+ * wie in den SPA-Links); sonst das erste Halbjahr der Klasse.
+ */
+export function halbjahrAusEingabe(klasseOderId, roh) {
+  const liste = halbjahreFuerKlasse(klasseOderId);
+  const text = /^\d{1,2}$/.test(String(roh)) ? halbjahrText(parseInt(roh, 10)) : roh;
+  return liste.includes(text) ? text : standardHalbjahr(klasseOderId, liste);
+}
+
+/**
+ * Mündlich-Anteil (%) für ein Halbjahr einer Klasse: die Einstellung des
+ * Schuljahres, in dem dieses Halbjahr liegt (siehe schuljahre.gewichtung_
+ * muendlich); gibt es dieses Schuljahr nicht als Eintrag, gilt das Schuljahr
+ * der Klasse, sonst `standard`.
+ */
+export function muendlichProzentFuerHalbjahr(klasseId, halbjahr, standard = 60) {
+  const db = getDb();
+  const laufzeit = klassenLaufzeit(klasseId);
+  const bez = laufzeit ? schuljahrDesHalbjahrs(laufzeit, halbjahrNr(halbjahr)) : null;
+  const eigenes = bez ? db.prepare('SELECT gewichtung_muendlich AS g FROM schuljahre WHERE bezeichnung = ?').get(bez) : null;
+  if (eigenes) return eigenes.g;
+  const heimat = db.prepare('SELECT s.gewichtung_muendlich AS g FROM schuljahre s JOIN klassen k ON k.schuljahr_id = s.id WHERE k.id = ?').get(klasseId);
+  return heimat?.g ?? standard;
+}
+
+/** Startjahr aus einem Formularfeld ("2025"), sonst null. */
+export function parseJahrEingabe(roh) {
+  const n = parseInt(roh, 10);
+  return Number.isFinite(n) && n >= 2000 && n <= 2100 ? n : null;
+}
+
+/** Auswahl für Einschulungs-/Abschlussschuljahr: Startjahre mit Bezeichnung ("2025/26"). */
+export function jahresOptionen(heute = jetzt()) {
+  const jetzt = aktuellesStartjahr(heute);
+  return Array.from({ length: 12 }, (_, i) => jetzt - 5 + i).map((jahr) => ({ jahr, bezeichnung: baueSchuljahrBezeichnung(jahr) }));
+}
+
+/** { "1. Halbjahr": "2025/26", ... } für die Beschriftung der Halbjahres-Reiter. */
+export function halbjahrSchuljahrMap(klasseOderId) {
+  const l = klassenLaufzeit(klasseOderId);
+  if (!l) return {};
+  return Object.fromEntries(l.halbjahre.map((h, i) => [h, schuljahrDesHalbjahrs(l, i + 1)]));
+}

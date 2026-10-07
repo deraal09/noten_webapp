@@ -20,6 +20,7 @@ import Database from 'better-sqlite3-multiple-ciphers';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parseSchuljahr } from './schuljahr-utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -785,6 +786,14 @@ function migrate(db) {
   ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'historische_halbjahre', 'erstellt_als_fachlehrkraft', 'erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'faecher', 'nur_historisch', 'nur_historisch INTEGER NOT NULL DEFAULT 0');
+  // Laufzeit einer Klasse in Schuljahren (Startjahr, z. B. 2025 für 2025/26): siehe src/klassen-jahre.js.
+  // NULL = Einschulung ist das Schuljahr der Klasse, Abschluss die Standarddauer (SPA 2, sonst 3 Jahre).
+  ensureColumn(db, 'klassen', 'einschulung_jahr', 'einschulung_jahr INTEGER');
+  ensureColumn(db, 'klassen', 'abschluss_jahr', 'abschluss_jahr INTEGER');
+  for (const k of db.prepare('SELECT k.id, s.bezeichnung FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.einschulung_jahr IS NULL').all()) {
+    const jahr = parseSchuljahr(k.bezeichnung)?.startJahr;
+    if (jahr) db.prepare('UPDATE klassen SET einschulung_jahr = ? WHERE id = ?').run(jahr, k.id);
+  }
   // Einmalige Bereinigung: auf Bestandsdatenbanken kann ein rein historisches
   // Fach schon VOR obigem nur_historisch-Fix von fuelleFachTeilnehmerAuf
   // fälschlich mit einer Teilnehmerliste versehen worden sein, wodurch es

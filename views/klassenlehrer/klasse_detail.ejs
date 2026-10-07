@@ -6,7 +6,7 @@
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
-    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=<%= aktiverTab %><% if (gewaehltesSchuljahr) { %>&schuljahr=<%= encodeURIComponent(gewaehltesSchuljahr) %><% } %>"><%= h %></a>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=<%= aktiverTab %><% if (gewaehltesSchuljahr) { %>&schuljahr=<%= encodeURIComponent(gewaehltesSchuljahr) %><% } %>" title="Schuljahr <%= (typeof HALBJAHR_SCHULJAHR !== 'undefined' && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
   <% }); %>
 </div>
 
@@ -363,6 +363,34 @@
 </div>
 
 <div id="panel-klassenleitung" class="reiter-panel <%= aktiverTab === 'klassenleitung' ? 'active' : '' %>">
+  <h2>Laufzeit der Klasse</h2>
+  <p class="hint">
+    Die Klasse läuft vom Einschulungs- bis zum Abschlussschuljahr; die Halbjahre werden über diese
+    Schuljahre durchgezählt (aktuell <strong><%= laufzeit.anzahlHalbjahre %> Halbjahre</strong>:
+    <%= laufzeit.schuljahre.map(function(sj) { return sj.bezeichnung; }).join(', ') %>).
+    Ohne Abschlussschuljahr gilt die Standarddauer (SPA 2, BG/IHK 3 Jahre).
+  </p>
+  <% var optionenJahre = jahresOptionen.map(function(j) { return j.jahr; });
+     var alleJahre = jahresOptionen.slice();
+     [laufzeit.einschulungJahr, laufzeit.abschlussJahr].forEach(function(jahr) {
+       if (optionenJahre.indexOf(jahr) === -1) { alleJahre.push({ jahr: jahr, bezeichnung: jahr + '/' + String((jahr + 1) % 100).padStart(2, '0') }); optionenJahre.push(jahr); }
+     });
+     alleJahre.sort(function(a, b) { return a.jahr - b.jahr; }); %>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/laufzeit" class="inline">
+    <label>Einschulungsschuljahr
+      <select name="einschulung_jahr">
+        <% alleJahre.forEach(function(j) { %><option value="<%= j.jahr %>" <%= j.jahr === laufzeit.einschulungJahr ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
+      </select>
+    </label>
+    <label>Abschlussschuljahr
+      <select name="abschluss_jahr">
+        <option value="" <%= laufzeit.abschlussIstStandard ? 'selected' : '' %>>Standard (<%= klasse.notenschluessel === 'SPA' ? 2 : 3 %> Jahre)</option>
+        <% alleJahre.filter(function(j) { return j.jahr >= laufzeit.einschulungJahr; }).forEach(function(j) { %><option value="<%= j.jahr %>" <%= (!laufzeit.abschlussIstStandard && j.jahr === laufzeit.abschlussJahr) ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
+      </select>
+    </label>
+    <button type="submit">Laufzeit speichern</button>
+  </form>
+
   <h2>Weitere Klassenlehrkräfte</h2>
   <p class="hint">
     Alle hier eingetragenen Personen sind gleichberechtigte Klassenleitung — sie sehen alle Noten

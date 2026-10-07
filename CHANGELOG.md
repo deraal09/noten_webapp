@@ -6,6 +6,24 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.52.0 - 2026-10-07
+
+- Klassen laufen über mehrere Schuljahre: jede Klasse hat ein
+  Einschulungs- und ein Abschlussschuljahr (beim Anlegen optional, später im
+  Klassenleitungsbereich unter "Laufzeit der Klasse" änderbar). Bestehende
+  Klassen starten im Schuljahr, in dem sie angelegt wurden; ohne Abschlussjahr
+  gilt die Standarddauer: BG/IHK drei Jahre (6 Halbjahre), SPA zwei Jahre
+  (4 Halbjahre).
+- Die Halbjahre werden über die Laufzeit durchgezählt (1. bis N. Halbjahr, im
+  Reiter mit dem Schuljahr als Tooltip). Fachseiten, Klassenleitungsübersicht,
+  Konferenzmodus, Notenbesprechung, Export und Abschluss-/Abgangsauswertung
+  kennen alle Halbjahre der Klasse; ohne Angabe öffnet sich das aktuelle
+  Halbjahr nach Datum. Der Mündlich-Anteil richtet sich nach dem Schuljahr des
+  jeweiligen Halbjahres.
+- Eine Klasse erscheint in "Meine Klassen" im Reiter jedes Schuljahres ihrer
+  Laufzeit. Die Laufzeit lässt sich nicht so kürzen, dass Halbjahre mit
+  bereits eingetragenen Leistungen wegfallen.
+
 ## 0.51.2 - 2026-10-06
 
 - SPA-Eingabemaske: Die Felder für die Notenpunkte haben keine Pfeile mehr,

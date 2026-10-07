@@ -9,7 +9,8 @@
 
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
-import { HALBJAHRE, gesamtnoteJahr, parseTendenzNote, NTG } from './grade-calc.js';
+import { gesamtnoteJahr, parseTendenzNote, NTG } from './grade-calc.js';
+import { klassenLaufzeit, halbjahrNr, schuljahrDesHalbjahrs } from './klassen-jahre.js';
 import { userHatFachZgriff, userIstKlassenlehrer } from './auth.js';
 import { holeSchuelerId } from './schueler-utils.js';
 import { parseSchuljahr } from './schuljahr-utils.js';
@@ -203,7 +204,7 @@ export function schliesseFachAb(fachId, userId) {
       'SELECT s.id FROM fach_teilnehmer ft JOIN schueler s ON s.id = ft.schueler_id WHERE ft.fach_id = ?'
     ).all(fachId);
 
-  const hjNotenMaps = HALBJAHRE.map((hj) => berechneGesamtnoten(fachId, hj));
+  const hjNotenMaps = klassenLaufzeit(fach.klasse_id).halbjahre.map((hj) => berechneGesamtnoten(fachId, hj));
   const historischeHalbjahre = ladeHistorischeHalbjahre(fachId);
   const historischeNotenMaps = historischeHalbjahre.map((hh) => ladeHistorischeNoten(hh.id));
 
@@ -358,12 +359,14 @@ export function ladeFachNotenEintraege(fach, schuelerId) {
       });
     }
   } else if (!fach.nur_historisch) {
-    HALBJAHRE.forEach((hj, i) => {
+    const laufzeit = klassenLaufzeit(fach.klasse_id);
+    laufzeit.halbjahre.forEach((hj, i) => {
       const note = berechneGesamtnoten(fach.id, hj).get(schuelerId) ?? null;
       if (note === null) return;
+      const schuljahr = schuljahrDesHalbjahrs(laufzeit, i + 1) ?? fach.schuljahr_bezeichnung;
       eintraege.push({
-        label: `${hj} ${fach.schuljahr_bezeichnung}`, note, anzeige: null, spa: false,
-        sortierung: zeugnisSortierschluessel(fach.schuljahr_bezeichnung, i + 1),
+        label: `${hj} ${schuljahr}`, note, anzeige: null, spa: false,
+        sortierung: zeugnisSortierschluessel(schuljahr, i + 1),
       });
     });
   }

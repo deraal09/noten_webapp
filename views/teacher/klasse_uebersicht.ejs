@@ -8,7 +8,7 @@
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
-    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>"><%= h %></a>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>" title="Schuljahr <%= (typeof HALBJAHR_SCHULJAHR !== 'undefined' && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
   <% }); %>
 </div>
 

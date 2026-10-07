@@ -9,7 +9,8 @@
 
 import { getDb } from '../db.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
-import { HALBJAHRE, FEHLZEIT_TYPEN } from '../grade-calc.js';
+import { FEHLZEIT_TYPEN } from '../grade-calc.js';
+import { halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, klassenLaufzeit, jahresOptionen } from '../klassen-jahre.js';
 import { ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
   ladeAbschlussuebersicht, ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu,
@@ -117,7 +118,7 @@ export default async function klassenlehrerRoutes(fastify) {
     if (!userIstKlassenlehrer(request.user, klasse.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
-    const halbjahr = HALBJAHRE.includes(request.query?.hj) ? request.query.hj : HALBJAHRE[0];
+    const halbjahr = halbjahrAusEingabe(klasse.id, request.query?.hj);
     const gueltigeTabs = ['uebersicht', 'halbjahr', 'fehlzeiten', 'abschluss', 'klassenleitung'];
     const aktiverTab = gueltigeTabs.includes(request.query?.tab) ? request.query.tab : 'uebersicht';
     const schueler = getDb().prepare(
@@ -209,7 +210,7 @@ export default async function klassenlehrerRoutes(fastify) {
       .filter((s) => s.aufhebung_angefragt).length;
 
     return reply.viewEjs('klassenlehrer/klasse_detail.ejs', {
-      user: request.user, klasse, halbjahr, schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
+      user: request.user, klasse, halbjahr, HALBJAHRE: halbjahreFuerKlasse(klasse.id), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(klasse.id), laufzeit: klassenLaufzeit(klasse.id), jahresOptionen: jahresOptionen(), schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
       halbjahresuebersicht, abschlussuebersicht, klassenleitungListe, zuweisbareLehrkraefte,
       offeneEntsperrAnfragen, vergangeneSchuljahre,
       verfuegbareSchuljahre, gewaehltesSchuljahr, historischeHalbjahresuebersicht, faecherOhneLehrkraft,
@@ -513,7 +514,7 @@ export default async function klassenlehrerRoutes(fastify) {
       getDb().prepare('INSERT INTO schueler_notizen (schueler_id, text, created_by_id) VALUES (?, ?, ?)')
         .run(request.params.id, text, request.user.id);
     }
-    const halbjahr = HALBJAHRE.includes(request.body?.hj) ? request.body.hj : HALBJAHRE[0];
+    const halbjahr = halbjahrAusEingabe(schueler.klasse_id, request.body?.hj);
     return reply.redirect(`/klassenlehrer/klasse/${schueler.klasse_id}?hj=${encodeURIComponent(halbjahr)}&tab=fehlzeiten`);
   });
 
@@ -523,7 +524,7 @@ export default async function klassenlehrerRoutes(fastify) {
     if (!userIstKlassenlehrer(request.user, klasse.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
-    const halbjahr = HALBJAHRE.includes(request.body?.hj) ? request.body.hj : HALBJAHRE[0];
+    const halbjahr = halbjahrAusEingabe(klasse.id, request.body?.hj);
     const schueler = getDb().prepare(
       'SELECT id FROM schueler WHERE klasse_id = ?'
     ).all(klasse.id);

@@ -3,10 +3,11 @@
  * Excel-freundlich (UTF-8 BOM, ; als Trennzeichen).
  */
 
+import { klassenLaufzeit, halbjahrNr, schuljahrDesHalbjahrs, muendlichProzentFuerHalbjahr } from '../klassen-jahre.js';
 import { getDb } from '../db.js';
 import { requireAuth, userDarfKlasseExportieren } from '../auth.js';
 import {
-  HALBJAHRE, noteAusPunkten, klausurNote, parseKlausurTeile, gesamtnoteHj, gesamtnoteJahr, unterrichtsleistungNote, formatNote,
+  noteAusPunkten, klausurNote, parseKlausurTeile, gesamtnoteHj, gesamtnoteJahr, unterrichtsleistungNote, formatNote,
 } from '../grade-calc.js';
 
 export default async function exportRoutes(fastify) {
@@ -106,13 +107,15 @@ function baueKlasseCsv(klasse) {
     fzMap[fz.schueler_id][fz.halbjahr][fz.typ] = fz.stunden;
   }
   const lines = [];
+  const laufzeit = klassenLaufzeit(klasse.id);
+  const HALBJAHRE = laufzeit.halbjahre;
   for (const f of faecher) {
     for (const s of schueler) {
       for (const hj of HALBJAHRE) {
         const zeile = zeileFuerSchuelerFachHj(klasse, csv, f, s, hj);
         const fzHj = fzMap[s.id]?.[hj] || {};
         lines.push([
-          klasse.schuljahr_bezeichnung, klasse.name, klasse.notenschluessel,
+          schuljahrDesHalbjahrs(laufzeit, halbjahrNr(hj)) ?? klasse.schuljahr_bezeichnung, klasse.name, klasse.notenschluessel,
           f.name, s.nachname, s.vorname, hj,
           zeile.muendlich_manuell, zeile.muendlich_bewertet,
           zeile.schriftlich_manuell, zeile.klausuren,
@@ -170,10 +173,7 @@ function zeileFuerSchuelerFachHj(klasse, csv, fach, schueler, halbjahr) {
     if (row?.wert !== null && row?.wert !== undefined) datumsWerte.push(row.wert);
   }
   const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen);
-  const sj = db.prepare(`
-    SELECT s.gewichtung_muendlich FROM schuljahre s JOIN klassen k ON k.schuljahr_id = s.id WHERE k.id = ?
-  `).get(klasse.id);
-  const ulPct = sj?.gewichtung_muendlich || 60;
+  const ulPct = muendlichProzentFuerHalbjahr(klasse.id, halbjahr, 60);
   const schriftlichPct = 100 - ulPct;
   const manuelle = { muendlich: [], schriftlich: [] };
   const notenRows = db.prepare(

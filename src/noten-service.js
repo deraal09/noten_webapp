@@ -10,6 +10,7 @@ import {
   klausurNote, klausurTeilNoten, parseKlausurTeile,
   DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from './grade-calc.js';
+import { muendlichProzentFuerHalbjahr } from './klassen-jahre.js';
 
 /** Lädt Unterrichtstermine + eingetragene Noten für ein Fach+Halbjahr (Datumstabelle). */
 function ladeUnterrichtTermine(fachId, halbjahr) {
@@ -134,8 +135,7 @@ export function berechneGesamtnoten(fachId, halbjahr) {
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
   const csvStr = getNotenschluesselCsv(fach);
-  const schuljahr = db.prepare('SELECT gewichtung_muendlich FROM schuljahre WHERE id = ?').get(fach.schuljahr_id);
-  const ulPct = schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG;
+  const ulPct = muendlichProzentFuerHalbjahr(fach.klasse_id, halbjahr, DEFAULT_GEWICHTUNG);
   const schriftlichPct = 100 - ulPct;
 
   const klausurErgs = new Map();
@@ -187,8 +187,7 @@ export function berechneGesamtnoteEinerPerson(fachId, halbjahr, schuelerId) {
   const fach = ladeFachMitUmfeld(fachId);
   if (!fach) return null;
   const csvStr = getNotenschluesselCsv(fach);
-  const schuljahr = db.prepare('SELECT gewichtung_muendlich FROM schuljahre WHERE id = ?').get(fach.schuljahr_id);
-  const ulPct = schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG;
+  const ulPct = muendlichProzentFuerHalbjahr(fach.klasse_id, halbjahr, DEFAULT_GEWICHTUNG);
 
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
@@ -240,8 +239,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
   const csvStr = getNotenschluesselCsv(fach);
-  const schuljahr = db.prepare('SELECT gewichtung_muendlich FROM schuljahre WHERE id = ?').get(fach.schuljahr_id);
-  const ulPct = schuljahr?.gewichtung_muendlich ?? DEFAULT_GEWICHTUNG;
+  const ulPct = muendlichProzentFuerHalbjahr(fach.klasse_id, halbjahr, DEFAULT_GEWICHTUNG);
   const schriftlichPct = 100 - ulPct;
 
   const klausurErgs = new Map();

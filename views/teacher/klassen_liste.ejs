@@ -58,7 +58,19 @@
               <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
             </select>
           </label>
-          <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>
+          <label>Einschulungsschuljahr (optional)
+          <select name="einschulung_jahr">
+            <option value="">wie gewähltes Schuljahr</option>
+            <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
+          </select>
+        </label>
+        <label>Abschlussschuljahr (optional)
+          <select name="abschluss_jahr">
+            <option value="">Standard (SPA 2 Jahre, sonst 3 Jahre)</option>
+            <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
+          </select>
+        </label>
+        <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>
           <div class="spa-bildungsgang-auswahl" style="display:none;">
             <p class="hint">
               SPA-Klassen laufen durchgehend über 4 Halbjahre (2 Schuljahre) mit fest vorgegebenen
@@ -97,6 +109,18 @@
             <option value="IHK" selected>IHK (1–6)</option>
             <option value="BG">BG (0–15 Punkte)</option>
             <option value="SPA">SPA (Sozialpädagogische Assistenz)</option>
+          </select>
+        </label>
+        <label>Einschulungsschuljahr (optional)
+          <select name="einschulung_jahr">
+            <option value="">wie gewähltes Schuljahr</option>
+            <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
+          </select>
+        </label>
+        <label>Abschlussschuljahr (optional)
+          <select name="abschluss_jahr">
+            <option value="">Standard (SPA 2 Jahre, sonst 3 Jahre)</option>
+            <% jahresOptionen.forEach(function(j) { %><option value="<%= j.jahr %>"><%= j.bezeichnung %></option><% }); %>
           </select>
         </label>
         <p class="hint">Bei IHK/BG kann der Admin den Notenschlüssel nachträglich ändern.</p>
