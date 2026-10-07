@@ -1,4 +1,7 @@
 <h1>Meine Klassen</h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher">📝 Zur Noteneingabe</a>
+</p>
 <p><small>
   <% if (kannSelbstKlasseAnlegen) { %>
     Als Lehrkraft mit LDAP-Zugang kannst du eigene Klassen selbst anlegen — eine Zuweisung durch
@@ -218,6 +221,7 @@
               <% } else { %>
                 <div class="kachel-sub">Notenschlüssel: <%= k.notenschluessel %></div>
                 <div class="kachel-aktionen">
+                  <a href="/teacher#klasse-<%= k.id %>">📝 Noteneingabe</a>
                   <a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a>
                 </div>
               <% } %>

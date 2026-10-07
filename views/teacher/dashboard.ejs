@@ -5,7 +5,7 @@
 <% } %>
 
 <% byKlasse.forEach(function(k) { %>
-    <h2><%= k.name %> <small>(<%= k.schuljahr_bezeichnung %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
+    <h2 id="klasse-<%= k.id %>"><%= k.name %> <small>(<%= k.schuljahr_bezeichnung %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
     <ul class="klasse-liste">
       <% k.faecher.forEach(function(f) { %>
         <li>

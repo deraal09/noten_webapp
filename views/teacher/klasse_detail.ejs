@@ -1,6 +1,7 @@
 <h1><%= klasse.name %> <small>(<%= klasse.schuljahr_bezeichnung %>)</small></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
+  <% if (!klasse.ist_ablage) { %><a class="btn" href="/teacher#klasse-<%= klasse.id %>">📝 Noteneingabe</a><% } %>
   <% if (!klasse.ist_ablage) { %><a class="btn" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a><% } %>
   <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
     <a class="btn" href="/teacher/klassen/<%= klasse.id %>/zeugnis">📋 Zeugnisübersicht</a>

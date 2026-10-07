@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.56.1 - 2026-10-07
+
+- "Meine Klassen": Button "Zur Noteneingabe" oben, je Klasse ein Link
+  "Noteneingabe" und auf der Klassenseite der Button "Noteneingabe". Sie führen
+  zur Noteneingabe und springen dort direkt zur jeweiligen Klasse.
+
 ## 0.56.0 - 2026-10-07
 
 - SPA: Die Noteneingabe ist jetzt wie bei IHK/BG die Fachseite mit

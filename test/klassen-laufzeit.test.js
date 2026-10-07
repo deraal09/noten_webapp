@@ -174,6 +174,14 @@ test('Klassen-Seite der Klassenleitung zeigt Laufzeit-Formular und alle Halbjahr
   assert.match(html, />6\. Halbjahr</);
 });
 
+test('Buttons zur Noteneingabe: auf "Meine Klassen" (oben und je Klasse) und auf der Klassenseite', async () => {
+  const liste = await (await admin('/teacher/klassen')).text();
+  assert.match(liste, /<a class="btn" href="\/teacher">📝 Zur Noteneingabe<\/a>/);
+  assert.match(liste, new RegExp(`<a href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
+  const klasse = await (await admin(`/teacher/klassen/${ihkId}`)).text();
+  assert.match(klasse, new RegExp(`<a class="btn" href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
+});
+
 test.after(async () => {
   await fastify.close();
 });
