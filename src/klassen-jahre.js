@@ -242,3 +242,39 @@ export function aktuelleHalbjahrNummern(laufzeit, heute = jetzt()) {
   const erste = nr % 2 === 1 ? nr : nr - 1;
   return [erste, erste + 1].filter((n) => n <= laufzeit.anzahlHalbjahre);
 }
+
+// ---------- Verrechnung der Halbjahresnoten ----------
+
+/** Verrechnung der Klasse als { [vonHalbjahrNr]: prozent }. */
+export function ladeVerrechnung(klasseId) {
+  const roh = getDb().prepare('SELECT verrechnung FROM klassen WHERE id = ?').get(klasseId)?.verrechnung;
+  if (!roh) return {};
+  try {
+    const obj = JSON.parse(roh);
+    const ergebnis = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const p = Number(v);
+      if (Number.isInteger(Number(k)) && Number.isFinite(p) && p > 0) ergebnis[k] = Math.min(100, p);
+    }
+    return ergebnis;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Prozent der Note aus dem VORHERIGEN Halbjahr, die in dieses Halbjahr
+ * einfließen (0 beim 1. Halbjahr oder wenn nicht eingestellt).
+ */
+export function verrechnungsProzent(klasseId, halbjahr) {
+  const nr = halbjahrNr(halbjahr);
+  if (!nr || nr < 2) return 0;
+  return ladeVerrechnung(klasseId)[String(nr - 1)] ?? 0;
+}
+
+/** Mischt die Note des Halbjahres mit der des Vorhalbjahres: (1-p)*aktuell + p*vorher, auf 2 Stellen gerundet. */
+export function wendeVerrechnungAn(aktuell, vorher, prozent) {
+  if (!prozent || aktuell === null || aktuell === undefined || vorher === null || vorher === undefined) return aktuell ?? null;
+  const p = prozent / 100;
+  return Math.round(((1 - p) * aktuell + p * vorher) * 100) / 100;
+}

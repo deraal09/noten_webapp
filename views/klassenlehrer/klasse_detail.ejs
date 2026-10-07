@@ -466,6 +466,28 @@
     <button type="submit">Laufzeit speichern</button>
   </form>
 
+  <h2>Verrechnung der Halbjahre</h2>
+  <p class="hint">
+    Legt fest, zu wie viel Prozent die Note eines Halbjahres in das <strong>nächste</strong> Halbjahr einfließt
+    (0 % = gar nicht). Beispiel: 50 % bei „1. → 2. Halbjahr" – die 2.-Halbjahres-Note besteht je zur Hälfte aus den
+    Leistungen des 2. Halbjahres und der (endgültigen) Note des 1. Halbjahres; „3. → 4." bleibt bei 0 %, dann zählt
+    das 4. Halbjahr nur für sich. Gilt für alle Fächer der Klasse außer SPA.
+  </p>
+  <% if (laufzeit.anzahlHalbjahre < 2) { %>
+    <p class="hint">Mit nur einem Halbjahr gibt es keine Verrechnung.</p>
+  <% } else { %>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/verrechnung" class="card">
+      <div class="verrechnung-raster">
+        <% for (var vn = 1; vn < laufzeit.anzahlHalbjahre; vn++) { %>
+          <label class="feld"><%= vn %>. → <%= vn + 1 %>. Halbjahr
+            <span class="feld-mit-einheit"><input type="number" name="p_<%= vn %>" min="0" max="100" step="1" value="<%= verrechnung[String(vn)] || 0 %>">%</span>
+          </label>
+        <% } %>
+      </div>
+      <button type="submit">Verrechnung speichern</button>
+    </form>
+  <% } %>
+
   <h2>Weitere Klassenlehrkräfte</h2>
   <p class="hint">
     Alle hier eingetragenen Personen sind gleichberechtigte Klassenleitung — sie sehen alle Noten

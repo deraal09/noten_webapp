@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.54.0 - 2026-10-07
+
+- Verrechnung der Halbjahresnoten: Im Klassenleitungsbereich (Reiter "Weitere
+  Klassenlehrkräfte", Abschnitt "Verrechnung der Halbjahre") lässt sich je
+  Übergang einstellen, zu wie viel Prozent die Note eines Halbjahres in das
+  nächste einfließt, z. B. 1. → 2. Halbjahr 50 %, 3. → 4. Halbjahr 0 %. Das
+  Halbjahr besteht dann aus (100 − p) % eigenen Leistungen und p % der
+  endgültigen Note des Vorhalbjahres (samt dessen Endnote bzw. eigener
+  Verrechnung). Ohne eigene Note im Halbjahr entsteht keine Note.
+- Fachseite: bei aktiver Verrechnung zeigt die Notenübersicht die Spalte
+  "Vorhalbjahr"; die Tabelle der direkten Endnoteneingabe zeigt die
+  verrechnete Note als "Berechnet". Die Synchronisation mit der Klassenleitung
+  aktualisiert ein bereits synchronisiertes Folgehalbjahr mit.
+
 ## 0.53.0 - 2026-10-07
 
 - Direkte Endnoteneingabe: Bei allen Fächern (außer SPA) gibt es auf der

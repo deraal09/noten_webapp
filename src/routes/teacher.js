@@ -329,7 +329,7 @@ export default async function teacherRoutes(fastify) {
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
       termine: uebersicht.termine, unterrichtNotizAnzahl,
-      rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct,
+      rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct, verrechnung: uebersicht.verrechnung,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       historischeHalbjahre, schuelerHistorie, abschlussnoten, sperren, teilnehmer,
       darfFachAbschliessen: userDarfFachBearbeiten(request.user, fach),
@@ -1352,6 +1352,34 @@ export default async function teacherRoutes(fastify) {
     getDb().prepare('UPDATE klassen SET einschulung_jahr = ?, abschluss_jahr = ? WHERE id = ?').run(einschulung, abschluss, klasse.id);
     request.flash?.('success', 'Laufzeit der Klasse gespeichert.');
     return reply.redirect(zurueck);
+  });
+
+  // ---------- Verrechnung der Halbjahresnoten (Prozent je Übergang) ----------
+  // p_<n> = Prozent der Note aus Halbjahr n, die in Halbjahr n+1 einfließen
+  // (0 = gar nicht). Gilt für alle Fächer der Klasse (außer SPA-Fächern, die
+  // ihr eigenes Vorwert-Schema haben). Nur Klassenleitung/Admin.
+  fastify.post('/klassen/:id/verrechnung', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung oder der Admin dürfen die Verrechnung ändern.' });
+    }
+    const laufzeit = klassenLaufzeit(klasse.id);
+    const werte = {};
+    for (let n = 1; n < laufzeit.anzahlHalbjahre; n++) {
+      const roh = String(request.body?.[`p_${n}`] ?? '').trim().replace(',', '.');
+      if (roh === '') continue;
+      const p = Number(roh);
+      if (!Number.isFinite(p) || p < 0 || p > 100) {
+        request.flash?.('error', `Ungültiger Prozentwert für Halbjahr ${n} → ${n + 1} (erlaubt: 0 bis 100).`);
+        return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?tab=klassenleitung`);
+      }
+      if (p > 0) werte[n] = Math.round(p * 10) / 10;
+    }
+    getDb().prepare('UPDATE klassen SET verrechnung = ? WHERE id = ?').run(Object.keys(werte).length ? JSON.stringify(werte) : null, klasse.id);
+    // Die Sync-Stände der Fächer sind damit veraltet -- Fachlehrkräfte mit Auto-Sync aktualisieren sich bei der nächsten Eingabe.
+    request.flash?.('success', 'Verrechnung gespeichert.');
+    return reply.redirect(`/klassenlehrer/klasse/${klasse.id}?tab=klassenleitung`);
   });
 
   // ---------- Beitritt zu einer bereits bestehenden Klasse (Namenskollision) ----------

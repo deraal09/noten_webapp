@@ -12,7 +12,7 @@
 import { getDb } from './db.js';
 import { berechneGesamtnoten, ladeFaecherFuerKlassenleitung } from './noten-service.js';
 import { ladeSperrenFuerKlasse } from './noten-sperre.js';
-import { fachGiltInHalbjahr } from './klassen-jahre.js';
+import { fachGiltInHalbjahr, verrechnungsProzent, halbjahrNr, halbjahrText } from './klassen-jahre.js';
 
 /** Schreibt den aktuellen Notenstand eines Fachs/Halbjahrs in den Sync-Stand. */
 export function syncFach(fachId, halbjahr, userId) {
@@ -36,6 +36,15 @@ export function syncFach(fachId, halbjahr, userId) {
     `).run(fachId, halbjahr, userId);
   });
   tx();
+  // Fließt diese Halbjahresnote per Verrechnung ins nächste Halbjahr ein und
+  // wurde dieses schon einmal synchronisiert, wird dessen Stand mit aktualisiert.
+  const fach = db.prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(fachId);
+  const nr = halbjahrNr(halbjahr);
+  if (fach && nr) {
+    const naechstes = halbjahrText(nr + 1);
+    const schonSynchronisiert = db.prepare('SELECT 1 AS x FROM fach_sync_meta WHERE fach_id = ? AND halbjahr = ?').get(fachId, naechstes);
+    if (schonSynchronisiert && verrechnungsProzent(fach.klasse_id, naechstes) > 0) syncFach(fachId, naechstes, userId);
+  }
 }
 
 /** Nach einer Notenänderung aufrufen: synchronisiert nur, wenn der Haken für diese Lehrkraft/dieses Fach gesetzt ist. */

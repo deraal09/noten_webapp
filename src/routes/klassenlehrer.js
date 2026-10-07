@@ -11,7 +11,7 @@ import { getDb } from '../db.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
 import { FEHLZEIT_TYPEN } from '../grade-calc.js';
 import { ladeEndnotenRaster } from '../endnoten-raster.js';
-import { halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, klassenLaufzeit, jahresOptionen } from '../klassen-jahre.js';
+import { halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, klassenLaufzeit, jahresOptionen, ladeVerrechnung } from '../klassen-jahre.js';
 import { ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
   ladeAbschlussuebersicht, ladeVergangeneSchuljahre, fuegeVergangenesSchuljahrHinzu,
@@ -214,7 +214,7 @@ export default async function klassenlehrerRoutes(fastify) {
       .filter((s) => s.aufhebung_angefragt).length;
 
     return reply.viewEjs('klassenlehrer/klasse_detail.ejs', {
-      user: request.user, klasse, halbjahr, HALBJAHRE: halbjahreFuerKlasse(klasse.id), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(klasse.id), laufzeit: klassenLaufzeit(klasse.id), endnotenRaster, jahresOptionen: jahresOptionen(), schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
+      user: request.user, klasse, halbjahr, HALBJAHRE: halbjahreFuerKlasse(klasse.id), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(klasse.id), laufzeit: klassenLaufzeit(klasse.id), endnotenRaster, verrechnung: ladeVerrechnung(klasse.id), jahresOptionen: jahresOptionen(), schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
       halbjahresuebersicht, abschlussuebersicht, klassenleitungListe, zuweisbareLehrkraefte,
       offeneEntsperrAnfragen, vergangeneSchuljahre,
       verfuegbareSchuljahre, gewaehltesSchuljahr, historischeHalbjahresuebersicht, faecherOhneLehrkraft,

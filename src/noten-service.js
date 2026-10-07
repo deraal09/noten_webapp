@@ -10,7 +10,7 @@ import {
   klausurNote, klausurTeilNoten, parseKlausurTeile,
   DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from './grade-calc.js';
-import { muendlichProzentFuerHalbjahr } from './klassen-jahre.js';
+import { muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
 import { ladeEndnoten } from './halbjahr-endnoten.js';
 
 /** Lädt Unterrichtstermine + eingetragene Noten für ein Fach+Halbjahr (Datumstabelle). */
@@ -130,8 +130,25 @@ export function berechneGesamtnoten(fachId, halbjahr) {
   return ergebnis;
 }
 
-/** Wie berechneGesamtnoten, aber ohne direkt eingetragene Endnoten (rein aus Klausuren/Unterrichtsleistung). */
+/**
+ * Halbjahresnote aus Klausuren/Unterrichtsleistung INKLUSIVE Verrechnung mit
+ * dem Vorhalbjahr (siehe verrechnungsProzent), aber ohne direkt eingetragene
+ * Endnoten. Das Vorhalbjahr zählt mit seiner endgültigen Note (also samt
+ * dessen Endnote bzw. eigener Verrechnung).
+ */
 export function berechneGesamtnotenOhneEndnoten(fachId, halbjahr) {
+  const roh = berechneRohnoten(fachId, halbjahr);
+  const fach = ladeFachMitUmfeld(fachId);
+  if (!fach || fach.spa_fach_key) return roh;
+  const prozent = verrechnungsProzent(fach.klasse_id, halbjahr);
+  if (!prozent) return roh;
+  const vorher = berechneGesamtnoten(fachId, halbjahrText(halbjahrNr(halbjahr) - 1));
+  for (const [schuelerId, note] of roh) roh.set(schuelerId, wendeVerrechnungAn(note, vorher.get(schuelerId) ?? null, prozent));
+  return roh;
+}
+
+/** Rein aus Klausuren/Unterrichtsleistung berechnete Halbjahresnote (ohne Verrechnung, ohne Endnoten). */
+export function berechneRohnoten(fachId, halbjahr) {
   const fach = ladeFachMitUmfeld(fachId);
   const ergebnis = new Map();
   if (!fach) return ergebnis;
@@ -274,6 +291,10 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   const { termine, noten: terminNoten, na: terminNa } = ladeUnterrichtTermine(fach.id, halbjahr);
 
   const endnoten = ladeEndnoten(fach.id, halbjahr);
+  // Verrechnung mit dem Vorhalbjahr (Einstellung der Klasse, siehe verrechnungsProzent).
+  const verrechnungProzent = fach.spa_fach_key ? 0 : verrechnungsProzent(fach.klasse_id, halbjahr);
+  const vorhalbjahr = verrechnungProzent ? halbjahrText(halbjahrNr(halbjahr) - 1) : null;
+  const vorherNoten = verrechnungProzent ? berechneGesamtnoten(fach.id, vorhalbjahr) : new Map();
   const rows = schueler.map((s) => {
     const klausurData = klausuren.map((k) => {
       const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
@@ -295,13 +316,15 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null, na: eigeneNa.has(t.id) }));
     const datumsWerte = datumsWerteFuerSchueler(s.id, termine, terminNoten);
     const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, ulData);
-    const berechnet = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
+    const ohneVerrechnung = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
+    const vorherNote = vorherNoten.get(s.id) ?? null;
+    const berechnet = wendeVerrechnungAn(ohneVerrechnung, vorherNote, verrechnungProzent);
     // Direkt eingetragene Endnote (siehe src/halbjahr-endnoten.js) ersetzt die berechnete Note.
     const endnote = endnoten.get(s.id) ?? null;
     const gn = endnote ? (endnote.ntg ? null : endnote.note) : berechnet;
     return {
       schueler_id: s.id, nachname: s.nachname, vorname: s.vorname,
-      endnote, gesamtBerechnet: berechnet,
+      endnote, gesamtBerechnet: berechnet, gesamtOhneVerrechnung: ohneVerrechnung, vorhalbjahrNote: vorherNote,
       // Nur gesetzt, wenn die Person aus einer ANDEREN Klasse als der
       // Heimat-Klasse dieses Fachs stammt (klassenübergreifender Kurs).
       herkunftKlasse: s.klasse_id === fach.klasse_id ? null : s.herkunft_klasse_name,
@@ -318,7 +341,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   });
 
   return {
-    schriftlichPct, ulPct, csvStr, uls, termine, schueler, rows,
+    schriftlichPct, ulPct, csvStr, uls, termine, schueler, rows, verrechnung: { prozent: verrechnungProzent, vorhalbjahr },
     klausuren: klausuren.map((k) => ({ ...k, teileInfo: parseKlausurTeile(k.teile) })),
   };
 }

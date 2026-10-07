@@ -809,6 +809,8 @@ function migrate(db) {
   ensureColumn(db, 'klassen', 'abschluss_jahr', 'abschluss_jahr INTEGER');
   // Halbjahre, in denen ein Fach gilt (JSON-Array der Halbjahr-Nummern, z. B. [1,2]); NULL = alle Halbjahre der Klasse.
   ensureColumn(db, 'faecher', 'halbjahre', 'halbjahre TEXT');
+  // Verrechnung der Halbjahresnoten: JSON {"1": 50, ...} = Prozent der Note aus Halbjahr n, die in Halbjahr n+1 einfließen (fehlt = 0).
+  ensureColumn(db, 'klassen', 'verrechnung', 'verrechnung TEXT');
   for (const k of db.prepare('SELECT k.id, s.bezeichnung FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.einschulung_jahr IS NULL').all()) {
     const jahr = parseSchuljahr(k.bezeichnung)?.startJahr;
     if (jahr) db.prepare('UPDATE klassen SET einschulung_jahr = ? WHERE id = ?').run(jahr, k.id);

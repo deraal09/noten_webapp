@@ -561,3 +561,6 @@ details.hj-bearbeiten summary { cursor: pointer; }
 details.hj-bearbeiten form { margin-top: 0.4rem; }
 
 input.endnote-raster { width: 4.5rem; text-align: center; }
+
+.verrechnung-raster { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-bottom: 0.5rem; }
+.verrechnung-raster input[type=number] { width: 4.5rem; }
