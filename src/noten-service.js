@@ -10,7 +10,7 @@ import {
   klausurNote, klausurTeilNoten, parseKlausurTeile,
   DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from './grade-calc.js';
-import { muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
+import { sortiereFaecher, muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
 import { ladeEndnoten } from './halbjahr-endnoten.js';
 import { unterfaecherImHalbjahr } from './unterfaecher.js';
 import { sortiereNachName } from './format.js';
@@ -90,7 +90,7 @@ export function ladeFaecherFuerKlassenleitung(klasseId) {
       AND f.parent_fach_id IS NULL
     ORDER BY f.name
   `).all(klasseId);
-  return sortiereNachName(rows);
+  return sortiereFaecher(rows);
 }
 
 /** Fächer, an denen eine bestimmte Person teilnimmt (für den Konferenzmodus). */

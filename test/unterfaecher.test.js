@@ -222,7 +222,7 @@ test('Fächer werden alphabetisch sortiert (deutsch: Groß-/Kleinschreibung egal
     await form(admin, `/teacher/klassen/${klasseId}/faecher/neu`, { name: n });
   }
   const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
-  const pos = (n) => html.indexOf(`class="fach-name" href="/teacher/fach/${getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasseId, n).id}"`);
+  const pos = (n) => html.indexOf(`data-fach-optionen data-fach-id="${getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasseId, n).id}"`);
   const reihenfolge = ['Biologie', 'Deutsch', 'englisch', 'LF2', 'LF10', 'Mathe', 'Ökonomie'].map(pos);
   assert.ok(reihenfolge.every((p) => p > 0), 'alle Fächer stehen auf der Seite');
   assert.deepEqual([...reihenfolge].sort((a, b) => a - b), reihenfolge, 'Reihenfolge ist alphabetisch');
@@ -246,6 +246,41 @@ test('Noteneingabe: Klassenfilter oben, sobald Fächer in mehreren Klassen/Kurse
   assert.match(html, new RegExp(`<option value="klasse-${klasseId}">11A`));
   assert.match(html, new RegExp(`data-gruppe="klasse-${b}"`));
   assert.ok(html.indexOf('id="klassenfilter"') < html.indexOf('class="klassen-gruppe"'), 'Filter steht oberhalb der Klassen');
+});
+
+test('Fach bearbeiten: Name, Halbjahre, Verrechnung; Fach anlegen mit Verrechnung; Dialog am Fachnamen', async () => {
+  const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, new RegExp(`<button type="button" class="fach-name fach-name-knopf" data-fach-optionen data-fach-id="${matheId}"`));
+  assert.match(html, /<dialog id="fach-optionen-dialog"/);
+  assert.match(html, /<dialog id="fach-bearbeiten-dialog"/);
+  assert.match(html, /<input type="hidden" name="verrechnung_gesetzt" value="1">/, 'Verrechnung auch beim Anlegen');
+  // Nicht-Klassenleitung: normaler Link zur Noteneingabe, kein Bearbeiten
+  assert.equal((await form(lehrer, `/teacher/faecher/${matheId}/bearbeiten`, { name: 'X' })).status, 403);
+  // Umbenennen + Verrechnung; Unterfächer ziehen den Namen mit
+  const alg = unterId('Algebra');
+  let r = await form(admin, `/teacher/faecher/${matheId}/bearbeiten`, { name: 'Mathematik', halbjahre: ['1', '2', '3', '5', '6'], p_1: '30', p_2: '0' });
+  assert.equal(r.status, 302);
+  const mathe = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(matheId);
+  assert.equal(mathe.name, 'Mathematik');
+  assert.equal(mathe.verrechnung, JSON.stringify({ 1: 30 }));
+  assert.equal(getDb().prepare('SELECT name FROM faecher WHERE id = ?').get(alg).name, 'Mathematik › Algebra');
+  // Unterfach umbenennen (keine Verrechnung)
+  r = await form(admin, `/teacher/faecher/${alg}/bearbeiten`, { name: 'Gleichungen', halbjahre: ['3'], p_1: '99' });
+  const u = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(alg);
+  assert.equal(u.name, 'Mathematik › Gleichungen');
+  assert.equal(u.kurzname, 'Gleichungen');
+  assert.equal(u.verrechnung, null);
+  // Doppelter Name und ungültige Verrechnung ändern nichts
+  await form(admin, `/teacher/faecher/${matheId}/bearbeiten`, { name: 'Deutsch', halbjahre: ['1', '2', '3', '5', '6'] });
+  assert.equal(getDb().prepare('SELECT name FROM faecher WHERE id = ?').get(matheId).name, 'Mathematik');
+  await form(admin, `/teacher/faecher/${matheId}/bearbeiten`, { name: 'Nope', halbjahre: ['1'], p_1: '500' });
+  assert.equal(getDb().prepare('SELECT name FROM faecher WHERE id = ?').get(matheId).name, 'Mathematik');
+  await form(admin, `/teacher/faecher/${matheId}/bearbeiten`, { name: 'Mathe', halbjahre: ['1', '2', '3', '5', '6'], p_1: '30' });
+  // Anlegen mit Verrechnung
+  await form(admin, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Physik', halbjahre: ['5', '6'], verrechnung_gesetzt: '1', p_5: '25' });
+  assert.equal(getDb().prepare("SELECT verrechnung FROM faecher WHERE name = 'Physik'").get().verrechnung, JSON.stringify({ 5: 25 }));
+  await form(lehrer, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Chemie', verrechnung_gesetzt: '1', p_1: '50' });
+  assert.equal(getDb().prepare("SELECT verrechnung FROM faecher WHERE name = 'Chemie'").get()?.verrechnung ?? null, null, 'ohne Klassenleitung keine Verrechnung beim Anlegen');
 });
 
 test.after(async () => {

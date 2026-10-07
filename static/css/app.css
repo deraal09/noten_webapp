@@ -637,3 +637,13 @@ table.data th, table.data td { padding-top: 0.55rem; padding-bottom: 0.55rem; }
 /* In dichten Tabellen/Notenzellen bleiben die Buttons kompakt. */
 table.tafel button, table.fz button, .tag, .notiz-meta button, .aufgabe-feld button, .platz-loeschen { min-height: 0; }
 table.data td > button, table.data td > form > button { min-height: 2.4rem; }
+
+/* Fachname als Button (öffnet "Bearbeiten / Zur Noteneingabe"), sieht aus wie ein Link */
+button.fach-name-knopf {
+  background: transparent; color: var(--link); border: none; padding: 0.3rem 0.4rem; text-align: left;
+  font: inherit; font-weight: 600; min-height: 2.75rem; cursor: pointer; border-radius: 6px;
+}
+button.fach-name-knopf:hover { background: var(--bg-tint); text-decoration: underline; }
+.unterfaecher-liste button.fach-name-knopf { font-weight: 500; }
+.fo-aktionen { display: flex; flex-direction: column; gap: 0.6rem; }
+.fo-aktionen .btn, .fo-aktionen button { width: 100%; text-align: center; }

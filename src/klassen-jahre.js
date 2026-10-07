@@ -11,6 +11,7 @@
  * Fehlt der Abschluss, gilt die Standarddauer: SPA zwei, BG/IHK drei Jahre.
  */
 
+import { vergleicheNamen } from './format.js';
 import { getDb } from './db.js';
 import { parseSchuljahr, baueSchuljahrBezeichnung, aktuellesStartjahr } from './schuljahr-utils.js';
 
@@ -295,4 +296,36 @@ export function wendeVerrechnungAn(aktuell, vorher, prozent) {
   if (!prozent || aktuell === null || aktuell === undefined || vorher === null || vorher === undefined) return aktuell ?? null;
   const p = prozent / 100;
   return Math.round(((1 - p) * aktuell + p * vorher) * 100) / 100;
+}
+
+/**
+ * Sortiergruppe eines Fachs nach seinen Halbjahren: [von, bis] bei einem
+ * zusammenhängenden Teilbereich, sonst null -- null gilt für Fächer in allen
+ * Halbjahren UND für inkonsistente (lückenhafte) Angaben.
+ */
+export function halbjahrGruppe(fach, laufzeit) {
+  const n = fachHalbjahrNummern(fach, laufzeit);
+  if (!n.length || n.length === laufzeit.anzahlHalbjahre) return null;
+  return n[n.length - 1] - n[0] + 1 === n.length ? [n[0], n[n.length - 1]] : null;
+}
+
+/**
+ * Sortiert Fächer: zuerst nach den Halbjahren aufsteigend (früheste zuerst),
+ * Fächer in allen Halbjahren (auch lückenhafte Angaben) ganz unten; innerhalb
+ * einer Gruppe alphabetisch (deutsch). `laufzeit` optional (sonst je Klasse des Fachs).
+ */
+export function sortiereFaecher(liste, laufzeit = null) {
+  const cache = new Map();
+  const laufzeitVon = (f) => {
+    if (laufzeit) return laufzeit;
+    if (!cache.has(f.klasse_id)) cache.set(f.klasse_id, klassenLaufzeit(f.klasse_id));
+    return cache.get(f.klasse_id);
+  };
+  const mitGruppe = liste.map((f) => ({ f, g: halbjahrGruppe(f, laufzeitVon(f)) }));
+  mitGruppe.sort((a, b) => {
+    if (!a.g !== !b.g) return a.g ? -1 : 1; // Fächer mit Teilbereich vor "alle Halbjahre"
+    if (a.g && (a.g[0] - b.g[0] || a.g[1] - b.g[1])) return (a.g[0] - b.g[0]) || (a.g[1] - b.g[1]);
+    return vergleicheNamen(a.f.name, b.f.name);
+  });
+  return mitGruppe.map((x) => x.f);
 }

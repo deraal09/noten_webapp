@@ -319,6 +319,27 @@ Meier, Carla"></textarea>
     nummern.forEach(function(n) { var b = laufzeit.schuljahre[Math.floor((n - 1) / 2)].bezeichnung; if (sj.indexOf(b) === -1) sj.push(b); });
     return hjBereiche(nummern) + '. Halbjahr (' + sj.join(', ') + ')';
   }
+  // Name eines (Unter-)Fachs: für die Klassenleitung ein Button, der den Dialog "Bearbeiten / Zur Noteneingabe" öffnet
+  // (nicht für vorgegebene SPA-Fächer/-Komponenten), sonst ein Link zur Noteneingabe.
+  function fachNameElement(f, anzeige, istUnterfach, erlaubteHj) {
+    var klein = !!(istKlassenlehrer && !f.spa_fach_key && !f.spa_komponente);
+    if (!klein) return '<a class="fach-name" href="/teacher/fach/' + f.id + '">' + anzeige + '</a>';
+    return '<button type="button" class="fach-name fach-name-knopf" data-fach-optionen data-fach-id="' + f.id + '"'
+      + ' data-name="' + (istUnterfach ? (f.kurzname || f.name) : f.name).replace(/"/g, '&quot;') + '"'
+      + ' data-unterfach="' + (istUnterfach ? '1' : '0') + '"'
+      + ' data-erlaubt="' + erlaubteHj.join(',') + '" data-gewaehlt="' + f.hjNummern.join(',') + '"'
+      + ' data-verrechnung="' + (verrechnungProFach[f.id] ? JSON.stringify(verrechnungProFach[f.id].werte).replace(/"/g, '&quot;') : '') + '"'
+      + ' title="Bearbeiten oder zur Noteneingabe">' + anzeige + '</button>';
+  }
+  // Prozent-Felder der Verrechnung (p_<n>), vorbelegt mit `werte`
+  function vrFelder(werte) {
+    if (laufzeit.anzahlHalbjahre < 2) return '';
+    var h = '<fieldset class="hj-auswahl"><legend>Verrechnung der Halbjahre <small>(Prozent der Vorhalbjahres-Note)</small></legend><div class="verrechnung-raster">';
+    for (var n = 1; n < laufzeit.anzahlHalbjahre; n++) {
+      h += '<label class="feld">' + n + '. → ' + (n + 1) + '. Halbjahr <span class="feld-mit-einheit"><input type="number" name="p_' + n + '" min="0" max="100" step="1" value="' + ((werte && werte[String(n)]) || 0) + '">%</span></label>';
+    }
+    return h + '</div></fieldset>';
+  }
   // Checkbox-Reihe für Halbjahre (name="halbjahre"), nur die erlaubten Nummern
   function hjChecks(erlaubt, gewaehlt) {
     return erlaubt.map(function(n) {
@@ -425,7 +446,7 @@ Meier, Carla"></textarea>
        var f = eintrag.fach; %>
     <li class="fach-eintrag">
       <div class="fach-zeile">
-        <a class="fach-name" href="/teacher/fach/<%= f.id %>"><%= f.name %></a>
+        <%- fachNameElement(f, f.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), false, laufzeit.halbjahre.map(function(h, i) { return i + 1; })) %>
         <span class="hint fach-hj"><%= f.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle Halbjahre' : hjBereiche(f.hjNummern) + '. Hj.' %></span>
         <details class="hj-bearbeiten">
           <summary title="Halbjahre des Fachs ändern" aria-label="Halbjahre des Fachs ändern">✎</summary>
@@ -456,7 +477,7 @@ Meier, Carla"></textarea>
             <li class="fach-eintrag unterfach">
               <div class="fach-zeile">
                 <span class="hint">📖</span>
-                <a class="fach-name" href="/teacher/fach/<%= u.id %>"><%= u.kurzname || u.name %></a>
+                <%- fachNameElement(u, (u.kurzname || u.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), true, f.hjNummern) %>
                 <% if (u.komponenteInfo && !(u.komponenteInfo.schaltbar && istKlassenlehrer)) { %>
                   <span class="hint" title="<%= u.komponenteInfo.schaltbar ? 'Zusammensetzung nur durch die Klassenleitung änderbar' : 'Festes Gewicht, nicht abschaltbar' %>"><%= u.hjNummern.length ? hjBereiche(u.hjNummern) + '. Hj.' : 'abgeschaltet' %><%= u.komponenteInfo.schaltbar ? '' : ' · fest' %></span>
                 <% } else { %>
@@ -504,6 +525,10 @@ Meier, Carla"></textarea>
           <%= i + 1 %>. Halbjahr <small>(<%= laufzeit.schuljahre[Math.floor(i / 2)].bezeichnung %>)</small></label>
       <% }); %>
     </fieldset>
+    <% if (istKlassenlehrer && laufzeit.anzahlHalbjahre >= 2) { %>
+      <input type="hidden" name="verrechnung_gesetzt" value="1">
+      <%- vrFelder(klassenVerrechnung) %>
+    <% } %>
     <div class="form-actions">
       <button type="submit">+ Fach anlegen</button>
       <button type="button" id="fach-neu-zu">Abbrechen</button>
@@ -523,6 +548,30 @@ Meier, Carla"></textarea>
 </script>
 
 <% if (istKlassenlehrer) { %>
+<dialog id="fach-optionen-dialog" class="notiz-dialog">
+  <h2 id="fo-name"></h2>
+  <div class="form-actions fo-aktionen">
+    <button type="button" id="fo-bearbeiten">✏️ Bearbeiten</button>
+    <a class="btn" id="fo-noteneingabe" href="#">📝 Zur Noteneingabe</a>
+    <button type="button" data-dialog-zu>Abbrechen</button>
+  </div>
+</dialog>
+
+<dialog id="fach-bearbeiten-dialog" class="notiz-dialog">
+  <form method="post" id="fach-bearbeiten-form" action="">
+    <h2>Fach bearbeiten</h2>
+    <label>Name
+      <input type="text" name="name" maxlength="100" required>
+    </label>
+    <fieldset class="hj-auswahl"><legend>Gilt in Halbjahr</legend><span id="fb-halbjahre"></span></fieldset>
+    <div id="fb-verrechnung"><%- vrFelder(null) %></div>
+    <div class="form-actions">
+      <button type="submit">Speichern</button>
+      <button type="button" data-dialog-zu>Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="lehrkraft-dialog" class="notiz-dialog">
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/zuweisungen/neu">
     <h2>Lehrkraft zuordnen</h2>
@@ -563,8 +612,8 @@ Meier, Carla"></textarea>
   (function() {
     var SCHULJAHR = <%- jsonFuerSkript(laufzeit.schuljahre.map(function(s) { return s.bezeichnung; })) %>;
     var VORBELEGT = <%- jsonFuerSkript(vorbelegungHj) %>;
-    function checks(ziel, erlaubt) {
-      var vorgewaehlt = erlaubt.filter(function(n) { return VORBELEGT.indexOf(n) !== -1; });
+    function checks(ziel, erlaubt, gewaehlt) {
+      var vorgewaehlt = gewaehlt || erlaubt.filter(function(n) { return VORBELEGT.indexOf(n) !== -1; });
       if (!vorgewaehlt.length) vorgewaehlt = erlaubt;
       ziel.textContent = '';
       erlaubt.forEach(function(n) {
@@ -593,6 +642,31 @@ Meier, Carla"></textarea>
         checks(document.getElementById('uf-halbjahre'), liste(b.dataset.erlaubt));
         document.getElementById('unterfach-dialog').showModal();
       });
+    });
+    var aktuellesFach = null;
+    document.querySelectorAll('[data-fach-optionen]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        aktuellesFach = b;
+        document.getElementById('fo-name').textContent = b.textContent;
+        document.getElementById('fo-noteneingabe').href = '/teacher/fach/' + b.dataset.fachId;
+        document.getElementById('fach-optionen-dialog').showModal();
+      });
+    });
+    document.getElementById('fo-bearbeiten').addEventListener('click', function() {
+      var b = aktuellesFach; if (!b) return;
+      var form = document.getElementById('fach-bearbeiten-form');
+      form.action = '/teacher/faecher/' + b.dataset.fachId + '/bearbeiten';
+      form.querySelector('input[name="name"]').value = b.dataset.name;
+      form.querySelector('input[name="name"]').maxLength = b.dataset.unterfach === '1' ? 60 : 100;
+      var erlaubt = liste(b.dataset.erlaubt);
+      checks(document.getElementById('fb-halbjahre'), erlaubt, liste(b.dataset.gewaehlt));
+      var vr = document.getElementById('fb-verrechnung');
+      vr.hidden = b.dataset.unterfach === '1'; // Unterfächer haben keine eigene Verrechnung
+      var werte = {};
+      try { werte = JSON.parse(b.dataset.verrechnung || '{}'); } catch (e) { /* leer */ }
+      vr.querySelectorAll('input[type=number]').forEach(function(i) { i.value = werte[i.name.replace('p_', '')] || 0; i.disabled = vr.hidden; });
+      document.getElementById('fach-optionen-dialog').close();
+      document.getElementById('fach-bearbeiten-dialog').showModal();
     });
     document.querySelectorAll('[data-dialog-zu]').forEach(function(b) {
       b.addEventListener('click', function() { b.closest('dialog').close(); });

@@ -7,10 +7,10 @@ import { getDb } from '../db.js';
 import { formatZeitLokal, sortiereNachName } from '../format.js';
 import { setzeEndnote, notenBereich } from '../halbjahr-endnoten.js';
 import {
-  ladeUnterfaecher, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
+  ladeUnterfaecher, UNTERFACH_TRENNER, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
   halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre,
 } from '../unterfaecher.js';
-import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
+import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
   requireAuth, userHatFachZgriff, erlaubteHalbjahreImFach, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
   userDarfFachLoeschen, userDarfKlasseVerwalten,
@@ -194,6 +194,22 @@ function alsGueltigesDatumOderNull(wert) {
 const KLASSE_VERWALTEN_NUR = 'Das darf nur die Klassenleitung, die Lehrkraft, die die Klasse angelegt hat, oder der Admin — '
   + 'es betrifft auch Fächer und Noten anderer Lehrkräfte.';
 
+/**
+ * Verrechnung aus einem Formular (p_<n> = Prozent der Note aus Halbjahr n, die in n+1 einfließen).
+ * @returns {{werte: Object<string, number>} | {fehler: string}} leere Felder und 0 zählen nicht
+ */
+function parseVerrechnungEingabe(body, laufzeit) {
+  const werte = {};
+  for (let n = 1; n < laufzeit.anzahlHalbjahre; n++) {
+    const roh = String(body?.[`p_${n}`] ?? '').trim().replace(',', '.');
+    if (roh === '') continue;
+    const p = Number(roh);
+    if (!Number.isFinite(p) || p < 0 || p > 100) return { fehler: `Ungültiger Prozentwert für Halbjahr ${n} → ${n + 1} (erlaubt: 0 bis 100).` };
+    if (p > 0) werte[n] = Math.round(p * 10) / 10;
+  }
+  return { werte };
+}
+
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
 
@@ -248,7 +264,7 @@ export default async function teacherRoutes(fastify) {
         const nummern = zuweisungsHalbjahre({ halbjahre: r.zuw_halbjahre }, { halbjahre: r.fach_halbjahre, klasse_id: r.klasse_id }, laufzeit);
         if (nummern.length < laufzeit.anzahlHalbjahre) halbjahreText = `${nummern.map((n) => `${n}.`).join(', ')} Halbjahr`;
       }
-      const eintrag = { id: r.id, name: r.name, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls, halbjahreText };
+      const eintrag = { id: r.id, name: r.name, klasse_id: r.klasse_id, halbjahre: r.fach_halbjahre, anzahl_klausuren: r.anzahl_klausuren, anzahl_uls: r.anzahl_uls, halbjahreText };
       if (r.ist_kurs) {
         kurse.push({ ...eintrag, notenschluessel: r.notenschluessel, schuljahr_bezeichnung: r.schuljahr_bezeichnung });
         continue;
@@ -261,7 +277,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     const klassenListe = Array.from(byKlasse.values());
-    for (const k of klassenListe) k.faecher = sortiereNachName(k.faecher);
+    for (const k of klassenListe) k.faecher = sortiereFaecher(k.faecher);
     return reply.viewEjs('teacher/dashboard.ejs', {
       user: request.user, byKlasse: klassenListe, kurse: sortiereNachName(kurse),
     });
@@ -1301,18 +1317,12 @@ export default async function teacherRoutes(fastify) {
       request.flash?.('error', 'Für Unterfächer gibt es keine eigene Verrechnung -- sie gilt für das Fach.');
       return reply.redirect(zurueck);
     }
-    const laufzeit = klassenLaufzeit(fach.klasse_id);
-    const werte = {};
-    for (let n = 1; n < laufzeit.anzahlHalbjahre; n++) {
-      const roh = String(request.body?.[`p_${n}`] ?? '').trim().replace(',', '.');
-      if (roh === '') continue;
-      const p = Number(roh);
-      if (!Number.isFinite(p) || p < 0 || p > 100) {
-        request.flash?.('error', `Ungültiger Prozentwert für Halbjahr ${n} → ${n + 1} (erlaubt: 0 bis 100).`);
-        return reply.redirect(zurueck);
-      }
-      if (p > 0) werte[n] = Math.round(p * 10) / 10;
+    const eingabe = parseVerrechnungEingabe(request.body, klassenLaufzeit(fach.klasse_id));
+    if (eingabe.fehler) {
+      request.flash?.('error', eingabe.fehler);
+      return reply.redirect(zurueck);
     }
+    const werte = eingabe.werte;
     // Immer als eigene Einstellung speichern ("{}" = bewusst keine Verrechnung), damit die Klassen-Vorgabe nicht durchschlägt.
     const json = JSON.stringify(werte);
     if (request.body?.fuer_alle === '1') {
@@ -1657,7 +1667,7 @@ export default async function teacherRoutes(fastify) {
     // Fächer als Baum: Fächer der obersten Ebene mit ihren Unterfächern (siehe src/unterfaecher.js).
     // SPA: die Komponenten der Lernfelder erscheinen als vorgegebene Unterfächer (idempotent, auch für ältere Klassen).
     if (klasse.notenschluessel === 'SPA') seedeKomponentenUnterfaecher(getDb(), klasse.id);
-    const alleFaecher = sortiereNachName(getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ?').all(klasse.id));
+    const alleFaecher = sortiereFaecher(getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ?').all(klasse.id), laufzeit);
     const baum = alleFaecher.filter((f) => !f.parent_fach_id).map((f) => {
       const komponenten = f.spa_fach_key ? spaKomponentenHalbjahre(getDb(), f) : new Map();
       return {
@@ -1691,7 +1701,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach,
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
@@ -1969,8 +1979,18 @@ export default async function teacherRoutes(fastify) {
       try {
         // Halbjahre, in denen das Fach gilt (Checkboxen); nichts/alles gewählt = alle Halbjahre der Klasse.
         const halbjahreNr = parseHalbjahreEingabe(request.body?.halbjahre, klassenLaufzeit(request.params.id));
-        const info = getDb().prepare('INSERT INTO faecher (klasse_id, name, halbjahre) VALUES (?, ?, ?)')
-          .run(request.params.id, name, halbjahreNr ? JSON.stringify(halbjahreNr) : null);
+        // Verrechnung (nur Klassenleitung): sie gilt dann als eigene Einstellung des Fachs.
+        let verrechnungJson = null;
+        if (userIstKlassenlehrer(request.user, request.params.id) && request.body?.verrechnung_gesetzt === '1') {
+          const eingabe = parseVerrechnungEingabe(request.body, klassenLaufzeit(request.params.id));
+          if (eingabe.fehler) {
+            request.flash?.('error', eingabe.fehler);
+            return reply.redirect(`/teacher/klassen/${request.params.id}`);
+          }
+          verrechnungJson = JSON.stringify(eingabe.werte);
+        }
+        const info = getDb().prepare('INSERT INTO faecher (klasse_id, name, halbjahre, verrechnung) VALUES (?, ?, ?, ?)')
+          .run(request.params.id, name, halbjahreNr ? JSON.stringify(halbjahreNr) : null, verrechnungJson);
         // Ersteller/in wird automatisch dem eigenen Fach zugewiesen — eine
         // spätere Zuweisung weiterer Lehrkräfte (Admin → Zuweisungen) bleibt
         // zusätzlich möglich, ist aber nicht Voraussetzung.
@@ -2020,6 +2040,56 @@ export default async function teacherRoutes(fastify) {
       return reply.redirect(ziel);
     }
     request.flash?.('success', 'Halbjahre gespeichert.');
+    return reply.redirect(ziel);
+  });
+
+  // Fach bearbeiten (Klassenleitung): Name, Halbjahre und -- bei Fächern -- Verrechnung in einem Dialog.
+  // Unterfächer: Name und Halbjahre. Vorgegebene SPA-Fächer/-Komponenten sind nicht umbenennbar.
+  fastify.post('/faecher/:id/bearbeiten', async (request, reply) => {
+    const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann Fächer bearbeiten.' });
+    }
+    const ziel = `/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte`;
+    if (fach.spa_fach_key || fach.spa_komponente) {
+      request.flash?.('error', 'Vorgegebene SPA-Fächer und -Komponenten lassen sich nicht bearbeiten.');
+      return reply.redirect(ziel);
+    }
+    const laufzeit = klassenLaufzeit(fach.klasse_id);
+    const name = String(request.body?.name || '').trim().slice(0, fach.parent_fach_id ? 60 : 100);
+    if (!name) {
+      request.flash?.('error', 'Bitte einen Namen angeben.');
+      return reply.redirect(ziel);
+    }
+    const verrechnung = !fach.parent_fach_id ? parseVerrechnungEingabe(request.body, laufzeit) : null;
+    if (verrechnung?.fehler) {
+      request.flash?.('error', verrechnung.fehler);
+      return reply.redirect(ziel);
+    }
+    // Halbjahre zuerst: schlägt es fehl (Daten in wegfallenden Halbjahren), bleibt alles unverändert.
+    const halbjahre = setzeFachHalbjahre(fach, parseHalbjahreEingabe(request.body?.halbjahre, laufzeit));
+    if (!halbjahre.ok) {
+      request.flash?.('error', halbjahre.fehler);
+      return reply.redirect(ziel);
+    }
+    try {
+      const db = getDb();
+      db.transaction(() => {
+        if (fach.parent_fach_id) {
+          const eltern = db.prepare('SELECT name FROM faecher WHERE id = ?').get(fach.parent_fach_id);
+          db.prepare('UPDATE faecher SET name = ?, kurzname = ? WHERE id = ?').run(`${eltern.name}${UNTERFACH_TRENNER}${name}`, name, fach.id);
+        } else {
+          db.prepare('UPDATE faecher SET name = ?, verrechnung = ? WHERE id = ?').run(name, JSON.stringify(verrechnung.werte), fach.id);
+          for (const u of ladeUnterfaecher(fach.id)) {
+            db.prepare('UPDATE faecher SET name = ? WHERE id = ?').run(`${name}${UNTERFACH_TRENNER}${u.kurzname || u.name}`, u.id);
+          }
+        }
+      })();
+      request.flash?.('success', `„${name}" gespeichert.`);
+    } catch (e) {
+      request.flash?.('error', 'Ein Fach mit diesem Namen gibt es in dieser Klasse schon.');
+    }
     return reply.redirect(ziel);
   });
 

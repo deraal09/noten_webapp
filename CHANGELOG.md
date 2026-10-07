@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.68.0 - 2026-10-07
+
+- Fächer lassen sich **nachträglich bearbeiten**: Ein Klick auf den Fachnamen
+  (Klassenleitung) öffnet einen Dialog mit „Bearbeiten" und „Zur Noteneingabe".
+  „Bearbeiten" ändert Name, Halbjahre und die **Verrechnung** des Fachs
+  (Unterfächer: Name und Halbjahre; Unterfächer ziehen den neuen Namen des Fachs
+  mit). Vorgegebene SPA-Fächer und -Komponenten sind nicht umbenennbar.
+- Beim **Anlegen eines Fachs** lässt sich die Verrechnung gleich mit einstellen
+  (nur Klassenleitung; vorbelegt mit der Klassen-Vorgabe).
+- Fächer sind zusätzlich **nach Halbjahren sortiert**: Teilbereiche aufsteigend
+  (früheste zuerst), Fächer in allen Halbjahren ganz unten; lückenhafte Angaben
+  (z. B. 1. und 3. Halbjahr) zählen wie „alle Halbjahre". Innerhalb einer Gruppe
+  alphabetisch. Gilt auf der Klassenseite, in der Noteneingabe-Übersicht und in
+  den Klassenleitungs-Übersichten.
+
 ## 0.67.0 - 2026-10-07
 
 - Klassenseite: Bei den Halbjahres-Einstellungen von Fächern, Unterfächern und
