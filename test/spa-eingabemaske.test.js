@@ -82,13 +82,27 @@ test('Vorbereitung: Admin, Schuljahr, SPA_PIA-Klasse (auto-geseedete Fächer), e
   assert.ok(getDb().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(lf1Id, schuelerId));
 });
 
-test('GET /teacher/fach/:id zeigt für ein SPA-Fach die eigene Eingabemaske (nicht die normale Notentafel)', async () => {
+test('GET /teacher/fach/:id zeigt für ein SPA-Fach die normale Noteneingabe (mündlich/schriftlich) mit Link zur Direkten Endnoteneingabe', async () => {
   const r = await admin(`/teacher/fach/${lf1Id}`);
   assert.equal(r.status, 200);
   const html = await r.text();
-  assert.ok(html.includes('SPA-Fach mit festem Bewertungsschema'));
+  assert.ok(html.includes('Notenübersicht'));
+  assert.ok(html.includes('Musterfrau'));
+  assert.ok(!html.includes('data-feld="direktwert"'), 'die Endnotentabelle ist eine eigene Ansicht');
+  assert.match(html, /href="\/teacher\/fach\/\d+\?ansicht=endnoten&(amp;)?hj=\d">✏️ Direkte Endnoteneingabe/);
+  assert.match(html, /Endpunkte <small>\(Endnotentabelle\)<\/small>/);
+});
+
+test('?ansicht=endnoten zeigt die SPA-Endnotentabelle (Direkte Endnoteneingabe) mit Rückweg zur Noteneingabe', async () => {
+  const r = await admin(`/teacher/fach/${lf1Id}?ansicht=endnoten&hj=1`);
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.ok(html.includes('Direkte Endnoteneingabe'));
+  assert.ok(html.includes('SPA-Fach') || html.includes('festes Bewertungsschema'));
   assert.ok(html.includes('Musterfrau'));
   assert.ok(html.includes('data-feld="direktwert"'));
+  assert.match(html, /href="\/teacher\/fach\/\d+\?hj=1">← Noteneingabe/);
+  assert.match(html, /href="\?ansicht=endnoten&hj=2"/, 'Halbjahres-Reiter bleiben in der Endnotentabelle');
 });
 
 test('LF1 (Direktwert): Eintragen über /spa/eingabe berechnet sofort Zwischennote/Endpunkte/Tendenz', async () => {
@@ -106,7 +120,7 @@ test('LF1 (Direktwert): Eintragen über /spa/eingabe berechnet sofort Zwischenno
   assert.equal(zeile.tendenz, '2+');
 
   // Auch serverseitig gerendert korrekt.
-  r = await admin(`/teacher/fach/${lf1Id}?hj=1`);
+  r = await admin(`/teacher/fach/${lf1Id}?ansicht=endnoten&hj=1`);
   const html = await r.text();
   assert.ok(html.includes('12.00') || html.includes('12,00') || /class="endpunkte-cell"[^>]*>\s*12\.00/.test(html));
 });

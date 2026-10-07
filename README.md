@@ -305,6 +305,9 @@ im **aktuellen Halbjahr** nach Datum (in Tests ist „heute" eingefroren,
 - **Verrechnung:** `klassen.verrechnung` (JSON `{ "1": 50 }`) = Prozent der
   Note aus Halbjahr n, die in Halbjahr n+1 einfließen (Einstellung je Klasse
   im Klassenleitungsbereich).
+- **SPA:** Die Fachseite ist die normale Noteneingabe (Klausuren/Unterrichtsleistung
+  in Punkten); die SPA-Tabelle mit Komponenten/Vorwerten ist die „Direkte
+  Endnoteneingabe" (`?ansicht=endnoten`).
 - Die früheren **historischen Halbjahre** gibt es nicht mehr; beim Start einer
   Bestandsdatenbank werden ihre Tabellen und rein historische Fächer entfernt.
 

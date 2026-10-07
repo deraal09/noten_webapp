@@ -2,12 +2,14 @@
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher">← Meine Noteneingabe</a>
   <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
-  <a class="btn" href="/teacher/fach/<%= fach.id %>?ansicht=leistungen&hj=<%= halbjahr %>">📝 Klausuren &amp; Unterrichtsleistung</a>
+  <a class="btn" href="/teacher/fach/<%= fach.id %>?hj=<%= halbjahr %>">← Noteneingabe (Klausuren &amp; Unterrichtsleistung)</a>
 </p>
+<h2>Direkte Endnoteneingabe</h2>
 <p class="hint">
-  SPA-Fach mit festem Bewertungsschema über 4 Halbjahre (siehe src/spa-schema.js) --
-  Punktwerte 0–15, die Endnote wird automatisch aus Zwischennoten und ggf. vorherigen
-  Halbjahren berechnet.
+  Endnotentabelle dieses SPA-Fachs (festes Bewertungsschema über 4 Halbjahre, siehe src/spa-schema.js):
+  Punktwerte 0–15, die Endnote wird automatisch aus Zwischennoten und ggf. vorherigen Halbjahren
+  berechnet. Die Punkte aus Klausuren und Unterrichtsleistung (mündlich/schriftlich) fließen hier
+  ein und stehen als Platzhalter in den Feldern -- ein von Hand eingetragener Wert hat Vorrang.
 </p>
 
 <% if (fach.spa_fach_key === 'WPK') { %>
@@ -24,7 +26,7 @@
 
 <div class="hj-tabs">
   <% aktiveHalbjahre.forEach(function(h) { %>
-    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= h %>"><%= h %>. Halbjahr</a>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?ansicht=endnoten&hj=<%= h %>"><%= h %>. Halbjahr</a>
   <% }); %>
 </div>
 

@@ -143,8 +143,8 @@ test('Halbe Punktzahl: 5/10 = 50 % -> 6 Punkte -> Tendenz 4+ (Punkteschlüssel, 
 });
 
 test('SPA-Eingabemaske verlinkt auf die Leistungen und zeigt die Leistungsnote als Platzhalter', async () => {
-  const html = await (await admin(`/teacher/fach/${lf1Id}?hj=2`)).text();
-  assert.match(html, /\?ansicht=leistungen&(amp;)?hj=2/);
+  const html = await (await admin(`/teacher/fach/${lf1Id}?ansicht=endnoten&hj=2`)).text();
+  assert.match(html, /fach\/\d+\?hj=2/);
   assert.match(html, /placeholder="15"/);
 });
 

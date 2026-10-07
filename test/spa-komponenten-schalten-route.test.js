@@ -79,11 +79,11 @@ test('Vorbereitung: SPA_REGULAR-Klasse (auto-geseedete Fächer, inkl. LF3), eine
 });
 
 test('GET /teacher/fach/:id (LF3) zeigt die Komponenten-Einstellung nur der Klassenleitung als Formular, sonst nur informativ', async () => {
-  const adminHtml = await (await admin(`/teacher/fach/${lf3Id}?hj=1`)).text();
+  const adminHtml = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
   assert.ok(adminHtml.includes('Zusammensetzung für diese Klasse'));
   assert.ok(adminHtml.includes('/spa/komponente'));
 
-  const lehrkraftHtml = await (await fachlehrkraft(`/teacher/fach/${lf3Id}?hj=1`)).text();
+  const lehrkraftHtml = await (await fachlehrkraft(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
   assert.ok(!lehrkraftHtml.includes('/spa/komponente'), 'einfache Fachlehrkraft darf keine Schalt-Formulare sehen');
 });
 
@@ -100,27 +100,27 @@ test('Admin (zählt als Klassenleitung) kann Musik im 1. Hj. abschalten -- Einga
     halbjahr: '1', komponente: 'musik', aktiv: '0',
   });
   assert.equal(r.status, 302, 'Formular-Post führt zurück zur Seite statt JSON anzuzeigen');
-  assert.equal(r.headers.get('location'), `/teacher/fach/${lf3Id}?hj=1`);
+  assert.equal(r.headers.get('location'), `/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`);
 
-  const html = await (await admin(`/teacher/fach/${lf3Id}?hj=1`)).text();
+  const html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
   assert.ok(!html.includes('data-feld="komponente:musik"'), 'deaktivierte Komponente darf keine Eingabespalte mehr haben');
   assert.ok(html.includes('data-feld="komponente:kunst"'), 'andere Komponenten bleiben unverändert');
   assert.ok(html.includes('komponente-inaktiv'), 'Musik-Umschalter zeigt sich als inaktiv');
 
   // 2. Hj. ist von der Deaktivierung im 1. Hj. nicht betroffen.
-  const htmlHj2 = await (await admin(`/teacher/fach/${lf3Id}?hj=2`)).text();
+  const htmlHj2 = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=2`)).text();
   assert.ok(htmlHj2.includes('data-feld="komponente:musik"'));
 });
 
 test('Fokus/Scroll-Position bleiben beim Schalten erhalten; Notenpunkte-Felder ohne Pfeile', async () => {
-  const html = await (await admin(`/teacher/fach/${lf3Id}?hj=1`)).text();
+  const html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
   assert.ok(html.includes("spa-komponente-fokus"), 'merkt Scroll-Position und Umschalter über den Reload');
   const css = fs.readFileSync(new URL('../static/css/app.css', import.meta.url), 'utf8');
   assert.match(css, /#spa-tabelle input\[type=number\]::-webkit-inner-spin-button/);
 });
 
 test('Einfache Fachlehrkraft sieht den deaktivierten Status informativ, ohne ihn ändern zu können', async () => {
-  const html = await (await fachlehrkraft(`/teacher/fach/${lf3Id}?hj=1`)).text();
+  const html = await (await fachlehrkraft(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=1`)).text();
   assert.ok(html.includes('deaktiviert'));
   assert.ok(!html.includes('/spa/komponente'));
 });

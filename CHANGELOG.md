@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.56.0 - 2026-10-07
+
+- SPA: Die Noteneingabe ist jetzt wie bei IHK/BG die Fachseite mit
+  Notenübersicht, Datumstabelle, Klausuren und Zusatzleistungen
+  (mündlich/schriftlich, Bewertung in Punkten 0-15). Die Halbjahrespunkte
+  fließen in die Endnotentabelle des Fachs ein; die Übersicht zeigt dafür die
+  neue Spalte "Endpunkte (Endnotentabelle)" samt Tendenz.
+- Die bisherige SPA-Tabelle (Komponenten, Zusammensetzung z. B. von
+  Lernfeld 3, Vorwert, Tendenz) ist die "Direkte Endnoteneingabe": Button auf
+  der Fachseite bzw. `?ansicht=endnoten`. Handeingaben dort haben wie bisher
+  Vorrang vor den berechneten Leistungspunkten; ein Link führt zurück zur
+  Noteneingabe.
+
 ## 0.55.0 - 2026-10-07
 
 - Die historischen Halbjahre sind entfernt: Reiter "Historische Halbjahre"

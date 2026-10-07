@@ -234,17 +234,13 @@ export default async function teacherRoutes(fastify) {
     if (!userHatFachZgriff(request.user, fach.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
-    // SPA-Fächer haben ein völlig anderes Bewertungsmodell (4 Halbjahre,
-    // Komponenten-Gewichtung, Tendenznote) als die reguläre Klausuren/UL-
-    // Notentafel unten -- eigene Ansicht statt Verzweigungen quer durch
-    // fach_detail.ejs (siehe src/spa-noten-service.js, spa-schema.js).
-    // Klausuren/Unterrichtsleistung eines SPA-Fachs laufen dagegen wie bei IHK
-    // über dieselbe Seite (?ansicht=leistungen, nur diese beiden Reiter) und
-    // speisen die Punkte des Fachs (siehe src/spa-leistung.js).
-    // Die Klausur-/UL-Aktionen leiten mit dem Text-Halbjahr ("3. Halbjahr")
-    // zurück, die SPA-Links der Eingabemaske nutzen nur die Ziffer.
-    const textHalbjahr = /\. Halbjahr$/.test(String(request.query?.hj || ''));
-    if (fach.spa_fach_key && request.query?.ansicht !== 'leistungen' && !textHalbjahr) {
+    // SPA-Fächer werden wie IHK/BG über Klausuren und Unterrichtsleistung
+    // (mündlich/schriftlich) bewertet, in Punkten 0-15 -- diese Seite ist die
+    // normale Noteneingabe. Die Punkte speisen die Endnotentabelle des Fachs
+    // (siehe src/spa-leistung.js); deren eigene Ansicht mit Komponenten,
+    // Vorwerten und Tendenz (src/spa-noten-service.js, spa-schema.js) ist die
+    // "Direkte Endnoteneingabe" (?ansicht=endnoten).
+    if (fach.spa_fach_key && request.query?.ansicht === 'endnoten') {
       return renderSpaFachDetail(request, reply, fach);
     }
     const halbjahr = halbjahrFuerFach(fach, request.query?.hj);
@@ -268,8 +264,14 @@ export default async function teacherRoutes(fastify) {
     if (fach.spa_fach_key) {
       const hjNr = halbjahrNr(halbjahr);
       const schemaHj = spaSchemaFuerFach(getDb(), fach.id).schema.find((x) => x.halbjahr === hjNr);
+      // Endpunkte/Tendenz laut Endnotentabelle (inkl. Vorwerten, Komponenten und Handeingaben) je Person.
+      const endpunkte = new Map();
+      for (const t of ladeTeilnehmerMitHerkunft(fach)) {
+        const e = berechneSpaFachFuerSchueler(getDb(), fach.id, t.id).find((x) => x.halbjahr === hjNr) ?? null;
+        endpunkte.set(t.id, e);
+      }
       spaLeistung = {
-        hjNr, schemaHj, ziel: leistungsZiel(getDb(), fach.id, hjNr),
+        hjNr, schemaHj, ziel: leistungsZiel(getDb(), fach.id, hjNr), endpunkte,
         komponentenNamen: KOMPONENTEN_NAMEN, darfBearbeiten: userDarfFachBearbeiten(request.user, fach),
       };
     }
@@ -303,7 +305,7 @@ export default async function teacherRoutes(fastify) {
     } else {
       request.flash?.('error', 'Ungültige Komponente für dieses Halbjahr.');
     }
-    return reply.redirect(`/teacher/fach/${fach.id}?ansicht=leistungen&hj=${hjNr}`);
+    return reply.redirect(`/teacher/fach/${fach.id}?hj=${hjNr}`);
   });
 
   // ---------- SPA-Eingabemaske (eigenes Bewertungsmodell, siehe oben) ----------
@@ -419,8 +421,8 @@ export default async function teacherRoutes(fastify) {
     if (!Number.isFinite(halbjahr) || !komponente) return reply.code(400).send({ ok: false, error: 'bad params' });
     const erfolg = spaSetzeKomponenteAktiv(getDb(), fach.id, halbjahr, komponente, aktiv);
     if (!erfolg) return reply.code(400).send({ ok: false, error: 'unbekannte oder nicht schaltbare Komponente' });
-    // Normales Formular (kein fetch): zurück zur Fachseite, sonst zeigt der Browser den JSON-Quelltext an.
-    return reply.redirect(`/teacher/fach/${fach.id}?hj=${halbjahr}`);
+    // Normales Formular (kein fetch): zurück zur Endnotentabelle, sonst zeigt der Browser den JSON-Quelltext an.
+    return reply.redirect(`/teacher/fach/${fach.id}?ansicht=endnoten&hj=${halbjahr}`);
   });
 
   // ---------- Sync mit Klassenleitung ----------
