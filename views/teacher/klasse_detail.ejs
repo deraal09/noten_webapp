@@ -426,8 +426,9 @@ Meier, Carla"></textarea>
     <li class="fach-eintrag">
       <div class="fach-zeile">
         <a class="fach-name" href="/teacher/fach/<%= f.id %>"><%= f.name %></a>
+        <span class="hint fach-hj"><%= f.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle Halbjahre' : hjBereiche(f.hjNummern) + '. Hj.' %></span>
         <details class="hj-bearbeiten">
-          <summary title="Halbjahre des Fachs ändern"><%= f.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle Halbjahre' : hjBereiche(f.hjNummern) + '. Hj.' %></summary>
+          <summary title="Halbjahre des Fachs ändern" aria-label="Halbjahre des Fachs ändern">✎</summary>
           <form method="post" action="/teacher/faecher/<%= f.id %>/halbjahre">
             <input type="hidden" name="zurueck" value="klasse">
             <%- hjChecks(laufzeit.halbjahre.map(function(h, i) { return i + 1; }), f.hjNummern) %>
@@ -459,8 +460,9 @@ Meier, Carla"></textarea>
                 <% if (u.komponenteInfo && !(u.komponenteInfo.schaltbar && istKlassenlehrer)) { %>
                   <span class="hint" title="<%= u.komponenteInfo.schaltbar ? 'Zusammensetzung nur durch die Klassenleitung änderbar' : 'Festes Gewicht, nicht abschaltbar' %>"><%= u.hjNummern.length ? hjBereiche(u.hjNummern) + '. Hj.' : 'abgeschaltet' %><%= u.komponenteInfo.schaltbar ? '' : ' · fest' %></span>
                 <% } else { %>
+                <span class="hint fach-hj"><%= (!u.hjNummern.length ? 'abgeschaltet' : (u.hjNummern.length === (u.komponenteInfo ? u.komponenteInfo.alle.length : laufzeit.anzahlHalbjahre) ? 'alle Halbjahre' : hjBereiche(u.hjNummern) + '. Hj.')) %></span>
                 <details class="hj-bearbeiten">
-                  <summary title="<%= u.komponenteInfo ? 'In welchen Halbjahren die Komponente zählt (Zusammensetzung)' : 'Halbjahre des Unterfachs ändern' %>"><%= !u.hjNummern.length ? 'abgeschaltet' : (u.hjNummern.length === (u.komponenteInfo ? u.komponenteInfo.alle.length : laufzeit.anzahlHalbjahre) ? 'alle Halbjahre' : hjBereiche(u.hjNummern) + '. Hj.') %></summary>
+                  <summary title="<%= u.komponenteInfo ? 'In welchen Halbjahren die Komponente zählt (Zusammensetzung)' : 'Halbjahre des Unterfachs ändern' %>" aria-label="Halbjahre ändern">✎</summary>
                   <form method="post" action="/teacher/faecher/<%= u.id %>/halbjahre">
                     <input type="hidden" name="zurueck" value="klasse">
                     <%- hjChecks(u.komponenteInfo ? u.komponenteInfo.alle : f.hjNummern, u.hjNummern) %>

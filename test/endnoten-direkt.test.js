@@ -240,7 +240,7 @@ test('Klassen-Seite zeigt Halbjahres-Auswahl beim Anlegen und die Halbjahre je F
   assert.doesNotMatch(html, /<form method="post" action="[^"]*faecher\/neu" class="card">/);
   assert.match(html, /name="halbjahre" value="5" checked/);
   assert.match(html, /name="halbjahre" value="1" >/);
-  assert.match(html, /<summary title="Halbjahre des Fachs ändern">3–4\. Hj\.<\/summary>/);
+  assert.match(html, /<span class="hint fach-hj">3–4\. Hj\.<\/span>\s*<details class="hj-bearbeiten">\s*<summary title="Halbjahre des Fachs ändern" aria-label="Halbjahre des Fachs ändern">✎<\/summary>/);
 });
 
 test.after(async () => {

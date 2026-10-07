@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.67.0 - 2026-10-07
+
+- Klassenseite: Bei den Halbjahres-Einstellungen von Fächern, Unterfächern und
+  Lehrkräften gibt es nur noch den **Stift** (✎) ohne kleines Dreieck; die
+  Halbjahre des Fachs stehen als Text daneben.
+- **Touch-Optimierung:** Buttons, Symbol-Buttons, Menüeinträge, Eingabefelder,
+  Auswahllisten und Halbjahres-Checkboxen sind größer (mind. ca. 44 px), die
+  Grundschrift ist etwas größer (15 → 17 px).
+
 ## 0.66.0 - 2026-10-07
 
 - Noteneingabe: Oben gibt es einen **Klassenfilter** (Auswahl „Alle Klassen",
