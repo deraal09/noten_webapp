@@ -565,3 +565,16 @@ input.endnote-raster { width: 4.5rem; text-align: center; }
 .verrechnung-raster { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-bottom: 0.5rem; }
 .verrechnung-raster input[type=number] { width: 4.5rem; }
 .hj-auswahl .hj-check, details.hj-bearbeiten .hj-check { display: inline-flex; flex-direction: row; align-items: center; gap: 0.35rem; }
+
+/* Aktionsmenü ("drei Balken") je Person in der Klassenansicht. */
+.aktionen-knopf { display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; height: 2.2rem; padding: 0; background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; cursor: pointer; }
+.aktionen-knopf:hover, .aktionen-knopf[aria-expanded="true"] { background: var(--bg-tint); border-color: var(--accent); }
+.drei-balken { display: inline-flex; flex-direction: column; gap: 3px; }
+.drei-balken span { display: block; width: 16px; height: 2px; background: var(--text); border-radius: 1px; }
+.aktionen-popover { position: absolute; z-index: 1000; min-width: 14rem; padding: 0.35rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 6px 20px var(--shadow); display: flex; flex-direction: column; gap: 0.15rem; }
+.aktionen-popover[hidden] { display: none; }
+.aktionen-popover form { margin: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.menue-eintrag { display: block; width: 100%; text-align: left; padding: 0.5rem 0.75rem; background: transparent; color: var(--text); border: none; border-radius: 5px; font: inherit; cursor: pointer; text-decoration: none; }
+.menue-eintrag:hover, .menue-eintrag:focus-visible { background: var(--bg-tint); }
+.menue-eintrag.danger { color: var(--danger); }
+#versetzen-dialog select { width: 100%; margin: 0.5rem 0; }

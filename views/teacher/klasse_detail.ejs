@@ -163,31 +163,24 @@ Meier, Carla"></textarea>
         <td><%= s.nachname %></td>
         <td><%= s.vorname %></td>
         <% if (darfVerwalten || darfVersetzen) { %>
-        <td>
-          <% if (versetzZiele.length) { %>
-            <form method="post" action="/teacher/schueler/<%= s.id %>/versetzen" class="inline" onsubmit="return confirm('Person in die gewählte Klasse versetzen? Alle bisherigen Noten bleiben der Person erhalten.')">
-              <select name="ziel_klasse_id" required aria-label="Zielklasse">
-                <option value="">↔ Versetzen nach …</option>
-                <% if (!klasse.ist_ablage) { %><option value="ohne-klasse">Ohne Klasse</option><% } %>
-                <% versetzZiele.filter(function(z) { return !z.ist_ablage; }).forEach(function(z) { %>
-                  <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
-                <% }); %>
-                <% versetzZiele.filter(function(z) { return z.ist_ablage; }).forEach(function(z) { %>
-                  <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
-                <% }); %>
-              </select>
-              <button type="submit" title="In eine andere Klasse versetzen (Noten bleiben erhalten)">↔</button>
-            </form>
-          <% } %>
-          <% if (darfVerwalten) { %>
-          <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" class="inline" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
-            <button type="submit" name="zeugnis" value="0" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
-            <button type="submit" name="zeugnis" value="1" title="Abgang eintragen und direkt das Abgangszeugnis mit allen Noten erstellen">🚪🎓 Abgang + Abgangszeugnis</button>
-          </form>
-          <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren. Für einen normalen Abgang stattdessen den Button „🚪 Abgang" nutzen.')">
-            <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
-          </form>
-          <% } %>
+        <td class="aktionen-zelle">
+          <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Aktionen für <%= s.vorname %> <%= s.nachname %>" title="Aktionen">
+            <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
+          </button>
+          <div class="aktionen-inhalt" hidden>
+            <% if (versetzZiele.length) { %>
+              <button type="button" class="menue-eintrag" data-versetzen data-sid="<%= s.id %>" data-name="<%= s.vorname %> <%= s.nachname %>" title="In eine andere Klasse versetzen (Noten bleiben erhalten)">↔ Versetzen …</button>
+            <% } %>
+            <% if (darfVerwalten) { %>
+              <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
+                <button type="submit" class="menue-eintrag" name="zeugnis" value="0" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
+                <button type="submit" class="menue-eintrag" name="zeugnis" value="1" title="Abgang eintragen und direkt das Abgangszeugnis mit allen Noten erstellen">🚪🎓 Abgang + Abgangszeugnis</button>
+              </form>
+              <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren. Für einen normalen Abgang stattdessen den Eintrag „🚪 Abgang“ nutzen.')">
+                <button type="submit" class="menue-eintrag danger" title="Komplett löschen (Noten gehen verloren)">🗑 Löschen</button>
+              </form>
+            <% } %>
+          </div>
         </td>
         <% } %>
       </tr>
@@ -207,14 +200,19 @@ Meier, Carla"></textarea>
             <td><%= s.vorname %></td>
             <td><%= s.abgang_am ? formatZeitLokal(s.abgang_am) : '–' %></td>
             <% if (darfVerwalten) { %>
-            <td>
-              <a class="btn" href="/teacher/schueler/<%= s.id %>/abgangszeugnis">🎓 Abgangszeugnis</a>
-              <form method="post" action="/teacher/schueler/<%= s.id %>/reaktivieren" class="inline">
-                <button type="submit" title="Abgang rückgängig machen">↩ Reaktivieren</button>
-              </form>
-              <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren.')">
-                <button type="submit" class="danger" title="Komplett löschen (Noten gehen verloren)">🗑</button>
-              </form>
+            <td class="aktionen-zelle">
+              <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Aktionen für <%= s.vorname %> <%= s.nachname %>" title="Aktionen">
+                <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
+              </button>
+              <div class="aktionen-inhalt" hidden>
+                <a class="menue-eintrag" href="/teacher/schueler/<%= s.id %>/abgangszeugnis">🎓 Abgangszeugnis</a>
+                <form method="post" action="/teacher/schueler/<%= s.id %>/reaktivieren">
+                  <button type="submit" class="menue-eintrag" title="Abgang rückgängig machen">↩ Reaktivieren</button>
+                </form>
+                <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren.')">
+                  <button type="submit" class="menue-eintrag danger" title="Komplett löschen (Noten gehen verloren)">🗑 Löschen</button>
+                </form>
+              </div>
             </td>
             <% } %>
           </tr>
@@ -223,6 +221,79 @@ Meier, Carla"></textarea>
     </table>
   </details>
 <% } %>
+
+<div id="aktionen-popover" class="aktionen-popover" role="menu" hidden></div>
+
+<% if (versetzZiele.length) { %>
+<dialog id="versetzen-dialog" class="notiz-dialog">
+  <form method="post" id="versetzen-form" action="">
+    <h2>Versetzen: <span id="versetzen-name"></span></h2>
+    <p class="hint">Alle bisherigen Noten bleiben der Person erhalten.</p>
+    <label>Zielklasse
+      <select name="ziel_klasse_id" required>
+        <option value="">— Klasse wählen —</option>
+        <% if (!klasse.ist_ablage) { %><option value="ohne-klasse">Ohne Klasse</option><% } %>
+        <% versetzZiele.filter(function(z) { return !z.ist_ablage; }).forEach(function(z) { %>
+          <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
+        <% }); %>
+        <% versetzZiele.filter(function(z) { return z.ist_ablage; }).forEach(function(z) { %>
+          <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
+        <% }); %>
+      </select>
+    </label>
+    <div class="form-actions">
+      <button type="submit">↔ Versetzen</button>
+      <button type="button" id="versetzen-abbrechen">Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+<% } %>
+
+<script>
+  // Aktionen je Person hinter den "drei Balken": ein gemeinsames Menü am Seitenende (wird
+  // nicht von der scrollbaren Tabelle abgeschnitten); "Versetzen" öffnet einen Dialog.
+  (function() {
+    var pop = document.getElementById('aktionen-popover');
+    var offen = null;
+    function schliessen() {
+      if (offen) { offen.setAttribute('aria-expanded', 'false'); offen = null; }
+      pop.hidden = true; pop.textContent = '';
+    }
+    document.querySelectorAll('.aktionen-knopf').forEach(function(knopf) {
+      knopf.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (offen === knopf) { schliessen(); return; }
+        schliessen();
+        var inhalt = knopf.parentElement.querySelector('.aktionen-inhalt');
+        Array.from(inhalt.children).forEach(function(kind) { pop.appendChild(kind.cloneNode(true)); });
+        pop.hidden = false;
+        var r = knopf.getBoundingClientRect();
+        var breite = pop.offsetWidth;
+        pop.style.top = (window.scrollY + r.bottom + 4) + 'px';
+        pop.style.left = Math.max(8, window.scrollX + Math.min(r.right - breite, document.documentElement.clientWidth - breite - 8)) + 'px';
+        knopf.setAttribute('aria-expanded', 'true');
+        offen = knopf;
+        var erster = pop.querySelector('button, a'); if (erster) erster.focus();
+      });
+    });
+    document.addEventListener('click', function(e) {
+      var ziel = e.target.closest('[data-versetzen]');
+      if (ziel) {
+        var dlg = document.getElementById('versetzen-dialog');
+        document.getElementById('versetzen-form').action = '/teacher/schueler/' + ziel.dataset.sid + '/versetzen';
+        document.getElementById('versetzen-name').textContent = ziel.dataset.name;
+        schliessen();
+        dlg.showModal();
+        return;
+      }
+      if (offen && !pop.contains(e.target)) schliessen();
+    });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') schliessen(); });
+    window.addEventListener('resize', schliessen);
+    var abbrechen = document.getElementById('versetzen-abbrechen');
+    if (abbrechen) abbrechen.addEventListener('click', function() { document.getElementById('versetzen-dialog').close(); });
+  })();
+</script>
 
 <% if (!klasse.ist_ablage) { %>
 <h2>Fächer</h2>

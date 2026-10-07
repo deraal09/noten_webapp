@@ -215,7 +215,8 @@ test('Sammelklasse ist für jede Lehrkraft einsehbar; übernehmen geht per Reite
   assert.equal(r.status, 200);
   const htmlAblage = await r.text();
   assert.match(htmlAblage, /Dietz/);
-  assert.match(htmlAblage, /Versetzen nach/);
+  assert.match(htmlAblage, /data-versetzen data-sid="\d+"/);
+  assert.match(htmlAblage, /<dialog id="versetzen-dialog"/);
   assert.doesNotMatch(htmlAblage, /Klasse löschen/);
   assert.doesNotMatch(htmlAblage, /\/abgang/);
   assert.equal((await form(lehrerFremd, `/teacher/klassen/${ablage.id}/loeschen`, {})).status, 403);
@@ -298,6 +299,21 @@ test('Die Sammelklasse selbst zu löschen entfernt ihre Schüler/innen endgülti
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(ablage.id), undefined);
   assert.equal(getDb().prepare('SELECT 1 FROM schueler WHERE id = ?').get(benId), undefined, 'Ben war in der Sammelklasse -> mit ihr gelöscht');
+});
+
+test('Klassenansicht: Aktionen je Person hinter den drei Balken, Versetzen öffnet einen Dialog mit Klassenauswahl', async () => {
+  const html = await (await lehrerA(`/teacher/klassen/${klasse10A}`)).text();
+  assert.match(html, /class="aktionen-knopf"[^>]*aria-haspopup="true"/);
+  assert.match(html, /<span class="drei-balken"/);
+  // Die einzelnen Buttons stehen im Menü (versteckt), nicht mehr offen in der Tabelle
+  assert.match(html, /<div class="aktionen-inhalt" hidden>[\s\S]*?↔ Versetzen …[\s\S]*?🚪 Abgang[\s\S]*?🗑 Löschen/);
+  assert.doesNotMatch(html, /<option value="">↔ Versetzen nach …<\/option>/);
+  // Dialog mit Zielklassen
+  const dialog = html.slice(html.indexOf('<dialog id="versetzen-dialog"'), html.indexOf('</dialog>', html.indexOf('<dialog id="versetzen-dialog"')));
+  assert.match(dialog, /name="ziel_klasse_id"/);
+  assert.match(dialog, /Ohne Klasse/);
+  assert.match(dialog, /<option value="\d+">9A \(2024\/25\)/);
+  assert.match(html, /<div id="aktionen-popover"/);
 });
 
 test.after(async () => {

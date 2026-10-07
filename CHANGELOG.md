@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.58.0 - 2026-10-07
+
+- Klassenansicht: Die Aktionen je Person (und bei ehemaligen Schüler/innen)
+  stehen hinter einem Menü mit drei Balken. Darin: Versetzen, Abgang, Abgang +
+  Abgangszeugnis und Löschen (bzw. Abgangszeugnis, Reaktivieren, Löschen).
+  "Versetzen" öffnet einen Dialog, in dem die Zielklasse ausgewählt wird.
+
 ## 0.57.0 - 2026-10-07
 
 - "Klasse ins nächste Schuljahr übertragen" heißt jetzt "Einschulungsjahr
