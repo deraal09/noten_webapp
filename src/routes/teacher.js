@@ -25,7 +25,7 @@ import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verkn
 import {
   ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerSchueler, ladeFaecherFuerKlassenleitung, unterfaecherDesHalbjahrs,
 } from '../noten-service.js';
-import { syncFach, syncFallsAutoAktiv, holeSyncMeta, ladeHalbjahresuebersicht } from '../noten-sync.js';
+import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta, ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
   ladeAbschlussnoten,
   ladeAbgangszeugnisDaten, ladeAbschlussuebersicht,
@@ -590,6 +590,8 @@ export default async function teacherRoutes(fastify) {
     }
     const ergebnis = setzeEndnote(fach.id, schuelerId, halbjahr, wert, notenBereich(fach.notenschluessel), request.user.id);
     if (!ergebnis.ok) return reply.code(400).send({ ok: false, error: ergebnis.fehler });
+    // Direkteingabe gilt sofort überall: Fachseite (liest dieselbe Endnote) UND Halbjahresübersicht der Klassenleitung.
+    syncPerson(fach.id, halbjahr, schuelerId, request.user.id);
     syncFallsAutoAktiv(fach.id, halbjahr, request.user.id);
     return reply.send({ ok: true, note: ergebnis.note, ntg: ergebnis.ntg });
   }

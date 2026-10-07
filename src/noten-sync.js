@@ -50,6 +50,38 @@ export function syncFach(fachId, halbjahr, userId) {
   }
 }
 
+/**
+ * Überträgt den aktuellen Stand EINER Person (Fach + Halbjahr) in den Sync-Stand, ohne die übrigen Personen
+ * des Fachs zu berühren -- für die direkte Noteneingabe: sie erscheint sofort in der Halbjahresübersicht
+ * der Klassenleitung (einschließlich Elternfach eines Unterfachs und bereits synchronisierter Folge-Halbjahre
+ * mit Verrechnung), ohne dass jemand erst „synchronisieren" drücken muss. Eine Konferenznote bleibt erhalten.
+ */
+export function syncPerson(fachId, halbjahr, schuelerId, userId) {
+  const db = getDb();
+  const note = berechneGesamtnoten(fachId, halbjahr).get(schuelerId) ?? null;
+  db.transaction(() => {
+    db.prepare(`
+      INSERT INTO fach_sync_stand (fach_id, halbjahr, schueler_id, note, synced_at, synced_by_id)
+      VALUES (?, ?, ?, ?, datetime('now'), ?)
+      ON CONFLICT(fach_id, halbjahr, schueler_id) DO UPDATE SET
+        note = excluded.note, synced_at = excluded.synced_at, synced_by_id = excluded.synced_by_id
+    `).run(fachId, halbjahr, schuelerId, note, userId);
+    db.prepare(`
+      INSERT INTO fach_sync_meta (fach_id, halbjahr, synced_at, synced_by_id)
+      VALUES (?, ?, datetime('now'), ?)
+      ON CONFLICT(fach_id, halbjahr) DO UPDATE SET synced_at = excluded.synced_at, synced_by_id = excluded.synced_by_id
+    `).run(fachId, halbjahr, userId);
+  })();
+  const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
+  if (fach?.parent_fach_id) syncPerson(fach.parent_fach_id, halbjahr, schuelerId, userId);
+  const nr = halbjahrNr(halbjahr);
+  if (fach && nr) {
+    const naechstes = halbjahrText(nr + 1);
+    const schonSynchronisiert = db.prepare('SELECT 1 AS x FROM fach_sync_meta WHERE fach_id = ? AND halbjahr = ?').get(fachId, naechstes);
+    if (schonSynchronisiert && verrechnungsProzent(fach.klasse_id, naechstes, fach) > 0) syncPerson(fachId, naechstes, schuelerId, userId);
+  }
+}
+
 /** Nach einer Notenänderung aufrufen: synchronisiert nur, wenn der Haken für diese Lehrkraft/dieses Fach gesetzt ist. */
 export function syncFallsAutoAktiv(fachId, halbjahr, userId) {
   const row = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?')

@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.79.0 - 2026-10-07
+
+- **Direkte Noteneingabe wird sofort synchronisiert:** Eine direkt eingetragene
+  Endnote bzw. Gesamtpunktzahl (Fachseite, Klassenleitungs-Raster, Unterfächer,
+  SPA) erscheint ohne weiteres „Synchronisieren" in der **Halbjahresübersicht**
+  der Klassenleitung -- für die betroffene Person, bei Unterfächern auch im
+  Fach, und bei Verrechnung in bereits synchronisierten Folge-Halbjahren. Auf
+  den Fachseiten der Lehrkräfte gilt sie ohnehin sofort. Eine Konferenznote
+  bleibt unberührt.
+
 ## 0.78.1 - 2026-10-07
 
 - Fix Klassenleitung (SPA): Im Reiter **„Endnoten (Direkteingabe)"** fehlten die

@@ -372,6 +372,15 @@ test('Unterfach-Seite und Zusammensetzungs-Seite bieten die direkte Noteneingabe
   const r = await endnote(admin, alg, bertaId, '2', HJ3);
   assert.equal(r.status, 200);
   assert.equal(berechneGesamtnoten(alg, HJ3).get(bertaId), 2);
+  // Direkteingabe landet sofort im Sync-Stand (Halbjahresübersicht der Klassenleitung) -- Unterfach und Fach
+  const stand = (fid) => getDb().prepare('SELECT note FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ?').get(fid, HJ3, bertaId)?.note;
+  assert.equal(stand(alg), 2);
+  assert.equal(stand(matheId), berechneGesamtnoten(matheId, HJ3).get(bertaId), 'auch das Elternfach wird nachgezogen');
+  // Korrigieren aktualisiert den Stand erneut
+  await endnote(admin, alg, bertaId, '3', HJ3);
+  assert.equal(stand(alg), 3);
+  const uebersicht = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr&hj=${enc(HJ3)}`)).text();
+  assert.match(uebersicht, /Halbjahresübersicht/);
 });
 
 test.after(async () => {
