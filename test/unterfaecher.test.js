@@ -361,6 +361,19 @@ test('Noteneingabe: Klassen stehen alphabetisch nach Klassenname (auch im Klasse
   assert.deepEqual(optionen, ueberschriften, 'Klassenfilter in derselben Reihenfolge');
 });
 
+test('Unterfach-Seite und Zusammensetzungs-Seite bieten die direkte Noteneingabe', async () => {
+  const alg = unterId('Gleichungen'); // früher umbenannt
+  const unter = await (await admin(`/teacher/fach/${alg}?hj=${enc(HJ3)}`)).text();
+  assert.match(unter, /id="endnoten-direkt"/, 'Unterfach: Direkte Endnoteneingabe');
+  const eltern = await (await admin(`/teacher/fach/${matheId}?hj=${enc(HJ3)}`)).text();
+  assert.match(eltern, /<th[^>]*>Direkteingabe<\/th>/, 'Fach mit Unterfächern: Direkteingabe der Fachnote');
+  assert.match(eltern, /class="endnote-eingabe"/);
+  // Unterfach-Endnote fließt in die Fachnote ein
+  const r = await endnote(admin, alg, bertaId, '2', HJ3);
+  assert.equal(r.status, 200);
+  assert.equal(berechneGesamtnoten(alg, HJ3).get(bertaId), 2);
+});
+
 test.after(async () => {
   await fastify.close();
 });

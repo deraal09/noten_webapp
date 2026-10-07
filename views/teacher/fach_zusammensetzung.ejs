@@ -59,6 +59,7 @@
           <% komposition.unterfaecher.forEach(function(u) { %><th><%= u.kurzname %></th><% }); %>
           <% if (verrechnung && verrechnung.prozent) { %><th>Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
           <th>Fachnote</th>
+          <% if (darfEndnoteEintragen) { %><th title="Ersetzt die aus den Unterfächern berechnete Fachnote">Direkteingabe</th><% } %>
         </tr>
       </thead>
       <tbody>
@@ -69,9 +70,35 @@
             <% r.unterfachNoten.forEach(function(n) { %><td><%= n === null ? '–' : String(n).replace('.', ',') %></td><% }); %>
             <% if (verrechnung && verrechnung.prozent) { %><td><%= r.vorhalbjahrNote === null ? '–' : String(r.vorhalbjahrNote).replace('.', ',') %></td><% } %>
             <td class="gesamt<%= r.nicht_bestanden ? ' nicht-bestanden' : '' %>"><strong><%= r.endnote && r.endnote.ntg ? 'ntg' : (r.gesamt === null ? '–' : String(r.gesamt).replace('.', ',')) %></strong></td>
+            <% if (darfEndnoteEintragen) { %>
+              <td>
+                <input type="text" inputmode="decimal" autocomplete="off" class="endnote-eingabe" data-sid="<%= r.schueler_id %>" placeholder="–"
+                  value="<%= r.endnote ? (r.endnote.ntg ? 'ntg' : String(r.endnote.note).replace('.', ',')) : '' %>"
+                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer: Leer = berechnete Fachnote">
+              </td>
+            <% } %>
           </tr>
         <% }); %>
       </tbody>
     </table>
   <% } %>
 </div>
+
+<% if (darfEndnoteEintragen) { %>
+<script>
+  (function() {
+    document.querySelectorAll('input.endnote-eingabe').forEach(function(inp) {
+      inp.addEventListener('change', async function() {
+        var body = new URLSearchParams();
+        body.append('schueler_id', inp.dataset.sid);
+        body.append('halbjahr', '<%= halbjahr %>');
+        body.append('wert', inp.value);
+        var d = null;
+        try { d = await (await fetch('/teacher/fach/<%= fach.id %>/endnote', { method: 'POST', body: body })).json(); } catch (e) { /* ignorieren */ }
+        if (d && d.ok) { location.reload(); }
+        else { inp.classList.add('speicherfehler'); inp.title = (d && d.error) || 'Nicht gespeichert.'; }
+      });
+    });
+  })();
+</script>
+<% } %>

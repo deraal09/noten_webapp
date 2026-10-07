@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.78.0 - 2026-10-07
+
+- **Direkte Noteneingabe bei Unterfächern:** Auch die **SPA-Komponenten-Unterfächer**
+  (z. B. Kunst, Musik) haben jetzt die „Direkte Eingabe der Gesamtpunkte" (0–15).
+  Die Punkte ersetzen die aus Klausuren/Unterrichtsleistung berechneten
+  Leistungspunkte und fließen als Wert der Komponente ins Lernfeld ein; leer =
+  wieder berechnet. Bei **Fächern mit Unterfächern** gibt es auf der
+  Zusammensetzungs-Seite eine Spalte „Direkteingabe", mit der sich die Fachnote
+  des Halbjahres direkt eintragen lässt (ersetzt die gewichtete Berechnung).
+  Normale Unterfächer (IHK/BG) hatten die Endnoteneingabe bereits.
+
 ## 0.77.1 - 2026-10-07
 
 - Noteneingabe: Die Klassen (und damit der Klassenfilter) sind **alphabetisch

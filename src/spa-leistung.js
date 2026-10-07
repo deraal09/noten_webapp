@@ -28,9 +28,15 @@ export function spaTendenz(punkte) {
  * (selbst schon verrechneten) Leistungspunkte des Vorhalbjahres ein.
  */
 export function leistungsPunkte(db, fachId, halbjahrNr, schuelerId) {
+  const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
+  // Komponenten-Unterfach: direkt eingetragene Gesamtpunkte (Direkteingabe) ersetzen die berechneten Leistungspunkte.
+  if (fach?.spa_komponente) {
+    const direkt = db.prepare('SELECT note, ntg FROM halbjahr_endnoten WHERE fach_id = ? AND schueler_id = ? AND halbjahr = ?')
+      .get(fachId, schuelerId, `${halbjahrNr}. Halbjahr`);
+    if (direkt) return direkt.ntg || direkt.note === null ? null : Math.round(direkt.note * 100) / 100;
+  }
   const punkte = berechneGesamtnoteEinerPerson(fachId, `${halbjahrNr}. Halbjahr`, schuelerId);
   if (punkte === null) return null;
-  const fach = db.prepare('SELECT * FROM faecher WHERE id = ?').get(fachId);
   const prozent = fach ? verrechnungsProzent(fach.klasse_id, `${halbjahrNr}. Halbjahr`, fach) : 0;
   const vorher = prozent ? leistungsPunkte(db, fachId, halbjahrNr - 1, schuelerId) : null;
   return Math.round(wendeVerrechnungAn(punkte, vorher, prozent) * 100) / 100;

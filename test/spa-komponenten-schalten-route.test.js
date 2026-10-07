@@ -229,6 +229,23 @@ test('SPA-Eingabemaske hat keine Altnote (importiert) mehr; das Feld wird nicht 
   assert.equal(r.status, 400);
 });
 
+test('Komponenten-Unterfach: direkte Eingabe der Gesamtpunkte ersetzt die berechneten Leistungspunkte und füttert die Komponente', async () => {
+  const db = getDb();
+  const kunst = komp('kunst');
+  const schuelerId = db.prepare("SELECT id FROM schueler WHERE nachname = 'Musterfrau'").get().id;
+  const html = await (await admin(`/teacher/fach/${kunst.id}?hj=${encodeURIComponent('2. Halbjahr')}`)).text();
+  assert.match(html, /id="endnoten-direkt"/);
+  assert.match(html, /Gesamtpunkte \(Direkteingabe\)/);
+  const r = await form(admin, `/teacher/fach/${kunst.id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '2. Halbjahr', wert: '11' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ok: true, note: 11, ntg: false });
+  const schemaHj = spaSchemaFuerFach(db, lf3Id).schema.find((x) => x.halbjahr === 2);
+  assert.equal(ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj).komponentenLeistung.kunst, 11, 'Direkteingabe vor der berechneten Leistung (15)');
+  assert.equal((await form(admin, `/teacher/fach/${kunst.id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '2. Halbjahr', wert: '16' })).status, 400, 'nur 0-15');
+  await form(admin, `/teacher/fach/${kunst.id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '2. Halbjahr', wert: '' });
+  assert.equal(ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj).komponentenLeistung.kunst, 15, 'leer = wieder die berechneten Leistungspunkte');
+});
+
 test.after(async () => {
   await fastify.close();
 });

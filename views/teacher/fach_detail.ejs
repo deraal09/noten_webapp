@@ -103,25 +103,23 @@
 %>
 <div id="panel-uebersicht" class="reiter-panel active">
   <h2>Notenübersicht</h2>
-  <% if (spaLeistung && spaLeistung.komponente) { %>
-    <%# Komponenten-Unterfach: keine eigene Endnote -- die Punkte fließen in die Komponente des Elternfachs. %>
-  <% } else if (spaLeistung) { %>
+  <% if (spaLeistung && !spaLeistung.komponente) { %>
     <p class="kopf-aktionen">
       <a class="btn" href="/teacher/fach/<%= fach.id %>?ansicht=endnoten&hj=<%= spaLeistung.hjNr %>">✏️ Direkte Endnoteneingabe</a>
     </p>
   <% } else { %>
     <p class="kopf-aktionen">
-      <button type="button" id="endnoten-toggle" aria-expanded="false" aria-controls="endnoten-direkt">✏️ Direkte Endnoteneingabe</button>
+      <button type="button" id="endnoten-toggle" aria-expanded="false" aria-controls="endnoten-direkt">✏️ Direkte <%= spaLeistung ? 'Eingabe der Gesamtpunkte' : 'Endnoteneingabe' %></button>
     </p>
     <div id="endnoten-direkt" class="card" hidden>
       <p class="hint">
-        Endnote für das <strong><%= halbjahr %></strong> direkt eintragen. Sie ersetzt die aus Klausuren und
-        Unterrichtsleistung berechnete Note. Leer lassen: die berechnete Note gilt. „ntg" = nicht teilgenommen.
+        <%= spaLeistung ? 'Gesamtpunkte' : 'Endnote' %> für das <strong><%= halbjahr %></strong> direkt eintragen. Sie ersetzen die aus Klausuren und
+        Unterrichtsleistung berechnete Note<% if (spaLeistung && spaLeistung.komponente) { %> und fließen als Wert der Komponente <strong><%= spaLeistung.komponente.name %></strong> in <%= spaLeistung.komponente.elternName %> ein<% } %>. Leer lassen: die berechnete Note gilt. „ntg" = nicht teilgenommen.
         Wird beim Verlassen des Feldes gespeichert; bei gesperrten Personen (Notenkonferenz) ist die Eingabe
         erst nach dem Entsperren durch die Klassenleitung möglich.
       </p>
       <table class="data" id="endnoten-tabelle">
-        <thead><tr><th>Schüler/in</th><th title="Aus Klausuren und Unterrichtsleistung berechnet">Berechnet</th><th>Endnote (Direkteingabe)</th></tr></thead>
+        <thead><tr><th>Schüler/in</th><th title="Aus Klausuren und Unterrichtsleistung berechnet">Berechnet</th><th><%= spaLeistung ? 'Gesamtpunkte' : 'Endnote' %> (Direkteingabe)</th></tr></thead>
         <tbody>
           <% rows.forEach(function(r) {
                var gesperrtEn = Boolean(sperren.get(r.schueler_id));

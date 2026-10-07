@@ -110,6 +110,7 @@ function renderZusammensetzung(request, reply, fach, halbjahr) {
     HALBJAHRE: halbjahreFuerFach(fach), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id),
     user: request.user, fach, halbjahr, komposition, rows: uebersicht.rows, verrechnung: uebersicht.verrechnung,
     darfGewichteAendern: userDarfZusammensetzungSehen(request.user, fach),
+    darfEndnoteEintragen: userHatFachZgriff(request.user, fach.id, halbjahr) || userIstKlassenlehrer(request.user, fach.klasse_id),
   });
 }
 
