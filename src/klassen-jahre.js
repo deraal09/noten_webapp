@@ -182,3 +182,63 @@ export function halbjahrSchuljahrMap(klasseOderId) {
   if (!l) return {};
   return Object.fromEntries(l.halbjahre.map((h, i) => [h, schuljahrDesHalbjahrs(l, i + 1)]));
 }
+
+// ---------- Fächer je Halbjahr ----------
+
+/** Halbjahr-Nummern, in denen das Fach gilt (faecher.halbjahre; NULL = alle der Klasse). */
+export function fachHalbjahrNummern(fach, laufzeit) {
+  const alle = laufzeit.halbjahre.map((_, i) => i + 1);
+  if (!fach?.halbjahre) return alle;
+  try {
+    const nummern = JSON.parse(fach.halbjahre).filter((n) => Number.isInteger(n) && n >= 1 && n <= laufzeit.anzahlHalbjahre);
+    return nummern.length ? [...new Set(nummern)].sort((a, b) => a - b) : alle;
+  } catch {
+    return alle;
+  }
+}
+
+export function fachGiltInHalbjahr(fach, halbjahrText_, laufzeit = klassenLaufzeit(fach.klasse_id)) {
+  const nr = halbjahrNr(halbjahrText_);
+  return nr !== null && fachHalbjahrNummern(fach, laufzeit).includes(nr);
+}
+
+/** Halbjahr-Texte, in denen das Fach gilt. */
+export function halbjahreFuerFach(fach) {
+  const l = klassenLaufzeit(fach.klasse_id);
+  if (!l) return ['1. Halbjahr', '2. Halbjahr'];
+  return fachHalbjahrNummern(fach, l).map(halbjahrText);
+}
+
+/**
+ * Halbjahr aus Query/Body für ein Fach: gültig nur innerhalb der Halbjahre des
+ * Fachs; sonst das aktuelle Halbjahr der Klasse, falls das Fach dort gilt, sonst
+ * das zeitlich nächste Halbjahr des Fachs.
+ */
+export function halbjahrAusEingabeFuerFach(fach, roh) {
+  const liste = halbjahreFuerFach(fach);
+  const text = /^\d{1,2}$/.test(String(roh)) ? halbjahrText(parseInt(roh, 10)) : roh;
+  if (liste.includes(text)) return text;
+  const l = klassenLaufzeit(fach.klasse_id);
+  const aktuell = l ? aktuellesHalbjahrDerKlasse(l, jetzt()) : liste[0];
+  if (liste.includes(aktuell)) return aktuell;
+  const ziel = halbjahrNr(aktuell) ?? 1;
+  return liste.reduce((beste, h) => (Math.abs(halbjahrNr(h) - ziel) < Math.abs(halbjahrNr(beste) - ziel) ? h : beste), liste[0]);
+}
+
+/**
+ * Halbjahr-Auswahl aus einem Formular (wiederholte Checkboxen) als Nummern der
+ * Laufzeit; null, wenn nichts oder alles gewählt wurde (= gilt in allen).
+ */
+export function parseHalbjahreEingabe(roh, laufzeit) {
+  const liste = (Array.isArray(roh) ? roh : [roh]).map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n >= 1 && n <= laufzeit.anzahlHalbjahre);
+  const eindeutig = [...new Set(liste)].sort((a, b) => a - b);
+  if (!eindeutig.length || eindeutig.length === laufzeit.anzahlHalbjahre) return null;
+  return eindeutig;
+}
+
+/** Die beiden Halbjahre des aktuellen Schuljahres der Klasse (Vorbelegung beim Anlegen eines Fachs). */
+export function aktuelleHalbjahrNummern(laufzeit, heute = jetzt()) {
+  const nr = halbjahrNr(aktuellesHalbjahrDerKlasse(laufzeit, heute)) ?? 1;
+  const erste = nr % 2 === 1 ? nr : nr - 1;
+  return [erste, erste + 1].filter((n) => n <= laufzeit.anzahlHalbjahre);
+}

@@ -547,3 +547,17 @@ table.tafel input.note-datum.ist-na { background: var(--bg-header); color: var(-
 #spa-tabelle input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 #spa-tabelle input[type=number]::-webkit-outer-spin-button,
 #spa-tabelle input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Direkte Endnoteneingabe (Fachseite). */
+input.endnote-eingabe { width: 5rem; text-align: center; }
+td.gesamt-cell.direkt::after { content: " ✎"; font-size: 0.8em; opacity: 0.8; }
+#endnoten-toggle.aktiv { background: var(--bg-tint); border-color: var(--accent); }
+
+.hj-auswahl { border: 1px solid var(--border); border-radius: 6px; margin: 0.5rem 0; padding: 0.5rem 0.75rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+.hj-auswahl legend { font-size: 0.8rem; color: var(--text-muted); padding: 0 0.25rem; }
+.hj-check { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0 0.5rem 0 0; font-weight: normal; }
+.hj-check input { width: auto; }
+details.hj-bearbeiten summary { cursor: pointer; }
+details.hj-bearbeiten form { margin-top: 0.4rem; }
+
+input.endnote-raster { width: 4.5rem; text-align: center; }

@@ -93,6 +93,37 @@
 %>
 <div id="panel-uebersicht" class="reiter-panel<%= fach.nur_historisch ? '' : ' active' %>">
   <h2>Notenübersicht</h2>
+  <% if (!spaLeistung) { %>
+    <p class="kopf-aktionen">
+      <button type="button" id="endnoten-toggle" aria-expanded="false" aria-controls="endnoten-direkt">✏️ Direkte Endnoteneingabe</button>
+    </p>
+    <div id="endnoten-direkt" class="card" hidden>
+      <p class="hint">
+        Endnote für das <strong><%= halbjahr %></strong> direkt eintragen. Sie ersetzt die aus Klausuren und
+        Unterrichtsleistung berechnete Note. Leer lassen: die berechnete Note gilt. „ntg" = nicht teilgenommen.
+        Wird beim Verlassen des Feldes gespeichert; bei gesperrten Personen (Notenkonferenz) ist die Eingabe
+        erst nach dem Entsperren durch die Klassenleitung möglich.
+      </p>
+      <table class="data" id="endnoten-tabelle">
+        <thead><tr><th>Schüler/in</th><th title="Aus Klausuren und Unterrichtsleistung berechnet">Berechnet</th><th>Endnote (Direkteingabe)</th></tr></thead>
+        <tbody>
+          <% rows.forEach(function(r) {
+               var gesperrtEn = Boolean(sperren.get(r.schueler_id));
+               var en = r.endnote; %>
+            <tr data-schueler="<%= r.schueler_id %>">
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrtEn) { %> 🔒<% } %></td>
+              <td class="note-cell berechnet"><%= r.gesamtBerechnet === null ? '–' : formatNote(r.gesamtBerechnet) %></td>
+              <td>
+                <input type="text" inputmode="decimal" autocomplete="off" class="endnote-eingabe" data-sid="<%= r.schueler_id %>"
+                  value="<%= en ? (en.ntg ? 'ntg' : String(en.note).replace('.', ',')) : '' %>" placeholder="–"
+                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer" <%= gesperrtEn ? 'disabled' : '' %>>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
   <table class="data" id="uebersicht">
     <thead>
       <tr>
@@ -144,7 +175,7 @@
           <% } %>
           <% if (zeigeMuendlicheNoteSpalte) { %><td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td><% } %>
           <% if (zeigeSchriftlicheNoteSpalte) { %><td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td><% } %>
-          <td class="gesamt-cell"><%= r.gesamt === null ? '–' : formatNote(r.gesamt) %></td>
+          <td class="gesamt-cell<%= r.endnote ? ' direkt' : '' %>"<% if (r.endnote) { %> title="Direkt eingetragene Endnote"<% } %>><%= r.gesamt === null ? (r.endnote && r.endnote.ntg ? 'ntg' : '–') : formatNote(r.gesamt) %></td>
           <% if (spaLeistung) { %><td class="note-cell spa-tendenz-cell"><%= r.gesamt === null ? '–' : spaTendenz(r.gesamt) %></td><% } %>
           <% if (zeigeNaSpalte) { %><td class="note-cell na-summe" data-sid="<%= r.schueler_id %>"><%= r.naAnzahl %></td><% } %>
           <% if (fach.abgeschlossen) { %>
@@ -804,6 +835,8 @@
 
   // Live-Update via JSON-API: aktualisiert Punkt-Noten UND die Notenübersicht oben
   const API_URL = '/teacher/fach/<%= fach.id %>/noten?hj=' + encodeURIComponent('<%= halbjahr %>');
+  const FACH_ID_END = '<%= fach.id %>';
+  const HJ_END = '<%= halbjahr %>';
   async function refresh() {
     try {
       const r = await fetch(API_URL);
@@ -843,7 +876,10 @@
           if (mn) mn.textContent = s.muendlicheNote !== null ? s.muendlicheNote.toString().replace('.', ',') : '–';
           const sn = tr.querySelector('.schriftliche-note');
           if (sn) sn.textContent = s.schriftlicheNote !== null ? s.schriftlicheNote.toString().replace('.', ',') : '–';
-          tr.querySelector('.gesamt-cell').textContent = s.gesamt !== null ? s.gesamt.toString().replace('.', ',') : '–';
+          const gc = tr.querySelector('.gesamt-cell');
+          gc.textContent = s.gesamt !== null ? s.gesamt.toString().replace('.', ',') : (s.endnote && s.endnote.ntg ? 'ntg' : '–');
+          gc.classList.toggle('direkt', Boolean(s.endnote));
+          gc.title = s.endnote ? 'Direkt eingetragene Endnote' : '';
           const spaTendenzZelle = tr.querySelector('.spa-tendenz-cell');
           if (spaTendenzZelle) {
             // Tendenznote zu Punkten 0-15 (SPA-Notenskala, siehe src/spa-grade-calc.js)
@@ -852,6 +888,8 @@
           }
         }
         document.querySelectorAll('.na-summe[data-sid="' + s.schueler_id + '"]').forEach(function(z) { z.textContent = String(s.naAnzahl); });
+        const berZelle = document.querySelector('#endnoten-tabelle tr[data-schueler="' + s.schueler_id + '"] .berechnet');
+        if (berZelle) berZelle.textContent = s.gesamtBerechnet !== null ? s.gesamtBerechnet.toString().replace('.', ',') : '–';
         const datumsZelle = document.querySelector('.datums-durchschnitt[data-sid="' + s.schueler_id + '"]');
         if (datumsZelle) {
           datumsZelle.textContent = s.datumsDurchschnitt !== null ? s.datumsDurchschnitt.toString().replace('.', ',') : '–';
@@ -879,6 +917,43 @@
       refresh();
     }, 400));
   });
+  // Direkte Endnoteneingabe: Tabelle ein-/ausklappen (Zustand je Fach und Halbjahr
+  // gemerkt) und beim Verlassen eines Feldes speichern.
+  (function() {
+    const knopf = document.getElementById('endnoten-toggle');
+    const box = document.getElementById('endnoten-direkt');
+    if (!knopf || !box) return;
+    const KEY = 'endnoten-offen-' + FACH_ID_END + '-' + HJ_END;
+    function setze(offen) {
+      box.hidden = !offen;
+      knopf.setAttribute('aria-expanded', offen ? 'true' : 'false');
+      knopf.classList.toggle('aktiv', offen);
+      try { sessionStorage.setItem(KEY, offen ? '1' : '0'); } catch (e) { /* ignorieren */ }
+    }
+    let offen = false;
+    try { offen = sessionStorage.getItem(KEY) === '1'; } catch (e) { /* ignorieren */ }
+    setze(offen);
+    knopf.addEventListener('click', function() { setze(box.hidden); });
+    box.querySelectorAll('input.endnote-eingabe').forEach(function(inp) {
+      inp.addEventListener('change', async function() {
+        const body = new URLSearchParams();
+        body.append('schueler_id', inp.dataset.sid);
+        body.append('halbjahr', HJ_END);
+        body.append('wert', inp.value);
+        let d = null;
+        try { d = await (await fetch('/teacher/fach/' + FACH_ID_END + '/endnote', { method: 'POST', body: body })).json(); } catch (e) { /* ignorieren */ }
+        if (d && d.ok) {
+          inp.value = d.ntg ? 'ntg' : (d.note === null ? '' : String(d.note).replace('.', ','));
+          inp.classList.remove('speicherfehler'); inp.title = '';
+          refresh();
+        } else {
+          inp.classList.add('speicherfehler');
+          inp.title = (d && d.error) || 'Nicht gespeichert.';
+        }
+      });
+    });
+  })();
+
   // Datumstabelle: nur Noten oder "n.a." (nicht anwesend). Beim Tippen wird
   // gespeichert, sobald der Wert eine gültige Zahl oder n.a. ist; beim
   // Verlassen des Feldes (change) wird jede andere Eingabe zu n.a. und das Feld

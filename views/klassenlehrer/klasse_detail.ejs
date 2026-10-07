@@ -13,6 +13,7 @@
 <div class="reiter" data-storage-key="klassenleitung-reiter-<%= klasse.id %>">
   <button type="button" class="<%= aktiverTab === 'uebersicht' ? 'active' : '' %>" data-target="panel-uebersicht">Übersicht</button>
   <button type="button" class="<%= aktiverTab === 'halbjahr' ? 'active' : '' %>" data-target="panel-halbjahr">Halbjahresübersicht</button>
+  <button type="button" class="<%= aktiverTab === 'endnoten' ? 'active' : '' %>" data-target="panel-endnoten">Endnoten (Direkteingabe)</button>
   <button type="button" class="<%= aktiverTab === 'fehlzeiten' ? 'active' : '' %>" data-target="panel-fehlzeiten">Fehlzeiten</button>
   <button type="button" class="<%= aktiverTab === 'abschluss' ? 'active' : '' %>" data-target="panel-abschluss">Abschluss-/Abgangsübersicht</button>
   <button type="button" class="<%= aktiverTab === 'klassenleitung' ? 'active' : '' %>" data-target="panel-klassenleitung">Weitere Klassenlehrkräfte</button>
@@ -227,6 +228,80 @@
       <a href="/klassenlehrer/klasse/<%= klasse.id %>/historische-noten-import">📋 Noten importieren (Text/CSV)</a>
     </p>
   </div>
+</div>
+
+<div id="panel-endnoten" class="reiter-panel <%= aktiverTab === 'endnoten' ? 'active' : '' %>">
+  <h2>Endnoten direkt eintragen <small>(<%= halbjahr %><% if (HALBJAHR_SCHULJAHR[halbjahr]) { %>, <%= HALBJAHR_SCHULJAHR[halbjahr] %><% } %>)</small></h2>
+  <% if (!endnotenRaster.bearbeitbar) { %>
+    <p class="hint">
+      Die Direkteingabe der Klassenleitung gilt für <strong>vergangene Halbjahre</strong>. Das <%= halbjahr %> läuft noch bzw.
+      liegt in der Zukunft -- dort tragen die Fachlehrkräfte die Endnote auf ihrer Fachseite ein
+      („Direkte Endnoteneingabe") bzw. sie wird aus den Leistungen berechnet. Wähle oben ein vergangenes Halbjahr.
+    </p>
+  <% } else { %>
+    <p class="hint">
+      Endnote je Fach direkt eintragen (ersetzt die berechnete Note; leer = berechnete Note, „ntg" = nicht teilgenommen).
+      Gesperrte Personen (🔒, Notenkonferenz) müssen zuerst im Konferenzmodus entsperrt werden. Fächer für dieses Halbjahr
+      legst du unter „Zur Klasse" → Fächer an (Haken bei den Halbjahren).
+    </p>
+  <% } %>
+  <% if (!endnotenRaster.faecher.length) { %>
+    <p>Für dieses Halbjahr gibt es noch keine Fächer.</p>
+  <% } else { %>
+    <div class="tabelle-scroll">
+    <table class="data" id="endnoten-raster">
+      <thead>
+        <tr>
+          <th>Schüler/in</th>
+          <% endnotenRaster.faecher.forEach(function(f) { %><th><%= f.name %></th><% }); %>
+        </tr>
+      </thead>
+      <tbody>
+        <% endnotenRaster.zeilen.forEach(function(z) { %>
+          <tr>
+            <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %><% if (z.gesperrt) { %> 🔒<% } %></td>
+            <% z.zellen.forEach(function(c) { %>
+              <td>
+                <% if (!c.teilnimmt) { %>
+                  <span class="hint">–</span>
+                <% } else { %>
+                  <input type="text" inputmode="decimal" autocomplete="off" class="endnote-raster"
+                    data-fach="<%= c.fach.id %>" data-sid="<%= z.schueler.id %>"
+                    value="<%= c.direkt ? (c.direkt.ntg ? 'ntg' : String(c.direkt.note).replace('.', ',')) : '' %>"
+                    placeholder="<%= c.berechnet === null ? '–' : String(c.berechnet).replace('.', ',') %>"
+                    title="<%= c.berechnet === null ? 'Keine berechnete Note' : 'Berechnet: ' + String(c.berechnet).replace('.', ',') %>"
+                    <%= (!endnotenRaster.bearbeitbar || z.gesperrt) ? 'disabled' : '' %>>
+                <% } %>
+              </td>
+            <% }); %>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    </div>
+    <script>
+      (function() {
+        document.querySelectorAll('input.endnote-raster').forEach(function(inp) {
+          inp.addEventListener('change', async function() {
+            const body = new URLSearchParams();
+            body.append('fach_id', inp.dataset.fach);
+            body.append('schueler_id', inp.dataset.sid);
+            body.append('halbjahr', '<%= halbjahr %>');
+            body.append('wert', inp.value);
+            let d = null;
+            try { d = await (await fetch('/teacher/klassen/<%= klasse.id %>/endnote', { method: 'POST', body: body })).json(); } catch (e) { /* ignorieren */ }
+            if (d && d.ok) {
+              inp.value = d.ntg ? 'ntg' : (d.note === null ? '' : String(d.note).replace('.', ','));
+              inp.classList.remove('speicherfehler'); inp.title = '';
+            } else {
+              inp.classList.add('speicherfehler');
+              inp.title = (d && d.error) || 'Nicht gespeichert.';
+            }
+          });
+        });
+      })();
+    </script>
+  <% } %>
 </div>
 
 <div id="panel-fehlzeiten" class="reiter-panel <%= aktiverTab === 'fehlzeiten' ? 'active' : '' %>">

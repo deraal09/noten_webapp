@@ -6,6 +6,25 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.53.0 - 2026-10-07
+
+- Direkte Endnoteneingabe: Bei allen Fächern (außer SPA) gibt es auf der
+  Fachseite neben der Notenübersicht den Button "Direkte Endnoteneingabe". Die
+  Tabelle zeigt je Person die berechnete Halbjahresnote und ein Feld für die
+  Endnote des gewählten Halbjahres (Zahl, "ntg" = nicht teilgenommen, leer =
+  berechnete Note). Die direkte Endnote ersetzt die berechnete Note in der
+  Übersicht, im Sync mit der Klassenleitung und in Abschluss/Zeugnis.
+- Klassenleitungsbereich: neuer Reiter "Endnoten (Direkteingabe)" -- die
+  Klassenleitung trägt für vergangene Halbjahre die Endnoten aller Fächer in
+  einem Raster ein. Ist eine Person durch die Notenkonferenz gesperrt, muss
+  sie zuerst entsperrt werden (gilt auch für die Fachseite).
+- Fächer je Halbjahr: Beim Anlegen eines Fachs werden die Halbjahre
+  angekreuzt, in denen es gilt (Vorbelegung: beide Halbjahre des aktuellen
+  Schuljahres). In der Fächerliste lassen sie sich ändern (nicht, solange im
+  wegfallenden Halbjahr Leistungen oder Endnoten stehen). Das Fach erscheint
+  nur in diesen Halbjahren (Reiter, Halbjahresübersicht, Konferenzmodus,
+  Raster); bestehende Fächer gelten in allen Halbjahren.
+
 ## 0.52.0 - 2026-10-07
 
 - Klassen laufen über mehrere Schuljahre: jede Klasse hat ein

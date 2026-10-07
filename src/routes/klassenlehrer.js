@@ -10,6 +10,7 @@
 import { getDb } from '../db.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
 import { FEHLZEIT_TYPEN } from '../grade-calc.js';
+import { ladeEndnotenRaster } from '../endnoten-raster.js';
 import { halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, klassenLaufzeit, jahresOptionen } from '../klassen-jahre.js';
 import { ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
@@ -119,7 +120,7 @@ export default async function klassenlehrerRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = halbjahrAusEingabe(klasse.id, request.query?.hj);
-    const gueltigeTabs = ['uebersicht', 'halbjahr', 'fehlzeiten', 'abschluss', 'klassenleitung'];
+    const gueltigeTabs = ['uebersicht', 'halbjahr', 'endnoten', 'fehlzeiten', 'abschluss', 'klassenleitung'];
     const aktiverTab = gueltigeTabs.includes(request.query?.tab) ? request.query.tab : 'uebersicht';
     const schueler = getDb().prepare(
       "SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname"
@@ -191,6 +192,9 @@ export default async function klassenlehrerRoutes(fastify) {
       ORDER BY f.name
     `).all(klasse.id);
 
+    // ---- Direkte Endnoteneingabe (vergangene Halbjahre) ----
+    const endnotenRaster = ladeEndnotenRaster(klasse, halbjahr);
+
     // ---- Tab 4: Abschluss-/Abgangsübersicht ----
     const abschlussuebersicht = ladeAbschlussuebersicht(klasse.id);
 
@@ -210,7 +214,7 @@ export default async function klassenlehrerRoutes(fastify) {
       .filter((s) => s.aufhebung_angefragt).length;
 
     return reply.viewEjs('klassenlehrer/klasse_detail.ejs', {
-      user: request.user, klasse, halbjahr, HALBJAHRE: halbjahreFuerKlasse(klasse.id), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(klasse.id), laufzeit: klassenLaufzeit(klasse.id), jahresOptionen: jahresOptionen(), schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
+      user: request.user, klasse, halbjahr, HALBJAHRE: halbjahreFuerKlasse(klasse.id), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(klasse.id), laufzeit: klassenLaufzeit(klasse.id), endnotenRaster, jahresOptionen: jahresOptionen(), schueler, fehlMap, fehlMap2, notizenMap, aktiverTab,
       halbjahresuebersicht, abschlussuebersicht, klassenleitungListe, zuweisbareLehrkraefte,
       offeneEntsperrAnfragen, vergangeneSchuljahre,
       verfuegbareSchuljahre, gewaehltesSchuljahr, historischeHalbjahresuebersicht, faecherOhneLehrkraft,

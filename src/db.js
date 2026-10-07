@@ -314,6 +314,23 @@ CREATE TABLE IF NOT EXISTS fach_abschlussnoten (
     UNIQUE (fach_id, schueler_id)
 );
 
+-- Direkt eingetragene Endnote je Fach, Schüler/in und Halbjahr. Sie ersetzt
+-- die aus Klausuren/Unterrichtsleistung berechnete Halbjahresnote (z. B. für
+-- vergangene Halbjahre, die die Klassenleitung direkt einträgt, oder wenn die
+-- Fachlehrkraft die Endnote selbst festlegt). ntg = 1: "nicht teilgenommen"
+-- (note bleibt NULL, zählt in keinen Schnitt).
+CREATE TABLE IF NOT EXISTS halbjahr_endnoten (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    note REAL,
+    ntg INTEGER NOT NULL DEFAULT 0,
+    eingetragen_von_id INTEGER REFERENCES users(id),
+    eingetragen_am TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (fach_id, schueler_id, halbjahr)
+);
+
 -- Historische Halbjahre eines Fachs: für Noten aus der Zeit vor Einführung
 -- dieser App (oder von einer anderen Schule) — nur eine freie Bezeichnung
 -- und je Schüler/in eine manuell eingetragene Endnote, keine
@@ -790,6 +807,8 @@ function migrate(db) {
   // NULL = Einschulung ist das Schuljahr der Klasse, Abschluss die Standarddauer (SPA 2, sonst 3 Jahre).
   ensureColumn(db, 'klassen', 'einschulung_jahr', 'einschulung_jahr INTEGER');
   ensureColumn(db, 'klassen', 'abschluss_jahr', 'abschluss_jahr INTEGER');
+  // Halbjahre, in denen ein Fach gilt (JSON-Array der Halbjahr-Nummern, z. B. [1,2]); NULL = alle Halbjahre der Klasse.
+  ensureColumn(db, 'faecher', 'halbjahre', 'halbjahre TEXT');
   for (const k of db.prepare('SELECT k.id, s.bezeichnung FROM klassen k JOIN schuljahre s ON s.id = k.schuljahr_id WHERE k.einschulung_jahr IS NULL').all()) {
     const jahr = parseSchuljahr(k.bezeichnung)?.startJahr;
     if (jahr) db.prepare('UPDATE klassen SET einschulung_jahr = ? WHERE id = ?').run(jahr, k.id);
