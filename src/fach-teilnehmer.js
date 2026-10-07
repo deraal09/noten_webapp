@@ -14,6 +14,7 @@
 
 import { getDb } from './db.js';
 import { DEFAULT_NS_CSV } from './grade-calc.js';
+import { findeLaufendeKlasse } from './klassen-jahre.js';
 import { findeOderLegeSchuelerAn } from './schueler-utils.js';
 
 /** Befüllt die Teilnehmerliste eines frisch angelegten Fachs mit allen Schüler/innen seiner Heimat-Klasse. */
@@ -167,8 +168,8 @@ export function legeManuellenTeilnehmerAn(fach, { nachname, vorname, klassenName
   if (!n || !v || !kn) return { ok: false, fehler: 'pflichtfelder' };
 
   const db = getDb();
-  let klasse = db.prepare('SELECT * FROM klassen WHERE schuljahr_id = ? AND name = ?')
-    .get(fach.schuljahr_id, kn);
+  // Auch eine Klasse, die im Schuljahr des Fachs nur läuft (Einschulung früher), zählt als vorhanden.
+  let klasse = findeLaufendeKlasse(kn, fach.schuljahr_id);
   if (klasse && klasse.notenschluessel !== fach.notenschluessel) {
     return { ok: false, fehler: 'notenschluessel' };
   }

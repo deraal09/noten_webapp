@@ -11,7 +11,7 @@ import {
   ladeUnterfaecher, UNTERFACH_TRENNER, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
   halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre,
 } from '../unterfaecher.js';
-import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
+import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, findeLaufendeKlasse, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
   requireAuth, userHatFachZgriff, erlaubteHalbjahreImFach, userDarfTeilnehmerVerwalten, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
   userDarfFachLoeschen, userDarfKlasseVerwalten,
@@ -1164,6 +1164,14 @@ export default async function teacherRoutes(fastify) {
     if (!schuljahrId || !name) {
       request.flash?.('error', 'Schuljahr und Name sind erforderlich.');
       return reply.redirect('/teacher/klassen');
+    }
+    // Gibt es diese Klasse schon (läuft sie im gewählten Schuljahr)? Dann nicht doppelt anlegen, sondern beitreten.
+    const laufende = findeLaufendeKlasse(name, schuljahrId);
+    if (laufende) {
+      request.flash?.('error', `Die Klasse „${name}" gibt es schon (${laufende.notenschluessel}) -- sie wurde nicht doppelt angelegt.`);
+      return reply.redirect(userHatKlassenZugriff(request.user, laufende.id)
+        ? `/teacher/klassen/${laufende.id}`
+        : `/teacher/klassen/${laufende.id}/verknuepfen`);
     }
     try {
       // Laufzeit: Einschulung (Standard: gewähltes Schuljahr) und Abschluss (Standard: SPA 2, sonst 3 Jahre).

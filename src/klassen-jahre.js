@@ -345,3 +345,19 @@ export function istFachAbgeschlossen(fach, heute = jetzt()) {
 export function mitAbschlussStatus(fach) {
   return fach ? { ...fach, abgeschlossen: istFachAbgeschlossen(fach) ? 1 : 0, abgeschlossen_am: null } : fach;
 }
+
+/**
+ * Gibt es schon eine Klasse mit diesem Namen, die im Schuljahr (id) läuft? Eine Klasse läuft über
+ * mehrere Schuljahre (siehe klassenLaufzeit) -- dieselbe Klasse darf dann nicht noch einmal parallel
+ * angelegt werden, sondern man tritt ihr bei. Gleiche Namen für spätere Jahrgänge (nach Ende der
+ * Laufzeit) bleiben möglich.
+ * @returns {object|null} die bestehende Klasse
+ */
+export function findeLaufendeKlasse(name, schuljahrId) {
+  const db = getDb();
+  const sj = db.prepare('SELECT bezeichnung FROM schuljahre WHERE id = ?').get(schuljahrId);
+  const start = parseSchuljahr(sj?.bezeichnung)?.startJahr;
+  const kandidaten = db.prepare('SELECT * FROM klassen WHERE name = ? AND ist_kurs_huelle = 0 AND ist_ablage = 0').all(name);
+  return kandidaten.find((k) => k.schuljahr_id === schuljahrId
+    || (start !== undefined && klasseLaeuftImSchuljahr(klassenLaufzeit(k.id), start))) ?? null;
+}

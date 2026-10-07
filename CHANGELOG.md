@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.73.1 - 2026-10-07
+
+- Fix: Dieselbe Klasse konnte **doppelt** entstehen (zwei Klassen mit gleichem
+  Namen und unterschiedlichen Fächern). Weil eine Klasse über mehrere
+  Schuljahre läuft, prüfte die Doppelt-Sperre nur das gewählte Schuljahr. Jetzt
+  wird beim Anlegen einer Klasse und beim manuellen Hinzufügen einer Person zu
+  einem Fach (Feld „Klasse") eine bereits laufende Klasse gleichen Namens
+  erkannt: man tritt ihr bei bzw. nutzt sie, statt eine zweite anzulegen. Nach
+  Ende der Laufzeit bleibt derselbe Name für einen neuen Jahrgang möglich.
+
 ## 0.73.0 - 2026-10-07
 
 - „Neue Klasse anlegen" → **„Vorhandene Klasse wählen"**: Es gibt nur noch die
