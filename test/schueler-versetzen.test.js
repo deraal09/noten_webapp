@@ -273,7 +273,7 @@ test('SPA-Klassen: Personen aus "Ohne Klasse" übernehmen, nach "Ohne Klasse" ve
   r = await form(lehrerA, `/teacher/klassen/${spaA}/schueler/aus-ablage`, { schueler_id: String(evaId) });
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaA);
-  const spaFaecher = getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND nur_historisch = 0').all(spaA);
+  const spaFaecher = getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ?').all(spaA);
   for (const f of spaFaecher) {
     assert.ok(getDb().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(f.id, evaId));
   }

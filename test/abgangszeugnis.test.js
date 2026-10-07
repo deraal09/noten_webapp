@@ -1,6 +1,7 @@
 /**
  * Abgangs-/Abschlusszeugnis: enthält ALLE Fächer über ALLE Schuljahre
- * (auch rein historische Fächer und historische Halbjahre), zeigt bei einem
+ * (auch Fächer, die nur in vergangenen Halbjahren gelten, und direkt
+ * eingetragene Endnoten), zeigt bei einem
  * laufenden Fach alle Einzelnoten plus den aktuellen Stand und bei einem
  * abgeschlossenen Fach nur die Gesamtnote. "Abgang + Abgangszeugnis" trägt den
  * Abgang ein und öffnet direkt das Zeugnis.
@@ -20,7 +21,6 @@ delete process.env.LDAP_URL;
 
 const { buildApp } = await import('../app.js');
 const { getDb } = await import('../src/db.js');
-const { HALBJAHRE } = await import('../src/grade-calc.js');
 const { ladeAbgangszeugnisDaten } = await import('../src/fach-abschluss.js');
 
 const fastify = await buildApp({ logger: false });
@@ -58,8 +58,13 @@ async function form(req, url, body) {
 const admin = client();
 const lehrerA = client();
 let klasseId, physikId, chemieId, religionId, annaId;
+const HJ = (n) => `${n}. Halbjahr`;
+const endnote = (fachId, sid, hj, wert) => lehrerA(`/teacher/fach/${fachId}/endnote`, {
+  method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ schueler_id: String(sid), halbjahr: hj, wert }),
+});
 
-test('Vorbereitung: Klasse 2025/26 mit Physik (laufend) und Chemie (abgeschlossen), vergangenes Schuljahr 2023/24 mit Physik und dem rein historischen Fach Religion', async () => {
+test('Vorbereitung: Klasse mit Einschulung 2023 (aktuell 5. Halbjahr, 2025/26) mit Physik (laufend) und Chemie (abgeschlossen), Physik und Religion mit Endnoten aus 2023/24', async () => {
   let r = await form(admin, '/setup', {
     username: 'admin', display_name: 'Admin', password: 'adminpass123', password2: 'adminpass123',
   });
@@ -74,7 +79,7 @@ test('Vorbereitung: Klasse 2025/26 mit Physik (laufend) und Chemie (abgeschlosse
   });
   getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 
-  await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '12A', notenschluessel: 'IHK' });
+  await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '12A', notenschluessel: 'IHK', einschulung_jahr: '2023' });
   klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '12A'").get().id;
   await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
   await form(lehrerA, `/teacher/klassen/${klasseId}/schueler/neu`, { nachname: 'Adler', vorname: 'Anna' });
@@ -82,10 +87,15 @@ test('Vorbereitung: Klasse 2025/26 mit Physik (laufend) und Chemie (abgeschlosse
 
   await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Physik' });
   await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Chemie' });
+  // Religion gab es nur im 1. und 2. Halbjahr (2023/24)
+  const religion = new URLSearchParams();
+  religion.append('name', 'Religion'); religion.append('halbjahre', '1'); religion.append('halbjahre', '2');
+  await lehrerA(`/teacher/klassen/${klasseId}/faecher/neu`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: religion });
   physikId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Physik'").get(klasseId).id;
   chemieId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Chemie'").get(klasseId).id;
+  religionId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Religion'").get(klasseId).id;
 
-  // Laufende Noten 2025/26 über je eine Klausur (Gewichtung 100 %): Physik 1. Hj 10/10, 2. Hj 5/10; Chemie 1. Hj 10/10
+  // Laufende Noten 2025/26 (5./6. Halbjahr) über je eine Klausur (Gewichtung 100 %): Physik 10/10 und 5/10; Chemie 10/10
   const klausur = async (fachId, hj, punkte) => {
     await form(lehrerA, `/teacher/fach/${fachId}/klausuren/neu`, { name: 'K ' + hj, aufgaben: '1', halbjahr: hj });
     const kId = getDb().prepare('SELECT id FROM klausuren WHERE fach_id = ? AND halbjahr = ?').get(fachId, hj).id;
@@ -96,21 +106,14 @@ test('Vorbereitung: Klasse 2025/26 mit Physik (laufend) und Chemie (abgeschlosse
       body: new URLSearchParams({ schueler_id: String(annaId), aufgabe_idx: '0', wert: String(punkte) }),
     });
   };
-  await klausur(physikId, HALBJAHRE[0], 10);
-  await klausur(physikId, HALBJAHRE[1], 5);
-  await klausur(chemieId, HALBJAHRE[0], 10);
+  await klausur(physikId, HJ(5), 10);
+  await klausur(physikId, HJ(6), 5);
+  await klausur(chemieId, HJ(5), 10);
 
-  // Vergangenes Schuljahr 2023/24: Physik (bestehendes Fach) + Religion (rein historisch)
-  await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, {
-    bezeichnung: '2023/24', faecher: 'Physik\nReligion',
-  });
-  religionId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Religion'").get(klasseId).id;
-  const hhPhysik = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2023/24'").get(physikId);
-  const hhReligion1 = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2023/24'").get(religionId);
-  const hhReligion2 = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '2. Halbjahr 2023/24'").get(religionId);
-  await form(lehrerA, `/teacher/historie/${hhPhysik.id}/speichern`, { ['note_' + annaId]: '3' });
-  await form(lehrerA, `/teacher/historie/${hhReligion1.id}/speichern`, { ['note_' + annaId]: 'ntg' });
-  await form(lehrerA, `/teacher/historie/${hhReligion2.id}/speichern`, { ['note_' + annaId]: '2' });
+  // Vergangenes Schuljahr 2023/24: direkt eingetragene Endnoten
+  await endnote(physikId, annaId, HJ(1), '3');
+  await endnote(religionId, annaId, HJ(1), 'ntg');
+  await endnote(religionId, annaId, HJ(2), '2');
 
   // Chemie wird abgeschlossen -> es zählt nur noch die Gesamtnote.
   await form(lehrerA, `/teacher/fach/${chemieId}/abschliessen`, {});
@@ -118,12 +121,12 @@ test('Vorbereitung: Klasse 2025/26 mit Physik (laufend) und Chemie (abgeschlosse
 
 test('ladeAbgangszeugnisDaten: alle Fächer über alle Schuljahre, Einzelnoten chronologisch, Stand als Mittelwert, abgeschlossenes Fach nur mit Abschlussnote', () => {
   const { zeilen } = ladeAbgangszeugnisDaten(annaId);
-  assert.deepEqual(zeilen.map((z) => z.fach.name), ['Chemie', 'Physik', 'Religion'], 'auch das rein historische Fach Religion ist dabei');
+  assert.deepEqual(zeilen.map((z) => z.fach.name), ['Chemie', 'Physik', 'Religion'], 'auch das nur in vergangenen Halbjahren geltende Fach Religion ist dabei');
 
   const physik = zeilen.find((z) => z.fach.name === 'Physik');
   assert.deepEqual(physik.eintraege.map((e) => e.label), [
-    '1. Halbjahr 2023/24', `${HALBJAHRE[0]} 2025/26`, `${HALBJAHRE[1]} 2025/26`,
-  ], 'vergangenes Schuljahr zuerst, dann das laufende');
+    '1. Halbjahr 2023/24', '5. Halbjahr 2025/26', '6. Halbjahr 2025/26',
+  ], 'vergangene Halbjahre zuerst, dann das laufende');
   const [historisch, hj1, hj2] = physik.eintraege.map((e) => e.note);
   assert.equal(historisch, 3);
   assert.ok(typeof hj1 === 'number' && typeof hj2 === 'number' && hj1 < hj2, 'live berechnete Noten der beiden Halbjahre');
@@ -138,7 +141,7 @@ test('ladeAbgangszeugnisDaten: alle Fächer über alle Schuljahre, Einzelnoten c
   assert.equal(chemie.abschlussnote, chemie.eintraege[0].note, 'Abschlussnote = Note des einzigen Halbjahres');
 });
 
-test('Zeugnis-Seite: Abschlusszeugnis für aktive, abgeschlossene Fächer nur mit Gesamtnote, historische Fächer sichtbar', async () => {
+test('Zeugnis-Seite: Abschlusszeugnis für aktive, abgeschlossene Fächer nur mit Gesamtnote, Fächer vergangener Halbjahre sichtbar', async () => {
   const html = await (await lehrerA(`/teacher/schueler/${annaId}/abgangszeugnis`)).text();
   assert.match(html, /<h1>Abschlusszeugnis: Adler, Anna/);
   assert.match(html, /Religion/);

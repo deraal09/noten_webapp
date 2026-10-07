@@ -3,7 +3,7 @@
  *
  * Standardmäßig speist das SPA-Fach der AKTUELLEN Klasse eine Position
  * (siehe abschlusszeugnis in spa-noten-service.js). Hat eine Person zusätzlich
- * Fächer aus früheren Klassen oder rein historische Fächer vergangener
+ * Fächer aus früheren Klassen oder Fächer vergangener
  * Schuljahre (siehe ladeFaecherEinerPerson), lässt sich jede Position pro
  * Person aus beliebigen dieser Fächer zusammenstellen: mehrere gewählte
  * Fächer werden gemittelt. Ohne gespeicherte Auswahl bleibt alles beim
@@ -74,7 +74,7 @@ export function wendeQuellenAn(db, klasse, zeilen) {
   for (const zeile of zeilen) {
     const auswahl = ladeQuellenAuswahl(db, zeile.schuelerId);
     if (auswahl.size === 0) continue;
-    const kandidaten = new Map(ladeFaecherEinerPerson(zeile.schuelerId, klasse.id).map((f) => [f.id, f]));
+    const kandidaten = new Map(ladeFaecherEinerPerson(zeile.schuelerId).map((f) => [f.id, f]));
     const cache = new Map();
     for (const zelle of zeile.faecher) {
       const fachIds = auswahl.get(zelle.fach);
@@ -111,7 +111,7 @@ export function zeugnisMitQuellen(db, klasse, halbjahr) {
 export function ladeQuellenSeite(db, klasse, schuelerId) {
   const zeile = zeugnisFuerKlasse(db, klasse.id, 4).find((z) => z.schuelerId === schuelerId);
   if (!zeile) return null;
-  const kandidaten = ladeFaecherEinerPerson(schuelerId, klasse.id);
+  const kandidaten = ladeFaecherEinerPerson(schuelerId);
   const auswahl = ladeQuellenAuswahl(db, schuelerId);
   const cache = new Map();
   const standardFaecher = new Map(
@@ -144,7 +144,7 @@ export function speichereQuellenAuswahl(db, klasse, schuelerId, gewaehlt) {
   const zeile = zeugnisFuerKlasse(db, klasse.id, 4).find((z) => z.schuelerId === schuelerId);
   if (!zeile) return 0;
   const positionen = new Set(zeile.faecher.map((z) => z.fach));
-  const erlaubteFaecher = new Set(ladeFaecherEinerPerson(schuelerId, klasse.id).map((f) => f.id));
+  const erlaubteFaecher = new Set(ladeFaecherEinerPerson(schuelerId).map((f) => f.id));
   const insert = db.prepare('INSERT OR IGNORE INTO spa_zeugnis_quellen (schueler_id, position, fach_id) VALUES (?, ?, ?)');
   let gespeichert = 0;
   db.transaction(() => {

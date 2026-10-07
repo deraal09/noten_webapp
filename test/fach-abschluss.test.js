@@ -1,9 +1,8 @@
 /**
  * Fachabschluss (optional): berechnet je Schüler/in eine Fachabschlussnote
- * als Mittelwert aus allen vorhandenen Halbjahren (aktuelle 1./2. Halbjahr
- * + historische Halbjahre von vor Einführung der App). Historische
- * Halbjahre werden von der Klassenleitung angelegt, von den dem Fach
- * zugewiesenen Lehrkräften kontrollierbar/korrigierbar.
+ * als Mittelwert aus allen Halbjahren, in denen das Fach gilt -- berechnet
+ * aus Klausuren/Unterrichtsleistung oder direkt als Endnote eingetragen. Die
+ * dem Fach zugewiesenen Lehrkräfte tragen/korrigieren die Endnoten.
  */
 
 import { test } from 'node:test';
@@ -111,47 +110,40 @@ test('Vorbereitung: Klasse, Fach, zwei Schüler/innen, Klausur mit Noten in beid
   }
 });
 
-test('Historische Halbjahre: zugewiesene Lehrkraft darf eigenes Halbjahr selbst anlegen, ohne Zuweisung/Klassenleitung kein Zugriff', async () => {
+test('Direkte Endnote (3. Halbjahr): zugewiesene Lehrkraft darf sie eintragen, ohne Zuweisung/Klassenleitung kein Zugriff', async () => {
+  const HJ3 = '3. Halbjahr';
+  const endnote = (client, sid, wert) => client(`/teacher/fach/${fachId}/endnote`, {
+    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ schueler_id: String(sid), halbjahr: HJ3, wert }),
+  });
   // Lehrer C ist noch niemandem zugewiesen und keine Klassenleitung -> kein Zugriff.
-  let r = await form(lehrerC, `/teacher/fach/${fachId}/historie/neu`, { bezeichnung: '1. Halbjahr 2024/25' });
+  let r = await endnote(lehrerC, s1, '2');
   assert.equal(r.status, 403);
 
-  // Lehrer A ist dem Fach als Ersteller/in bereits zugewiesen -> darf für ihr
-  // eigenes Fach ein historisches Halbjahr selbst anlegen, auch ohne
-  // Klassenleitung zu sein (siehe userDarfHistorischeNotenBearbeiten).
-  r = await form(lehrerA, `/teacher/fach/${fachId}/historie/neu`, { bezeichnung: '1. Halbjahr 2024/25' });
-  assert.equal(r.status, 302);
-  const hh = getDb().prepare('SELECT * FROM historische_halbjahre WHERE fach_id = ?').get(fachId);
-  assert.ok(hh);
-  assert.equal(hh.bezeichnung, '1. Halbjahr 2024/25');
-  assert.equal(hh.erstellt_als_fachlehrkraft, 1);
+  // Lehrer A ist dem Fach als Ersteller/in zugewiesen -> darf direkte Endnoten eintragen.
+  r = await endnote(lehrerA, s1, '2');
+  assert.equal(r.status, 200);
 
   // Für die Zuweisung weiterer Lehrkräfte (unten) muss Lehrer A Klassenleitung sein.
   await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
 
-  // Lehrer C ist immer noch nicht zugewiesen -> darf keine Noten eintragen.
-  r = await lehrerC(`/teacher/historie/${hh.id}/speichern`, {
-    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ ['note_' + s1]: '2' }),
-  });
+  // Lehrer C ist immer noch nicht zugewiesen -> darf nichts ändern.
+  r = await endnote(lehrerC, s2, '4');
   assert.equal(r.status, 403);
 
-  // Erst nach Zuweisung darf Lehrer C die historischen Noten pflegen.
+  // Erst nach Zuweisung darf Lehrer C die Endnoten pflegen.
   await form(lehrerA, `/teacher/klassen/${klasseId}/zuweisungen/neu`, {
     user_id: String(getDb().prepare('SELECT id FROM users WHERE username = ?').get('lehrerc').id),
     fach_id: String(fachId),
   });
-  r = await lehrerC(`/teacher/historie/${hh.id}/speichern`, {
-    method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ ['note_' + s1]: '2', ['note_' + s2]: '4' }),
-  });
-  assert.equal(r.status, 302);
-  const noten = getDb().prepare('SELECT schueler_id, note FROM historische_noten WHERE historisches_halbjahr_id = ?').all(hh.id);
+  r = await endnote(lehrerC, s2, '4');
+  assert.equal(r.status, 200);
+  const noten = getDb().prepare("SELECT schueler_id, note FROM halbjahr_endnoten WHERE fach_id = ? AND halbjahr = '3. Halbjahr'").all(fachId);
   assert.equal(noten.find((n) => n.schueler_id === s1).note, 2);
   assert.equal(noten.find((n) => n.schueler_id === s2).note, 4);
 });
 
-test('Fach abschließen: Fachabschlussnote = Mittelwert aus allen Halbjahren (aktuell + historisch)', async () => {
+test('Fach abschließen: Fachabschlussnote = Mittelwert aus allen Halbjahren (berechnet + direkte Endnote)', async () => {
   const r = await form(lehrerA, `/teacher/fach/${fachId}/abschliessen`, {});
   assert.equal(r.status, 302);
 
@@ -159,12 +151,12 @@ test('Fach abschließen: Fachabschlussnote = Mittelwert aus allen Halbjahren (ak
   assert.equal(fach.abgeschlossen, 1);
   assert.ok(fach.abgeschlossen_am);
 
-  // s1: HJ1=sehr gut (10/10 -> 1), HJ2=sehr gut (10/10 -> 1), historisch=2 -> Mittelwert ≈ 1,33
+  // s1: HJ1=sehr gut (10/10 -> 1), HJ2=sehr gut (10/10 -> 1), 3. Halbjahr=2 -> Mittelwert ≈ 1,33
   const abschlussS1 = getDb().prepare('SELECT note FROM fach_abschlussnoten WHERE fach_id = ? AND schueler_id = ?').get(fachId, s1);
   assert.ok(abschlussS1);
   assert.ok(abschlussS1.note > 1 && abschlussS1.note < 1.5, `erwartet ~1,33, war ${abschlussS1.note}`);
 
-  // s2: HJ1=sehr gut (1), HJ2=keine Note (ignoriert), historisch=4 -> Mittelwert = 2,5
+  // s2: HJ1=sehr gut (1), HJ2=keine Note (ignoriert), 3. Halbjahr=4 -> Mittelwert = 2,5
   const abschlussS2 = getDb().prepare('SELECT note FROM fach_abschlussnoten WHERE fach_id = ? AND schueler_id = ?').get(fachId, s2);
   assert.equal(abschlussS2.note, 2.5);
 

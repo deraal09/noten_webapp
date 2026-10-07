@@ -21,8 +21,8 @@ import {
 } from '../noten-service.js';
 import { syncFach, syncFallsAutoAktiv, holeSyncMeta, ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
-  ladeHistorischeHalbjahre, ladeHistorischeNoten, ladeAbschlussnoten, schliesseFachAb, oeffneFach,
-  ladeAbgangszeugnisDaten, ladeAbschlussuebersicht, userDarfHistorischeNotenBearbeiten,
+  ladeAbschlussnoten, schliesseFachAb, oeffneFach,
+  ladeAbgangszeugnisDaten, ladeAbschlussuebersicht,
 } from '../fach-abschluss.js';
 import {
   istSchuelerGesperrtInFach, sperren, entsperren, aufhebungAnfragen,
@@ -85,24 +85,21 @@ function leseMultipartDatei(buffer, contentType, feldname) {
   });
 }
 
-/** Fach-assignierte Lehrkraft ODER Klassenleitung darf die Notentafel/Historie eines Fachs bearbeiten. */
+/** Fach-assignierte Lehrkraft ODER Klassenleitung darf die Notentafel eines Fachs bearbeiten. */
 function userDarfFachBearbeiten(user, fach) {
   return userHatFachZgriff(user, fach.id) || userIstKlassenlehrer(user, fach.klasse_id);
 }
 
 /**
- * Wohin nach einer Historie-Aktion (anlegen/speichern/löschen) oder einem
- * Fach-Abschluss (abschliessen/oeffnen) zurückleiten: die zugewiesene
- * Lehrkraft auf die normale Fach-Seite, eine Klassenleitung ohne eigene
- * Zuweisung stattdessen auf die eigens dafür vorgesehene Klassenleitungs-Seite
- * (GET /teacher/fach/:id bleibt bewusst der zugewiesenen Lehrkraft
- * vorbehalten, siehe dort; /klassenlehrer/fach/:id/historie zeigt neben
- * historischen Halbjahren auch den Fach-Abschluss-Status).
+ * Wohin nach einem Fach-Abschluss (abschliessen/oeffnen) zurückleiten: die
+ * zugewiesene Lehrkraft auf die normale Fach-Seite, eine Klassenleitung ohne
+ * eigene Zuweisung auf die Klassenleitungsseite der Klasse (GET
+ * /teacher/fach/:id bleibt bewusst der zugewiesenen Lehrkraft vorbehalten).
  */
-function historieZielRedirect(user, fach) {
+function fachZielRedirect(user, fach) {
   return userHatFachZgriff(user, fach.id)
     ? `/teacher/fach/${fach.id}`
-    : `/klassenlehrer/fach/${fach.id}/historie`;
+    : `/klassenlehrer/klasse/${fach.klasse_id}?tab=abschluss`;
 }
 
 /**
@@ -192,20 +189,14 @@ export default async function teacherRoutes(fastify) {
     // eine eigene, klassenlose Rubrik statt unter ihrer unsichtbaren
     // Kurs-Hülle zu erscheinen (siehe /kurse/neu, klassen.ist_kurs_huelle) --
     // deren technischer Name (__kurshuelle_…) wäre als "Klassen"-Überschrift
-    // nur verwirrend. Rein historische Fächer (faecher.nur_historisch, siehe
-    // fuegeVergangenesSchuljahrHinzu/importiereHistorischeNoten) bleiben hier
-    // bewusst außen vor: sie hängen technisch an der AKTUELLEN Klasse,
-    // gehören inhaltlich aber zu einem vergangenen Schuljahr und würden
-    // sonst als (leeres, teilnehmerloses) Fach im laufenden Schuljahr
-    // auftauchen. Sie erscheinen weiter unten nur, wenn explizit ein
-    // vergangenes Schuljahr ausgewählt wird (siehe dashboard.ejs).
+    // nur verwirrend.
     const rows = getDb().prepare(`
       SELECT f.id, f.name, f.ist_kurs, k.id AS klasse_id, k.name AS klasse_name, k.notenschluessel,
              s.id AS schuljahr_id, s.bezeichnung AS schuljahr_bezeichnung,
              (SELECT COUNT(*) FROM klausuren kk WHERE kk.fach_id = f.id) AS anzahl_klausuren,
              (SELECT COUNT(*) FROM unterrichtsleistungen uu WHERE uu.fach_id = f.id) AS anzahl_uls
       FROM fach_zuweisungen fz
-      JOIN faecher f ON f.id = fz.fach_id AND f.nur_historisch = 0
+      JOIN faecher f ON f.id = fz.fach_id
       JOIN klassen k ON k.id = f.klasse_id
       JOIN schuljahre s ON s.id = k.schuljahr_id
       WHERE fz.user_id = ?
@@ -226,37 +217,8 @@ export default async function teacherRoutes(fastify) {
       byKlasse.get(r.klasse_id).faecher.push(eintrag);
     }
 
-    // Rein historische Fächer, denen der User zugewiesen ist, gruppiert nach
-    // dem Schuljahr aus der Bezeichnung ihrer historischen Halbjahre (siehe
-    // ladeVergangeneSchuljahre in fach-abschluss.js) -- per Auswahl (Query
-    // "schuljahr") sichtbar zu machen, Standard ist "kein vergangenes
-    // Schuljahr ausgewählt" (aktuelles Schuljahr, s. o.).
-    const vergangeneRows = getDb().prepare(`
-      SELECT f.id, f.name, k.name AS klasse_name, hh.bezeichnung
-      FROM fach_zuweisungen fz
-      JOIN faecher f ON f.id = fz.fach_id AND f.nur_historisch = 1
-      JOIN klassen k ON k.id = f.klasse_id
-      JOIN historische_halbjahre hh ON hh.fach_id = f.id
-      WHERE fz.user_id = ?
-    `).all(request.user.id);
-    const proSchuljahr = new Map();
-    for (const r of vergangeneRows) {
-      const treffer = /^[12]\. Halbjahr (.+)$/.exec(r.bezeichnung);
-      const sj = treffer ? treffer[1] : r.bezeichnung;
-      if (!proSchuljahr.has(sj)) proSchuljahr.set(sj, new Map());
-      proSchuljahr.get(sj).set(r.id, { id: r.id, name: r.name, klasse_name: r.klasse_name });
-    }
-    const verfuegbareSchuljahre = sortiereSchuljahreAbsteigend(
-      Array.from(proSchuljahr.keys()).map((bezeichnung) => ({ bezeichnung }))
-    ).map((s) => s.bezeichnung);
-    const gewaehltesSchuljahr = String(request.query?.schuljahr || '').trim();
-    const vergangeneFaecher = gewaehltesSchuljahr && proSchuljahr.has(gewaehltesSchuljahr)
-      ? Array.from(proSchuljahr.get(gewaehltesSchuljahr).values())
-      : [];
-
     return reply.viewEjs('teacher/dashboard.ejs', {
       user: request.user, byKlasse: Array.from(byKlasse.values()), kurse,
-      verfuegbareSchuljahre, gewaehltesSchuljahr, vergangeneFaecher,
     });
   });
 
@@ -267,8 +229,8 @@ export default async function teacherRoutes(fastify) {
     // Bewusst NUR die dem Fach zugewiesene Lehrkraft (nicht jede
     // Klassenleitung) -- die Live-Notentafel bleibt bis zum Sync unter
     // Kontrolle der Fachlehrkraft (siehe src/noten-sync.js). Eine
-    // Klassenleitung ohne eigene Zuweisung verwaltet historische Halbjahre
-    // stattdessen über /klassenlehrer/fach/:id/historie.
+    // Klassenleitung ohne eigene Zuweisung trägt Endnoten vergangener
+    // Halbjahre im Klassenleitungsbereich ein (Reiter "Endnoten").
     if (!userHatFachZgriff(request.user, fach.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
@@ -290,19 +252,6 @@ export default async function teacherRoutes(fastify) {
     const zuweisung = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?')
       .get(fach.id, request.user.id);
     const syncMeta = holeSyncMeta(fach.id, halbjahr);
-    const historischeHalbjahre = ladeHistorischeHalbjahre(fach.id).map((hh) => ({
-      ...hh, noten: ladeHistorischeNoten(hh.id),
-      darfBearbeiten: userDarfHistorischeNotenBearbeiten(request.user, fach, hh),
-    }));
-    // Historische Noten hängen an den AKTUELLEN Schüler/innen der Klasse
-    // (siehe /historie/:id/speichern), nicht an fach_teilnehmer -- bei einem
-    // rein historischen Fach (nur_historisch) ist die Teilnehmerliste
-    // absichtlich leer (siehe fuelleFachTeilnehmerAuf in src/db.js), sonst
-    // würde das "Historische Halbjahre"-Panel unten (das dieselbe Liste wie
-    // die Live-Notentafel nutzen würde) fälschlich leer bleiben.
-    const schuelerHistorie = getDb().prepare(
-      'SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname'
-    ).all(fach.klasse_id);
     const abschlussnoten = fach.abgeschlossen ? ladeAbschlussnoten(fach.id) : new Map();
     // Sperren über die Schüler-IDs statt "die eine Klasse" -- bei einem
     // klassenübergreifenden Kurs liegt die Sperre bei der jeweils EIGENEN
@@ -331,10 +280,8 @@ export default async function teacherRoutes(fastify) {
       termine: uebersicht.termine, unterrichtNotizAnzahl,
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct, verrechnung: uebersicht.verrechnung,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
-      historischeHalbjahre, schuelerHistorie, abschlussnoten, sperren, teilnehmer,
+      abschlussnoten, sperren, teilnehmer,
       darfFachAbschliessen: userDarfFachBearbeiten(request.user, fach),
-      darfHistorieAnlegen: userDarfFachBearbeiten(request.user, fach),
-      darfHistorieLoeschen: userIstKlassenlehrer(request.user, fach.klasse_id),
     });
   });
 
@@ -1090,7 +1037,7 @@ export default async function teacherRoutes(fastify) {
     }
     schliesseFachAb(fach.id, request.user.id);
     request.flash?.('success', 'Fach abgeschlossen — Fachabschlussnoten berechnet.');
-    return reply.redirect(historieZielRedirect(request.user, fach));
+    return reply.redirect(fachZielRedirect(request.user, fach));
   });
 
   fastify.post('/fach/:id/oeffnen', async (request, reply) => {
@@ -1101,68 +1048,7 @@ export default async function teacherRoutes(fastify) {
     }
     oeffneFach(fach.id);
     request.flash?.('success', 'Fach wieder geöffnet.');
-    return reply.redirect(historieZielRedirect(request.user, fach));
-  });
-
-  // ---------- Historische Halbjahre (Noten von vor Einführung der App) ----------
-  fastify.post('/fach/:id/historie/neu', async (request, reply) => {
-    const fach = ladeFachMitUmfeld(request.params.id);
-    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
-    if (!userDarfFachBearbeiten(request.user, fach)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung, vergangene Halbjahre hinzuzufügen.' });
-    }
-    const bezeichnung = String(request.body?.bezeichnung || '').trim();
-    if (bezeichnung) {
-      const reihenfolge = getDb().prepare('SELECT COUNT(*) AS c FROM historische_halbjahre WHERE fach_id = ?').get(fach.id).c;
-      const alsFachlehrkraft = userHatFachZgriff(request.user, fach.id) ? 1 : 0;
-      getDb().prepare(`
-        INSERT INTO historische_halbjahre (fach_id, bezeichnung, reihenfolge, erstellt_von_id, erstellt_als_fachlehrkraft)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(fach.id, bezeichnung, reihenfolge, request.user.id, alsFachlehrkraft);
-    }
-    return reply.redirect(historieZielRedirect(request.user, fach));
-  });
-
-  fastify.post('/historie/:id/speichern', async (request, reply) => {
-    const hh = getDb().prepare('SELECT * FROM historische_halbjahre WHERE id = ?').get(request.params.id);
-    if (!hh) return reply.redirect('/teacher');
-    const fach = ladeFachMitUmfeld(hh.fach_id);
-    if (!userDarfHistorischeNotenBearbeiten(request.user, fach, hh)) return reply.code(403).send({ error: 'forbidden' });
-    const schuelerListe = getDb().prepare('SELECT id FROM schueler WHERE klasse_id = ?').all(fach.klasse_id);
-    const [min, max] = fach.notenschluessel === 'BG' ? [0, 15] : [1, 6];
-    const upsert = getDb().prepare(`
-      INSERT INTO historische_noten (historisches_halbjahr_id, schueler_id, note)
-      VALUES (?, ?, ?)
-      ON CONFLICT(historisches_halbjahr_id, schueler_id) DO UPDATE SET note = excluded.note
-    `);
-    const tx = getDb().transaction(() => {
-      for (const s of schuelerListe) {
-        const roh = String(request.body?.['note_' + s.id] ?? '');
-        if (roh.trim() === '') {
-          upsert.run(hh.id, s.id, null);
-          continue;
-        }
-        const wert = parseTendenzNote(roh);
-        if (wert === null) continue; // nicht lesbar -- unverändert lassen
-        if (wert !== NTG && (wert < min || wert > max)) continue; // außerhalb des Notenschlüssels -- unverändert lassen
-        upsert.run(hh.id, s.id, wert);
-      }
-    });
-    tx();
-    request.flash?.('success', 'Historische Noten gespeichert.');
-    return reply.redirect(historieZielRedirect(request.user, fach));
-  });
-
-  fastify.post('/historie/:id/loeschen', async (request, reply) => {
-    const hh = getDb().prepare('SELECT * FROM historische_halbjahre WHERE id = ?').get(request.params.id);
-    if (!hh) return reply.redirect('/teacher');
-    const fach = ladeFachMitUmfeld(hh.fach_id);
-    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann vergangene Halbjahre entfernen.' });
-    }
-    getDb().prepare('DELETE FROM historische_halbjahre WHERE id = ?').run(hh.id);
-    request.flash?.('success', 'Historisches Halbjahr entfernt.');
-    return reply.redirect(historieZielRedirect(request.user, fach));
+    return reply.redirect(fachZielRedirect(request.user, fach));
   });
 
   // ---------- Notensperre: Entsperrung anfragen (Fachlehrkraft) ----------
@@ -1491,8 +1377,8 @@ export default async function teacherRoutes(fastify) {
 
   // ---------- SPA-Abschlusszeugnis: Quellfächer je Person wählen ----------
   // Jede Zeugnisposition (Lernfeld/Fach) lässt sich pro Person aus beliebigen
-  // ihrer Fächer zusammenstellen -- auch aus früheren Klassen und rein
-  // historischen Fächern (siehe src/spa-zeugnis-quellen.js).
+  // ihrer Fächer zusammenstellen -- auch aus früheren Klassen (siehe
+  // src/spa-zeugnis-quellen.js).
   function ladeSpaKlasseFuerQuellen(request, reply) {
     const klasse = getDb().prepare(`
       SELECT k.*, s.bezeichnung AS schuljahr_bezeichnung
@@ -1714,7 +1600,7 @@ export default async function teacherRoutes(fastify) {
       SELECT f.*,
         (SELECT GROUP_CONCAT(u.display_name || COALESCE(NULLIF(' / ' || u.username, ' / '), ''), ', ')
            FROM fach_zuweisungen fz JOIN users u ON u.id = fz.user_id WHERE fz.fach_id = f.id) AS lehrer_liste
-      FROM faecher f WHERE f.klasse_id = ? AND f.nur_historisch = 0 ORDER BY f.name
+      FROM faecher f WHERE f.klasse_id = ? ORDER BY f.name
     `).all(klasse.id);
     // Löschen/Abgang/Abgangszeugnis nur anzeigen, wenn die Aktion auch
     // durchgeht (dieselbe Regel wie in den Routen, siehe userDarfKlasseVerwalten).
@@ -2003,8 +1889,8 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
   });
 
-  // Abgangszeugnis: Notenübersicht über ALLE Fächer einer Person (aktuelle
-  // Halbjahre + historische Halbjahre + Abschlussnote je Fach) auf einer
+  // Abgangszeugnis: Notenübersicht über ALLE Fächer einer Person (alle
+  // Halbjahre + Abschlussnote je Fach) auf einer
   // Seite -- unabhängig vom Abgangs-Status, damit sich auch für aktive
   // Schüler/innen schon vorab ein Zwischenstand ansehen lässt.
   fastify.get('/schueler/:id/abgangszeugnis', async (request, reply) => {

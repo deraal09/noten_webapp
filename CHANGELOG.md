@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.55.0 - 2026-10-07
+
+- Die historischen Halbjahre sind entfernt: Reiter "Historische Halbjahre"
+  auf der Fachseite, "Vergangene Schuljahre hinzufügen", der
+  Notenimport (Text/CSV) und die Klassenleitungs-Seite je Fach entfallen,
+  ebenso die Auswahl vergangener Schuljahre im Dashboard und in der
+  Halbjahresübersicht. Bestehende historische Noten und rein historische Fächer
+  werden beim Start der Datenbank gelöscht.
+- Ersatz: Halbjahre über die Laufzeit der Klasse, Fächer je Halbjahr und die
+  direkte Endnoteneingabe (Fachseite und Klassenleitung). Abschluss-/
+  Abgangsübersicht, Abgangs-/Abschlusszeugnis und die SPA-Zeugnisquellen
+  nutzen jetzt alle Halbjahre der Fächer (berechnet oder als Endnote
+  eingetragen); Fächer, die nur in einzelnen Halbjahren gelten, tragen
+  Halbjahre und Schuljahr in der Überschrift.
+
 ## 0.54.0 - 2026-10-07
 
 - Verrechnung der Halbjahresnoten: Im Klassenleitungsbereich (Reiter "Weitere

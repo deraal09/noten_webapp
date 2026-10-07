@@ -1,6 +1,6 @@
 /**
  * SPA-Abschlusszeugnis: pro Person lassen sich die Quellfächer je Position
- * wählen -- auch rein historische Fächer/Fächer früherer Klassen. Ohne
+ * wählen -- auch Fächer, die nur in früheren Halbjahren galten, und Fächer früherer Klassen. Ohne
  * Auswahl bleibt alles beim Standard (Fach der aktuellen Klasse); mehrere
  * gewählte Fächer werden gemittelt.
  */
@@ -64,7 +64,7 @@ let klasseId, schuelerId, lf1Id, histFachId;
 const zeugnisHtml = async () => (await admin(`/teacher/klassen/${klasseId}/zeugnis?hj=4`)).text();
 const quellenUrl = () => `/teacher/klassen/${klasseId}/zeugnis/${schuelerId}/quellen`;
 
-test('Vorbereitung: SPA-Klasse, Person mit LF1-Noten (Halbjahr 1/2) und einem historischen Fach "Lernfeld 1 (alt)" aus 2023/24', async () => {
+test('Vorbereitung: SPA-Klasse, Person mit LF1-Noten (Halbjahr 1/2) und einem Zusatzfach "Lernfeld 1 (alt)" nur im 1./2. Halbjahr (Endnoten 2 und 4)', async () => {
   let r = await form(admin, '/setup', { username: 'admin', display_name: 'Admin', password: 'adminpass123', password2: 'adminpass123' });
   assert.equal(r.status, 302);
   await form(admin, '/admin/schuljahre/neu', { bezeichnung: '2026/27' });
@@ -80,13 +80,12 @@ test('Vorbereitung: SPA-Klasse, Person mit LF1-Noten (Halbjahr 1/2) und einem hi
   await form(admin, `/teacher/fach/${lf1Id}/spa/eingabe`, { schueler_id: String(schuelerId), halbjahr: '1', feld: 'direktwert', wert: '10' });
   await form(admin, `/teacher/fach/${lf1Id}/spa/eingabe`, { schueler_id: String(schuelerId), halbjahr: '2', feld: 'direktwert', wert: '12' });
 
-  r = await form(admin, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, { bezeichnung: '2023/24', faecher: 'Lernfeld 1 (alt)' });
-  assert.equal(r.status, 302);
+  const fachBody = new URLSearchParams();
+  fachBody.append('name', 'Lernfeld 1 (alt)'); fachBody.append('halbjahre', '1'); fachBody.append('halbjahre', '2');
+  await admin(`/teacher/klassen/${klasseId}/faecher/neu`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: fachBody });
   histFachId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Lernfeld 1 (alt)'").get(klasseId).id;
-  const hh1 = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '1. Halbjahr 2023/24'").get(histFachId);
-  const hh2 = getDb().prepare("SELECT id FROM historische_halbjahre WHERE fach_id = ? AND bezeichnung = '2. Halbjahr 2023/24'").get(histFachId);
-  await form(admin, `/teacher/historie/${hh1.id}/speichern`, { ['note_' + schuelerId]: '2' });
-  await form(admin, `/teacher/historie/${hh2.id}/speichern`, { ['note_' + schuelerId]: '4' });
+  await form(admin, `/teacher/fach/${histFachId}/endnote`, { schueler_id: String(schuelerId), halbjahr: '1. Halbjahr', wert: '2' });
+  await form(admin, `/teacher/fach/${histFachId}/endnote`, { schueler_id: String(schuelerId), halbjahr: '2. Halbjahr', wert: '4' });
 });
 
 test('Standard: ohne Auswahl zeigt das Abschlusszeugnis das LF1 der aktuellen Klasse (11.00), ohne Markierung', async () => {
@@ -96,15 +95,14 @@ test('Standard: ohne Auswahl zeigt das Abschlusszeugnis das LF1 der aktuellen Kl
   assert.match(html, new RegExp(`${quellenUrl()}`));
 });
 
-test('Auswahl-Seite listet alle Fächer der Person -- auch das historische -- je Position', async () => {
+test('Auswahl-Seite listet alle Fächer der Person -- auch das Zusatzfach -- je Position', async () => {
   const r = await admin(quellenUrl());
   assert.equal(r.status, 200);
   const html = await r.text();
   assert.match(html, /Lernfeld 1 \(alt\)/);
-  assert.match(html, /\(historisch\)/);
   assert.match(html, /Lernfeld 1/);
   assert.match(html, /value="LF1:4\|\d+"/);
-  assert.match(html, /8\.00/, 'historisches Fach: Stand 3,0 -> 8 Punkte');
+  assert.match(html, /8\.00/, 'Zusatzfach: Stand 3,0 -> 8 Punkte');
 });
 
 test('Mehrere Fächer gewählt: Position wird gemittelt (LF1 11 + historisch 8 = 9.50), Markierung ✎', async () => {

@@ -6,7 +6,7 @@
 
 <p class="hint">
   Jede Position des Abschlusszeugnisses kann für diese Person aus beliebigen ihrer Fächer zusammengestellt
-  werden -- auch aus früheren Klassen und rein historischen Fächern vergangener Schuljahre. Ohne Häkchen gilt der
+  werden -- auch aus früheren Klassen. Ohne Häkchen gilt der
   Standard (das SPA-Fach der aktuellen Klasse). Sind mehrere Fächer gewählt, wird der Mittelwert ihrer Punkte
   verwendet; Fächer mit Schulnoten (1-6) werden dafür in Punkte umgerechnet (1 = 14, 2 = 11, 3 = 8, 4 = 5, 5 = 2, 6 = 0).
   Das Zeugnis zählt nur Fächer mit einem Wert.
@@ -31,7 +31,6 @@
               <td class="name">
                 <%= k.fach.name %>
                 <% if (k.fach.id === pos.standardFachId) { %><small class="hint">(Standard)</small><% } %>
-                <% if (k.fach.nur_historisch) { %><small class="hint">(historisch)</small><% } %>
                 <% if (k.fach.abgeschlossen) { %><small class="hint">(abgeschlossen)</small><% } %>
               </td>
               <td><%= k.fach.klasse_name %> · <%= k.fach.schuljahr_bezeichnung %></td>

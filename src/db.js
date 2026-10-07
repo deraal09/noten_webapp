@@ -197,14 +197,6 @@ CREATE TABLE IF NOT EXISTS faecher (
     -- Wahlpflichtkurses, siehe WPK_KURSE).
     spa_fach_key TEXT,
     spa_wpk_kurs TEXT,
-    -- 1, wenn dieses Fach ausschließlich für ein vergangenes Schuljahr
-    -- angelegt wurde, in dem die Klasse ein Fach/Lernfeld hatte, das im
-    -- aktuellen Schuljahr nicht mehr existiert (siehe "Vergangenes
-    -- Schuljahr hinzufügen" in fach-abschluss.js). Kein Bestandteil der
-    -- laufenden Notentafel/Klausuren -- wird aus den "aktuellen Fächer"-
-    -- Listen (Klassenseite, CSV-Export, Klassenübertragung) ausgeblendet,
-    -- bleibt aber für historische Halbjahre/Noten nutzbar.
-    nur_historisch INTEGER NOT NULL DEFAULT 0,
     UNIQUE (klasse_id, name)
 );
 
@@ -212,7 +204,7 @@ CREATE TABLE IF NOT EXISTS faecher (
 -- Direktwert (halbjahrModus 'direkt'), eine optionale Prüfungsnote (nur
 -- angezeigt bzw. bei Englisch/Mathematik 4. Hj. über pruefungswert in die
 -- Endnote verrechnet, siehe src/spa-noten-service.js) sowie eine importierte
--- (historische) Endnote, die die Berechnung überschreibt. Komponentenwerte
+-- (importierte) Endnote, die die Berechnung überschreibt. Komponentenwerte
 -- (halbjahrModus 'komponenten_gewichtet') stehen separat in
 -- spa_komponenten_noten.
 CREATE TABLE IF NOT EXISTS spa_eingaben (
@@ -257,7 +249,7 @@ CREATE TABLE IF NOT EXISTS spa_leistung_ziele (
 -- Pro Person gewählte Quellfächer für eine Position des SPA-Abschlusszeugnisses
 -- (position = "<Fach-Schlüssel>:<Halbjahr>", z. B. "LF1:4"). Ohne Zeilen gilt
 -- der Standard (das SPA-Fach der aktuellen Klasse); mit Zeilen wird die Position
--- aus den gewählten Fächern (auch früherer Klassen/rein historisch) zusammengestellt,
+-- aus den gewählten Fächern (auch früherer Klassen) zusammengestellt,
 -- siehe src/spa-zeugnis-quellen.js.
 CREATE TABLE IF NOT EXISTS spa_zeugnis_quellen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -301,8 +293,7 @@ CREATE TABLE IF NOT EXISTS fach_teilnehmer (
 );
 
 -- Eingefrorene Fachabschlussnote je Schüler/in (Mittelwert aus allen
--- vorhandenen Halbjahren dieses Fachs — aktuelle 1./2. Halbjahr UND
--- historische, siehe historische_halbjahre). Wird beim "Fach abschließen"
+-- vorhandenen Halbjahren dieses Fachs, siehe src/fach-abschluss.js). Wird beim "Fach abschließen"
 -- (neu) berechnet und beim "wieder öffnen" NICHT gelöscht (nur der
 -- abgeschlossen-Status auf faecher), damit ein erneutes Abschließen die
 -- Werte einfach überschreibt.
@@ -329,37 +320,6 @@ CREATE TABLE IF NOT EXISTS halbjahr_endnoten (
     eingetragen_von_id INTEGER REFERENCES users(id),
     eingetragen_am TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (fach_id, schueler_id, halbjahr)
-);
-
--- Historische Halbjahre eines Fachs: für Noten aus der Zeit vor Einführung
--- dieser App (oder von einer anderen Schule) — nur eine freie Bezeichnung
--- und je Schüler/in eine manuell eingetragene Endnote, keine
--- Klausuren/ULs. Von der Klassenleitung angelegt, von den dem Fach
--- zugewiesenen Lehrkräften kontrollierbar/korrigierbar (siehe
--- historische_noten, gleiche Berechtigung wie die Notentafel).
-CREATE TABLE IF NOT EXISTS historische_halbjahre (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
-    bezeichnung TEXT NOT NULL,
-    reihenfolge INTEGER NOT NULL DEFAULT 0,
-    erstellt_von_id INTEGER REFERENCES users(id),
-    erstellt_am TEXT NOT NULL DEFAULT (datetime('now')),
-    -- 1, wenn eine dem Fach zugewiesene Lehrkraft (nicht die Klassenleitung
-    -- klassenweit) dieses Halbjahr selbst angelegt hat -- dann darf nur noch
-    -- diese Fachlehrkraft (bzw. jede andere dem Fach zugewiesene Person) die
-    -- Noten eintragen, die Klassenleitung sieht sie nur noch an (siehe
-    -- userDarfHistorischeNotenBearbeiten in fach-abschluss.js). Klassenweit
-    -- per "Vergangenes Schuljahr hinzufügen" angelegte Halbjahre (0) bleiben
-    -- wie bisher auch für die Klassenleitung eintragbar.
-    erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS historische_noten (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    historisches_halbjahr_id INTEGER NOT NULL REFERENCES historische_halbjahre(id) ON DELETE CASCADE,
-    schueler_id INTEGER NOT NULL REFERENCES schueler(id) ON DELETE CASCADE,
-    note REAL,
-    UNIQUE (historisches_halbjahr_id, schueler_id)
 );
 
 -- Notensperre: nach der Notenkonferenz kann die Klassenleitung die Noten
@@ -729,9 +689,8 @@ function stelleBenutzernamenEindeutigSicher(db) {
 // als auch den Normalfall neu angelegter Fächer ab. Ein Fach, dessen
 // Teilnehmerliste bereits (und sei es nur teilweise) gepflegt wurde, bleibt
 // unangetastet -- diese Abfrage überschreibt nie eine bewusst angepasste
-// Liste, sie füllt nur eine komplett leere auf. Rein historische Fächer
-// (nur_historisch) werden bewusst ausgenommen -- sie brauchen keine
-// Teilnehmerliste (historische Noten hängen direkt an den aktuellen
+// Liste, sie füllt nur eine komplett leere auf.
+//
 // Schüler/innen der Klasse, siehe fach-abschluss.js), und eine automatisch
 // aufgefüllte Liste hat sie bislang fälschlich wie ein aktuelles Fach in der
 // Halbjahresübersicht auftauchen lassen (siehe ladeFaecherFuerKlassenleitung
@@ -741,7 +700,7 @@ function fuelleFachTeilnehmerAuf(db) {
     INSERT INTO fach_teilnehmer (fach_id, schueler_id)
     SELECT f.id, s.id FROM faecher f
     JOIN schueler s ON s.klasse_id = f.klasse_id
-    WHERE f.nur_historisch = 0 AND NOT EXISTS (SELECT 1 FROM fach_teilnehmer ft WHERE ft.fach_id = f.id)
+    WHERE NOT EXISTS (SELECT 1 FROM fach_teilnehmer ft WHERE ft.fach_id = f.id)
   `);
 }
 
@@ -801,8 +760,6 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
-  ensureColumn(db, 'historische_halbjahre', 'erstellt_als_fachlehrkraft', 'erstellt_als_fachlehrkraft INTEGER NOT NULL DEFAULT 0');
-  ensureColumn(db, 'faecher', 'nur_historisch', 'nur_historisch INTEGER NOT NULL DEFAULT 0');
   // Laufzeit einer Klasse in Schuljahren (Startjahr, z. B. 2025 für 2025/26): siehe src/klassen-jahre.js.
   // NULL = Einschulung ist das Schuljahr der Klasse, Abschluss die Standarddauer (SPA 2, sonst 3 Jahre).
   ensureColumn(db, 'klassen', 'einschulung_jahr', 'einschulung_jahr INTEGER');
@@ -815,16 +772,20 @@ function migrate(db) {
     const jahr = parseSchuljahr(k.bezeichnung)?.startJahr;
     if (jahr) db.prepare('UPDATE klassen SET einschulung_jahr = ? WHERE id = ?').run(jahr, k.id);
   }
-  // Einmalige Bereinigung: auf Bestandsdatenbanken kann ein rein historisches
-  // Fach schon VOR obigem nur_historisch-Fix von fuelleFachTeilnehmerAuf
-  // fälschlich mit einer Teilnehmerliste versehen worden sein, wodurch es
-  // wie ein aktuelles Fach in der Halbjahresübersicht auftauchte (siehe
-  // ladeFaecherFuerKlassenleitung in noten-service.js). Entfernen ist
-  // gefahrlos -- historische Noten hängen nicht an fach_teilnehmer.
-  db.exec(`
-    DELETE FROM fach_teilnehmer
-    WHERE fach_id IN (SELECT id FROM faecher WHERE nur_historisch = 1)
-  `);
+  // Historische Halbjahre wurden entfernt (ersetzt durch die Endnoten je
+  // Halbjahr, siehe halbjahr_endnoten): Bestandsdaten dürfen verworfen werden.
+  // Rein historische Fächer (nur für vergangene Schuljahre angelegt) fallen
+  // samt ihren Noten weg, die Tabellen und die Spalte werden entfernt.
+  db.exec('DROP TABLE IF EXISTS historische_noten');
+  db.exec('DROP TABLE IF EXISTS historische_halbjahre');
+  if (db.prepare('PRAGMA table_info(faecher)').all().some((c) => c.name === 'nur_historisch')) {
+    db.exec('DELETE FROM faecher WHERE nur_historisch = 1');
+    try {
+      db.exec('ALTER TABLE faecher DROP COLUMN nur_historisch');
+    } catch {
+      // Ältere SQLite-Version ohne DROP COLUMN: die Spalte bleibt ungenutzt (DEFAULT 0) stehen.
+    }
+  }
   migriereSitzplanRaeume(db);
   fuelleFachTeilnehmerAuf(db);
 }

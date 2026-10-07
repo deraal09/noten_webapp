@@ -2,7 +2,7 @@
  * Klassenwechsel einzelner Schüler/innen und Klasse löschen, ohne die
  * Personen zu verlieren.
  *
- * Noten (aktuelle wie historische) hängen am Schüler-Datensatz, nicht an
+ * Noten (aller Halbjahre) hängen am Schüler-Datensatz, nicht an
  * der Klasse -- ein Versetzen ändert deshalb nur die Klassenzuordnung der
  * Person. Die Teilnahmen an den Fächern der bisherigen Klasse bleiben
  * bewusst bestehen (wie beim Abgang, siehe /schueler/:id/abgang), damit
@@ -91,7 +91,7 @@ export function versetzeSchueler(schuelerId, zielKlasseId) {
     // Wie bei einer neu angelegten Person: Teilnehmer/in aller aktuellen
     // Fächer der neuen Klasse.
     const ins = db.prepare('INSERT OR IGNORE INTO fach_teilnehmer (fach_id, schueler_id) VALUES (?, ?)');
-    for (const f of db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND nur_historisch = 0').all(ziel.id)) {
+    for (const f of db.prepare('SELECT id FROM faecher WHERE klasse_id = ?').all(ziel.id)) {
       ins.run(f.id, schueler.id);
     }
   })();

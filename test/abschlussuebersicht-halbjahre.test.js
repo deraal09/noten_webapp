@@ -1,12 +1,8 @@
 /**
- * Abschluss-/Abgangsübersicht: zeigt seit dieser Änderung nicht mehr nur die
- * Fächer des laufenden Schuljahres, sondern ALLE Fächer der gesamten
- * Schullaufbahn -- also auch rein historische Fächer vergangener Schuljahre
- * (siehe "Vergangenes Schuljahr hinzufügen"/Noten-Import), samt deren
- * Fachabschlussnote. Ein rein historisches Fach wird beim Anlegen eines
- * vergangenen Schuljahres per Name wiederverwendet (siehe
- * fuegeVergangenesSchuljahrHinzu) und kann deshalb historische Halbjahre
- * mehrerer Schuljahre tragen -- die Spalte zeigt dafür die Schuljahr-Spanne.
+ * Abschluss-/Abgangsübersicht: zeigt ALLE Fächer der Klasse über die gesamte
+ * Laufzeit (mehrere Schuljahre), samt Fachabschlussnote. Fächer, die nur in
+ * einzelnen Halbjahren gelten, tragen die Halbjahre und das/die Schuljahr(e)
+ * als Beschriftung.
  */
 
 import { test } from 'node:test';
@@ -15,9 +11,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'noten-test-abschluss-historisch-'));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'noten-test-abschluss-halbjahre-'));
 process.env.DB_PFAD = path.join(tempDir, 'test.sqlite3');
-process.env.SECRET = 'test-secret-fuer-abschluss-historisch-test-bitte-lang-genug';
+process.env.SECRET = 'test-secret-fuer-abschluss-halbjahre-test-bitte-lang-genug';
 process.env.NODE_ENV = 'test';
 delete process.env.LDAP_URL;
 
@@ -61,7 +57,7 @@ const admin = client();
 const lehrerA = client();
 let klasseId, physikId, chemieId, biologieId;
 
-test('Vorbereitung: Klasse (2025/26) mit aktuellem Fach Physik, plus zwei vergangene Schuljahre mit Fächern "Chemie" (beide Jahre) und "Biologie" (nur 2021/22)', async () => {
+test('Vorbereitung: Klasse mit Einschulung 2023 (6 Halbjahre) mit Physik (alle Halbjahre), Chemie (1.-4. Halbjahr) und Biologie (1.-2. Halbjahr)', async () => {
   let r = await form(admin, '/setup', {
     username: 'admin', display_name: 'Admin', password: 'adminpass123', password2: 'adminpass123',
   });
@@ -76,36 +72,26 @@ test('Vorbereitung: Klasse (2025/26) mit aktuellem Fach Physik, plus zwei vergan
   });
   getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrera'").run();
 
-  await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '12B', notenschluessel: 'IHK' });
+  await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '12B', notenschluessel: 'IHK', einschulung_jahr: '2023' });
   klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '12B'").get().id;
   await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
   await form(lehrerA, `/teacher/klassen/${klasseId}/schueler/neu`, { nachname: 'Adler', vorname: 'Anna' });
 
+  const mitHalbjahren = (name, nummern) => {
+    const body = new URLSearchParams();
+    body.append('name', name);
+    for (const n of nummern) body.append('halbjahre', String(n));
+    return lehrerA(`/teacher/klassen/${klasseId}/faecher/neu`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+  };
   await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Physik' });
+  await mitHalbjahren('Chemie', [1, 2, 3, 4]);
+  await mitHalbjahren('Biologie', [1, 2]);
   physikId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Physik'").get(klasseId).id;
-
-  // "Chemie" existiert unter diesem Namen noch nicht -> wird beim ersten
-  // vergangenen Schuljahr (2023/24) neu als rein historisches Fach angelegt.
-  await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, {
-    bezeichnung: '2023/24', faecher: 'Chemie\nBiologie',
-  });
-  // Beim zweiten, ÄLTEREN vergangenen Schuljahr (2021/22) wird "Chemie" (Name
-  // existiert bereits) wiederverwendet -- dasselbe Fach bekommt weitere
-  // historische Halbjahre dazu, statt eine zweite Spalte zu erzeugen.
-  // "Biologie" nur für 2023/24, nicht für 2021/22.
-  await form(lehrerA, `/klassenlehrer/klasse/${klasseId}/vergangenes-schuljahr/neu`, {
-    bezeichnung: '2021/22', faecher: 'Chemie',
-  });
-
   chemieId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Chemie'").get(klasseId).id;
   biologieId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Biologie'").get(klasseId).id;
-  const chemieHalbjahre = getDb().prepare('SELECT bezeichnung FROM historische_halbjahre WHERE fach_id = ? ORDER BY reihenfolge').all(chemieId);
-  assert.deepEqual(chemieHalbjahre.map((h) => h.bezeichnung), [
-    '1. Halbjahr 2023/24', '2. Halbjahr 2023/24', '1. Halbjahr 2021/22', '2. Halbjahr 2021/22',
-  ], '"Chemie" ist EIN Fach mit historischen Halbjahren aus zwei Schuljahren, keine zwei getrennten Fächer');
 });
 
-test('Fach abschließen: das aktuelle Fach UND das durchgehende historische Fach werden abgeschlossen, "Biologie" läuft weiter', async () => {
+test('Fach abschließen: Physik und Chemie werden abgeschlossen, Biologie läuft weiter', async () => {
   await form(lehrerA, `/teacher/fach/${physikId}/abschliessen`, {});
   await form(lehrerA, `/teacher/fach/${chemieId}/abschliessen`, {});
   assert.equal(getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(physikId).abgeschlossen, 1);
@@ -113,41 +99,33 @@ test('Fach abschließen: das aktuelle Fach UND das durchgehende historische Fach
   assert.equal(getDb().prepare('SELECT abgeschlossen FROM faecher WHERE id = ?').get(biologieId).abgeschlossen, 0);
 });
 
-test('ladeAbschlussuebersicht: enthält alle Fächer über alle Schuljahre, aktuelles Fach zuerst, historische Fächer alphabetisch mit Schuljahr(en)-Beschriftung', () => {
+test('ladeAbschlussuebersicht: enthält alle Fächer der Laufzeit alphabetisch, Fächer mit eingeschränkten Halbjahren mit Beschriftung', () => {
   const { faecher, zeilen } = ladeAbschlussuebersicht(klasseId);
   assert.deepEqual(
     faecher.map((f) => ({ name: f.name, schuljahrLabel: f.schuljahrLabel })),
     [
+      { name: 'Biologie', schuljahrLabel: '1.–2. Halbjahr, 2023/24' },
+      { name: 'Chemie', schuljahrLabel: '1.–4. Halbjahr, 2023/24–2024/25' },
       { name: 'Physik', schuljahrLabel: null },
-      { name: 'Biologie', schuljahrLabel: '2023/24' },
-      { name: 'Chemie', schuljahrLabel: '2021/22–2023/24' },
     ],
   );
-  assert.equal(faecher[1].id, biologieId);
-  assert.equal(faecher[2].id, chemieId);
-
   const anna = zeilen[0];
   assert.equal(anna.noten.find((n) => n.fach.id === physikId).fach.abgeschlossen, 1);
   assert.equal(anna.noten.find((n) => n.fach.id === chemieId).fach.abgeschlossen, 1);
   assert.equal(anna.noten.find((n) => n.fach.id === biologieId).fach.abgeschlossen, 0);
 });
 
-test('Seite /teacher/klassen/:id/abschluss zeigt aktuelle und historische Fächer nebeneinander, historische mit Schuljahr(en) in der Überschrift', async () => {
+test('Seite /teacher/klassen/:id/abschluss zeigt alle Fächer, eingeschränkte mit Halbjahren und Schuljahr(en) in der Überschrift', async () => {
   const html = await (await lehrerA(`/teacher/klassen/${klasseId}/abschluss`)).text();
-  assert.match(html, /<th>Physik<br>/, 'aktuelles Fach ohne Schuljahr-Zusatz');
-  assert.match(html, /<th>Biologie <small class="hint">\(2023\/24\)<\/small><br><small>läuft<\/small><\/th>/);
-  assert.match(html, /<th>Chemie <small class="hint">\(2021\/22–2023\/24\)<\/small><br><small>abgeschlossen<\/small><\/th>/);
-
-  const idxPhysik = html.indexOf('<th>Physik');
-  const idxBio = html.indexOf('<th>Biologie');
-  const idxChemie = html.indexOf('<th>Chemie');
-  assert.ok(idxPhysik > 0 && idxPhysik < idxBio && idxBio < idxChemie, 'aktuelles Fach zuerst, dann historische alphabetisch');
+  assert.match(html, /<th>Physik<br>/, 'Fach über alle Halbjahre ohne Zusatz');
+  assert.match(html, /<th>Biologie <small class="hint">\(1\.–2\. Halbjahr, 2023\/24\)<\/small><br><small>läuft<\/small><\/th>/);
+  assert.match(html, /<th>Chemie <small class="hint">\(1\.–4\. Halbjahr, 2023\/24–2024\/25\)<\/small><br><small>abgeschlossen<\/small><\/th>/);
 });
 
 test('Derselbe Reiter auf der Klassenleitungsübersicht zeigt dieselben Fächer', async () => {
   const html = await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=abschluss`)).text();
-  assert.match(html, /Chemie <small class="hint">\(2021\/22–2023\/24\)<\/small>/);
-  assert.match(html, /Biologie <small class="hint">\(2023\/24\)<\/small>/);
+  assert.match(html, /Chemie <small class="hint">\(1\.–4\. Halbjahr, 2023\/24–2024\/25\)<\/small>/);
+  assert.match(html, /Biologie <small class="hint">\(1\.–2\. Halbjahr, 2023\/24\)<\/small>/);
 });
 
 test.after(async () => {

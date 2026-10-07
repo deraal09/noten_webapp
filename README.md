@@ -284,6 +284,30 @@ der chronologisch richtigen Stelle — nie oben in der Liste und nie mit dem
 heutige Kalenderdatum ermittelt wird (deutsches Schuljahr läuft ca.
 August–Juli, siehe `aktuellesStartjahr()`).
 
+## Klassen über mehrere Schuljahre, Halbjahre und Endnoten
+
+Eine Klasse läuft vom **Einschulungs- bis zum Abschlussschuljahr**
+(`klassen.einschulung_jahr`/`abschluss_jahr`, Startjahre; änderbar im
+Klassenleitungsbereich unter „Laufzeit der Klasse"). Ohne Abschlussjahr gilt
+die Standarddauer: BG/IHK drei Jahre, SPA zwei Jahre. Die **Halbjahre** werden
+über die Laufzeit durchgezählt (`1. Halbjahr` … `N. Halbjahr`, siehe
+`src/klassen-jahre.js`); die Schlüssel sind weiterhin Texte, sodass
+bestehende Daten gültig bleiben. Ohne Halbjahres-Parameter öffnen sich Seiten
+im **aktuellen Halbjahr** nach Datum (in Tests ist „heute" eingefroren,
+`NOTEN_HEUTE` überschreibt es).
+
+- **Fächer je Halbjahr:** `faecher.halbjahre` (JSON, NULL = alle) legt fest,
+  in welchen Halbjahren ein Fach gilt (Haken beim Anlegen, später änderbar).
+- **Direkte Endnote:** `halbjahr_endnoten` (je Fach, Person, Halbjahr; Zahl oder
+  `ntg`) ersetzt die berechnete Halbjahresnote. Fachseite: Button „Direkte
+  Endnoteneingabe"; Klassenleitung: Reiter „Endnoten (Direkteingabe)" für
+  vergangene Halbjahre. Eine Notenkonferenz-Sperre muss vorher aufgehoben werden.
+- **Verrechnung:** `klassen.verrechnung` (JSON `{ "1": 50 }`) = Prozent der
+  Note aus Halbjahr n, die in Halbjahr n+1 einfließen (Einstellung je Klasse
+  im Klassenleitungsbereich).
+- Die früheren **historischen Halbjahre** gibt es nicht mehr; beim Start einer
+  Bestandsdatenbank werden ihre Tabellen und rein historische Fächer entfernt.
+
 ## Klassen selbst anlegen (ohne Admin-Zuweisung)
 
 Lehrkräfte mit **LDAP-Zugang** (also von der Schule verwaltete Konten) können

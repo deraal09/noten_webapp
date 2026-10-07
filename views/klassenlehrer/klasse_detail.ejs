@@ -6,7 +6,7 @@
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
-    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=<%= aktiverTab %><% if (gewaehltesSchuljahr) { %>&schuljahr=<%= encodeURIComponent(gewaehltesSchuljahr) %><% } %>" title="Schuljahr <%= (typeof HALBJAHR_SCHULJAHR !== 'undefined' && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
+    <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(h) %>&tab=<%= aktiverTab %>" title="Schuljahr <%= (typeof HALBJAHR_SCHULJAHR !== 'undefined' && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
   <% }); %>
 </div>
 
@@ -31,16 +31,6 @@
 <div id="panel-halbjahr" class="reiter-panel <%= aktiverTab === 'halbjahr' ? 'active' : '' %>">
   <h2>Halbjahresübersicht</h2>
 
-  <% if (verfuegbareSchuljahre.length) { %>
-    <div class="hj-tabs">
-      <a class="hj-tab <%= !gewaehltesSchuljahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(halbjahr) %>&tab=halbjahr">Aktuelles Schuljahr</a>
-      <% verfuegbareSchuljahre.forEach(function(sj) { %>
-        <a class="hj-tab <%= sj === gewaehltesSchuljahr ? 'active' : '' %>" href="?hj=<%= encodeURIComponent(halbjahr) %>&tab=halbjahr&schuljahr=<%= encodeURIComponent(sj) %>"><%= sj %></a>
-      <% }); %>
-    </div>
-  <% } %>
-
-  <% if (!gewaehltesSchuljahr) { %>
   <p class="kopf-aktionen">
     <% if (halbjahresuebersicht.zeilen.length) { %>
       <a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= halbjahresuebersicht.zeilen[0].schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">🎓 Konferenzmodus starten</a>
@@ -123,46 +113,12 @@
       </tbody>
     </table>
   <% } %>
-  <% } else { %>
-    <p class="hint">
-      Historischer Stand für <strong><%= gewaehltesSchuljahr %></strong> -- zeigt beide Halbjahre
-      nebeneinander, rein lesend, kein Sync/Sperren/Notizen/Konferenzmodus für vergangene Halbjahre.
-      Noten trägst du je Fach auf dessen Seite im Reiter „Historische Halbjahre" bzw. über
-      „<a href="#vergangene-schuljahre">Vergangene Schuljahre</a>" unten ein.
-    </p>
-    <% if (!historischeHalbjahresuebersicht.spalten.length) { %>
-      <p>Für <%= gewaehltesSchuljahr %> sind noch keine Fächer/Noten hinterlegt.</p>
-    <% } else { %>
-      <table class="data">
-        <thead>
-          <tr>
-            <th>Schüler/in</th>
-            <% historischeHalbjahresuebersicht.spalten.forEach(function(sp) { %>
-              <th><%= sp.fach_name %> <small>(<%= sp.hjKurz %>)</small></th>
-            <% }); %>
-            <th>Ø Notenschnitt</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% historischeHalbjahresuebersicht.zeilen.forEach(function(z) { %>
-            <tr>
-              <td class="name"><%= z.schueler.nachname %>, <%= z.schueler.vorname %></td>
-              <% z.noten.forEach(function(n) { %>
-                <td><%= n.note === null ? '–' : formatNote(n.note) %></td>
-              <% }); %>
-              <td><strong><%= z.schnitt === null ? '–' : formatNote(z.schnitt) %></strong></td>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    <% } %>
-  <% } %>
 
   <div class="card" id="fuer-loeschung">
     <h3>Fächer ohne Lehrkraft</h3>
     <p class="hint">
       Fächer, denen aktuell niemand zugewiesen ist -- z. B. versehentlich oder mit falschem Namen
-      angelegte rein historische Fächer. Nur hier auflistbar und löschbar, solange keine Lehrkraft
+      angelegte Fächer. Nur hier auflistbar und löschbar, solange keine Lehrkraft
       zugeordnet ist.
     </p>
     <% if (!faecherOhneLehrkraft.length) { %>
@@ -171,7 +127,7 @@
       <ul>
         <% faecherOhneLehrkraft.forEach(function(f) { %>
           <li>
-            <%= f.name %><% if (f.nur_historisch) { %> <small class="hint">(rein historisch)</small><% } %>
+            <%= f.name %>
             <form method="post" action="/klassenlehrer/fach/<%= f.id %>/loeschen" class="inline"
                   onsubmit="return confirm(<%- jsonFuerSkript(f.name + ' endgültig löschen? Alle zugehörigen Noten gehen dabei verloren.') %>)">
               <button type="submit" class="danger">🗑 Löschen</button>
@@ -180,53 +136,6 @@
         <% }); %>
       </ul>
     <% } %>
-  </div>
-
-  <div class="card" id="vergangene-schuljahre">
-    <h3>Vergangene Schuljahre</h3>
-    <p class="hint">
-      Für ein noch nicht erfasstes vergangenes Schuljahr (z. B. weil die Klasse erst später in diese
-      App aufgenommen wurde) lässt sich hier ein historisches Halbjahrespaar anlegen ("1./2. Halbjahr
-      &lt;Schuljahr&gt;") -- für genau die Fächer/Lernfelder, die unten eingetragen werden (die
-      <strong>aktuellen</strong> Fächer der Klasse werden NICHT automatisch übernommen, da der
-      Fächerkanon damals ein anderer gewesen sein kann). Ein eingetragener Name, der zu einem
-      bestehenden Fach der Klasse passt, verwendet dieses weiter; ein neuer Name wird eigens dafür als
-      rein historisches Fach angelegt und taucht nicht in der laufenden Fächerliste der Klasse auf. Die
-      eigentlichen Noten trägst du danach je Fach auf dessen Seite im Reiter „Historische Halbjahre"
-      ein. Hat eine Fachlehrkraft das für ihr Fach schon selbst angelegt, gehört es ihr -- du siehst
-      die Noten dann nur noch an, statt sie zu überschreiben; nur bei den Fächern, die du selbst (oder
-      eine andere Klassenleitung) hinzugefügt hast, kannst du sie weiter bearbeiten. Für aktuelle
-      Halbjahre gilt weiter die normale Notentafel der Fachlehrkräfte.
-    </p>
-    <% if (vergangeneSchuljahre.length) { %>
-      <ul>
-        <% vergangeneSchuljahre.forEach(function(sj) { %>
-          <li>
-            <strong><%= sj.schuljahr %></strong> -- bereits vorhanden:
-            <% sj.faecher.forEach(function(f, i) { %>
-              <% if (i > 0) { %>, <% } %><a href="/klassenlehrer/fach/<%= f.id %>/historie"><%= f.name %></a><%
-                 if (f.erstelltAlsFachlehrkraft) { %> <small class="hint" title="Von der Fachlehrkraft selbst angelegt -- nur sie kann die Noten eintragen">🔒</small><% } %>
-            <% }); %>
-          </li>
-        <% }); %>
-      </ul>
-    <% } else { %>
-      <p class="hint">Noch keine vergangenen Schuljahre hinterlegt.</p>
-    <% } %>
-    <form method="post" action="/klassenlehrer/klasse/<%= klasse.id %>/vergangenes-schuljahr/neu">
-      <label>Schuljahr
-        <input type="text" name="bezeichnung" placeholder="z. B. 2022/23" required>
-      </label>
-      <label>Fächer/Lernfelder dieses Schuljahres <small class="hint">(eine Zeile je Fach -- werden NICHT automatisch von den aktuellen Fächern übernommen)</small>
-        <textarea name="faecher" rows="4" placeholder="z. B.&#10;Deutsch&#10;Mathematik&#10;LF5 Fachpraxis Pflege&#10;Religion" required></textarea>
-      </label>
-      <button type="submit">+ Vergangenes Schuljahr hinzufügen</button>
-    </form>
-    <p class="hint">
-      Noten für ein ganzes Halbjahr über mehrere Fächer auf einen Schlag eintragen (z. B. aus einem
-      alten Notenspiegel kopiert)?
-      <a href="/klassenlehrer/klasse/<%= klasse.id %>/historische-noten-import">📋 Noten importieren (Text/CSV)</a>
-    </p>
   </div>
 </div>
 
@@ -395,8 +304,8 @@
 <div id="panel-abschluss" class="reiter-panel <%= aktiverTab === 'abschluss' ? 'active' : '' %>">
   <h2>Abschluss-/Abgangsübersicht</h2>
   <p class="hint">
-    Zeigt die Fachabschlussnote je Fach über die gesamte Schullaufbahn -- die aktuellen Fächer des
-    laufenden Schuljahres UND alle rein historischen Fächer vergangener Schuljahre (mit Schuljahr
+    Zeigt die Fachabschlussnote je Fach über die gesamte Schullaufbahn -- alle Fächer der Klasse über
+    die gesamte Laufzeit (bei Fächern, die nur in einzelnen Halbjahren gelten, mit Halbjahren und Schuljahr
     in der Spaltenüberschrift) -- jeweils nur für Fächer, die die Fachlehrkraft (oder du als
     Klassenleitung) über "Fach abschließen" abgeschlossen hat. Nicht abgeschlossene Fächer zeigen
     "läuft", da sie (noch) keine Abschlussnote haben.

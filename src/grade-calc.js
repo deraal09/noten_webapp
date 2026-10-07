@@ -8,8 +8,8 @@ export const FEHLZEIT_TYPEN = ['entschuldigt', 'unentschuldigt', 'betrieblich'];
 export const NOTE_TYPEN = ['muendlich', 'schriftlich'];
 export const DEFAULT_GEWICHTUNG = 60; // % mündliche Unterrichtsleistungen
 
-// "nicht teilgenommen" -- einziges nicht-numerisches Kürzel bei historischen
-// Noten (siehe parseTendenzNote unten, historische_noten.note in src/db.js).
+// "nicht teilgenommen" -- einziges nicht-numerisches Kürzel bei Endnoten
+// (siehe parseTendenzNote unten, halbjahr_endnoten.ntg in src/db.js).
 // Zählt nirgends in einen Notenschnitt hinein (wie eine fehlende Note), wird
 // aber -- anders als eine fehlende Note -- explizit als "ntg" angezeigt.
 export const NTG = 'ntg';
@@ -60,8 +60,7 @@ export function nsCsvParse(csvStr) {
 /**
  * Parst eine Notenangabe mit optionaler Tendenz ("3+", "2-", "1") zu einer
  * reinen Zahl -- die Tendenz ist fürs Zeugnis nicht relevant und wird
- * verworfen (z. B. beim Massenimport historischer Noten per CSV/Text, siehe
- * fach-abschluss.js: importiereHistorischeNoten). "ntg" (Groß-/Kleinschreibung
+ * verworfen. "ntg" (Groß-/Kleinschreibung
  * und umgebende Leerzeichen egal) liefert das NTG-Kürzel zurück statt einer
  * Zahl. Gibt null zurück, wenn das Feld leer oder nicht lesbar ist.
  * @returns {number | 'ntg' | null}
@@ -342,7 +341,7 @@ export function unterrichtsleistungNote(datumsWerte, zusatzleistungen) {
 }
 
 export function gesamtnoteJahr(hjNoten) {
-  // typeof-Filter statt nur null/undefined: historische Noten können auch
+  // typeof-Filter statt nur null/undefined: Endnoten können auch
   // "ntg" (nicht teilgenommen, siehe NTG oben) enthalten -- zählt wie eine
   // fehlende Note nicht in den Schnitt hinein.
   const notes = hjNoten.filter((n) => typeof n === 'number');
