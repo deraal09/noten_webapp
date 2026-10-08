@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keine Verbindung – Notenverwaltung</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; background: #1d3557; color: #fff; text-align: center; padding: 1rem; box-sizing: border-box; }
+    main { max-width: 26rem; }
+    img { width: 96px; height: 96px; border-radius: 20px; }
+    button { font: inherit; padding: 0.8rem 1.6rem; border: 0; border-radius: 8px; background: #fff; color: #1d3557; font-weight: 600; min-height: 44px; cursor: pointer; }
+    p { line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/static/icons/icon-192.png" alt="">
+    <h1>Keine Verbindung</h1>
+    <p>Die Notenverwaltung braucht eine Internetverbindung, damit keine Noten auf dem Gerät zurückbleiben. Bitte die Verbindung prüfen und erneut versuchen.</p>
+    <button type="button" onclick="location.reload()">Erneut versuchen</button>
+  </main>
+</body>
+</html>

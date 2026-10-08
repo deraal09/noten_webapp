@@ -25,6 +25,9 @@ die App direkt und routet die Subdomain darauf.
   (Admins weiterhin auf `/admin`) — vier Kacheln zu Meine Klassen,
   Sitzpläne, Noteneingabe und Klassenleitung (`src/routes/start.js`,
   `views/start.ejs`).
+- **Als App installierbar (PWA):** Knopf „App installieren" in der Kopfzeile (Android/Windows/Linux per
+  Browser-Dialog, iOS mit Anleitung); Manifest und Service Worker in `static/pwa/`, Symbole in
+  `static/icons/`. Der Service Worker cacht bewusst keine Seiten oder Noten. Braucht https.
 - **Rollen:** Admin / Lehrkraft / Klassenleitung
 - **Setup:** Beim ersten Start wird der erste Admin via `/setup` angelegt
 - **LDAP/Active-Directory-Login:** optional, siehe Abschnitt „LDAP-Konfiguration"

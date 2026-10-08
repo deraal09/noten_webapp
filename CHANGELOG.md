@@ -6,6 +6,22 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.85.0 - 2026-10-08
+
+- **Als App installieren.** Neuer Knopf „📲 App installieren" in der Kopfzeile:
+  - Android, Windows, Linux (Chrome, Edge, Chromium): öffnet direkt den
+    Installationsdialog des Browsers. Bietet der Browser ihn gerade nicht an,
+    erscheint eine kurze Anleitung (Menü bzw. Installieren-Symbol der Adressleiste).
+  - iPhone/iPad: eine Schritt-für-Schritt-Anleitung (Safari → Teilen →
+    „Zum Home-Bildschirm" → „Hinzufügen"); Safari am Mac: „Zum Dock hinzufügen";
+    Firefox: Hinweis, dass dort keine Installation möglich ist.
+  - Läuft die Seite schon als App (oder eingebettet im Lehrerkalender), erscheint der
+    Knopf nicht.
+- Technik: Web-App-Manifest (`/manifest.webmanifest`), Service Worker (`/sw.js`),
+  App-Symbole (auch maskierbar und für iOS) unter `static/icons/`. Der Service Worker
+  speichert **keine** Seiten oder Daten zwischen; ohne Verbindung erscheint nur eine
+  Hinweisseite. Die Installation braucht https (außer auf localhost).
+
 ## 0.84.1 - 2026-10-07
 
 - **Direkte Endnoteneingabe** (Fachseite) ist beim Öffnen der Seite **eingeklappt**.

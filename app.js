@@ -198,6 +198,14 @@ export async function buildApp(opts = {}) {
     done();
   });
 
+  // PWA: Manifest und Service Worker (Installation als App, siehe views/partials/layout.ejs). Der Service Worker
+  // muss unter "/" liegen, damit sein Geltungsbereich die ganze App umfasst; beides ist ohne Anmeldung abrufbar.
+  const pwaDatei = (name) => readFileSync(path.join(__dirname, 'static', 'pwa', name));
+  app.get('/manifest.webmanifest', async (request, reply) => reply
+    .type('application/manifest+json; charset=utf-8').header('Cache-Control', 'no-cache').send(pwaDatei('manifest.webmanifest')));
+  app.get('/sw.js', async (request, reply) => reply
+    .type('text/javascript; charset=utf-8').header('Cache-Control', 'no-cache').header('Service-Worker-Allowed', '/').send(pwaDatei('sw.js')));
+
   // Index → Login / Setup / Rolle
   app.get('/', async (request, reply) => {
     const userCount = getDb().prepare('SELECT COUNT(*) AS c FROM users').get().c;

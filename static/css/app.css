@@ -675,3 +675,12 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .spa-hj label.inline { display: inline-block; margin-right: 0.75rem; }
 .spa-hj textarea { width: 100%; }
 .spa-haken { margin-top: 0.5rem; }
+
+/* App installieren (siehe views/partials/layout.ejs) */
+.app-install { display: inline-flex; align-items: center; gap: 0.25rem; min-height: 40px; padding: 0.2rem 0.7rem; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; background: rgba(255,255,255,0.12); color: var(--on-dark); font: inherit; font-size: 0.9rem; cursor: pointer; }
+.app-install:hover { background: rgba(255,255,255,0.22); }
+.app-install[hidden] { display: none; }
+.app-install-dialog { max-width: 520px; }
+.app-install-dialog [hidden] { display: none; }
+.app-install-dialog ol, .app-install-dialog ul { padding-left: 1.3rem; line-height: 1.6; }
+@media (max-width: 480px) { .app-install-text { display: none; } .app-install { padding: 0.2rem 0.55rem; } }
