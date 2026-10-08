@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.85.1 - 2026-10-08
+
+- **Einladungslinks sind wirklich nur einmal einlösbar.** Das Einlösen und das
+  Anlegen des Kontos laufen jetzt in einer Transaktion: Der Link wird zuerst als
+  verbraucht markiert, nur dann entsteht das Konto. Auch bei gleichzeitigen Aufrufen
+  mit demselben Link bekommt nur der erste ein Konto. Ein gescheiterter Versuch
+  (Benutzername vergeben, Passwort zu kurz) verbraucht den Link nicht.
+
 ## 0.85.0 - 2026-10-08
 
 - **Als App installieren.** Neuer Knopf „📲 App installieren" in der Kopfzeile:

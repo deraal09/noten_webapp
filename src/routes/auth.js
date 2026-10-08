@@ -26,6 +26,9 @@ function wendeSessionDauerAn(request) {
   request.session.cookie.maxAge = bleibenAngemeldet ? MAXAGE_ANGEMELDET_BLEIBEN : MAXAGE_STANDARD;
 }
 
+/** Der Einladungslink wurde in der Zwischenzeit schon verwendet oder ist abgelaufen. */
+class EinladungVergeben extends Error {}
+
 export default async function authRoutes(fastify) {
   // ---------- /setup (nur solange noch kein User existiert) ----------
   fastify.get('/setup', async (request, reply) => {
@@ -247,21 +250,28 @@ export default async function authRoutes(fastify) {
       });
     }
     try {
+      // Einmal verwendbar: Die Einladung wird zuerst in derselben Transaktion "eingelöst" (UPDATE nur, solange
+      // sie noch unbenutzt ist; Ablauf und Gültigkeit sind oben geprüft). Schlägt das fehl -- etwa weil ein zweiter Aufruf mit
+      // demselben Link schneller war --, entsteht kein Konto. Scheitert das Anlegen (z. B. Benutzername
+      // vergeben), wird die Transaktion zurückgerollt und der Link bleibt für einen neuen Versuch gültig.
       const tx = getDb().transaction(() => {
+        const eingeloest = getDb()
+          .prepare("UPDATE invitations SET used_at = datetime('now') WHERE id = ? AND used_at IS NULL")
+          .run(inv.id);
+        if (eingeloest.changes !== 1) throw new EinladungVergeben();
         const info = getDb()
           .prepare(`INSERT INTO users (username, display_name, email, password_hash, role, active, invited_by_id)
                     VALUES (?, ?, ?, ?, ?, 1, ?)`)
           .run(u, String(display_name).trim() || inv.display_name || u,
                inv.email, hashPassword(password), inv.role, inv.created_by_id);
-        getDb()
-          .prepare(`UPDATE invitations SET used_at = datetime('now'), used_by_id = ? WHERE id = ?`)
-          .run(info.lastInsertRowid, inv.id);
+        getDb().prepare('UPDATE invitations SET used_by_id = ? WHERE id = ?').run(info.lastInsertRowid, inv.id);
         return info.lastInsertRowid;
       });
       const newId = tx();
       request.session.userId = newId;
       return reply.redirect('/');
     } catch (e) {
+      if (e instanceof EinladungVergeben) return reply.redirect('/login?msg=invite_expired');
       return reply.viewEjs('auth/accept_invitation.ejs', {
         user: request.user, invitation: inv, error: 'Benutzername ist bereits vergeben – bitte einen anderen wählen.',
       });
