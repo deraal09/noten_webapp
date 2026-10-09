@@ -7,6 +7,19 @@
     du bekommst sofort Zugriff mit deinem eigenen Fach, keine Zustimmung nötig.
   </p>
 
+  <% if (freieFaecher.length) { %>
+    <div class="card">
+      <h2>Fächer ohne Lehrkraft</h2>
+      <p class="hint">In diesen Fächern ist noch niemand eingetragen -- du kannst dich direkt dafür eintragen (und später wieder austragen).</p>
+      <% freieFaecher.forEach(function(f) { %>
+        <form method="post" action="/teacher/klassen/<%= klasse.id %>/verknuepfen" class="inline">
+          <input type="hidden" name="fach" value="<%= f.name %>">
+          <button type="submit">🎓 <%= f.name %> übernehmen</button>
+        </form>
+      <% }); %>
+    </div>
+    <p class="hint">Oder ein neues Fach anlegen:</p>
+  <% } %>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/verknuepfen" class="card">
     <label>Welches Fach möchtest du in dieser Klasse unterrichten?
       <input type="text" name="fach" placeholder="z. B. Mathematik" required autofocus>

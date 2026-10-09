@@ -1356,7 +1356,13 @@ export default async function teacherRoutes(fastify) {
     const verbundene = ermittleVerbundenePersonen(klasse.id);
     verbundene.delete(request.user.id);
     const kannBeitreten = verbundene.size === 0 || Boolean(klasse.offen_fuer_beitritt);
-    return reply.viewEjs('teacher/klasse_verknuepfen.ejs', { user: request.user, klasse, kannBeitreten });
+    // Fächer ohne Lehrkraft: lassen sich direkt übernehmen (statt einen Fachnamen einzutippen)
+    const laufzeit = klassenLaufzeit(klasse.id);
+    const freieFaecher = kannBeitreten
+      ? sortiereFaecher(getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? AND ist_kurs = 0').all(klasse.id), laufzeit)
+        .filter((f) => freieHalbjahre(f, laufzeit).length)
+      : [];
+    return reply.viewEjs('teacher/klasse_verknuepfen.ejs', { user: request.user, klasse, kannBeitreten, freieFaecher });
   });
 
   fastify.post('/klassen/:id/verknuepfen', async (request, reply) => {
@@ -1376,11 +1382,13 @@ export default async function teacherRoutes(fastify) {
       klasseId: klasse.id, angefragtVonId: request.user.id, vorgeschlagenesFach: fach,
     });
     if (ergebnis.direkterBeitritt) {
-      request.flash?.('success', `Zugriff erhalten — dein Fach „${fach}".`);
+      request.flash?.('success', ergebnis.uebernommen
+        ? `Zugriff erhalten — du bist jetzt für „${fach}" eingetragen (bisher ohne Lehrkraft). Du kannst dich auf der Klassenseite wieder austragen.`
+        : `Zugriff erhalten — dein Fach „${fach}".`);
       return reply.redirect(`/teacher/klassen/${klasse.id}`);
     }
     if (ergebnis.fachExistiert) {
-      request.flash?.('error', `Das Fach „${fach}" gibt es in dieser Klasse schon und gehört einer anderen Lehrkraft. Bitte die Klassenleitung oder den Admin, dich zuzuordnen — oder einen anderen Fachnamen wählen.`);
+      request.flash?.('error', `Das Fach „${fach}" gibt es in dieser Klasse schon und hat bereits eine Lehrkraft. Bitte die Klassenleitung oder den Admin, dich zuzuordnen — oder einen anderen Fachnamen wählen.`);
       // Wer schon (über ein anderes Fach) dabei ist, landet auf der Klassenseite
       // -- die Beitrittsseite würde ohnehin dorthin weiterleiten.
       return reply.redirect(userHatKlassenZugriff(request.user, klasse.id)
@@ -2231,8 +2239,9 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/faecher/:id/halbjahre', async (request, reply) => {
     const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(request.params.id);
     if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
-    if (!userHatFachZgriff(request.user, fach.id) && !userIstKlassenlehrer(request.user, fach.klasse_id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    // Halbjahre eines Fachs ändern: nur die erstellende Lehrkraft (solange es keine Klassenleitung gibt) bzw. die Klassenleitung.
+    if (!userDarfKlasseVerwalten(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung (bzw. die erstellende Lehrkraft) kann die Halbjahre eines Fachs ändern.' });
     }
     const laufzeit = klassenLaufzeit(fach.klasse_id);
     const neu = parseHalbjahreEingabe(request.body?.halbjahre, laufzeit);

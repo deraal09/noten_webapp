@@ -15,6 +15,7 @@
 
 import { getDb } from './db.js';
 import { seedeTeilnehmerAusKlasse } from './fach-teilnehmer.js';
+import { freieHalbjahre, traegeMichEin } from './unterfaecher.js';
 
 /** Alle User-IDs, die bereits mit der Klasse verbunden sind. */
 export function ermittleVerbundenePersonen(klasseId) {
@@ -60,13 +61,19 @@ export function starteVerknuepfung({ klasseId, angefragtVonId, vorgeschlagenesFa
   verbundene.delete(angefragtVonId); // falls die Person selbst schon verbunden ist, ohnehin kein Thema
 
   if (verbundene.size === 0 || klasse?.offen_fuer_beitritt) {
-    const bestehend = db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?')
+    const bestehend = db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND name = ?')
       .get(klasseId, vorgeschlagenesFach);
     if (bestehend) {
       const schonZugeordnet = db.prepare('SELECT 1 FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?')
         .get(angefragtVonId, bestehend.id);
       if (schonZugeordnet) return { direkterBeitritt: true, fachId: bestehend.id };
-      if (verbundene.size > 0) return { direkterBeitritt: false, fachExistiert: true };
+      if (verbundene.size > 0) {
+        // Ein Fach, in dem (noch) keine Lehrkraft eingetragen ist, darf man übernehmen -- und sich später selbst wieder austragen.
+        if (freieHalbjahre(bestehend).length && traegeMichEin(bestehend, angefragtVonId).ok) {
+          return { direkterBeitritt: true, fachId: bestehend.id, uebernommen: true };
+        }
+        return { direkterBeitritt: false, fachExistiert: true };
+      }
       db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
         .run(angefragtVonId, bestehend.id);
       return { direkterBeitritt: true, fachId: bestehend.id };

@@ -474,6 +474,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
       <div class="fach-zeile">
         <%- fachNameElement(f, f.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), false, laufzeit.halbjahre.map(function(h, i) { return i + 1; })) %>
         <span class="hint fach-hj"><%= f.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle Halbjahre' : hjBereiche(f.hjNummern) + '. Hj.' %></span>
+        <% if (darfVerwalten) { %>
         <details class="hj-bearbeiten">
           <summary title="Halbjahre des Fachs ändern" aria-label="Halbjahre des Fachs ändern">✎</summary>
           <form method="post" action="/teacher/faecher/<%= f.id %>/halbjahre">
@@ -482,6 +483,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
             <button type="submit">Speichern</button>
           </form>
         </details>
+        <% } %>
         <% if (teilnehmerVerwaltbar && !f.spa_fach_key) { %>
           <a class="icon-knopf" href="/teacher/fach/<%= f.id %>/teilnehmer" title="Teilnehmer/innen des Fachs verwalten" aria-label="Teilnehmer/innen verwalten: <%= f.name %>">👥</a>
         <% } %>

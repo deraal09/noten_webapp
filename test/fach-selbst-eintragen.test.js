@@ -164,6 +164,52 @@ test('Klassenseite: Eintragen-Knopf bei freien Fächern, Austragen bei der eigen
   assert.equal(zuw(sport).length, 0);
 });
 
+test('Stift (Halbjahre des Fachs ändern) nur für die Klassenleitung bzw. -- ohne Klassenleitung -- die erstellende Lehrkraft', async () => {
+  const STIFT = /Halbjahre des Fachs ändern/;
+  // dora ist Klassenleitung (aus dem vorigen Test), anna hat die Klasse erstellt, bernd hat nur ein Fach
+  assert.match(await (await dora(`/teacher/klassen/${klasseId}`)).text(), STIFT);
+  assert.doesNotMatch(await (await anna(`/teacher/klassen/${klasseId}`)).text(), STIFT, 'Erstellerin verliert es mit einer Klassenleitung');
+  assert.doesNotMatch(await (await bernd(`/teacher/klassen/${klasseId}`)).text(), STIFT);
+  assert.equal((await form(bernd, `/teacher/faecher/${deutsch}/halbjahre`, { halbjahre: ['1', '2'] })).status, 403, 'auch nicht per Direktaufruf');
+  assert.equal((await form(anna, `/teacher/faecher/${deutsch}/halbjahre`, { halbjahre: ['1', '2'] })).status, 403);
+  // ohne Klassenleitung: die erstellende Lehrkraft sieht und darf es, andere weiterhin nicht
+  db().prepare('DELETE FROM klassenleitung WHERE klasse_id = ?').run(klasseId);
+  assert.match(await (await anna(`/teacher/klassen/${klasseId}`)).text(), STIFT);
+  assert.doesNotMatch(await (await bernd(`/teacher/klassen/${klasseId}`)).text(), STIFT);
+  assert.equal((await form(anna, `/teacher/faecher/${deutsch}/halbjahre`, { halbjahre: ['1', '2'] })).status, 302);
+  assert.equal((await form(anna, `/teacher/faecher/${deutsch}/halbjahre`, { halbjahre: ['1', '2', '3', '4', '5', '6'] })).status, 302);
+  db().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(klasseId, uid('dora'));
+});
+
+test('Beitritt zu einer freigegebenen Klasse: Fach ohne Lehrkraft übernehmen statt abgewiesen zu werden', async () => {
+  db().prepare('UPDATE klassen SET offen_fuer_beitritt = 1 WHERE id = ?').run(klasseId);
+  db().prepare('DELETE FROM fach_zuweisungen WHERE fach_id = ?').run(sport);
+  const [emil, finn] = [client(), client()];
+  for (const [c, name] of [[emil, 'emil'], [finn, 'finn']]) {
+    await form(admin, '/admin/einladungen/neu', { display_name: name, ttl_days: '14' });
+    const inv = db().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
+    await form(c, `/einladung/${inv.token}`, { username: name, display_name: name, password: 'passwort123', password2: 'passwort123' });
+    db().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = ?").run(name);
+  }
+  // Die Beitrittsseite bietet die Fächer ohne Lehrkraft direkt an
+  const seite = await (await emil(`/teacher/klassen/${klasseId}/verknuepfen`)).text();
+  assert.match(seite, /Fächer ohne Lehrkraft/);
+  assert.match(seite, /Sport übernehmen/);
+  assert.doesNotMatch(seite, /Mathe übernehmen/, 'Mathe hat eine Lehrkraft');
+  // Fach mit Lehrkraft: weiterhin abgewiesen
+  await form(finn, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Mathe' });
+  assert.equal(zuw(mathe).some((z) => z.username === 'finn'), false);
+  assert.equal(db().prepare('SELECT COUNT(*) AS c FROM fach_zuweisungen WHERE user_id = ?').get(uid('finn')).c, 0);
+  // freies Fach: übernommen, als selbst eingetragen (wieder austragbar), Zugriff auf die Klasse
+  const r = await form(emil, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Sport' });
+  assert.equal(r.status, 302);
+  assert.deepEqual(zuw(sport).map((z) => [z.username, z.selbst_eingetragen]), [['emil', 1]]);
+  assert.equal((await emil(`/teacher/klassen/${klasseId}`)).status, 200);
+  // ein neues, noch nicht vorhandenes Fach geht weiterhin
+  await form(finn, `/teacher/klassen/${klasseId}/verknuepfen`, { fach: 'Physik' });
+  assert.ok(db().prepare("SELECT 1 FROM faecher f JOIN fach_zuweisungen fz ON fz.fach_id = f.id WHERE f.name = 'Physik' AND fz.user_id = ?").get(uid('finn')));
+});
+
 test.after(async () => {
   await fastify.close();
   fs.rmSync(tempDir, { recursive: true, force: true });

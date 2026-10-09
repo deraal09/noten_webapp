@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.87.2 - 2026-10-09
+
+- **Stift-Symbol (Halbjahre des Fachs ändern)** erscheint auf der Klassenseite nur noch
+  für die Klassenleitung -- bzw. für die erstellende Lehrkraft, solange es noch keine
+  Klassenleitung gibt (und den Admin). Auch der Direktaufruf ist auf diese Personen
+  beschränkt; bisher durfte jede Lehrkraft mit dem Fach die Halbjahre ändern.
+- **Fach ohne Lehrkraft übernehmen beim Beitritt.** Wer einer freigegebenen Klasse beitritt
+  (Klasse mit gleichem Namen anlegen bzw. „Vorhandene Klasse wählen"), wurde bisher
+  abgewiesen, wenn er ein vorhandenes Fach ohne Lehrkraft eintippte. Jetzt wird er dafür
+  eingetragen (und kann sich später selbst austragen). Die Beitrittsseite listet die
+  Fächer ohne Lehrkraft zum direkten Übernehmen auf; Fächer mit Lehrkraft bleiben
+  geschützt.
+
 ## 0.87.1 - 2026-10-09
 
 - **App-Symbol auf dem iPhone robuster.** Das iOS-Symbol (180 × 180 Pixel, PNG) liegt
