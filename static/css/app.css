@@ -694,3 +694,16 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .fach-einstellungen textarea { width: 100%; font-family: inherit; }
 .fach-einstellungen label { display: block; margin: 0.6rem 0; }
 .fach-einstellungen .hj-check { display: inline-block; margin-right: 0.75rem; }
+
+/* Noteneingabe-Tafeln (Datumstabelle, Klausuren, Unterrichtsleistung): die Namensspalte bleibt beim seitlichen
+   Scrollen links stehen -- auf dem Handy sonst kaum zu bedienen, wenn man die Namen nicht mehr sieht. */
+table.tafel th:first-child, table.tafel td:first-child {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg-card);
+  box-shadow: 2px 0 3px -1px var(--shadow-strong, rgba(0, 0, 0, 0.25));
+}
+table.tafel thead th:first-child { background: var(--bg-header); z-index: 3; }
+@media (max-width: 600px) {
+  /* schmal: Namen dürfen umbrechen, damit die fixierte Spalte nicht den halben Bildschirm belegt */
+  table.tafel td.name { white-space: normal; min-width: 6.5rem; max-width: 9rem; }
+}

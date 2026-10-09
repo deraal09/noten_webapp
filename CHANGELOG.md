@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.88.1 - 2026-10-09
+
+- **Noteneingabe: Namensspalte bleibt beim seitlichen Scrollen links stehen** -- in der
+  Datumstabelle (Unterrichtsleistung) sowie in den Tafeln für Klausuren und
+  Unterrichtsleistungen. Auf dem Handy sieht man so immer, zu welcher Person die Zelle gehört.
+  Lange Namen brechen auf schmalen Bildschirmen um, damit die feste Spalte nicht zu breit wird.
+
 ## 0.88.0 - 2026-10-09
 
 - **Fach einstellen über ein Zahnrad (⚙), auch bei IHK/BG.** Wie bei SPA gibt es am Fach
