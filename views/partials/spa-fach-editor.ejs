@@ -19,9 +19,34 @@
         <label class="spa-entfernen"><input type="checkbox" name="f<%= i %>_entfernen" value="1"> Fach aus der Vorlage entfernen</label>
       <% } %>
     </div>
+    <% var ag = f.allgemein || {}; var q = 'f' + i + '_allg_'; %>
+    <div class="spa-tabs" role="tablist" aria-label="Einstellungen von <%= f.name || 'Neues Fach' %>">
+      <button type="button" class="active" role="tab" data-tab="allg">Allgemein</button>
+      <% f.halbjahre.forEach(function(h) { %><button type="button" role="tab" data-tab="hj<%= h.hj %>"><%= h.hj %>. Halbjahr</button><% }); %>
+    </div>
+    <fieldset class="spa-allgemein" data-panel="allg">
+      <legend>Allgemeine Einstellungen <small class="hint">(gelten für das ganze Fach, alle Halbjahre)</small></legend>
+      <div class="spa-haken">
+        <div class="spa-option">
+          <label class="inline"><input type="checkbox" name="<%= q %>abschluss" value="1" <%= ag.abschluss ? 'checked' : '' %>> im Abschlusszeugnis zeigen</label>
+          <label class="inline spa-option-hj">aus Halbjahr(en) <input type="text" name="<%= q %>abschluss_hj" value="<%= ag.abschlussHj || '' %>" size="6" placeholder="letztes" inputmode="numeric" autocomplete="off"></label>
+        </div>
+        <div class="spa-option">
+          <label class="inline"><input type="checkbox" name="<%= q %>pruefung" value="1" <%= ag.pruefung ? 'checked' : '' %>> mit Prüfung</label>
+          <label class="inline spa-option-hj">im Halbjahr <input type="text" name="<%= q %>pruefung_hj" value="<%= ag.pruefungHj || '' %>" size="6" placeholder="letztes" inputmode="numeric" autocomplete="off"></label>
+        </div>
+        <div class="spa-option"><label class="inline"><input type="checkbox" name="<%= q %>deakt" value="1" <%= ag.deakt ? 'checked' : '' %>> „n/a“ je Person möglich</label></div>
+        <div class="spa-option"><label class="inline"><input type="checkbox" name="<%= q %>komma" value="1" <%= ag.komma ? 'checked' : '' %>> als Komma-Note (z. B. 3,0)</label></div>
+      </div>
+      <p class="hint">
+        Zeugnisposition und Prüfung gelten im genannten Halbjahr (leer = letztes aktives Halbjahr des Fachs); mehrere Halbjahre bei
+        der Zeugnisposition mit Komma, z. B. <code>2, 4</code> (Praxis mit zwei Zeilen im Abschlusszeugnis).
+        Bewertung, Komponenten und Verrechnung stellst du je Halbjahr in den Reitern daneben ein.
+      </p>
+    </fieldset>
     <div class="spa-halbjahre">
       <% f.halbjahre.forEach(function(h) { var p = 'f' + i + '_h' + h.hj + '_'; %>
-        <fieldset class="spa-hj" data-hj>
+        <fieldset class="spa-hj" data-hj data-panel="hj<%= h.hj %>">
           <legend><%= h.hj %>. Halbjahr</legend>
           <label>Das Fach ist in diesem Halbjahr
             <select name="<%= p %>status">
@@ -82,12 +107,6 @@
               </label>
             </span>
           </div>
-          <div class="spa-haken">
-            <label class="inline"><input type="checkbox" name="<%= p %>abschluss" value="1" <%= h.abschluss ? 'checked' : '' %>> im Abschlusszeugnis zeigen</label>
-            <label class="inline"><input type="checkbox" name="<%= p %>pruefung" value="1" <%= h.pruefung ? 'checked' : '' %>> mit Prüfung</label>
-            <label class="inline"><input type="checkbox" name="<%= p %>deakt" value="1" <%= h.deakt ? 'checked' : '' %>> „n/a“ je Person möglich</label>
-            <label class="inline"><input type="checkbox" name="<%= p %>komma" value="1" <%= h.komma ? 'checked' : '' %>> als Komma-Note (z. B. 3,0)</label>
-          </div>
         </fieldset>
       <% }); %>
     </div>
@@ -102,6 +121,16 @@
       fs.querySelectorAll('[data-wenn-kum]').forEach(function(e) { e.hidden = e.getAttribute('data-wenn-kum') !== wert('kum'); });
       fs.querySelectorAll('[data-wenn-quelle]').forEach(function(e) { e.hidden = e.getAttribute('data-wenn-quelle').split(' ').indexOf(wert('quelle')) < 0; });
     }
+    // Reiter je Fach: "Allgemein" und die vier Halbjahre (ohne JavaScript sind alle Bereiche sichtbar).
+    document.querySelectorAll('.spa-fach').forEach(function(karte) {
+      var tabs = karte.querySelectorAll('.spa-tabs button[data-tab]');
+      var zeige = function(name) {
+        tabs.forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === name); });
+        karte.querySelectorAll('[data-panel]').forEach(function(p) { p.hidden = p.getAttribute('data-panel') !== name; });
+      };
+      tabs.forEach(function(b) { b.addEventListener('click', function() { zeige(b.getAttribute('data-tab')); }); });
+      if (tabs.length) zeige('allg');
+    });
     document.querySelectorAll('fieldset[data-hj]').forEach(function(fs) {
       fs.addEventListener('change', function() { aktualisieren(fs); });
       aktualisieren(fs);

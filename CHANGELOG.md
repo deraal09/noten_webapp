@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.89.0 - 2026-10-09
+
+- **SPA-Editor: Reiter „Allgemein" für die Fach-weiten Optionen.** Die Haken **im Abschlusszeugnis
+  zeigen**, **mit Prüfung**, **„n/a" je Person möglich** und **als Komma-Note (z. B. 3,0)** standen
+  bisher in jedem Halbjahr einzeln, gelten aber für das ganze Fach. Sie stehen jetzt einmal je Fach im
+  neuen Reiter „Allgemein" (neben den Reitern der vier Halbjahre) -- in den SPA-Vorlagen und beim
+  Bewertungsschema eines Fachs (⚙). Zeugnisposition und Prüfung nennen dort ihr Halbjahr (leer =
+  letztes aktives Halbjahr; bei der Zeugnisposition mehrere möglich, z. B. `2, 4` für Praxis mit zwei
+  Zeilen im Abschlusszeugnis). Bestehende Vorlagen und Klassen bleiben unverändert und werden korrekt
+  in den Reiter übernommen.
+- **Namensspalte fixiert auch in der SPA-Zeugnisübersicht** (Klassenleitung).
+
 ## 0.88.5 - 2026-10-09
 
 - **Namensspalte fixiert auch in der Abschluss-/Abgangsübersicht** (beide Seiten) **und in den

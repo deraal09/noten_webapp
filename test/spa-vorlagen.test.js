@@ -114,8 +114,9 @@ test('Editor zeigt alle Einstellungen und lässt sich komplett ändern (Fächer,
     ...fachFelder(0, 'Sport', { key: '', typ: 'FACH' }, {
       alle: { f: 1 }, 1: { [`f0_h1_modus`]: 'komponenten_gewichtet', [`f0_h1_komp`]: 'Theorie; 60\nPraxis; Rest' },
     }),
+    f1_allg_abschluss: '1', f1_allg_abschluss_hj: '4', f0_allg_deakt: '1', f0_allg_komma: '1', f0_allg_pruefung: '1',
     ...fachFelder(1, 'Musik', { typ: 'LF' }, {
-      4: { [`f1_h4_kum`]: 'gewichtet_vorgaenger', [`f1_h4_quelle`]: 'fach', [`f1_h4_extfach`]: 'SPORT', [`f1_h4_exthj`]: '1', [`f1_h4_extpct`]: '25', [`f1_h4_abschluss`]: '1' },
+      4: { [`f1_h4_kum`]: 'gewichtet_vorgaenger', [`f1_h4_quelle`]: 'fach', [`f1_h4_extfach`]: 'SPORT', [`f1_h4_exthj`]: '1', [`f1_h4_extpct`]: '25' },
     }),
   };
   const r = await form(admin, `/teacher/spa-vorlagen/${v.id}`, body);
@@ -129,6 +130,11 @@ test('Editor zeigt alle Einstellungen und lässt sich komplett ändern (Fächer,
   assert.equal(hj4.gewichtExtern, 0.25);
   assert.equal(hj4.gewichtAktuell, 0.75);
   assert.equal(hj4.abschlussZeigen, true);
+  // Fach-weite Optionen (Reiter "Allgemein"): Sport hat "n/a", Komma-Note und Prüfung (letztes Halbjahr) in allen Halbjahren
+  assert.deepEqual(konfig[0].schema.map((x) => [x.deaktivierbar, x.kommaNote, x.pruefung, x.abschlussZeigen]),
+    [[true, true, false, false], [true, true, false, false], [true, true, false, false], [true, true, true, false]]);
+  assert.deepEqual(konfig[1].schema.map((x) => x.abschlussZeigen), [false, false, false, true]);
+  assert.equal(konfig[1].schema.every((x) => !x.deaktivierbar && !x.kommaNote && !x.pruefung), true);
 
   // Fehler: Anzeige mit Meldung, nichts gespeichert
   const schlecht = await form(admin, `/teacher/spa-vorlagen/${v.id}`, { ...body, f0_h1_komp: 'Theorie; 80\nPraxis; 40' });
@@ -296,4 +302,65 @@ test('Vorlage löschen', async () => {
 test.after(async () => {
   await fastify.close();
   fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
+test('Allgemeine Einstellungen (Reiter): Abschlusszeugnis, Prüfung, „n/a“, Komma-Note gelten fürs ganze Fach', async () => {
+  const V = await import('../src/spa-vorlagen.js');
+  const modell = (bg, key) => V.editorModell(S.standardKonfig(bg)).find((f) => f.schluessel === key).allgemein;
+  assert.deepEqual(modell('SPA_PIA', 'PRAXIS'), { abschluss: true, abschlussHj: '2, 4', pruefung: false, pruefungHj: '', deakt: false, komma: false });
+  assert.deepEqual(modell('SPA_REGULAR', 'PRAXIS').abschlussHj, '2, 3');
+  assert.deepEqual(modell('SPA_REGULAR', 'DEUTSCH'), { abschluss: true, abschlussHj: '4', pruefung: true, pruefungHj: '4', deakt: false, komma: false });
+  assert.deepEqual(modell('SPA_REGULAR', 'WPK'), { abschluss: true, abschlussHj: '2', pruefung: false, pruefungHj: '', deakt: false, komma: true });
+  assert.equal(modell('SPA_PIA', 'LF4').deakt, true);
+
+  // Der Editor zeigt die Optionen im Reiter "Allgemein" und nicht mehr je Halbjahr
+  const v = vorlageByName('Meine SPA');
+  const html = await (await admin(`/teacher/spa-vorlagen/${v.id}`)).text();
+  assert.match(html, /<button type="button" class="active" role="tab" data-tab="allg">Allgemein<\/button>/);
+  assert.match(html, /name="f0_allg_abschluss"/);
+  assert.match(html, /name="f0_allg_pruefung_hj"/);
+  assert.doesNotMatch(html, /name="f0_h1_(abschluss|pruefung|deakt|komma)"/, 'keine Haken mehr je Halbjahr');
+
+  // Rundlauf: Standard -> Formularfelder (wie der Editor sie sendet) -> gleiche Konfiguration
+  for (const bg of ['SPA_REGULAR', 'SPA_PIA']) {
+    const body = { fach_idx: [] };
+    V.editorModell(S.standardKonfig(bg)).forEach((f, i) => {
+      body.fach_idx.push(String(i));
+      Object.assign(body, { [`f${i}_key`]: f.schluessel, [`f${i}_name`]: f.name, [`f${i}_typ`]: f.typ });
+      const a = f.allgemein;
+      if (a.abschluss) Object.assign(body, { [`f${i}_allg_abschluss`]: '1', [`f${i}_allg_abschluss_hj`]: a.abschlussHj });
+      if (a.pruefung) Object.assign(body, { [`f${i}_allg_pruefung`]: '1', [`f${i}_allg_pruefung_hj`]: a.pruefungHj });
+      if (a.deakt) body[`f${i}_allg_deakt`] = '1';
+      if (a.komma) body[`f${i}_allg_komma`] = '1';
+      for (const h of f.halbjahre) {
+        const p = `f${i}_h${h.hj}_`;
+        if (h.status === 'fehlt') { body[`${p}status`] = 'fehlt'; continue; }
+        Object.assign(body, { [`${p}status`]: h.status, [`${p}modus`]: h.modus, [`${p}kum`]: h.kum, [`${p}komp`]: h.komp, [`${p}mw`]: h.mw.map(String), [`${p}quelle`]: h.quelle, [`${p}extfach`]: h.extFach, [`${p}exthj`]: String(h.extHj), [`${p}extpct`]: h.extPct });
+      }
+    });
+    const gelesen = V.leseFaecherAusFormular(body);
+    assert.equal(V.ersterFormularFehler(gelesen), null);
+    const geprueft = S.pruefeKonfig(gelesen);
+    assert.equal(geprueft.ok, true, geprueft.fehler);
+    assert.deepEqual(geprueft.faecher, S.pruefeKonfig(S.standardKonfig(bg)).faecher, `${bg}: unverändert gespeichert`);
+  }
+});
+
+test('Allgemeine Einstellungen: Halbjahre prüfen (nicht vorhanden / unverständlich), leer = letztes aktives Halbjahr', async () => {
+  const V = await import('../src/spa-vorlagen.js');
+  const basis = { fach_idx: '0', f0_name: 'Test', f0_typ: 'FACH', f0_h1_status: 'aktiv', f0_h1_modus: 'direkt', f0_h1_kum: 'keine', f0_h2_status: 'aktiv', f0_h2_modus: 'direkt', f0_h2_kum: 'keine', f0_h3_status: 'fehlt', f0_h4_status: 'fehlt' };
+  const schema = (extra) => V.leseFaecherAusFormular({ ...basis, ...extra })[0];
+  const f1 = schema({ f0_allg_abschluss: '1', f0_allg_pruefung: '1' });
+  assert.deepEqual(f1.schema.map((x) => [x.abschlussZeigen, x.pruefung]), [[false, false], [true, true]], 'leer = letztes aktives (2.)');
+  assert.match(V.ersterFormularFehler([schema({ f0_allg_abschluss: '1', f0_allg_abschluss_hj: '4' })]), /Abschlusszeugnis.*4\. Halbjahr nicht vorhanden/);
+  assert.match(V.ersterFormularFehler([schema({ f0_allg_pruefung: '1', f0_allg_pruefung_hj: 'x' })]), /Prüfung.*nicht verständlich/);
+  assert.equal(V.ersterFormularFehler([schema({ f0_allg_abschluss: '1', f0_allg_abschluss_hj: '1-2' })]), null);
+  // Ohne Haken: nichts gesetzt, auch wenn ein Halbjahr eingetragen ist
+  assert.deepEqual(schema({ f0_allg_abschluss_hj: '2' }).schema.map((x) => x.abschlussZeigen), [false, false]);
+  // über die Route: Fehlermeldung statt Speichern
+  const klasse = db().prepare("SELECT * FROM klassen WHERE name = 'SPA-A'").get();
+  const lf4 = db().prepare("SELECT * FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF4'").get(klasse.id);
+  const r = await form(admin, `/teacher/faecher/${lf4.id}/spa-schema`, { ...fachFelder(0, 'Lernfeld 4', { key: 'LF4', typ: 'LF' }), f0_allg_pruefung: '1', f0_allg_pruefung_hj: '7' });
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /Prüfung: Halbjahr „7“ gibt es nicht/);
 });

@@ -49,7 +49,7 @@ import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchulj
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
 import {
   ladeSpaVorlagen, ladeSpaVorlage, speichereSpaVorlage, loescheSpaVorlage, freierVorlagenName, ladeSpaVorlageInKlasse,
-  editorModell, neuesFach, leseFaecherAusFormular,
+  editorModell, neuesFach, leseFaecherAusFormular, ersterFormularFehler,
 } from '../spa-vorlagen.js';
 import {
   berechneFachFuerSchueler as berechneSpaFachFuerSchueler, vorwerteFuer as spaVorwerteFuer,
@@ -2159,6 +2159,8 @@ export default async function teacherRoutes(fastify) {
     const name = String(body.name || '').trim();
     // Neu hinzugefügte, noch unbenannte Fächer blockieren das Speichern nicht -- sie bleiben im Formular.
     const speicherbar = faecher.filter((f) => f.name);
+    const formularFehler = ersterFormularFehler(speicherbar);
+    if (formularFehler) return zeigeVorlagenEditor(reply, request, { ...vorlage, name, bildungsgang }, faecher, { fehler: formularFehler });
     const res = speichereSpaVorlage(request.user.id, { id: vorlage.id, name, bildungsgang, faecher: speicherbar });
     if (!res.ok) return zeigeVorlagenEditor(reply, request, { ...vorlage, name, bildungsgang }, faecher, { fehler: res.fehler });
     if (body.aktion === 'fach_neu') return reply.redirect(`/teacher/spa-vorlagen/${vorlage.id}?neu=1#neues-fach`);
@@ -2220,7 +2222,7 @@ export default async function teacherRoutes(fastify) {
     const body = { ...(request.body || {}), fach_idx: '0', f0_key: fach.spa_fach_key };
     const [eingabe] = leseFaecherAusFormular(body);
     const alle = klassenFaecherModell(fach, eingabe);
-    const pruefung = pruefeKonfig(alle);
+    const pruefung = ersterFormularFehler([eingabe]) ? { ok: false, fehler: ersterFormularFehler([eingabe]) } : pruefeKonfig(alle);
     const doppelt = getDb().prepare('SELECT 1 FROM faecher WHERE klasse_id = ? AND name = ? AND id != ?').get(fach.klasse_id, eingabe.name, fach.id);
     if (!pruefung.ok || doppelt) {
       return reply.viewEjs('teacher/spa_fach_schema.ejs', {

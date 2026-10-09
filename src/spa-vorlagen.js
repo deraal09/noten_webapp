@@ -92,7 +92,9 @@ export function ladeSpaVorlageInKlasse(klasse, quelle, userId) {
 //   f{i}_h{h}_kum              keine | fortlaufend_50_50 | gewichtet_vorgaenger | mittelwert_halbjahre
 //   f{i}_h{h}_mw (mehrfach)    Halbjahre für den Mittelwert
 //   f{i}_h{h}_quelle           vorgaenger | fach | pruefung       _extfach / _exthj / _extpct
-//   f{i}_h{h}_deakt / _abschluss / _pruefung / _komma  (Kontrollkästchen)
+//   f{i}_allg_abschluss / _abschluss_hj   im Abschlusszeugnis zeigen (+ aus welchem/n Halbjahr/en, leer = letztes aktives)
+//   f{i}_allg_pruefung / _pruefung_hj     mit Prüfung (+ in welchem Halbjahr, leer = letztes aktives)
+//   f{i}_allg_deakt / _komma              "n/a" je Person möglich / als Komma-Note  (gelten für das ganze Fach)
 // ---------------------------------------------------------------------------
 
 const prozentText = (x) => String(Math.round(x * 1000) / 10).replace('.', ',');
@@ -113,10 +115,40 @@ function halbjahrModell(hj, s) {
 
 /** Fach-Definitionen -> Formularmodell der Fach-Karten. */
 export function editorModell(faecher) {
-  return faecher.map((f) => ({
-    schluessel: f.schluessel ?? '', name: f.name ?? '', typ: f.typ === 'LF' ? 'LF' : 'FACH',
-    halbjahre: [1, 2, 3, 4].map((hj) => halbjahrModell(hj, (f.schema ?? []).find((s) => s.halbjahr === hj))),
-  }));
+  return faecher.map((f) => {
+    const schema = f.schema ?? [];
+    const hjText = (merkmal) => schema.filter((s) => s[merkmal]).map((s) => s.halbjahr).join(', ');
+    return {
+      schluessel: f.schluessel ?? '', name: f.name ?? '', typ: f.typ === 'LF' ? 'LF' : 'FACH',
+      // Fach-weite Optionen (statt je Halbjahr): gelten für alle Halbjahre des Fachs; Zeugnisposition und Prüfung nennen ihr Halbjahr.
+      allgemein: {
+        abschluss: schema.some((s) => s.abschlussZeigen), abschlussHj: hjText('abschlussZeigen'),
+        pruefung: schema.some((s) => s.pruefung), pruefungHj: hjText('pruefung'),
+        deakt: schema.some((s) => s.deaktivierbar), komma: schema.some((s) => s.kommaNote),
+      },
+      halbjahre: [1, 2, 3, 4].map((hj) => halbjahrModell(hj, schema.find((s) => s.halbjahr === hj))),
+    };
+  });
+}
+
+/** "4", "2, 3", "2-3" -> Nummern; wirft bei Unsinn. */
+function parseHalbjahrListe(roh) {
+  const nummern = new Set();
+  for (const teil of String(roh).trim().split(/[,;\s]+/).filter(Boolean)) {
+    const m = teil.match(/^(\d)(?:\s*[-–]\s*(\d))?\.?$/);
+    if (!m) throw new Error(`Halbjahre „${String(roh).trim()}“ nicht verständlich (z. B. 4 oder 2, 3)`);
+    const von = Number(m[1]);
+    const bis = m[2] ? Number(m[2]) : von;
+    if (von < 1 || bis > 4 || bis < von) throw new Error(`Halbjahr „${teil}“ gibt es nicht (1 bis 4)`);
+    for (let n = von; n <= bis; n++) nummern.add(n);
+  }
+  return [...nummern].sort((a, b) => a - b);
+}
+
+/** Erste Fehlermeldung aus dem Auslesen der Fach-weiten Optionen (oder null). */
+export function ersterFormularFehler(faecher) {
+  const f = faecher.find((x) => x.formularFehler);
+  return f ? `${f.name || 'Neues Fach'}: ${f.formularFehler}` : null;
 }
 
 /** Neues, leeres Fach: in allen vier Halbjahren aktiv, Direkteingabe, keine Verrechnung. */
@@ -175,8 +207,7 @@ export function leseFaecherAusFormular(body) {
       if (status !== 'aktiv' && status !== 'inaktiv') continue;
       const s = {
         halbjahr: hj, aktiv: status === 'aktiv', halbjahrModus: body[`${p}modus`], kumulationModus: body[`${p}kum`],
-        deaktivierbar: Boolean(body[`${p}deakt`]), abschlussZeigen: Boolean(body[`${p}abschluss`]),
-        pruefung: Boolean(body[`${p}pruefung`]), kommaNote: Boolean(body[`${p}komma`]), komponenten: [],
+        deaktivierbar: false, abschlussZeigen: false, pruefung: false, kommaNote: false, komponenten: [],
       };
       if (s.halbjahrModus === 'komponenten_gewichtet') s.komponenten = parseKomponenten(body[`${p}komp`]);
       if (s.kumulationModus === 'mittelwert_halbjahre') s.mittelwertHalbjahre = alsListe(body[`${p}mw`]).map(Number);
@@ -192,7 +223,27 @@ export function leseFaecherAusFormular(body) {
       }
       schema.push(s);
     }
-    faecher.push({ schluessel, name, typ: body[`f${i}_typ`] === 'LF' ? 'LF' : 'FACH', schema });
+    // Fach-weite Optionen (Reiter "Allgemein"): gelten für alle vorhandenen Halbjahre; Zeugnisposition und Prüfung nennen ihr Halbjahr.
+    let formularFehler = null;
+    const letztesAktives = [...schema].reverse().find((x) => x.aktiv)?.halbjahr ?? schema[schema.length - 1]?.halbjahr;
+    const halbjahrDerOption = (an, roh, was) => {
+      if (!an) return [];
+      try {
+        const liste = String(roh ?? '').trim() ? parseHalbjahrListe(roh) : [letztesAktives];
+        const vorhanden = liste.filter((n) => schema.some((x) => x.halbjahr === n));
+        if (!vorhanden.length) { formularFehler ??= `${was}: Das Fach ist im ${liste.join(', ')}. Halbjahr nicht vorhanden.`; return []; }
+        return vorhanden;
+      } catch (e) { formularFehler ??= `${was}: ${e.message}`; return []; }
+    };
+    const abschlussHj = halbjahrDerOption(Boolean(body[`f${i}_allg_abschluss`]), body[`f${i}_allg_abschluss_hj`], 'Abschlusszeugnis');
+    const pruefungHj = halbjahrDerOption(Boolean(body[`f${i}_allg_pruefung`]), body[`f${i}_allg_pruefung_hj`], 'Prüfung');
+    for (const s of schema) {
+      s.abschlussZeigen = abschlussHj.includes(s.halbjahr);
+      s.pruefung = pruefungHj.includes(s.halbjahr) || Boolean(s.pruefungVerrechnen);
+      s.deaktivierbar = Boolean(body[`f${i}_allg_deakt`]);
+      s.kommaNote = Boolean(body[`f${i}_allg_komma`]);
+    }
+    faecher.push({ schluessel, name, typ: body[`f${i}_typ`] === 'LF' ? 'LF' : 'FACH', schema, formularFehler });
   }
   return faecher;
 }

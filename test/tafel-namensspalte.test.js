@@ -32,7 +32,7 @@ test('Übersichtstabellen (Notenübersicht, Halbjahresübersicht) tragen die Kla
   assert.match(css, /table\.tabelle-fix tbody tr:nth-child\(even\) td:first-child\s*\{[^}]*background:\s*var\(--bg-subtle\)/, 'folgt der Zebra-Streifung');
   assert.match(css, /table\.tabelle-fix,\s*table\.tafel\s*\{\s*border-collapse:\s*separate/, 'getrennte Rahmen gegen Durchscheinen');
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'views');
-  for (const datei of ['teacher/fach_detail.ejs', 'teacher/fach_zusammensetzung.ejs', 'teacher/klasse_uebersicht.ejs', 'klassenlehrer/klasse_detail.ejs', 'teacher/klasse_abschluss.ejs']) {
+  for (const datei of ['teacher/fach_detail.ejs', 'teacher/fach_zusammensetzung.ejs', 'teacher/klasse_uebersicht.ejs', 'klassenlehrer/klasse_detail.ejs', 'teacher/klasse_abschluss.ejs', 'teacher/klasse_zeugnis_spa.ejs']) {
     assert.match(fs.readFileSync(path.join(root, datei), 'utf8'), /<table class="data tabelle-fix"/, datei);
   }
   // Abschlussübersicht (beide Seiten) und die direkten Noteneingaben (Fach, SPA, Endnoten-Raster der Klassenleitung)
