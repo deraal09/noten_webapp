@@ -15,7 +15,7 @@ import {
 import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, findeLaufendeKlasse, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
   requireAuth, userHatFachZgriff, erlaubteHalbjahreImFach, userDarfTeilnehmerVerwalten, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
-  userDarfFachLoeschen, userDarfKlasseVerwalten,
+  userDarfFachLoeschen, userDarfKlasseVerwalten, userDarfSichAlsKlassenleitungEintragen,
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
@@ -1665,8 +1665,8 @@ export default async function teacherRoutes(fastify) {
     const darfVerwalten = userDarfKlasseVerwalten(request.user, klasse.id);
     const istKlassenlehrer = userIstKlassenlehrer(request.user, klasse.id);
     const kannExportieren = userDarfKlasseExportieren(request.user, klasse.id);
-    const kannSelbstAlsKlassenlehrerEintragen = !istKlassenlehrer
-      && (klasse.created_by_id === request.user.id || request.user.isAdmin);
+    const kannSelbstAlsKlassenlehrerEintragen = !istKlassenlehrer && !klasse.ist_ablage
+      && userDarfSichAlsKlassenleitungEintragen(request.user, klasse.id);
 
     let zuweisbareLehrkraefte = [];
     if (istKlassenlehrer) {
@@ -1686,16 +1686,22 @@ export default async function teacherRoutes(fastify) {
     });
   });
 
+  // Als Klassenleitung eintragen: jede Lehrkraft mit Zugriff auf die Klasse, solange noch niemand eingetragen
+  // ist (auch wer die Klasse nicht angelegt hat). Danach verwaltet diese Person die Klasse (siehe userDarfKlasseVerwalten).
   fastify.post('/klassen/:id/klassenlehrer/eintragen', async (request, reply) => {
-    const klasse = getDb().prepare('SELECT created_by_id FROM klassen WHERE id = ?').get(request.params.id);
+    const klasse = getDb().prepare('SELECT id, ist_ablage FROM klassen WHERE id = ?').get(request.params.id);
     if (!klasse) return reply.redirect('/teacher/klassen');
-    if (klasse.created_by_id !== request.user.id && !request.user.isAdmin) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die erstellende Lehrkraft oder der Admin kann sich hier als Klassenleitung eintragen.' });
+    if (klasse.ist_ablage || !userHatKlassenZugriff(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung für diese Klasse.' });
     }
-    getDb().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)')
-      .run(request.params.id, request.user.id);
-    request.flash?.('success', 'Du bist jetzt als Klassenleitung eingetragen und siehst alle Noten dieser Klasse.');
-    return reply.redirect(`/teacher/klassen/${request.params.id}`);
+    const eintragen = getDb().transaction(() => {
+      if (!userDarfSichAlsKlassenleitungEintragen(request.user, klasse.id)) return false;
+      getDb().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(klasse.id, request.user.id);
+      return true;
+    });
+    if (eintragen()) request.flash?.('success', 'Du bist jetzt als Klassenleitung eingetragen und siehst alle Noten dieser Klasse.');
+    else request.flash?.('error', 'Für diese Klasse ist schon eine Klassenleitung eingetragen. Weitere Personen trägt die Klassenleitung selbst ein.');
+    return reply.redirect(`/teacher/klassen/${klasse.id}`);
   });
 
   // ---------- Co-Klassenlehrkraft: eine bestehende Klassenleitung kann

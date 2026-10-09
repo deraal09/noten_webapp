@@ -17,7 +17,7 @@
 import { istFachAbgeschlossen } from '../klassen-jahre.js';
 import { getDb, SCHEMA_VERSION } from '../db.js';
 import {
-  ladeMeineKlassen, userHatKlassenZugriff, userIstKlassenlehrer, userHatFachZgriff,
+  ladeMeineKlassen, userHatKlassenZugriff, userIstKlassenlehrer, userHatFachZgriff, userDarfKlasseVerwalten,
 } from '../auth.js';
 import { bearerPasst, userAusSub, istSsoAktiv } from '../sso.js';
 
@@ -43,7 +43,7 @@ function faecherFuer(user, klasse) {
     .prepare('SELECT id, name, klasse_id, halbjahre FROM faecher WHERE klasse_id = ? ORDER BY name')
     .all(klasse.id);
   const alleSehen =
-    user.isAdmin || klasse.created_by_id === user.id || userIstKlassenlehrer(user, klasse.id);
+    userDarfKlasseVerwalten(user, klasse.id);
   const sichtbar = alleSehen ? alle : alle.filter((f) => userHatFachZgriff(user, f.id));
   return sichtbar.map((f) => ({ id: f.id, name: f.name, abgeschlossen: istFachAbgeschlossen(f) }));
 }

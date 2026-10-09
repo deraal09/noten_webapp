@@ -426,9 +426,26 @@ export function userDarfFachLoeschen(user, fach) {
  */
 export function userDarfKlasseVerwalten(user, klasseId) {
   if (user.isAdmin) return true;
-  const klasse = getDb().prepare('SELECT created_by_id FROM klassen WHERE id = ?').get(klasseId);
-  if (klasse && klasse.created_by_id === user.id) return true;
-  return userIstKlassenlehrer(user, klasseId);
+  // Sobald sich jemand als Klassenleitung eingetragen hat, übernimmt diese Person die Verwaltung --
+  // die erstellende Lehrkraft verliert dann ihre Sonderrechte (und behält den normalen Zugriff).
+  if (klasseHatKlassenleitung(klasseId)) return userIstKlassenlehrer(user, klasseId);
+  return istErstellerDerKlasse(user, klasseId);
+}
+
+/** Hat der User die Klasse angelegt? */
+export function istErstellerDerKlasse(user, klasseId) {
+  return Boolean(getDb().prepare('SELECT 1 FROM klassen WHERE id = ? AND created_by_id = ?').get(klasseId, user.id));
+}
+
+/**
+ * Darf sich der User jetzt als Klassenleitung eintragen? Solange noch niemand eingetragen ist, kann das jede
+ * Lehrkraft mit Zugriff auf die Klasse (auch ohne sie angelegt zu haben); danach ist es Sache der
+ * Klassenleitung (Co-Klassenleitung eintragen) -- nur der Admin darf immer.
+ */
+export function userDarfSichAlsKlassenleitungEintragen(user, klasseId) {
+  if (user.isAdmin) return true;
+  if (klasseHatKlassenleitung(klasseId)) return false;
+  return userHatKlassenZugriff(user, klasseId);
 }
 
 /**
@@ -458,9 +475,8 @@ export function istEinzigeLehrkraftImFach(user, fachId) {
 export function userDarfKlasseExportieren(user, klasseId) {
   if (user.isAdmin) return true;
   const db = getDb();
-  const erstellt = db.prepare('SELECT 1 FROM klassen WHERE id = ? AND created_by_id = ?')
-    .get(klasseId, user.id);
-  if (erstellt) return true;
+  // Die erstellende Lehrkraft darf alles exportieren, bis sich eine Klassenleitung eingetragen hat.
+  if (!klasseHatKlassenleitung(klasseId) && istErstellerDerKlasse(user, klasseId)) return true;
   const fach = db.prepare(`
     SELECT 1 FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id
     WHERE f.klasse_id = ? AND fz.user_id = ?

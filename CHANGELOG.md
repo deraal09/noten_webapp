@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.86.0 - 2026-10-09
+
+- **Klassenleitung eintragen für alle mit Klassenzugriff.** Bisher konnte sich nur die
+  erstellende Lehrkraft (oder der Admin) als Klassenleitung eintragen. Jetzt kann es
+  jede Lehrkraft mit Zugriff auf die Klasse -- auch ohne sie angelegt zu haben --,
+  **solange noch niemand eingetragen ist**. Zwei gleichzeitige Eintragungen: nur die
+  erste gilt.
+- **Danach übernimmt diese Person die Verwaltung der Klasse.** Weitere Personen können
+  sich nicht mehr selbst eintragen (die Klassenleitung trägt Co-Klassenleitungen ein; der
+  Admin darf immer). Die erstellende Lehrkraft verliert ihre Sonderrechte
+  (Fächer/Schüler löschen, Abgang, Abgangszeugnis, Sicht auf alle Fächer in der
+  externen Schnittstelle, Export der Klasse ohne eigenes Fach), behält aber den normalen
+  Zugriff. Wird die Klassenleitung später entfernt, gilt wieder die alte Regel.
+
 ## 0.85.1 - 2026-10-08
 
 - **Einladungslinks sind wirklich nur einmal einlösbar.** Das Einlösen und das
