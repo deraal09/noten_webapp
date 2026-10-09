@@ -244,25 +244,6 @@ export default async function teacherRoutes(fastify) {
     id: z.id, ich: z.user_id === user.id, selbst: z.selbst, name: z.name,
     halbjahre: z.halbjahre.length < laufzeit.anzahlHalbjahre ? `${z.halbjahre.map((n) => `${n}.`).join(', ')} Hj.` : '',
   }));
-  // Fächer einer Klasse, in denen die Lehrkraft nicht eingetragen ist ("Meine Klassen"): mit Lehrkräften und den
-  // Halbjahren ohne Lehrkraft (dort kann sich jede Lehrkraft mit Klassenzugriff selbst eintragen).
-  const ladeWeitereFaecher = (user, klasseId) => {
-    const laufzeit = klassenLaufzeit(klasseId);
-    const fachRows = getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? AND ist_kurs = 0').all(klasseId);
-    const zuweisungen = ladeZuweisungenDerKlasse(klasseId, fachRows, laufzeit);
-    const eigene = new Set(fachRows.filter((f) => (zuweisungen.get(f.id) ?? []).some((z) => z.user_id === user.id)).map((f) => f.id));
-    return {
-      hatEigene: eigene.size > 0,
-      weitere: sortiereFaecher(fachRows.filter((f) => !eigene.has(f.id)), laufzeit).map((f) => {
-        const nummern = fachHalbjahrNummern(f, laufzeit);
-        return {
-          id: f.id, name: f.name, lehrkraefte: lehrkraefteDarstellung(user, zuweisungen.get(f.id), laufzeit), frei: freieHalbjahre(f, laufzeit),
-          halbjahreText: nummern.length < laufzeit.anzahlHalbjahre ? `${nummern.map((n) => `${n}.`).join(', ')} Halbjahr` : '',
-        };
-      }),
-    };
-  };
-
   // ---------- Dashboard (Lehrkraft) ----------
   fastify.get('/', async (request, reply) => {
     if (request.user.isAdmin) {
@@ -310,7 +291,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     // Die Noteneingabe zeigt nur die eigenen Fächer (mit ihren Lehrkräften und freien Halbjahren). Die übrigen Fächer
-    // der Klassen stehen unter "Meine Klassen" (siehe ladeWeitereFaecher).
+    // der Klasse stehen auf der Klassenseite (Reiter "Weitere Fächer"; die Klassenleitung sieht dort alle).
     for (const klasse of byKlasse.values()) {
       const laufzeit = klassenLaufzeit(klasse.id);
       const fachRows = getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? AND ist_kurs = 0').all(klasse.id);
@@ -1180,16 +1161,7 @@ export default async function teacherRoutes(fastify) {
       WHERE k.ist_kurs_huelle = 0 AND k.ist_ablage = 0 ORDER BY s.bezeichnung DESC, k.name
     `).all().filter((k) => !userHatKlassenZugriff(request.user, k.id));
 
-    // Fächer der Klassen, in denen man nicht eingetragen ist -- ausblendbar, für die Klassenleitung dauerhaft sichtbar.
-    const weitereProKlasse = {};
-    for (const k of sichtbareKlassen) {
-      if (k.ist_ablage || k.ist_kurs_huelle) continue;
-      const w = ladeWeitereFaecher(request.user, k.id);
-      if (w.weitere.length) weitereProKlasse[k.id] = { ...w, istKlassenleitung: userIstKlassenlehrer(request.user, k.id) };
-    }
-
     return reply.viewEjs('teacher/klassen_liste.ejs', {
-      weitereProKlasse,
       user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen: sichtbareKlassen,
       kurseNachSchuljahr, bildungsgaenge: BILDUNGSGAENGE, spaVorlagen: ladeSpaVorlagen(request.user.id), jahresOptionen: jahresOptionen(),
       kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), vorhandeneKlassen,
@@ -1824,7 +1796,7 @@ export default async function teacherRoutes(fastify) {
   // Selbstbedienung: Ist zu einem Fach (in einzelnen Halbjahren) noch keine Lehrkraft eingetragen, darf sich jede
   // Lehrkraft mit Zugriff auf die Klasse dafür eintragen -- auch wenn sie das Fach nicht angelegt hat -- und sich
   // später selbst wieder austragen. Alles andere (andere eintragen/entfernen, Halbjahre ändern) bleibt bei der Klassenleitung.
-  const zurueckNach = (request, klasseId) => (request.body?.zurueck === 'noteneingabe' ? `/teacher#klasse-${klasseId}` : request.body?.zurueck === 'klassen' ? '/teacher/klassen' : klasseAnker(klasseId));
+  const zurueckNach = (request, klasseId) => (request.body?.zurueck === 'noteneingabe' ? `/teacher#klasse-${klasseId}` : klasseAnker(klasseId));
 
   fastify.post('/faecher/:id/selbst-eintragen', async (request, reply) => {
     const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(request.params.id);

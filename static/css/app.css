@@ -685,10 +685,6 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .app-install-dialog ol, .app-install-dialog ul { padding-left: 1.3rem; line-height: 1.6; }
 @media (max-width: 480px) { .app-install-text { display: none; } .app-install { padding: 0.2rem 0.55rem; } }
 
-/* Meine Klassen: weitere Fächer der Klasse (auch anderer Lehrkräfte) */
-.weitere-titel { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
-.weitere-schalter { min-height: 36px; }
-.weitere-liste[hidden] { display: none; }
 .fach-einstellungen textarea { width: 100%; font-family: inherit; }
 .fach-einstellungen label { display: block; margin: 0.6rem 0; }
 .fach-einstellungen .hj-check { display: inline-block; margin-right: 0.75rem; }
@@ -766,6 +762,3 @@ table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }
 .unterfach-block { margin: 0 0 1rem; }
 .unterfach-block h3 { margin: 0 0 0.3rem; }
 .hinweis-aufklappbar > div.hint p { margin: 0.25rem 0 0.5rem; }
-.weitere-eintrag { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border-subtle); }
-.weitere-name { font-weight: 600; font-size: 0.95rem; }
-.klasse-liste .weitere-titel { margin-top: 0.75rem; font-size: 0.95rem; }

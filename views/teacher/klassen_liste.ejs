@@ -214,46 +214,6 @@
                   <a href="/teacher#klasse-<%= k.id %>">📝 Noteneingabe</a>
                   <a href="/teacher/klassen/<%= k.id %>/sitzplan">🪑 Sitzplan</a>
                 </div>
-                <% var w = weitereProKlasse[k.id]; if (w) { %>
-                  <div class="weitere-faecher" data-klasse="<%= k.id %>" data-dauerhaft="<%= w.istKlassenleitung ? '1' : '0' %>">
-                    <div class="weitere-titel">
-                      <strong><%= w.hatEigene ? 'Weitere Fächer' : 'Fächer der Klasse' %></strong>
-                      <% if (w.istKlassenleitung) { %>
-                        <small class="hint">(als Klassenleitung immer sichtbar)</small>
-                      <% } else { %>
-                        <button type="button" class="weitere-schalter" aria-expanded="true">Ausblenden</button>
-                      <% } %>
-                    </div>
-                    <div class="weitere-liste">
-                      <% w.weitere.forEach(function(f) { %>
-                        <div class="weitere-eintrag">
-                          <div class="weitere-name">📋 <%= f.name %><% if (f.halbjahreText) { %> <small class="hint">(<%= f.halbjahreText %>)</small><% } %></div>
-                          <div class="kachel-sub">
-                            <% if (f.lehrkraefte.length) { %>🎓 <%= f.lehrkraefte.map(function(l) { return (l.ich ? 'Du' : l.name) + (l.halbjahre ? ' (' + l.halbjahre + ')' : ''); }).join(', ') %>
-                            <% } else { %>keine Lehrkraft<% } %>
-                          </div>
-                          <% var meine = f.lehrkraefte.filter(function(l) { return l.ich && l.selbst; })[0]; %>
-                          <% if (meine || f.frei.length) { %>
-                            <div class="kachel-aktionen">
-                              <% if (f.frei.length) { %>
-                                <form method="post" action="/teacher/faecher/<%= f.id %>/selbst-eintragen" class="inline">
-                                  <input type="hidden" name="zurueck" value="klassen">
-                                  <button type="submit" title="Für die Halbjahre ohne Lehrkraft eintragen (<%= f.frei.map(function(n) { return n + '.'; }).join(', ') %> Hj.)">Für dieses Fach eintragen</button>
-                                </form>
-                              <% } %>
-                              <% if (meine) { %>
-                                <form method="post" action="/teacher/zuweisungen/<%= meine.id %>/selbst-austragen" class="inline" onsubmit="return confirm('Aus „<%= f.name.replace(/'/g, '') %>“ austragen? Das Fach ist danach wieder frei für andere Lehrkräfte.')">
-                                  <input type="hidden" name="zurueck" value="klassen">
-                                  <button type="submit" title="Dich selbst wieder austragen">Austragen</button>
-                                </form>
-                              <% } %>
-                            </div>
-                          <% } %>
-                        </div>
-                      <% }); %>
-                    </div>
-                  </div>
-                <% } %>
               <% } %>
             </li>
           <% }); %>
@@ -293,27 +253,6 @@
     </div>
   <% }); %>
 <% } %>
-
-<script>
-  // Weitere Fächer einer Klasse ausblenden (außer als Klassenleitung); die Wahl wird im Browser gemerkt.
-  (function() {
-    function lies(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
-    function schreibe(key, wert) { try { localStorage.setItem(key, wert); } catch (e) { /* ohne Speicher */ } }
-    document.querySelectorAll('.weitere-faecher').forEach(function(box) {
-      var knopf = box.querySelector('.weitere-schalter');
-      var liste = box.querySelector('.weitere-liste');
-      if (!knopf || box.dataset.dauerhaft === '1') return;
-      var key = 'noteneingabe-weitere-' + box.dataset.klasse;
-      function setze(an) {
-        liste.hidden = !an;
-        knopf.textContent = an ? 'Ausblenden' : 'Anzeigen';
-        knopf.setAttribute('aria-expanded', an ? 'true' : 'false');
-      }
-      setze(lies(key) !== '0');
-      knopf.addEventListener('click', function() { var an = liste.hidden; schreibe(key, an ? '1' : '0'); setze(an); });
-    });
-  })();
-</script>
 
 <script>
   // Jede .reiter-Gruppe schaltet nur ihre eigenen Buttons/Panels um --

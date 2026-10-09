@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.92.0 - 2026-10-09
+
+- **Fächer nur noch auf der Klassenseite.** „Meine Klassen“ zeigt wieder nur die Klassenkacheln, ohne
+  Fächer (die 0.91.0-Ansicht dort entfällt). Auf der Klassenseite sehen Lehrkräfte, die nicht die
+  Klassenleitung sind, unter „Fächer und Lehrkräftezuordnung“ zwei Reiter: **Meine Fächer** (Fächer, in
+  denen sie selbst oder in einem Unterfach eingetragen sind) und **Weitere Fächer** (alle übrigen, mit
+  Lehrkräften und „Eintragen“ bei freien Fächern bzw. Halbjahren). Die Klassenleitung hat diese Reiter
+  nicht und sieht alle Fächer immer. Die Noteneingabe bleibt bei den eigenen Fächern.
+
 ## 0.91.1 - 2026-10-09
 
 - **Noteneingabe: Haken „Lehrkräfte der Fächer anzeigen“ entfernt.** Die Lehrkräfte stehen wie bisher an

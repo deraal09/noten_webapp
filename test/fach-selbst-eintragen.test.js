@@ -1,5 +1,5 @@
 /**
- * Fächer der Klasse unter "Meine Klassen" für alle mit Klassenzugriff (ausblendbar, für die Klassenleitung dauerhaft),
+ * Fächer der Klasse auf der Klassenseite (Reiter "Weitere Fächer") für alle mit Klassenzugriff (ausblendbar, für die Klassenleitung dauerhaft),
  * mit den Lehrkräften; Fächer ohne Lehrkraft können sich andere Lehrkräfte selbst eintragen und wieder austragen.
  */
 
@@ -66,21 +66,26 @@ test('Vorbereitung: Anna legt 10K an (Mathe, Sport, Deutsch); Bernd hat nur Deut
   assert.deepEqual(zuw(mathe).map((z) => z.username), ['anna']);
 });
 
-test('Meine Klassen zeigt Bernd die weiteren Fächer der Klasse mit Lehrkräften; ausblendbar; freie Fächer zum Eintragen -- die Noteneingabe nicht mehr', async () => {
-  const html = await (await bernd('/teacher/klassen')).text();
-  assert.match(html, /Weitere Fächer/);
-  assert.match(html, /weitere-schalter/, 'ausblendbar');
-  assert.doesNotMatch(html, /als Klassenleitung immer sichtbar/);
-  const weitere = html.slice(html.indexOf('class="weitere-faecher"'));
+test('Klassenseite: Bernd sieht seine Fächer und die übrigen im Reiter "Weitere Fächer" mit Lehrkräften und Eintragen-Knopf; weder Meine Klassen noch Noteneingabe zeigen Fächer', async () => {
+  const html = await (await bernd(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /data-target="faecher-eigene">Meine Fächer \(1\)</);
+  assert.match(html, /data-target="faecher-weitere">Weitere Fächer \(2\)</);
+  const eigene = html.slice(html.indexOf('id="faecher-eigene"'), html.indexOf('id="faecher-weitere"'));
+  const weitere = html.slice(html.indexOf('id="faecher-weitere"'));
+  assert.match(eigene, /Deutsch/);
+  assert.doesNotMatch(eigene, />Mathe</);
   assert.match(weitere, /Mathe[\s\S]*?🎓 anna/);
   assert.match(weitere, /Sport/);
   // Sport ist frei (Eintragen), Mathe hat eine Lehrkraft (kein Knopf)
   assert.match(weitere, new RegExp(`/teacher/faecher/${sport}/selbst-eintragen`));
   assert.doesNotMatch(weitere, new RegExp(`/teacher/faecher/${mathe}/selbst-eintragen`));
-  // Noteneingabe: nur das eigene Fach (Deutsch), keine weiteren Fächer
+  // Meine Klassen: nur die Klassenkacheln, keine Fächer
+  const uebersicht = await (await bernd('/teacher/klassen')).text();
+  assert.match(uebersicht, new RegExp(`href="/teacher/klassen/${klasseId}"`));
+  assert.doesNotMatch(uebersicht, /weitere-faecher|Weitere Fächer|selbst-eintragen|>Sport</);
+  // Noteneingabe: nur das eigene Fach (Deutsch)
   const noten = await (await bernd('/teacher')).text();
-  assert.doesNotMatch(noten, /weitere-faecher|Weitere Fächer|weitere-schalter/);
-  assert.doesNotMatch(noten, new RegExp(`/teacher/faecher/${sport}/selbst-eintragen`));
+  assert.doesNotMatch(noten, /weitere-faecher|Weitere Fächer|selbst-eintragen"/);
   assert.match(noten, /kachel-titel-klein">Deutsch</);
   assert.doesNotMatch(noten, /kachel-titel-klein">(Mathe|Sport)</);
   assert.doesNotMatch(noten, /lehrkraefte-schalter|Lehrkräfte der Fächer anzeigen/, 'kein Schalter mehr');
@@ -102,10 +107,10 @@ test('Sich eintragen (ohne Zugriff verboten), nur freie Fächer, danach wieder a
   await form(bernd, `/teacher/faecher/${mathe}/selbst-eintragen`);
   assert.deepEqual(zuw(mathe).map((z) => z.username), ['anna']);
   // freies Fach
-  let r = await form(bernd, `/teacher/faecher/${sport}/selbst-eintragen`, { zurueck: 'klassen' });
+  let r = await form(bernd, `/teacher/faecher/${sport}/selbst-eintragen`);
   assert.equal(r.status, 302);
-  assert.equal(r.headers.get('location'), '/teacher/klassen', 'Rücksprung nach Meine Klassen');
-  await form(bernd, `/teacher/zuweisungen/${zuw(sport)[0].id}/selbst-austragen`, { zurueck: 'noteneingabe' });
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${klasseId}#faecher-lehrkraefte`, 'Rücksprung auf die Klassenseite');
+  await form(bernd, `/teacher/zuweisungen/${zuw(sport)[0].id}/selbst-austragen`);
   r = await form(bernd, `/teacher/faecher/${sport}/selbst-eintragen`, { zurueck: 'noteneingabe' });
   assert.equal(r.headers.get('location'), `/teacher#klasse-${klasseId}`);
   assert.deepEqual(zuw(sport).map((z) => [z.username, z.selbst_eingetragen]), [['bernd', 1]]);
@@ -146,19 +151,18 @@ test('Eine von der Klassenleitung vergebene Zuordnung kann man nicht selbst aufh
   assert.equal(zuw(sport).length, 1, 'Klassenleitungs-Zuordnung bleibt');
 });
 
-test('Klassenleitung sieht alle Fächer der Klasse unter Meine Klassen dauerhaft (nicht ausblendbar), auch ohne eigenes Fach', async () => {
+test('Klassenleitung hat den Reiter "Weitere Fächer" nicht und sieht alle Fächer der Klasse immer -- auch ohne eigenes Fach', async () => {
   db().prepare('DELETE FROM fach_zuweisungen WHERE user_id = ?').run(uid('dora'));
   db().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(klasseId, uid('dora'));
-  const html = await (await dora('/teacher/klassen')).text();
-  assert.match(html, /Fächer der Klasse/);
-  assert.match(html, /als Klassenleitung immer sichtbar/);
-  assert.doesNotMatch(html, /class="weitere-schalter"/);
-  for (const n of ['Mathe', 'Sport', 'Deutsch']) assert.match(html, new RegExp(`📋 ${n}`));
+  const html = await (await dora(`/teacher/klassen/${klasseId}`)).text();
+  assert.doesNotMatch(html, /faecher-reiter|Weitere Fächer|data-target="faecher-/);
+  for (const n of ['Mathe', 'Sport', 'Deutsch']) assert.match(html, new RegExp(`class="fach-name"[^>]*>${n}<`));
   assert.match(html, /🎓 anna/);
-  // Die Noteneingabe zeigt ihr ohne eigenes Fach nichts von dieser Klasse
+  // weder Meine Klassen noch die Noteneingabe zeigen ihr Fächer dieser Klasse
+  assert.doesNotMatch(await (await dora('/teacher/klassen')).text(), /class="fach-name"|>Sport</);
   assert.doesNotMatch(await (await dora('/teacher')).text(), /10K/);
-  // Bernd (keine Klassenleitung) kann weiter ausblenden
-  assert.match(await (await bernd('/teacher/klassen')).text(), /class="weitere-schalter"/);
+  // Bernd (keine Klassenleitung) hat den Reiter weiter
+  assert.match(await (await bernd(`/teacher/klassen/${klasseId}`)).text(), /data-target="faecher-weitere"/);
 });
 
 test('Klassenseite: Eintragen-Knopf bei freien Fächern, Austragen bei der eigenen Selbst-Eintragung; Zuordnen anderer nur durch die Klassenleitung', async () => {
@@ -233,9 +237,8 @@ test('Fach mit Unterfächern: kein Eintragen-Knopf beim Fach selbst (auch nicht 
   const klasseSeite = await (await anna(`/teacher/klassen/${klasseId}`)).text();
   assert.doesNotMatch(klasseSeite, new RegExp(`/teacher/faecher/${deutsch}/selbst-eintragen`));
   assert.match(klasseSeite, new RegExp(`/teacher/faecher/${grammatik}/selbst-eintragen`));
-  const klassenListe = await (await dora('/teacher/klassen')).text();
-  assert.doesNotMatch(klassenListe, new RegExp(`/teacher/faecher/${deutsch}/selbst-eintragen`));
-  assert.match(klassenListe, new RegExp(`/teacher/faecher/${grammatik}/selbst-eintragen`));
+  const dashboard = await (await dora('/teacher')).text();
+  assert.doesNotMatch(dashboard, /selbst-eintragen"/, 'die Noteneingabe zeigt keine fremden Fächer mehr');
   // direkter Aufruf wird ebenfalls abgewiesen
   await form(anna, `/teacher/faecher/${deutsch}/selbst-eintragen`);
   assert.equal(zuw(deutsch).length, 0);
