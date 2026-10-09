@@ -130,7 +130,7 @@ test('Sich eintragen (ohne Zugriff verboten), nur freie Fächer, danach wieder a
   await form(bernd, `/teacher/zuweisungen/${z.id}/selbst-austragen`);
   assert.equal(zuw(sport).length, 0);
   assert.deepEqual(U.freieHalbjahre(fachRow(sport)), [5, 6]);
-  assert.equal((await bernd(`/teacher/fach/${sport}`)).status, 403, 'kein Zugriff mehr');
+  assert.match(await (await bernd(`/teacher/fach/${sport}`)).text(), /Noch keine Lehrkraft eingetragen/, 'kein Zugriff mehr auf die Noten, nur das Angebot zum Eintragen');
   // Danach kann Dora übernehmen
   await form(dora, `/teacher/faecher/${sport}/selbst-eintragen`);
   assert.deepEqual(zuw(sport).map((x) => x.username), ['dora']);
@@ -151,6 +151,30 @@ test('Eine von der Klassenleitung vergebene Zuordnung kann man nicht selbst aufh
   assert.equal(z.selbst_eingetragen, 0);
   await form(bernd, `/teacher/zuweisungen/${z.id}/selbst-austragen`);
   assert.equal(zuw(sport).length, 1, 'Klassenleitungs-Zuordnung bleibt');
+});
+
+test('Fach öffnen: ohne Lehrkraft bietet es das Eintragen an (statt 403), danach nur noch die eingetragene Lehrkraft', async () => {
+  db().prepare('DELETE FROM fach_zuweisungen WHERE fach_id = ?').run(sport);
+  // Bernd (Zugriff auf die Klasse über Deutsch) öffnet das freie Fach Sport
+  let r = await bernd(`/teacher/fach/${sport}`);
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.match(html, /Noch keine Lehrkraft eingetragen/);
+  assert.match(html, new RegExp(`action="/teacher/faecher/${sport}/selbst-eintragen"`));
+  // Eintragen führt zurück ins Fach
+  r = await form(bernd, `/teacher/faecher/${sport}/selbst-eintragen`, { zurueck: 'fach' });
+  assert.equal(r.headers.get('location'), `/teacher/fach/${sport}`);
+  assert.equal((await bernd(`/teacher/fach/${sport}`)).status, 200);
+  // Jetzt ist es vergeben: andere Lehrkräfte mit Klassenzugriff werden abgewiesen, ohne Klassenzugriff erst recht
+  db().prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(uid('dora'), deutsch);
+  r = await dora(`/teacher/fach/${sport}`);
+  assert.equal(r.status, 403);
+  assert.match(await r.text(), /bereits eine Lehrkraft eingetragen/);
+  assert.equal((await carla(`/teacher/fach/${sport}`)).status, 403);
+  // Wieder freigeben (Austragen) -> wieder angeboten
+  await form(bernd, `/teacher/zuweisungen/${zuw(sport)[0].id}/selbst-austragen`);
+  assert.equal((await dora(`/teacher/fach/${sport}`)).status, 200);
+  db().prepare('DELETE FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?').run(uid('dora'), deutsch);
 });
 
 test('Klassenleitung hat den Knopf "Weitere Fächer" nicht und sieht alle Fächer der Klasse immer -- auch ohne eigenes Fach', async () => {

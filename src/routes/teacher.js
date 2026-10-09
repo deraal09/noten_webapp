@@ -333,6 +333,15 @@ export default async function teacherRoutes(fastify) {
       return renderZusammensetzung(request, reply, fach, zusammensetzungHj);
     }
     if (!userHatFachZgriff(request.user, fach.id)) {
+      // Lehrkräfte mit Zugriff auf die Klasse dürfen sich in ein Fach eintragen, solange dort (in noch nicht
+      // vergangenen Halbjahren) keine Lehrkraft eingetragen ist. Danach nur noch die eingetragene Lehrkraft und die Klassenleitung.
+      if (!fach.ist_kurs && userHatKlassenZugriff(request.user, fach.klasse_id)) {
+        const frei = freieHalbjahre(fach);
+        if (frei.length) {
+          return reply.viewEjs('teacher/fach_frei.ejs', { user: request.user, fach, frei, alleHalbjahre: klassenLaufzeit(fach.klasse_id).anzahlHalbjahre });
+        }
+        return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'In diesem Fach ist bereits eine Lehrkraft eingetragen. Bearbeiten dürfen es nur diese Lehrkraft und die Klassenleitung.' });
+      }
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     // Strikt je Halbjahr: nur die Halbjahre der Zuordnung (siehe src/unterfaecher.js).
@@ -1807,6 +1816,7 @@ export default async function teacherRoutes(fastify) {
     const res = traegeMichEin(fach, request.user.id);
     if (res.ok) request.flash?.('success', `Du bist jetzt für „${fach.name}“ eingetragen (${res.halbjahre.length === klassenLaufzeit(fach.klasse_id).anzahlHalbjahre ? 'alle Halbjahre' : `${res.halbjahre.map((n) => `${n}.`).join(', ')} Halbjahr`}).`);
     else request.flash?.('error', res.fehler);
+    if (res.ok && request.body?.zurueck === 'fach') return reply.redirect(`/teacher/fach/${fach.id}`);
     return reply.redirect(zurueckNach(request, fach.klasse_id));
   });
 

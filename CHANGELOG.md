@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.92.2 - 2026-10-09
+
+- **Fach ohne Lehrkraft öffnen: statt „403 Keine Berechtigung“ das Eintragen anbieten.** Wer Zugriff auf
+  die Klasse hat und ein Fach (oder Unterfach) öffnet, in dem noch keine Lehrkraft eingetragen ist, sieht
+  jetzt eine Seite „Noch keine Lehrkraft eingetragen“ mit dem Knopf „Für dieses Fach eintragen“. Danach
+  geht es direkt im Fach weiter. Ist das Fach schon vergeben, bekommen andere Lehrkräfte den Hinweis, dass
+  nur die eingetragene Lehrkraft und die Klassenleitung es bearbeiten dürfen; wer keinen Zugriff auf die
+  Klasse hat, bekommt weiterhin 403.
+
 ## 0.92.1 - 2026-10-09
 
 - **Klassenseite: „Weitere Fächer“ klappt nach unten auf, statt die eigenen Fächer zu verdecken.** Die

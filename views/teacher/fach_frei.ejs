@@ -1,0 +1,18 @@
+<h1><%= fach.name %> <small>(<%= fach.klasse_name %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a>
+</p>
+<section class="card">
+  <h2>Noch keine Lehrkraft eingetragen</h2>
+  <p>
+    Für dieses Fach ist
+    <%= frei.length === alleHalbjahre ? 'noch keine Lehrkraft eingetragen' : 'in den Halbjahren ' + frei.map(function(n) { return n + '.'; }).join(', ') + ' noch keine Lehrkraft eingetragen' %>.
+    Solange das so ist, kannst du dich selbst eintragen und Noten eingeben. Danach dürfen nur noch die eingetragene
+    Lehrkraft und die Klassenleitung das Fach bearbeiten.
+  </p>
+  <form method="post" action="/teacher/faecher/<%= fach.id %>/selbst-eintragen">
+    <input type="hidden" name="zurueck" value="fach">
+    <button type="submit">🎓 Für dieses Fach eintragen</button>
+  </form>
+  <p class="hint">Du kannst dich später auf der Klassenseite wieder austragen. Das Fach ist dann wieder frei für andere.</p>
+</section>
