@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.92.3 - 2026-10-09
+
+- **Klassenseite: „Weitere Fächer“ farblich abgesetzt.** Der aufklappbare Bereich hat einen gestrichelten
+  Rand und einen leicht getönten Hintergrund; der Knopf „Weitere Fächer (n)“ ist als gestrichelter
+  Umriss-Knopf gestaltet und hebt sich so von den normalen (gefüllten) Knöpfen ab.
+
 ## 0.92.2 - 2026-10-09
 
 - **Fach ohne Lehrkraft öffnen: statt „403 Keine Berechtigung“ das Eintragen anbieten.** Wer Zugriff auf

@@ -763,10 +763,12 @@ table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }
 .unterfach-block h3 { margin: 0 0 0.3rem; }
 .hinweis-aufklappbar > div.hint p { margin: 0.25rem 0 0.5rem; }
 
-/* Klassenseite: "Weitere Fächer" klappt unter den eigenen Fächern auf */
-.weitere-aufklappbar { margin: 0.5rem 0 1rem; }
-.weitere-aufklappbar > summary { display: inline-block; list-style: none; padding: 0.6rem 1.2rem; min-height: 2.75rem; box-sizing: border-box; background: var(--primary); color: var(--on-dark); border-radius: 4px; cursor: pointer; }
+/* Klassenseite: "Weitere Fächer" klappt unter den eigenen Fächern auf -- farblich abgesetzt (gestrichelt) */
+.weitere-aufklappbar { margin: 1rem 0; padding: 0.5rem 0.75rem; border: 2px dashed var(--border-strong); border-radius: 8px; background: var(--bg-subtle); }
+.weitere-aufklappbar[open] { padding-bottom: 0.25rem; }
+.weitere-aufklappbar > summary { display: inline-block; list-style: none; padding: 0.55rem 1.1rem; min-height: 2.75rem; box-sizing: border-box; background: var(--bg-card); color: var(--primary-text); border: 2px dashed var(--primary-text); border-radius: 6px; cursor: pointer; font-weight: 600; }
 .weitere-aufklappbar > summary::-webkit-details-marker { display: none; }
 .weitere-aufklappbar > summary::before { content: "▸ "; }
 .weitere-aufklappbar[open] > summary::before { content: "▾ "; }
-.weitere-aufklappbar > summary:hover { background: var(--primary-hover); }
+.weitere-aufklappbar > summary:hover { background: var(--bg-tint); }
+.weitere-aufklappbar > .faecher-baum { margin-top: 0.5rem; }

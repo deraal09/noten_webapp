@@ -25,3 +25,8 @@ test('CSS: Container bricht nicht um, Platz hat feste Breite', () => {
   assert.match(css, /\.aktion-platz\s*\{[^}]*width:\s*2\.75rem/);
   assert.match(css, /\.aktion-platz\s*\{[^}]*flex:\s*none/);
 });
+
+test('Weitere Fächer (Klassenseite): Bereich und Knopf sind gestrichelt abgesetzt', () => {
+  assert.match(css, /\.weitere-aufklappbar\s*\{[^}]*border:\s*2px dashed/);
+  assert.match(css, /\.weitere-aufklappbar\s*>\s*summary\s*\{[^}]*border:\s*2px dashed/);
+});
