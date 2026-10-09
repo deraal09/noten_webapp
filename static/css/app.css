@@ -762,3 +762,11 @@ table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }
 .unterfach-block { margin: 0 0 1rem; }
 .unterfach-block h3 { margin: 0 0 0.3rem; }
 .hinweis-aufklappbar > div.hint p { margin: 0.25rem 0 0.5rem; }
+
+/* Klassenseite: "Weitere Fächer" klappt unter den eigenen Fächern auf */
+.weitere-aufklappbar { margin: 0.5rem 0 1rem; }
+.weitere-aufklappbar > summary { display: inline-block; list-style: none; padding: 0.6rem 1.2rem; min-height: 2.75rem; box-sizing: border-box; background: var(--primary); color: var(--on-dark); border-radius: 4px; cursor: pointer; }
+.weitere-aufklappbar > summary::-webkit-details-marker { display: none; }
+.weitere-aufklappbar > summary::before { content: "▸ "; }
+.weitere-aufklappbar[open] > summary::before { content: "▾ "; }
+.weitere-aufklappbar > summary:hover { background: var(--primary-hover); }

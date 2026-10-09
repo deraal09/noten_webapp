@@ -1,5 +1,5 @@
 /**
- * Fächer der Klasse auf der Klassenseite (Reiter "Weitere Fächer") für alle mit Klassenzugriff (ausblendbar, für die Klassenleitung dauerhaft),
+ * Fächer der Klasse auf der Klassenseite (Knopf "Weitere Fächer" klappt sie unter den eigenen auf; die Klassenleitung sieht alle dauerhaft),
  * mit den Lehrkräften; Fächer ohne Lehrkraft können sich andere Lehrkräfte selbst eintragen und wieder austragen.
  */
 
@@ -66,12 +66,14 @@ test('Vorbereitung: Anna legt 10K an (Mathe, Sport, Deutsch); Bernd hat nur Deut
   assert.deepEqual(zuw(mathe).map((z) => z.username), ['anna']);
 });
 
-test('Klassenseite: Bernd sieht seine Fächer und die übrigen im Reiter "Weitere Fächer" mit Lehrkräften und Eintragen-Knopf; weder Meine Klassen noch Noteneingabe zeigen Fächer', async () => {
+test('Klassenseite: Bernd sieht seine Fächer und darunter aufklappbar die übrigen ("Weitere Fächer") mit Lehrkräften und Eintragen-Knopf; weder Meine Klassen noch Noteneingabe zeigen Fächer', async () => {
   const html = await (await bernd(`/teacher/klassen/${klasseId}`)).text();
-  assert.match(html, /data-target="faecher-eigene">Meine Fächer \(1\)</);
-  assert.match(html, /data-target="faecher-weitere">Weitere Fächer \(2\)</);
-  const eigene = html.slice(html.indexOf('id="faecher-eigene"'), html.indexOf('id="faecher-weitere"'));
-  const weitere = html.slice(html.indexOf('id="faecher-weitere"'));
+  assert.doesNotMatch(html, /data-target="faecher-/, 'keine Reiter mehr');
+  assert.match(html, /<details class="weitere-aufklappbar" id="weitere-faecher"[^>]*>\s*<summary>Weitere Fächer \(2\)<\/summary>/);
+  assert.doesNotMatch(html, /<details class="weitere-aufklappbar"[^>]* open>/, 'standardmäßig zugeklappt (er hat ein eigenes Fach)');
+  const marke = html.indexOf('<details class="weitere-aufklappbar"');
+  const eigene = html.slice(html.indexOf('class="faecher-baum"'), marke);
+  const weitere = html.slice(marke);
   assert.match(eigene, /Deutsch/);
   assert.doesNotMatch(eigene, />Mathe</);
   assert.match(weitere, /Mathe[\s\S]*?🎓 anna/);
@@ -151,18 +153,18 @@ test('Eine von der Klassenleitung vergebene Zuordnung kann man nicht selbst aufh
   assert.equal(zuw(sport).length, 1, 'Klassenleitungs-Zuordnung bleibt');
 });
 
-test('Klassenleitung hat den Reiter "Weitere Fächer" nicht und sieht alle Fächer der Klasse immer -- auch ohne eigenes Fach', async () => {
+test('Klassenleitung hat den Knopf "Weitere Fächer" nicht und sieht alle Fächer der Klasse immer -- auch ohne eigenes Fach', async () => {
   db().prepare('DELETE FROM fach_zuweisungen WHERE user_id = ?').run(uid('dora'));
   db().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(klasseId, uid('dora'));
   const html = await (await dora(`/teacher/klassen/${klasseId}`)).text();
-  assert.doesNotMatch(html, /faecher-reiter|Weitere Fächer|data-target="faecher-/);
+  assert.doesNotMatch(html, /weitere-aufklappbar|Weitere Fächer/);
   for (const n of ['Mathe', 'Sport', 'Deutsch']) assert.match(html, new RegExp(`class="fach-name"[^>]*>${n}<`));
   assert.match(html, /🎓 anna/);
   // weder Meine Klassen noch die Noteneingabe zeigen ihr Fächer dieser Klasse
   assert.doesNotMatch(await (await dora('/teacher/klassen')).text(), /class="fach-name"|>Sport</);
   assert.doesNotMatch(await (await dora('/teacher')).text(), /10K/);
-  // Bernd (keine Klassenleitung) hat den Reiter weiter
-  assert.match(await (await bernd(`/teacher/klassen/${klasseId}`)).text(), /data-target="faecher-weitere"/);
+  // Bernd (keine Klassenleitung) hat den Knopf weiter
+  assert.match(await (await bernd(`/teacher/klassen/${klasseId}`)).text(), /weitere-aufklappbar/);
 });
 
 test('Klassenseite: Eintragen-Knopf bei freien Fächern, Austragen bei der eigenen Selbst-Eintragung; Zuordnen anderer nur durch die Klassenleitung', async () => {

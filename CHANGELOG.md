@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.92.1 - 2026-10-09
+
+- **Klassenseite: „Weitere Fächer“ klappt nach unten auf, statt die eigenen Fächer zu verdecken.** Die
+  zwei Reiter „Meine Fächer“/„Weitere Fächer“ entfallen. Die eigenen Fächer stehen immer da; darunter
+  öffnet der Knopf „Weitere Fächer (n)“ die übrigen. Zugeklappt sieht man nur die eigenen, aufgeklappt
+  alle Fächer. Standard ist zugeklappt (ohne eigenes Fach aufgeklappt); die Wahl wird im Browser gemerkt.
+  Die Klassenleitung hat den Knopf weiterhin nicht und sieht alle Fächer immer.
+
 ## 0.92.0 - 2026-10-09
 
 - **Fächer nur noch auf der Klassenseite.** „Meine Klassen“ zeigt wieder nur die Klassenkacheln, ohne

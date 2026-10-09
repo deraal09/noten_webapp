@@ -469,24 +469,30 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 <% } %>
 
 <%
-  // Wer nicht Klassenleitung ist, sieht zuerst die eigenen Fächer und die übrigen im Reiter "Weitere Fächer".
-  // Die Klassenleitung hat diesen Reiter nicht: sie sieht alle Fächer immer.
+  // Wer nicht Klassenleitung ist, sieht die eigenen Fächer immer; die übrigen klappt "Weitere Fächer" darunter auf.
+  // Die Klassenleitung hat diesen Knopf nicht: sie sieht alle Fächer immer.
   function istMeinFach(id) { return (zuweisungenProFach[id] || []).some(function(z) { return z.user_id === user.id; }); }
   var eigeneBaum = baum.filter(function(e) { return istMeinFach(e.fach.id) || e.kinder.some(function(u) { return istMeinFach(u.id); }); });
   var weitereBaum = baum.filter(function(e) { return eigeneBaum.indexOf(e) === -1; });
   var mitReitern = !istKlassenlehrer && weitereBaum.length > 0;
 %>
 <% if (mitReitern) { %>
-  <div class="reiter faecher-reiter" data-storage-key="klasse-faecher-<%= klasse.id %>">
-    <button type="button" class="<%= eigeneBaum.length ? 'active' : '' %>" data-target="faecher-eigene">Meine Fächer (<%= eigeneBaum.length %>)</button>
-    <button type="button" class="<%= eigeneBaum.length ? '' : 'active' %>" data-target="faecher-weitere">Weitere Fächer (<%= weitereBaum.length %>)</button>
-  </div>
-  <div id="faecher-eigene" class="reiter-panel<%= eigeneBaum.length ? ' active' : '' %>">
-    <% zeigeFaecherBaum(eigeneBaum, 'Du bist in dieser Klasse noch in keinem Fach eingetragen -- unter „Weitere Fächer“ kannst du dich bei freien Fächern eintragen.'); %>
-  </div>
-  <div id="faecher-weitere" class="reiter-panel<%= eigeneBaum.length ? '' : ' active' %>">
+  <% zeigeFaecherBaum(eigeneBaum, 'Du bist in dieser Klasse noch in keinem Fach eingetragen -- unter „Weitere Fächer“ kannst du dich bei freien Fächern eintragen.'); %>
+  <details class="weitere-aufklappbar" id="weitere-faecher" data-key="klasse-weitere-faecher-<%= klasse.id %>"<%= eigeneBaum.length ? '' : ' open' %>>
+    <summary>Weitere Fächer (<%= weitereBaum.length %>)</summary>
     <% zeigeFaecherBaum(weitereBaum, ''); %>
-  </div>
+  </details>
+  <script>
+    // Aufgeklappt = alle Fächer der Klasse, zugeklappt = nur die eigenen; die Wahl wird im Browser gemerkt.
+    (function() {
+      var d = document.getElementById('weitere-faecher');
+      try {
+        var v = localStorage.getItem(d.dataset.key);
+        if (v === '1') d.open = true; else if (v === '0') d.open = false;
+      } catch (e) { /* ohne Speicher */ }
+      d.addEventListener('toggle', function() { try { localStorage.setItem(d.dataset.key, d.open ? '1' : '0'); } catch (e) { /* ohne Speicher */ } });
+    })();
+  </script>
 <% } else { %>
   <% zeigeFaecherBaum(baum, 'Noch keine Fächer.'); %>
 <% } %>
