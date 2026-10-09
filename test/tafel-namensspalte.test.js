@@ -32,7 +32,14 @@ test('Übersichtstabellen (Notenübersicht, Halbjahresübersicht) tragen die Kla
   assert.match(css, /table\.tabelle-fix tbody tr:nth-child\(even\) td:first-child\s*\{[^}]*background:\s*var\(--bg-subtle\)/, 'folgt der Zebra-Streifung');
   assert.match(css, /table\.tabelle-fix,\s*table\.tafel\s*\{\s*border-collapse:\s*separate/, 'getrennte Rahmen gegen Durchscheinen');
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'views');
-  for (const datei of ['teacher/fach_detail.ejs', 'teacher/fach_zusammensetzung.ejs', 'teacher/klasse_uebersicht.ejs', 'klassenlehrer/klasse_detail.ejs']) {
+  for (const datei of ['teacher/fach_detail.ejs', 'teacher/fach_zusammensetzung.ejs', 'teacher/klasse_uebersicht.ejs', 'klassenlehrer/klasse_detail.ejs', 'teacher/klasse_abschluss.ejs']) {
     assert.match(fs.readFileSync(path.join(root, datei), 'utf8'), /<table class="data tabelle-fix"/, datei);
   }
+  // Abschlussübersicht (beide Seiten) und die direkten Noteneingaben (Fach, SPA, Endnoten-Raster der Klassenleitung)
+  const lies = (d) => fs.readFileSync(path.join(root, d), 'utf8');
+  assert.match(lies('teacher/klasse_abschluss.ejs'), /<table class="data tabelle-fix">[\s\S]*Ø Abschluss/);
+  assert.match(lies('klassenlehrer/klasse_detail.ejs'), /<table class="data tabelle-fix">\s*<thead>\s*<tr>\s*<th>Schüler\/in<\/th>\s*<% abschlussuebersicht\.faecher\.forEach/);
+  assert.match(lies('klassenlehrer/klasse_detail.ejs'), /<table class="data tabelle-fix" id="endnoten-raster">/);
+  assert.match(lies('teacher/fach_detail.ejs'), /<table class="data tabelle-fix" id="endnoten-tabelle">/);
+  assert.match(lies('teacher/fach_detail_spa.ejs'), /<table class="data tabelle-fix" id="spa-tabelle"/);
 });

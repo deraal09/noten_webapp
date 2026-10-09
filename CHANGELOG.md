@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.88.5 - 2026-10-09
+
+- **Namensspalte fixiert auch in der Abschluss-/Abgangsübersicht** (beide Seiten) **und in den
+  direkten Noteneingaben**: Direkte Endnoteneingabe eines Fachs (IHK/BG und SPA) sowie das
+  Endnoten-Raster der Klassenleitung. Die Spalte „Schüler/in" bleibt beim seitlichen Scrollen
+  links stehen.
+
 ## 0.88.4 - 2026-10-09
 
 - **Namensspalte auch in der Halbjahresübersicht und der Notenübersicht fixiert.** Wie in den

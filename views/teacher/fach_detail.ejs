@@ -118,7 +118,7 @@
         Wird beim Verlassen des Feldes gespeichert; bei gesperrten Personen (Notenkonferenz) ist die Eingabe
         erst nach dem Entsperren durch die Klassenleitung möglich.
       </p>
-      <table class="data" id="endnoten-tabelle">
+      <table class="data tabelle-fix" id="endnoten-tabelle">
         <thead><tr><th>Schüler/in</th><th title="Aus Klausuren und Unterrichtsleistung berechnet">Berechnet</th><th><%= spaLeistung ? 'Gesamtpunkte' : 'Endnote' %> (Direkteingabe)</th></tr></thead>
         <tbody>
           <% rows.forEach(function(r) {

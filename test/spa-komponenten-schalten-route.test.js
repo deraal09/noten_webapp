@@ -250,7 +250,7 @@ test('Klassenleitung: SPA-Fächer stehen in der Direkteingabe; Gesamtpunkte gelt
   const db = getDb();
   const schuelerId = db.prepare("SELECT id FROM schueler WHERE nachname = 'Musterfrau'").get().id;
   const html = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=endnoten&hj=${encodeURIComponent('1. Halbjahr')}`)).text();
-  assert.match(html, /<table class="data" id="endnoten-raster">/);
+  assert.match(html, /<table class="data tabelle-fix" id="endnoten-raster">/);
   assert.ok(html.includes(`data-fach="${lf3Id}"`), 'LF3 (SPA) hat eine Eingabezelle');
   // (Die Klassenleitungs-Route gilt nur für vergangene Halbjahre; diese Klasse liegt in der Zukunft -- gleiche Speicherung über die Fach-Route.)
   const r = await form(admin, `/teacher/fach/${lf3Id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '1. Halbjahr', wert: '9' });
