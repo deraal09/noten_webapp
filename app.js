@@ -203,6 +203,12 @@ export async function buildApp(opts = {}) {
   const pwaDatei = (name) => readFileSync(path.join(__dirname, 'static', 'pwa', name));
   app.get('/manifest.webmanifest', async (request, reply) => reply
     .type('application/manifest+json; charset=utf-8').header('Cache-Control', 'no-cache').send(pwaDatei('manifest.webmanifest')));
+  // Symbole unter den festen Pfaden, die iOS/Browser von sich aus abfragen, wenn kein <link> greift
+  // (iOS: apple-touch-icon[-precomposed].png für den Home-Bildschirm, Browser: favicon.ico).
+  const symbol = (datei) => readFileSync(path.join(__dirname, 'static', 'icons', datei));
+  for (const [route, datei] of [['/apple-touch-icon.png', 'apple-touch-icon.png'], ['/apple-touch-icon-precomposed.png', 'apple-touch-icon.png'], ['/favicon.ico', 'icon-192.png']]) {
+    app.get(route, async (request, reply) => reply.type('image/png').header('Cache-Control', 'public, max-age=86400').send(symbol(datei)));
+  }
   app.get('/sw.js', async (request, reply) => reply
     .type('text/javascript; charset=utf-8').header('Cache-Control', 'no-cache').header('Service-Worker-Allowed', '/').send(pwaDatei('sw.js')));
 

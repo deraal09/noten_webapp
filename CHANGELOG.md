@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.87.1 - 2026-10-09
+
+- **App-Symbol auf dem iPhone robuster.** Das iOS-Symbol (180 × 180 Pixel, PNG) liegt
+  jetzt zusätzlich unter den festen Adressen `/apple-touch-icon.png` und
+  `/apple-touch-icon-precomposed.png` (dort fragt iOS von sich aus nach, wenn ihm der
+  Link im Seitenkopf nicht genügt); `/favicon.ico` liefert ebenfalls ein Symbol statt
+  einer Fehlerseite. Das Manifest enthält nur noch PNG-Symbole (iOS kann kein SVG).
+  Ein schon installiertes Symbol aktualisiert iOS nicht: die App vom Home-Bildschirm
+  löschen und neu installieren.
+
 ## 0.87.0 - 2026-10-09
 
 - **Noteneingabe zeigt auch die Fächer der anderen Lehrkräfte** der eigenen Klassen

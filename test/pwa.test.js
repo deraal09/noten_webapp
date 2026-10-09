@@ -43,10 +43,23 @@ test('Service Worker liegt unter /, hat den fetch-Handler und cacht keine Seiten
   assert.equal((await get('/static/pwa/offline.html')).status, 200);
 });
 
+test('Symbole auch unter den festen Pfaden (iOS-Home-Bildschirm, favicon), iOS-Symbol ist 180x180', async () => {
+  for (const url of ['/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/static/icons/apple-touch-icon.png', '/favicon.ico']) {
+    const r = await get(url, { headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1' } });
+    assert.equal(r.status, 200, url);
+    assert.equal(r.headers.get('content-type'), 'image/png', url);
+  }
+  const png = Buffer.from(await (await get('/apple-touch-icon.png')).arrayBuffer());
+  assert.equal(png.readUInt32BE(16), 180);
+  assert.equal(png.readUInt32BE(20), 180);
+  const m = await (await get('/manifest.webmanifest')).json();
+  assert.equal(m.icons.some((i) => i.type === 'image/svg+xml'), false, 'nur PNG-Symbole (iOS kann kein SVG)');
+});
+
 test('Seiten verlinken Manifest, iOS-Symbol und bieten den Installieren-Knopf samt Anleitung an', async () => {
   const html = await (await get('/setup')).text();
   assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest">/);
-  assert.match(html, /rel="apple-touch-icon" href="\/static\/icons\/apple-touch-icon\.png"/);
+  assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="\/static\/icons\/apple-touch-icon\.png"/);
   assert.match(html, /name="theme-color"/);
   assert.match(html, /id="app-install-knopf"/);
   // Anleitung für iOS-Nutzer/innen (Teilen → Zum Home-Bildschirm) und die anderen Systeme
