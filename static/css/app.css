@@ -707,3 +707,8 @@ table.tafel thead th:first-child { background: var(--bg-header); z-index: 3; }
   /* schmal: Namen dürfen umbrechen, damit die fixierte Spalte nicht den halben Bildschirm belegt */
   table.tafel td.name { white-space: normal; min-width: 6.5rem; max-width: 9rem; }
 }
+
+/* Aufklappbarer Hinweistext (z. B. Datumstabelle): standardmäßig zu, damit die Seite kompakt bleibt. */
+.hinweis-aufklappbar { margin: 0.25rem 0 0.5rem; }
+.hinweis-aufklappbar > summary { cursor: pointer; color: var(--text-muted); font-size: 0.9rem; padding: 0.35rem 0; }
+.hinweis-aufklappbar > .hint { margin: 0.25rem 0 0.5rem; }

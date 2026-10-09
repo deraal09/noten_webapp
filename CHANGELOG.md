@@ -6,6 +6,11 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.88.2 - 2026-10-09
+
+- **Datumstabelle: Hinweistext aufklappbar**, standardmäßig eingeklappt („Hinweis zur
+  Datumstabelle"). Die Seite wird dadurch kompakter; der Text bleibt mit einem Klick erreichbar.
+
 ## 0.88.1 - 2026-10-09
 
 - **Noteneingabe: Namensspalte bleibt beim seitlichen Scrollen links stehen** -- in der

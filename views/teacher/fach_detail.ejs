@@ -349,14 +349,17 @@
   </div>
 
   <div id="ul-panel-datumstabelle" class="reiter-panel unter-panel card active">
-    <p class="hint">
-      Eine Spalte je Unterrichtstermin, eine Note je Schüler/in ohne
-      Einzelgewichtung. Eingetragen werden nur Noten oder <strong>n.a.</strong>
-      (nicht anwesend) – alles andere wird automatisch zu n.a.; n.a. zählt nicht
-      in den Durchschnitt, wird aber je Person gezählt. Der Durchschnitt aller eingetragenen Noten bildet die
-      Basis der Unterrichtsleistungsnote — Zusatzleistungen (eigene Reiter)
-      zählen zusätzlich mit ihrer eigenen Gewichtung.
-    </p>
+    <details class="hinweis-aufklappbar" id="datumstabelle-hinweis">
+      <summary>Hinweis zur Datumstabelle</summary>
+      <p class="hint">
+        Eine Spalte je Unterrichtstermin, eine Note je Schüler/in ohne
+        Einzelgewichtung. Eingetragen werden nur Noten oder <strong>n.a.</strong>
+        (nicht anwesend) – alles andere wird automatisch zu n.a.; n.a. zählt nicht
+        in den Durchschnitt, wird aber je Person gezählt. Der Durchschnitt aller eingetragenen Noten bildet die
+        Basis der Unterrichtsleistungsnote — Zusatzleistungen (eigene Reiter)
+        zählen zusätzlich mit ihrer eigenen Gewichtung.
+      </p>
+    </details>
     <form method="post" action="/teacher/fach/<%= fach.id %>/unterricht/termine/neu" class="inline">
       <input type="date" name="datum" required>
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
