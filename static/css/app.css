@@ -318,8 +318,8 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .right { float: right; }
 .hint { color: var(--text-muted); font-size: 0.9rem; }
 
-.hj-tabs { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
-.hj-tab { padding: 0.4rem 1rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 4px 4px 0 0; color: var(--text); }
+.hj-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
+.hj-tab { white-space: nowrap; padding: 0.4rem 1rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 4px 4px 0 0; color: var(--text); }
 .hj-tab.active { background: var(--primary); color: var(--on-dark); border-color: var(--primary); }
 
 .reiter { display: flex; gap: 0.75rem; margin: 1rem 0 0; flex-wrap: wrap; }
@@ -772,3 +772,21 @@ table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }
 .weitere-aufklappbar[open] > summary::before { content: "▾ "; }
 .weitere-aufklappbar > summary:hover { background: var(--bg-tint); }
 .weitere-aufklappbar > .faecher-baum { margin-top: 0.5rem; }
+
+/* Notenauswahl per Touch (static/js/noten-picker.js): Auswahl am unteren Rand, Felder nur zum Antippen */
+.note-picker { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--bg-card); border-top: 2px solid var(--border-strong); box-shadow: 0 -4px 16px var(--shadow-strong); padding: 0.6rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom)); max-height: 60vh; overflow-y: auto; }
+.note-picker[hidden] { display: none; }
+.note-picker-kopf { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.note-picker-titel { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: center; }
+.note-picker-titel strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-picker-pos { color: var(--text-muted); }
+.note-picker-nav { min-width: 2.75rem; padding: 0.4rem 0.6rem; background: var(--bg-card); color: var(--primary-text); border: 1px solid var(--primary-text); }
+.note-picker-raster { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.note-picker-wert { min-height: 3.25rem; font-size: 1.25rem; font-weight: 600; padding: 0.3rem; background: var(--bg-card); color: var(--primary-text); border: 2px solid var(--primary-text); }
+.note-picker-wert.note-picker-na { border-style: dashed; }
+.note-picker-wert[aria-pressed="true"] { background: var(--primary); color: var(--on-dark); }
+.note-picker-fuss { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+.note-picker-fuss button { background: var(--bg-card); color: var(--primary-text); border: 1px solid var(--primary-text); }
+.note-picker-fuss button[aria-pressed="true"] { background: var(--bg-tint); }
+.note-picker-fuss button[hidden] { display: none; }
+input.note-picker-aktiv { outline: 3px solid var(--primary-text); outline-offset: 1px; }

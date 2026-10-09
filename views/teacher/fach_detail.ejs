@@ -130,7 +130,7 @@
               <td>
                 <input type="text" inputmode="decimal" autocomplete="off" class="endnote-eingabe" data-sid="<%= r.schueler_id %>"
                   value="<%= en ? (en.ntg ? 'ntg' : String(en.note).replace('.', ',')) : '' %>" placeholder="–"
-                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer" <%= gesperrtEn ? 'disabled' : '' %>>
+                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer" <% if (fach.notenschluessel === 'IHK' || fach.notenschluessel === 'BG') { %> data-note-picker="<%= fach.notenschluessel %>" data-picker-ntg="1"<% } %> <%= gesperrtEn ? 'disabled' : '' %>>
               </td>
             </tr>
           <% }); %>
@@ -397,7 +397,7 @@
               </td>
               <% r.terminNoten.forEach(function(tn) { %>
                 <td>
-                  <input type="text" inputmode="decimal" autocomplete="off" class="note-datum<%= tn.na ? ' ist-na' : '' %>" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"
+                  <input type="text" inputmode="decimal" autocomplete="off" class="note-datum<%= tn.na ? ' ist-na' : '' %>" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"<% if (fach.notenschluessel === 'IHK' || fach.notenschluessel === 'BG') { %> data-note-picker="<%= fach.notenschluessel %>" data-picker-na="1"<% } %>
                     value="<%= tn.na ? 'n.a.' : (tn.wert === null ? '' : String(tn.wert).replace('.', ',')) %>" placeholder="–" title="Note oder n.a. (nicht anwesend)" <%= gesperrt ? 'disabled' : '' %>>
                 </td>
               <% }); %>

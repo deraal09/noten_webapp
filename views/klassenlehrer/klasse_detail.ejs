@@ -183,6 +183,7 @@
                     value="<%= c.direkt ? (c.direkt.ntg ? 'ntg' : String(c.direkt.note).replace('.', ',')) : '' %>"
                     placeholder="<%= c.berechnet === null ? '–' : String(c.berechnet).replace('.', ',') %>"
                     title="<%= c.berechnet === null ? 'Keine berechnete Note' : 'Berechnet: ' + String(c.berechnet).replace('.', ',') %>"
+                    <% if (klasse.notenschluessel === 'IHK' || klasse.notenschluessel === 'BG') { %> data-note-picker="<%= klasse.notenschluessel %>" data-picker-ntg="1"<% } %>
                     <%= (!c.bearbeitbar || z.gesperrt) ? 'disabled' : '' %>>
                 <% } %>
               </td>

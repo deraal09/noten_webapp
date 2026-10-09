@@ -67,6 +67,11 @@ try {
   const cssInhalt = readFileSync(path.join(__dirname, 'static', 'css', 'app.css'));
   cssVersion = crypto.createHash('sha1').update(cssInhalt).digest('hex').slice(0, 10);
 } catch { /* static/css/app.css sollte immer vorhanden sein — Fallback bleibt 'dev' */ }
+// Ebenso fürs Skript der Touch-Notenauswahl (static/js/noten-picker.js).
+let jsVersion = 'dev';
+try {
+  jsVersion = crypto.createHash('sha1').update(readFileSync(path.join(__dirname, 'static', 'js', 'noten-picker.js'))).digest('hex').slice(0, 10);
+} catch { /* Fallback bleibt 'dev' */ }
 
 // Versionsnummer + Release-Datum für die Fußzeile (siehe
 // views/partials/layout.ejs), aus package.json ausgelesen -- das ist die
@@ -155,6 +160,7 @@ export async function buildApp(opts = {}) {
     reply.locals.now = new Date();
     reply.locals.PUBLIC_URL = PUBLIC_URL;
     reply.locals.cssVersion = cssVersion;
+    reply.locals.jsVersion = jsVersion;
     reply.locals.appVersion = appVersion;
     reply.locals.appReleaseDate = appReleaseDate;
     // Geteilte Anzeige-Konstanten/-Helfer für alle Templates verfügbar machen.

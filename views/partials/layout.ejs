@@ -122,6 +122,7 @@
     if (typeof appReleaseDate !== 'undefined' && appReleaseDate) { %> (<%= appReleaseDate.split('-').reverse().join('.') %>)<% } %><% } %></small>
 </footer>
 <% } %>
+<script src="/static/js/noten-picker.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script>
   (function () {
     var toggle = document.querySelector('.nav-toggle');

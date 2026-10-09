@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.93.0 - 2026-10-09
+
+- **Notenauswahl per Touch.** Auf Touch-Geräten (Handy/Tablet) öffnet das Antippen eines Notenfeldes
+  (Datumstabelle, Endnoten-Direkteingabe im Fach und in der Zusammensetzung, Endnoten-Raster der
+  Klassenleitung; IHK und BG) statt der Bildschirmtastatur eine Auswahl am unteren Rand: ganz vorne
+  **n.a.** (bei den Endnoten **ntg**), danach die Noten des Notenschlüssels (IHK 1–6 mit optional
+  „Zwischennoten“ x,3/x,7; BG 0–15), dazu „Leeren“. Nach der Wahl geht es mit der nächsten Person derselben
+  Spalte weiter (◀ ▶ zum Blättern, „Fertig“ schließt). Für Werte wie 2,5 schaltet „⌨ Tastatur“ auf die
+  normale Eingabe um. **Am PC (Maus/Tastatur) bleibt alles wie bisher:** Note direkt eintippen. Erkennung über
+  den primären Zeiger (`pointer: coarse`), das Skript liegt in `static/js/noten-picker.js`.
+- **Halbjahres-Reiter brechen um.** Bei Klassen mit vielen Halbjahren machten die Reiter „1. Halbjahr … 6.
+  Halbjahr“ die ganze Seite auf dem Handy seitlich breiter als den Bildschirm; sie laufen jetzt in eine
+  zweite Zeile.
+
 ## 0.92.3 - 2026-10-09
 
 - **Klassenseite: „Weitere Fächer“ farblich abgesetzt.** Der aufklappbare Bereich hat einen gestrichelten

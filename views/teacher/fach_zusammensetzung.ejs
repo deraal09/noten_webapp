@@ -74,7 +74,7 @@
               <td>
                 <input type="text" inputmode="decimal" autocomplete="off" class="endnote-eingabe" data-sid="<%= r.schueler_id %>" placeholder="–"
                   value="<%= r.endnote ? (r.endnote.ntg ? 'ntg' : String(r.endnote.note).replace('.', ',')) : '' %>"
-                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer: Leer = berechnete Fachnote">
+                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer: Leer = berechnete Fachnote"<% if (fach.notenschluessel === 'IHK' || fach.notenschluessel === 'BG') { %> data-note-picker="<%= fach.notenschluessel %>" data-picker-ntg="1"<% } %>>
               </td>
             <% } %>
           </tr>
