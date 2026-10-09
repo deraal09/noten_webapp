@@ -2,16 +2,34 @@
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher">📝 Zur Noteneingabe</a>
 </p>
-<p><small>
-  <% if (kannSelbstKlasseAnlegen) { %>
-    Als Lehrkraft mit LDAP-Zugang kannst du eigene Klassen selbst anlegen — eine Zuweisung durch
-    den Admin ist nicht nötig, kann aber jederzeit zusätzlich erfolgen (Admin → Zuweisungen).
-  <% } else { %>
-    Hier erscheinen die Klassen, denen du zugewiesen bist. Eigene Klassen anlegen können nur
-    Lehrkräfte mit LDAP-Zugang — bitte eine Klassenleitung oder den Admin bitten, dich einem
-    Fach zuzuweisen.
-  <% } %>
-</small></p>
+<details class="hinweis-aufklappbar" id="klassen-infos">
+  <summary>ℹ️ Infos zu Klassen und Kursen</summary>
+  <div class="hint">
+    <p>
+      <% if (kannSelbstKlasseAnlegen) { %>
+        Als Lehrkraft mit LDAP-Zugang kannst du eigene Klassen und Kurse selbst anlegen — eine Zuweisung durch
+        den Admin ist nicht nötig, kann aber jederzeit zusätzlich erfolgen (Admin → Zuweisungen).
+      <% } else { %>
+        Hier erscheinen die Klassen, denen du zugewiesen bist. Eigene Klassen und Kurse anlegen können nur
+        Lehrkräfte mit LDAP-Zugang — bitte eine Klassenleitung oder den Admin bitten, dich einem
+        Fach zuzuweisen.
+      <% } %>
+    </p>
+    <p>
+      <strong>+ Neue Klasse anlegen:</strong> Entweder eine bereits im System vorhandene Klasse wählen und ihr
+      beitreten (Schuljahr, Notenschlüssel und Laufzeit werden übernommen), oder eine neue Klasse mit Name,
+      Schuljahr und Notenschlüssel (IHK, BG oder SPA) anlegen. Optional legst du Einschulungsjahr und Anzahl der
+      Schuljahre fest. Die Klasse ist danach deine; sie lässt sich für andere Lehrkräfte freigeben, die ein Fach
+      mit demselben Klassennamen anlegen. Sobald sich jemand als Klassenleitung einträgt, übernimmt diese Person
+      die Verwaltung der Klasse. Fächer, Lehrkräfte und Schüler/innen ergänzt du danach auf der Klassenseite.
+    </p>
+    <p>
+      <strong>+ Neuen Kurs anlegen:</strong> Ein Kurs ist ein einzelnes Fach, dessen Teilnehmer/innen du frei aus
+      mehreren Klassen desselben Schuljahres zusammenstellst (z. B. AG oder Wahlpflichtkurs). Du gibst Kursname,
+      Schuljahr und Notenschlüssel (IHK oder BG) an; die Teilnehmer/innen kommen danach auf der Fach-Seite hinzu.
+    </p>
+  </div>
+</details>
 
 <div class="reiter knopf-reihe">
   <button type="button" data-target="panel-klasse-anlegen">+ Neue Klasse anlegen</button>

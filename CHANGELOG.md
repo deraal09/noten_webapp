@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.90.1 - 2026-10-09
+
+- **„Meine Klassen“: Infos aufklappbar.** Der Infotext oben steht jetzt in einem Block „ℹ️ Infos zu Klassen
+  und Kursen“, der standardmäßig eingeklappt ist. Er erklärt zusätzlich, was „+ Neue Klasse anlegen“
+  (vorhandene Klasse wählen oder neu anlegen, Freigabe, Klassenleitung) und „+ Neuen Kurs anlegen“
+  (Teilnehmer/innen aus mehreren Klassen) bewirken.
+
 ## 0.90.0 - 2026-10-09
 
 - **Fächer: nur noch das Zahnrad (⚙).** Auf der Klassenseite steht je Fach nur noch das Zahnrad; ✎, 👥,

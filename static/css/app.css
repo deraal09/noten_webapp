@@ -767,3 +767,4 @@ table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }
 .fach-loeschen { margin-top: 1.5rem; }
 .unterfach-block { margin: 0 0 1rem; }
 .unterfach-block h3 { margin: 0 0 0.3rem; }
+.hinweis-aufklappbar > div.hint p { margin: 0.25rem 0 0.5rem; }

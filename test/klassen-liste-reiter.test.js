@@ -172,6 +172,16 @@ test('Jede Klasse erscheint nur im Panel ihres eigenen Schuljahrs', async () => 
   assert.doesNotMatch(panelNachgetragen, /9A/);
 });
 
+test('Infos auf "Meine Klassen": aufklappbar, standardmäßig eingeklappt, mit Erklärung zu Neue Klasse und Neuer Kurs', async () => {
+  const html = await (await lehrerA('/teacher/klassen')).text();
+  const m = html.match(/<details class="hinweis-aufklappbar" id="klassen-infos"([^>]*)>\s*<summary>([^<]*)<\/summary>([\s\S]*?)<\/details>/);
+  assert.ok(m, 'details-Block vorhanden');
+  assert.equal(m[1].trim(), '', 'ohne open-Attribut = eingeklappt');
+  assert.match(m[3], /\+ Neue Klasse anlegen:/);
+  assert.match(m[3], /\+ Neuen Kurs anlegen:/);
+  assert.match(m[3], /eigene Klassen und Kurse selbst anlegen/);
+});
+
 test.after(async () => {
   await fastify.close();
 });
