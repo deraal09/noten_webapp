@@ -28,7 +28,7 @@
   <p class="hint" id="filter-leer" hidden>Keine Klassen oder Fächer für diese Auswahl.</p>
 <% } %>
 
-<% var zeigeLehrkraefteSchalter = byKlasse.some(function(k) { return k.faecher.length || k.weitere.length; }); %>
+<% var zeigeLehrkraefteSchalter = byKlasse.some(function(k) { return k.faecher.length; }); %>
 <% if (zeigeLehrkraefteSchalter) { %>
   <p class="klassenfilter">
     <label class="hj-check"><input type="checkbox" id="lehrkraefte-schalter" checked> Lehrkräfte der Fächer anzeigen</label>
@@ -81,37 +81,6 @@
     </ul>
     <% } %>
 
-    <% if (k.weitere.length) { %>
-      <div class="weitere-faecher" data-klasse="<%= k.id %>" data-dauerhaft="<%= k.istKlassenleitung ? '1' : '0' %>">
-        <h3 class="weitere-titel">
-          <%= k.faecher.length ? 'Weitere Fächer der Klasse' : 'Fächer der Klasse' %>
-          <% if (k.istKlassenleitung) { %>
-            <small class="hint">(als Klassenleitung immer sichtbar · <a href="/teacher/klassen/<%= k.id %>#faecher-lehrkraefte">verwalten</a>)</small>
-          <% } else { %>
-            <button type="button" class="weitere-schalter" aria-expanded="true">Ausblenden</button>
-          <% } %>
-        </h3>
-        <ul class="klasse-liste weitere-liste">
-          <% k.weitere.forEach(function(f) { %>
-            <li class="fach-kachel fach-weitere" data-schuljahre="<%= f.schuljahre.join('|') %>">
-              <div class="kachel-zeile">
-                <span class="kachel-icon-klein">📋</span>
-                <span class="kachel-titel-klein"><%= f.name %></span>
-              </div>
-              <% if (f.halbjahreText) { %><div class="kachel-sub"><%= f.halbjahreText %></div><% } %>
-              <% lehrkraefteZeile(f); %>
-              <% var meine = f.lehrkraefte.filter(function(l) { return l.ich && l.selbst; })[0]; %>
-              <% if (meine || f.frei.length) { %>
-                <div class="kachel-aktionen">
-                  <% if (f.frei.length) { eintragenForm(f, k.id, 'Für dieses Fach eintragen'); } %>
-                  <% if (meine) { austragenForm(meine, f); } %>
-                </div>
-              <% } %>
-            </li>
-          <% }); %>
-        </ul>
-      </div>
-    <% } %>
   </section>
   <% }); %>
 
@@ -174,8 +143,7 @@
     anwenden();
   })();
 
-  // Lehrkräfte der Fächer ein-/ausblenden und die Fächer anderer Lehrkräfte je Klasse ausblenden (außer als Klassenleitung);
-  // beides wird im Browser gemerkt.
+  // Lehrkräfte der Fächer ein-/ausblenden (wird im Browser gemerkt).
   (function() {
     function lies(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
     function schreibe(key, wert) { try { localStorage.setItem(key, wert); } catch (e) { /* ohne Speicher */ } }
@@ -186,18 +154,5 @@
       lehrkraefte(schalter.checked);
       schalter.addEventListener('change', function() { schreibe('noteneingabe-lehrkraefte', schalter.checked ? '1' : '0'); lehrkraefte(schalter.checked); });
     }
-    document.querySelectorAll('.weitere-faecher').forEach(function(box) {
-      var knopf = box.querySelector('.weitere-schalter');
-      var liste = box.querySelector('.weitere-liste');
-      if (!knopf || box.dataset.dauerhaft === '1') return; // Klassenleitung: immer sichtbar
-      var key = 'noteneingabe-weitere-' + box.dataset.klasse;
-      function setze(an) {
-        liste.hidden = !an;
-        knopf.textContent = an ? 'Ausblenden' : 'Anzeigen';
-        knopf.setAttribute('aria-expanded', an ? 'true' : 'false');
-      }
-      setze(lies(key) !== '0');
-      knopf.addEventListener('click', function() { var an = liste.hidden; schreibe(key, an ? '1' : '0'); setze(an); });
-    });
   })();
 </script>

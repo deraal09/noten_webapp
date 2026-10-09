@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.91.0 - 2026-10-09
+
+- **Weitere Fächer der Klassen nur noch unter „Meine Klassen“.** Die Noteneingabe zeigt nur noch die
+  eigenen Fächer (mit ihren Lehrkräften, „Weitere Halbjahre übernehmen“ und „Austragen“). Die Fächer, in
+  denen man nicht eingetragen ist, stehen jetzt in der Kachel der jeweiligen Klasse unter „Meine
+  Klassen“, mit ihren Lehrkräften und dem Knopf „Für dieses Fach eintragen“ bei freien Fächern bzw.
+  Halbjahren. Dort lassen sie sich pro Klasse **ausblenden** („Ausblenden“/„Anzeigen“, wird im Browser
+  gemerkt); für die Klassenleitung bleiben sie dauerhaft sichtbar. Klassen ohne eigenes Fach erscheinen
+  nicht mehr in der Noteneingabe.
+
 ## 0.90.1 - 2026-10-09
 
 - **„Meine Klassen“: Infos aufklappbar.** Der Infotext oben steht jetzt in einem Block „ℹ️ Infos zu Klassen
