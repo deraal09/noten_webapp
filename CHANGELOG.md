@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.88.3 - 2026-10-09
+
+- **Fach öffnen: immer zuerst die Notenübersicht.** Bisher stand beim Öffnen eines Fachs der
+  zuletzt benutzte Reiter (z. B. Klausuren) vorn. Jetzt beginnt jedes neue Öffnen -- aus der
+  Noteneingabe-Übersicht, über die Klassenseite oder per Adresse -- mit der Notenübersicht.
+  Der gewählte Reiter bleibt nur erhalten, solange man auf der Fachseite bleibt: Neuladen,
+  Zurück-Taste, Formular absenden (z. B. Klausur anlegen) und Halbjahr wechseln.
+
 ## 0.88.2 - 2026-10-09
 
 - **Datumstabelle: Hinweistext aufklappbar**, standardmäßig eingeklappt („Hinweis zur

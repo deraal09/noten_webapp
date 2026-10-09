@@ -560,7 +560,7 @@
 
 <script>
   // Reiter (Notenübersicht/Unterrichtsleistung/Klausuren, sowie die
-  // Unter-Reiter je Klausur und je Zusatzleistung) umschalten. Jede
+  // Unter-Reiter je Klausur und je Zusatzleistung) umschalten (beim Öffnen des Fachs ist die Notenübersicht vorn, siehe unten). Jede
   // .reiter-Gruppe verwaltet nur ihre eigenen Buttons/Panels (sonst würde
   // ein Klick auf einen Unter-Reiter versehentlich auch die oberste
   // Reiter-Ebene umschalten). Der gewählte Reiter wird je Gruppe in
@@ -619,7 +619,9 @@
         if (mehrWrapper.classList.contains('offen') && !mehrWrapper.contains(e.target)) schliesseMehrMenue();
       });
     }
-    if (storageKey) {
+    // Der gemerkte Reiter gilt nur, solange man auf dieser Fachseite bleibt (Neuladen, Zurück, Formular senden, Halbjahr
+    // wechseln). Wird das Fach neu geöffnet (z. B. aus der Noteneingabe-Übersicht), steht immer die Notenübersicht vorn.
+    if (storageKey && sollGemerktenReiterNutzen()) {
       try {
         const gemerkterReiter = localStorage.getItem(storageKey);
         if (gemerkterReiter && document.getElementById(gemerkterReiter)) {
@@ -627,6 +629,14 @@
         }
       } catch (e) { /* z. B. privater Modus */ }
     }
+  }
+  function sollGemerktenReiterNutzen() {
+    try {
+      const nav = performance.getEntriesByType('navigation')[0];
+      if (nav && (nav.type === 'reload' || nav.type === 'back_forward')) return true;
+      // Formular gesendet (Weiterleitung auf die Fachseite) oder Halbjahr gewechselt: man kam von der Fachseite selbst.
+      return Boolean(document.referrer) && new URL(document.referrer).pathname === location.pathname;
+    } catch (e) { return false; }
   }
   document.querySelectorAll('.reiter').forEach(initReiterGruppe);
 
