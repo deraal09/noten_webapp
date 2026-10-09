@@ -98,8 +98,9 @@ test('Klassenseite listet die Komponenten als vorgegebene Unterfächer unter dem
   assert.ok(html.includes(`/teacher/fach/${komp('musik').id}`));
   assert.ok(!html.includes(`data-unterfach-dialog data-fach-id="${lf3Id}"`), 'SPA-Lernfelder bekommen keine freien Unterfächer');
   assert.ok(!html.includes(`/teacher/faecher/${komp('musik').id}/loeschen`), 'vorgegebene Komponenten lassen sich nicht löschen');
-  // Lernfeld-Lehrkraft bleibt am Lernfeld selbst
-  assert.ok(html.includes(`data-lehrkraft-dialog data-fach-id="${lf3Id}"`));
+  // Lehrkräfte werden nur noch über das Zahnrad zugeordnet (Reiter Lehrkräfte / Unterfächer)
+  assert.ok(html.includes(`/teacher/faecher/${lf3Id}/spa-schema`), 'Zahnrad am Lernfeld');
+  assert.ok(!html.includes('data-lehrkraft-dialog'), 'kein Zuordnen-Dialog mehr in der Hauptansicht');
   const r = await form(admin, `/teacher/faecher/${komp('musik').id}/loeschen`, {});
   assert.equal(r.status, 302);
   assert.ok(komp('musik'), 'Löschen wird abgewiesen');

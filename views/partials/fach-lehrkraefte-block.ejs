@@ -1,0 +1,47 @@
+<%# Lehrkräfte eines (Unter-)Fachs: Halbjahre ändern, entfernen, neu zuordnen. Nur Klassenleitung.
+    Erwartet: ziel {id, name}, erlaubt (Halbjahres-Nummern), zuweisungen, zuweisbare, laufzeit, vorbelegung, zurueck (z. B. "lehrkraefte:12"). %>
+<%
+  var hjChecksBlock = function(gewaehlt) {
+    return erlaubt.map(function(n) {
+      return '<label class="hj-check"><input type="checkbox" name="halbjahre" value="' + n + '"' + (gewaehlt.indexOf(n) !== -1 ? ' checked' : '') + '> ' + n + '. Hj. <small>(' + laufzeit.schuljahre[Math.floor((n - 1) / 2)].bezeichnung + ')</small></label>';
+    }).join(' ');
+  };
+  var vorgewaehlt = erlaubt.filter(function(n) { return vorbelegung.indexOf(n) !== -1; });
+  if (!vorgewaehlt.length) vorgewaehlt = erlaubt;
+%>
+<% if (!erlaubt.length) { %>
+  <p class="hint">In keinem Halbjahr zuordenbar<%= typeof grund !== 'undefined' ? ' – ' + grund : '' %>.</p>
+<% } else { %>
+  <% if (zuweisungen.length) { %>
+    <ul class="lehrkraefte-liste lehrkraefte-bearbeiten">
+      <% zuweisungen.forEach(function(z) { %>
+        <li>
+          <form method="post" action="/teacher/zuweisungen/<%= z.id %>/halbjahre" class="zuweisung-form">
+            <input type="hidden" name="zurueck" value="<%= zurueck %>">
+            <span class="lehrkraft-name">🎓 <%= z.name %></span>
+            <span class="hj-auswahl"><%- hjChecksBlock(z.halbjahre) %></span>
+            <button type="submit">Speichern</button>
+          </form>
+          <form method="post" action="/teacher/zuweisungen/<%= z.id %>/loeschen" class="inline" onsubmit="return confirm('Zuordnung von <%= z.name.replace(/'/g, '') %> entfernen?')">
+            <input type="hidden" name="zurueck" value="<%= zurueck %>">
+            <button type="submit" class="danger" aria-label="Lehrkraft <%= z.name %> entfernen">✕ Entfernen</button>
+          </form>
+        </li>
+      <% }); %>
+    </ul>
+  <% } else { %>
+    <p class="hint">Noch keine Lehrkraft eingetragen.</p>
+  <% } %>
+  <form method="post" action="/teacher/klassen/<%= klasseId %>/zuweisungen/neu" class="lehrkraft-hinzufuegen">
+    <input type="hidden" name="fach_id" value="<%= ziel.id %>">
+    <input type="hidden" name="zurueck" value="<%= zurueck %>">
+    <label>Lehrkraft hinzufügen
+      <select name="user_id" required>
+        <option value="">— wählen —</option>
+        <% zuweisbare.forEach(function(u) { %><option value="<%= u.id %>"><%= u.display_name || u.username %></option><% }); %>
+      </select>
+    </label>
+    <fieldset class="hj-auswahl"><legend>Unterrichtet in Halbjahr</legend><%- hjChecksBlock(vorgewaehlt) %></fieldset>
+    <button type="submit">+ Zuordnen</button>
+  </form>
+<% } %>

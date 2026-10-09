@@ -1,0 +1,8 @@
+<%# Fach löschen (nur im Reiter "Allgemein"). Erwartet `fach`. %>
+<section class="card fach-loeschen">
+  <h2>Fach löschen</h2>
+  <p class="hint">Löscht „<%= fach.name %>“ mit allen Noten, Unterfächern und Zuordnungen. Das lässt sich nicht rückgängig machen.</p>
+  <form method="post" action="/teacher/faecher/<%= fach.id %>/loeschen" onsubmit="return confirm('Fach löschen? Alle Noten dieses Fachs und seiner Unterfächer gehen dabei verloren.')">
+    <button type="submit" class="danger">🗑 Fach löschen</button>
+  </form>
+</section>

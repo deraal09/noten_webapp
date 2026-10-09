@@ -1785,10 +1785,11 @@ export default async function teacherRoutes(fastify) {
       request.flash?.('error', 'Ungültige Auswahl.');
       return reply.redirect(klasseAnker(request.params.id));
     }
+    const ziel = reiterZiel(request, fach.klasse_id, klasseAnker(request.params.id));
     // Halbjahre aus dem Formular; ohne Angabe gilt die Lehrkraft in allen (möglichen) Halbjahren des Fachs.
     const ergebnis = weiseLehrkraftZu(fach, userId, halbjahreAusFormular(request.body?.halbjahre, fach.klasse_id));
     if (!ergebnis.ok) request.flash?.('error', ergebnis.fehler);
-    return reply.redirect(klasseAnker(request.params.id));
+    return reply.redirect(ziel);
   });
 
   fastify.post('/zuweisungen/:id/loeschen', async (request, reply) => {
@@ -1800,7 +1801,7 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann hier Zuweisungen entfernen.' });
     }
     getDb().prepare('DELETE FROM fach_zuweisungen WHERE id = ?').run(request.params.id);
-    return reply.redirect(klasseAnker(z.klasse_id));
+    return reply.redirect(reiterZiel(request, z.klasse_id, klasseAnker(z.klasse_id)));
   });
 
   // Selbstbedienung: Ist zu einem Fach (in einzelnen Halbjahren) noch keine Lehrkraft eingetragen, darf sich jede
@@ -2199,21 +2200,45 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(`/teacher/spa-vorlagen/${res.id}`);
   });
 
+  // Reiter der Fach-Einstellungen (⚙): Allgemein · Lehrkräfte · Unterfächer (automatisch, wenn es welche gibt) · Teilnehmer.
+  const fachReiterKontext = (request, fach) => ({
+    id: fach.id, name: fach.name, spa: Boolean(fach.spa_fach_key),
+    hatUnterfaecher: Boolean(getDb().prepare('SELECT 1 FROM faecher WHERE parent_fach_id = ? LIMIT 1').get(fach.id)),
+    zeigeLehrkraefte: userIstKlassenlehrer(request.user, fach.klasse_id),
+    zeigeTeilnehmer: !fach.spa_fach_key && !fach.ist_kurs && userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: fach.klasse_id, ist_kurs: 0 }),
+  });
+  // Rücksprung zu einem Reiter der Fach-Einstellungen: Formularfeld zurueck="lehrkraefte:<fachId>" (auch unterfaecher, einstellungen).
+  const reiterZiel = (request, klasseId, standard) => {
+    const m = /^(lehrkraefte|unterfaecher|einstellungen):(\d+)$/.exec(String(request.body?.zurueck || ''));
+    if (!m) return standard;
+    const f = getDb().prepare('SELECT id, klasse_id, spa_fach_key FROM faecher WHERE id = ?').get(Number(m[2]));
+    if (!f || f.klasse_id !== Number(klasseId)) return standard;
+    if (m[1] === 'einstellungen') return f.spa_fach_key ? `/teacher/faecher/${f.id}/spa-schema` : `/teacher/faecher/${f.id}/einstellungen`;
+    return `/teacher/faecher/${f.id}/${m[1]}`;
+  };
+
   // Bewertungsschema eines einzelnen SPA-Fachs der Klasse bearbeiten (Klassenleitung): wie ein Fach der Vorlage.
   const ladeSchemaFach = (request, reply) => {
     const fach = getDb().prepare('SELECT f.*, k.name AS klasse_name, k.spa_bildungsgang FROM faecher f JOIN klassen k ON k.id = f.klasse_id WHERE f.id = ?').get(request.params.id);
     if (!fach || !fach.spa_fach_key) { reply.code(404).viewEjs('error.ejs', { code: 404, message: 'SPA-Fach nicht gefunden.' }); return null; }
-    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) { reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung darf das Bewertungsschema ändern.' }); return null; }
+    if (!userDarfKlasseVerwalten(request.user, fach.klasse_id)) { reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung (bzw. die erstellende Lehrkraft) darf das Bewertungsschema ändern.' }); return null; }
     return fach;
   };
   const klassenFaecherModell = (fach, ersatz) => spaKlassenKonfig(getDb(), fach.klasse_id).faecher
     .map((f) => (f.fachId === fach.id ? ersatz : { schluessel: f.schluessel, name: f.name, typ: 'FACH', schema: f.schema }));
 
+  const zeigeSpaSchema = (reply, request, fach, extra) => {
+    const laufzeit = klassenLaufzeit(fach.klasse_id);
+    return reply.viewEjs('teacher/spa_fach_schema.ejs', {
+      user: request.user, fach, laufzeit, gewaehlteHj: fachHalbjahrNummern(fach, laufzeit), reiter: fachReiterKontext(request, fach), ...extra,
+    });
+  };
+
   fastify.get('/faecher/:id/spa-schema', async (request, reply) => {
     const fach = ladeSchemaFach(request, reply); if (!fach) return;
     const eigenes = { schluessel: fach.spa_fach_key, name: fach.name, typ: 'FACH', schema: spaBasisSchemaVon(fach, fach.spa_bildungsgang) };
-    return reply.viewEjs('teacher/spa_fach_schema.ejs', {
-      user: request.user, fach, modell: editorModell([eigenes]), alleFaecher: klassenFaecherModell(fach, eigenes).map((f) => ({ schluessel: f.schluessel, name: f.name })),
+    return zeigeSpaSchema(reply, request, fach, {
+      modell: editorModell([eigenes]), alleFaecher: klassenFaecherModell(fach, eigenes).map((f) => ({ schluessel: f.schluessel, name: f.name })),
     });
   });
 
@@ -2225,8 +2250,8 @@ export default async function teacherRoutes(fastify) {
     const pruefung = ersterFormularFehler([eingabe]) ? { ok: false, fehler: ersterFormularFehler([eingabe]) } : pruefeKonfig(alle);
     const doppelt = getDb().prepare('SELECT 1 FROM faecher WHERE klasse_id = ? AND name = ? AND id != ?').get(fach.klasse_id, eingabe.name, fach.id);
     if (!pruefung.ok || doppelt) {
-      return reply.viewEjs('teacher/spa_fach_schema.ejs', {
-        user: request.user, fach, modell: editorModell([eingabe]), alleFaecher: alle.map((f) => ({ schluessel: f.schluessel, name: f.name })),
+      return zeigeSpaSchema(reply, request, fach, {
+        modell: editorModell([eingabe]), alleFaecher: alle.map((f) => ({ schluessel: f.schluessel, name: f.name })),
         fehler: doppelt ? `Es gibt in der Klasse schon ein Fach „${eingabe.name}“.` : pruefung.fehler,
       });
     }
@@ -2248,7 +2273,7 @@ export default async function teacherRoutes(fastify) {
     }
     const laufzeit = klassenLaufzeit(fach.klasse_id);
     const neu = parseHalbjahreEingabe(request.body?.halbjahre, laufzeit);
-    const ziel = request.body?.zurueck === 'klasse' ? `/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte` : `/teacher/fach/${fach.id}`;
+    const ziel = reiterZiel(request, fach.klasse_id, request.body?.zurueck === 'klasse' ? `/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte` : `/teacher/fach/${fach.id}`);
     // Vorgegebene SPA-Komponente (Unterfach): "Halbjahre" schaltet die Komponente je Halbjahr ein/aus (nur Klassenleitung).
     if (fach.spa_komponente) {
       if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
@@ -2295,7 +2320,7 @@ export default async function teacherRoutes(fastify) {
     const laufzeit = klassenLaufzeit(fach.klasse_id);
     return reply.viewEjs('teacher/fach_einstellungen.ejs', {
       user: request.user, fach, laufzeit, gewaehlteHj: fachHalbjahrNummern(fach, laufzeit),
-      unterfaecherText: unterfaecherAlsText(fach), verrechnung: ladeVerrechnungFuerFach(fach),
+      unterfaecherText: unterfaecherAlsText(fach), verrechnung: ladeVerrechnungFuerFach(fach), reiter: fachReiterKontext(request, fach),
       ...extra,
     });
   };
@@ -2328,6 +2353,49 @@ export default async function teacherRoutes(fastify) {
     request.flash?.('success', `„${String(body.name).trim()}“ gespeichert.`);
     for (const h of ergebnis.hinweise) request.flash?.('error', h);
     return reply.redirect(`/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte`);
+  });
+
+  // Reiter "Lehrkräfte" und "Unterfächer" der Fach-Einstellungen (nur Klassenleitung): Lehrkräfte je Halbjahr zuordnen.
+  const ladeLehrkraefteFach = (request, reply) => {
+    const fach = getDb().prepare('SELECT f.*, k.name AS klasse_name FROM faecher f JOIN klassen k ON k.id = f.klasse_id WHERE f.id = ?').get(request.params.id);
+    if (!fach || fach.ist_kurs || fach.parent_fach_id || fach.spa_komponente) {
+      reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+      return null;
+    }
+    if (!userIstKlassenlehrer(request.user, fach.klasse_id)) {
+      reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann Lehrkräfte zuordnen.' });
+      return null;
+    }
+    return fach;
+  };
+  const lehrkraefteAnsicht = (request, fach) => {
+    const laufzeit = klassenLaufzeit(fach.klasse_id);
+    if (fach.spa_fach_key) seedeKomponentenUnterfaecher(getDb(), fach.klasse_id);
+    const alle = getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ?').all(fach.klasse_id);
+    const komponenten = fach.spa_fach_key ? spaKomponentenHalbjahre(getDb(), fach) : new Map();
+    const kinder = sortiereFaecher(alle.filter((u) => u.parent_fach_id === fach.id), laufzeit).map((u) => {
+      const info = u.spa_komponente ? komponenten.get(u.spa_komponente) : null;
+      return { ...u, hjNummern: info ? info.aktiv : fachHalbjahrNummern(u, laufzeit), komponenteInfo: info ?? null };
+    });
+    return {
+      user: request.user, fach, laufzeit, kinder, hatUnterfaecher: kinder.length > 0, freieHj: halbjahreOhneUnterfaecher(fach, laufzeit),
+      zuweisungen: Object.fromEntries(ladeZuweisungenDerKlasse(fach.klasse_id, alle, laufzeit)),
+      zuweisbare: getDb().prepare("SELECT id, username, display_name FROM users WHERE role != 'admin' AND active = 1 ORDER BY username").all(),
+      vorbelegung: aktuelleHalbjahrNummern(laufzeit), reiter: fachReiterKontext(request, fach),
+    };
+  };
+
+  fastify.get('/faecher/:id/lehrkraefte', async (request, reply) => {
+    const fach = ladeLehrkraefteFach(request, reply); if (!fach) return;
+    const ansicht = lehrkraefteAnsicht(request, fach);
+    return reply.viewEjs('teacher/fach_lehrkraefte.ejs', { ...ansicht, zuweisungen: ansicht.zuweisungen[fach.id] || [] });
+  });
+
+  fastify.get('/faecher/:id/unterfaecher', async (request, reply) => {
+    const fach = ladeLehrkraefteFach(request, reply); if (!fach) return;
+    const ansicht = lehrkraefteAnsicht(request, fach);
+    if (!ansicht.kinder.length) return reply.redirect(`/teacher/faecher/${fach.id}/lehrkraefte`);
+    return reply.viewEjs('teacher/fach_unterfaecher.ejs', ansicht);
   });
 
   // Fach bearbeiten (Klassenleitung): Name, Halbjahre und -- bei Fächern -- Verrechnung in einem Dialog.
@@ -2410,7 +2478,7 @@ export default async function teacherRoutes(fastify) {
     const nummern = halbjahreAusFormular(request.body?.halbjahre, z.klasse_id) ?? [];
     const ergebnis = setzeZuweisungHalbjahre(z.id, nummern);
     request.flash?.(ergebnis.ok ? 'success' : 'error', ergebnis.ok ? 'Halbjahre der Zuordnung gespeichert.' : ergebnis.fehler);
-    return reply.redirect(klasseAnker(z.klasse_id));
+    return reply.redirect(reiterZiel(request, z.klasse_id, klasseAnker(z.klasse_id)));
   });
 
   // Gewichte der Unterfächer in der Fachnote (leer = 1).
@@ -2529,7 +2597,7 @@ export default async function teacherRoutes(fastify) {
     const fach = ladeTeilnehmerFach(request, reply);
     if (!fach) return reply;
     return reply.viewEjs('teacher/fach_teilnehmer.ejs', {
-      user: request.user, fach, teilnehmer: ladeTeilnehmerMitHerkunft(fach),
+      user: request.user, fach, teilnehmer: ladeTeilnehmerMitHerkunft(fach), reiter: fach.ist_kurs ? null : fachReiterKontext(request, fach),
     });
   });
 

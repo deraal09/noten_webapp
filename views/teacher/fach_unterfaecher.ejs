@@ -1,0 +1,33 @@
+<h1>⚙ Fach einstellen: <%= fach.name %> <small>(<%= fach.klasse_name %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a>
+  <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
+</p>
+<%- await include('../partials/fach-reiter', { reiter: reiter, aktiv: 'unterfaecher' }) %>
+
+<p class="hint">
+  Je Unterfach: In welchen Halbjahren es zählt und welche Lehrkräfte es benoten.
+  <% if (!fach.spa_fach_key) { %>Name, Gewicht und Halbjahre der Unterfächer änderst du im Reiter „Allgemein“ (Textfeld).<% } %>
+</p>
+<% for (const u of kinder) { %>
+  <section class="card unterfach-block">
+    <h3>📖 <a href="/teacher/fach/<%= u.id %>"><%= u.kurzname || u.name %></a>
+      <small class="hint"><%= !u.hjNummern.length ? 'abgeschaltet' : (u.hjNummern.length === (u.komponenteInfo ? u.komponenteInfo.alle.length : laufzeit.anzahlHalbjahre) ? 'alle Halbjahre' : u.hjNummern.join(', ') + '. Hj.') %><%= u.komponenteInfo && !u.komponenteInfo.schaltbar ? ' · festes Gewicht' : '' %></small></h3>
+    <% if (u.komponenteInfo && u.komponenteInfo.schaltbar) { %>
+      <form method="post" action="/teacher/faecher/<%= u.id %>/halbjahre" class="zuweisung-form">
+        <input type="hidden" name="zurueck" value="unterfaecher:<%= fach.id %>">
+        <span class="hj-auswahl">
+          <% u.komponenteInfo.alle.forEach(function(n) { %>
+            <label class="hj-check"><input type="checkbox" name="halbjahre" value="<%= n %>" <%= u.hjNummern.indexOf(n) !== -1 ? 'checked' : '' %>> <%= n %>. Hj.</label>
+          <% }); %>
+        </span>
+        <button type="submit">Zusammensetzung speichern</button>
+      </form>
+    <% } %>
+    <h4>Lehrkräfte</h4>
+    <%- await include('../partials/fach-lehrkraefte-block', {
+      ziel: u, erlaubt: u.hjNummern, zuweisungen: zuweisungen[u.id] || [], zuweisbare: zuweisbare, laufzeit: laufzeit, vorbelegung: vorbelegung,
+      zurueck: 'unterfaecher:' + fach.id, klasseId: fach.klasse_id, grund: 'das Unterfach ist abgeschaltet'
+    }) %>
+  </section>
+<% } %>

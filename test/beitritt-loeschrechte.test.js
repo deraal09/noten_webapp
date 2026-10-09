@@ -201,7 +201,10 @@ test('Die Klassenseite zeigt nach dem Beitritt keine Buttons, die nicht funktion
 
 test('Ersteller/in der Klasse darf weiterhin verwalten und löschen', async () => {
   const html = await (await ersteller(`/teacher/klassen/${klasseId}`)).text();
-  assert.ok(html.includes(`/teacher/faecher/${matheId}/loeschen`), 'Lösch-Button für die Ersteller/in sichtbar');
+  assert.ok(html.includes(`/teacher/faecher/${matheId}/einstellungen`), 'Zahnrad für die Ersteller/in sichtbar');
+  assert.ok(!html.includes(`/teacher/faecher/${matheId}/loeschen`), 'Löschen steht nicht mehr in der Hauptansicht');
+  const einstellungen = await (await ersteller(`/teacher/faecher/${matheId}/einstellungen`)).text();
+  assert.ok(einstellungen.includes(`/teacher/faecher/${matheId}/loeschen`), 'Lösch-Button in den Einstellungen sichtbar');
 
   let r = await form(ersteller, `/teacher/schueler/${schuelerId}/abgang`, {});
   assert.equal(r.status, 302);

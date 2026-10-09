@@ -10,6 +10,7 @@
   <% } %>
   <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
 </p>
+<% if (typeof reiter !== 'undefined' && reiter) { %><%- await include('../partials/fach-reiter', { reiter: reiter, aktiv: 'teilnehmer' }) %><% } %>
 
 <p class="hint">
   Diese Liste bestimmt, wer in diesem Fach benotet wird

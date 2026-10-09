@@ -1,0 +1,18 @@
+<h1>⚙ Fach einstellen: <%= fach.name %> <small>(<%= fach.klasse_name %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a>
+  <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
+</p>
+<%- await include('../partials/fach-reiter', { reiter: reiter, aktiv: 'lehrkraefte' }) %>
+
+<section class="card">
+  <h2>Lehrkräfte</h2>
+  <p class="hint">
+    Lehrkräfte dürfen das Fach benoten, jeweils in den Halbjahren, die du ihnen zuordnest.
+    <% if (hatUnterfaecher) { %>In Halbjahren mit Unterfächern werden die Lehrkräfte den Unterfächern zugeordnet (Reiter „Unterfächer“).<% } %>
+  </p>
+  <%- await include('../partials/fach-lehrkraefte-block', {
+    ziel: fach, erlaubt: freieHj, zuweisungen: zuweisungen, zuweisbare: zuweisbare, laufzeit: laufzeit, vorbelegung: vorbelegung,
+    zurueck: 'lehrkraefte:' + fach.id, klasseId: fach.klasse_id, grund: 'dort gibt es Unterfächer'
+  }) %>
+</section>

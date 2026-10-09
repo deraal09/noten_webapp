@@ -3,6 +3,7 @@
   <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a>
   <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
 </p>
+<%- await include('../partials/fach-reiter', { reiter: reiter, aktiv: 'allgemein' }) %>
 <% if (typeof fehler !== 'undefined' && fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
 
 <form method="post" action="/teacher/faecher/<%= fach.id %>/einstellungen" class="card fach-einstellungen">
@@ -49,3 +50,5 @@
     <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">Abbrechen</a>
   </div>
 </form>
+
+<%- await include('../partials/fach-loeschen', { fach: fach }) %>

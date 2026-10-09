@@ -296,7 +296,9 @@ test('Teilnehmer: nicht mehr in der Noteneingabe, Verwaltung über die Klassense
   const fachSeite = await (await admin(`/teacher/fach/${matheId}?hj=${enc('5. Halbjahr')}`)).text();
   assert.doesNotMatch(fachSeite, /panel-teilnehmer|teilnehmer-tabelle-body|Teilnehmer\/innen<\/button>/);
   const klassenSeite = await (await admin(`/teacher/klassen/${klasseId}`)).text();
-  assert.ok(klassenSeite.includes(`href="/teacher/fach/${matheId}/teilnehmer"`), 'Link 👥 auf der Klassenseite');
+  assert.ok(!klassenSeite.includes(`href="/teacher/fach/${matheId}/teilnehmer"`), '👥 steht nicht mehr in der Hauptansicht');
+  const einstellungen = await (await admin(`/teacher/faecher/${matheId}/einstellungen`)).text();
+  assert.ok(einstellungen.includes(`href="/teacher/fach/${matheId}/teilnehmer"`), 'Reiter Teilnehmer in den Einstellungen');
   const seite = await admin(`/teacher/fach/${matheId}/teilnehmer`);
   assert.equal(seite.status, 200);
   assert.match(await seite.text(), /id="teilnehmer-tabelle-body"/);

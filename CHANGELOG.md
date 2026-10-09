@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.90.0 - 2026-10-09
+
+- **Fächer: nur noch das Zahnrad (⚙).** Auf der Klassenseite steht je Fach nur noch das Zahnrad; ✎, 👥,
+  🎓 und 🗑 sowie das ✎ und ✕ bei den Lehrkräften und die Symbole an den Unterfächern sind weg. Alles
+  Weitere liegt hinter dem Zahnrad, gilt für IHK/BG **und** SPA und steht in Reitern: **Allgemein**
+  (Name, Halbjahre, Unterfächer-Text, Verrechnung bzw. das SPA-Bewertungsschema, dazu **Fach löschen**),
+  **Lehrkräfte** (Lehrkraft hinzufügen, ihre Halbjahre ändern, entfernen), **Unterfächer** und
+  **Teilnehmer** (nur IHK/BG).
+- **Reiter „Unterfächer“ entsteht automatisch**, sobald ein Fach Unterfächer hat (bei SPA also bei allen
+  Lernfeldern mit Komponenten). Je Unterfach: Halbjahre der Zusammensetzung (SPA-Komponenten) und die
+  zugeordneten Lehrkräfte. Nach jeder Änderung geht es auf demselben Reiter weiter.
+- Die Klassenseite zeigt weiterhin die Lehrkräfte je Fach/Unterfach und die Knöpfe zum Selbst-Eintragen
+  und -Austragen. Das SPA-Bewertungsschema darf jetzt auch die erstellende Lehrkraft ändern, solange es
+  noch keine Klassenleitung gibt (wie bei IHK/BG).
+
 ## 0.89.1 - 2026-10-09
 
 - **Klassenseite: Aktions-Icons der Fächer stehen stabil.** ✎, 👥, 🎓, ⚙ und 🗑 sitzen jetzt in einem

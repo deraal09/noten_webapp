@@ -1,0 +1,8 @@
+<%# Reiter der Fach-Einstellungen (⚙): Allgemein · Lehrkräfte · Unterfächer (nur wenn es welche gibt) · Teilnehmer.
+    Erwartet `reiter` (siehe fachReiterKontext in src/routes/teacher.js) und `aktiv`. %>
+<nav class="fach-reiter" aria-label="Einstellungen von <%= reiter.name %>">
+  <a href="<%= reiter.spa ? '/teacher/faecher/' + reiter.id + '/spa-schema' : '/teacher/faecher/' + reiter.id + '/einstellungen' %>"<%- aktiv === 'allgemein' ? ' class="aktiv" aria-current="page"' : '' %>>⚙ Allgemein</a>
+  <% if (reiter.zeigeLehrkraefte) { %><a href="/teacher/faecher/<%= reiter.id %>/lehrkraefte"<%- aktiv === 'lehrkraefte' ? ' class="aktiv" aria-current="page"' : '' %>>🎓 Lehrkräfte</a><% } %>
+  <% if (reiter.zeigeLehrkraefte && reiter.hatUnterfaecher) { %><a href="/teacher/faecher/<%= reiter.id %>/unterfaecher"<%- aktiv === 'unterfaecher' ? ' class="aktiv" aria-current="page"' : '' %>>📖 Unterfächer</a><% } %>
+  <% if (reiter.zeigeTeilnehmer) { %><a href="/teacher/fach/<%= reiter.id %>/teilnehmer"<%- aktiv === 'teilnehmer' ? ' class="aktiv" aria-current="page"' : '' %>>👥 Teilnehmer</a><% } %>
+</nav>
