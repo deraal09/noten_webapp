@@ -83,7 +83,8 @@ test('Meine Klassen zeigt Bernd die weiteren Fächer der Klasse mit Lehrkräften
   assert.doesNotMatch(noten, new RegExp(`/teacher/faecher/${sport}/selbst-eintragen`));
   assert.match(noten, /kachel-titel-klein">Deutsch</);
   assert.doesNotMatch(noten, /kachel-titel-klein">(Mathe|Sport)</);
-  assert.match(noten, /id="lehrkraefte-schalter"/);
+  assert.doesNotMatch(noten, /lehrkraefte-schalter|Lehrkräfte der Fächer anzeigen/, 'kein Schalter mehr');
+  assert.match(noten, /🎓 (Du|anna)/, 'Lehrkräfte des eigenen Fachs bleiben sichtbar');
   // Carla (kein Zugriff) sieht die Klasse nicht
   assert.doesNotMatch(await (await carla('/teacher/klassen')).text(), new RegExp(`href="/teacher/klassen/${klasseId}"`));
 });

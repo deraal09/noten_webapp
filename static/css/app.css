@@ -688,7 +688,7 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 /* Meine Klassen: weitere Fächer der Klasse (auch anderer Lehrkräfte) */
 .weitere-titel { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
 .weitere-schalter { min-height: 36px; }
-.lehrkraefte-zeile[hidden], .weitere-liste[hidden] { display: none; }
+.weitere-liste[hidden] { display: none; }
 .fach-einstellungen textarea { width: 100%; font-family: inherit; }
 .fach-einstellungen label { display: block; margin: 0.6rem 0; }
 .fach-einstellungen .hj-check { display: inline-block; margin-right: 0.75rem; }

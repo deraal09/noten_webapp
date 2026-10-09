@@ -28,13 +28,6 @@
   <p class="hint" id="filter-leer" hidden>Keine Klassen oder Fächer für diese Auswahl.</p>
 <% } %>
 
-<% var zeigeLehrkraefteSchalter = byKlasse.some(function(k) { return k.faecher.length; }); %>
-<% if (zeigeLehrkraefteSchalter) { %>
-  <p class="klassenfilter">
-    <label class="hj-check"><input type="checkbox" id="lehrkraefte-schalter" checked> Lehrkräfte der Fächer anzeigen</label>
-  </p>
-<% } %>
-
 <% function eintragenForm(f, klasseId, text) { %>
   <form method="post" action="/teacher/faecher/<%= f.id %>/selbst-eintragen" class="inline">
     <input type="hidden" name="zurueck" value="noteneingabe">
@@ -141,18 +134,5 @@
     merke(klasse, KEY_K);
     merke(schuljahr, KEY_S);
     anwenden();
-  })();
-
-  // Lehrkräfte der Fächer ein-/ausblenden (wird im Browser gemerkt).
-  (function() {
-    function lies(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
-    function schreibe(key, wert) { try { localStorage.setItem(key, wert); } catch (e) { /* ohne Speicher */ } }
-    var schalter = document.getElementById('lehrkraefte-schalter');
-    function lehrkraefte(an) { document.querySelectorAll('.lehrkraefte-zeile').forEach(function(z) { z.hidden = !an; }); }
-    if (schalter) {
-      schalter.checked = lies('noteneingabe-lehrkraefte') !== '0';
-      lehrkraefte(schalter.checked);
-      schalter.addEventListener('change', function() { schreibe('noteneingabe-lehrkraefte', schalter.checked ? '1' : '0'); lehrkraefte(schalter.checked); });
-    }
   })();
 </script>

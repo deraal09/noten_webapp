@@ -6,6 +6,11 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.91.1 - 2026-10-09
+
+- **Noteneingabe: Haken „Lehrkräfte der Fächer anzeigen“ entfernt.** Die Lehrkräfte stehen wie bisher an
+  jedem eigenen Fach; ein Schalter dafür ist nicht mehr nötig.
+
 ## 0.91.0 - 2026-10-09
 
 - **Weitere Fächer der Klassen nur noch unter „Meine Klassen“.** Die Noteneingabe zeigt nur noch die
