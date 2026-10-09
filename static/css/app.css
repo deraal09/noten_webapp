@@ -712,3 +712,23 @@ table.tafel thead th:first-child { background: var(--bg-header); z-index: 3; }
 .hinweis-aufklappbar { margin: 0.25rem 0 0.5rem; }
 .hinweis-aufklappbar > summary { cursor: pointer; color: var(--text-muted); font-size: 0.9rem; padding: 0.35rem 0; }
 .hinweis-aufklappbar > .hint { margin: 0.25rem 0 0.5rem; }
+
+/* Übersichtstabellen (Notenübersicht eines Fachs, Halbjahresübersicht der Klasse): die Namensspalte bleibt beim
+   seitlichen Scrollen links stehen. Der Hintergrund folgt der Zebra-Streifung, damit nichts durchscheint. */
+table.tabelle-fix th:first-child, table.tabelle-fix td:first-child {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg-card);
+  box-shadow: 2px 0 3px -1px var(--shadow-strong, rgba(0, 0, 0, 0.25));
+}
+table.tabelle-fix tbody tr:nth-child(even) td:first-child { background: var(--bg-subtle); }
+table.tabelle-fix thead th:first-child { background: var(--bg-header); z-index: 3; }
+@media (max-width: 600px) {
+  table.tabelle-fix td.name { white-space: normal; min-width: 6.5rem; max-width: 9rem; }
+}
+
+/* Fixierte Namensspalte: getrennte Rahmen statt zusammengelegter (border-collapse), sonst blitzen beim Scrollen am
+   Rand der festen Spalte Reste der darunter durchlaufenden Zellen durch. Optisch bleibt das Gitter gleich. */
+table.tabelle-fix, table.tafel { border-collapse: separate; border-spacing: 0; }
+table.tabelle-fix th, table.tabelle-fix td, table.tafel th, table.tafel td { border-width: 0 1px 1px 0; }
+table.tabelle-fix th:first-child, table.tabelle-fix td:first-child, table.tafel th:first-child, table.tafel td:first-child { border-left-width: 1px; }
+table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }

@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.88.4 - 2026-10-09
+
+- **Namensspalte auch in der Halbjahresübersicht und der Notenübersicht fixiert.** Wie in den
+  Noten-Tafeln bleibt die Spalte „Schüler/in" beim seitlichen Scrollen links stehen -- in der
+  Halbjahresübersicht (Klassenleitung, beide Seiten) und in der Notenübersicht eines Fachs (auch
+  bei Fächern aus Unterfächern). Dazu werden die Tabellenrahmen intern getrennt gezeichnet
+  (gleiches Aussehen), damit am Rand der festen Spalte nichts durchscheint.
+
 ## 0.88.3 - 2026-10-09
 
 - **Fach öffnen: immer zuerst die Notenübersicht.** Bisher stand beim Öffnen eines Fachs der
