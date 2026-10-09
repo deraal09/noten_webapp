@@ -6,6 +6,23 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.88.0 - 2026-10-09
+
+- **Fach einstellen über ein Zahnrad (⚙), auch bei IHK/BG.** Wie bei SPA gibt es am Fach
+  ein ⚙ (für die Klassenleitung bzw. die erstellende Lehrkraft, solange es keine
+  Klassenleitung gibt). Die neue Seite vereint:
+  - **Unterfächer als Text**, eines pro Zeile: `Name; Gewicht; Halbjahre`, z. B.
+    `Algebra; 3; 3-4` (Gewicht in der Fachnote, leer = 1; Halbjahre als Liste oder Bereich,
+    leer/`alle` = alle). Eine Zeile entfernen löscht das Unterfach, solange nichts darin
+    eingetragen ist (sonst Hinweis).
+  - **Name** und **Halbjahre** des Fachs (Halbjahre mit eingetragenen Noten bleiben geschützt),
+  - **Verrechnung der Halbjahre** (optional für alle Fächer der Klasse).
+- **Entfernt** auf der Klassenseite: die Symbole ✎ (Halbjahre von Fach/Unterfach), 📖 (Unterfach
+  hinzufügen), 🗑 am Unterfach, ⚖️ (Verrechnung) und der Dialog am Fachnamen -- der Fachname
+  ist jetzt ein Link zur Noteneingabe. Die **Übersicht bleibt** auf der Hauptseite (Fächer mit
+  Unterfächern, Halbjahren und Lehrkräften, Verrechnungs-Tabelle mit ⚙ je Fach). SPA-Fächer
+  behalten ihr Bewertungsschema-⚙ und die Komponenten-Schalter.
+
 ## 0.87.3 - 2026-10-09
 
 - **Kein Eintragen als Lehrkraft bei Fächern mit Unterfächern.** Der Knopf „Für dieses

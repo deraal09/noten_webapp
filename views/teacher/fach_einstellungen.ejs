@@ -1,0 +1,51 @@
+<h1>⚙ Fach einstellen: <%= fach.name %> <small>(<%= fach.klasse_name %>)</small></h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a>
+  <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
+</p>
+<% if (typeof fehler !== 'undefined' && fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
+
+<form method="post" action="/teacher/faecher/<%= fach.id %>/einstellungen" class="card fach-einstellungen">
+  <label>Name des Fachs
+    <input type="text" name="name" maxlength="100" required value="<%= typeof eingabeName !== 'undefined' && eingabeName !== undefined ? eingabeName : fach.name %>">
+  </label>
+
+  <fieldset class="hj-auswahl">
+    <legend>Gilt in diesen Halbjahren</legend>
+    <% laufzeit.halbjahre.forEach(function(h, i) { %>
+      <label class="hj-check"><input type="checkbox" name="halbjahre" value="<%= i + 1 %>" <%= gewaehlteHj.indexOf(i + 1) !== -1 ? 'checked' : '' %>>
+        <%= i + 1 %>. Halbjahr <small>(<%= laufzeit.schuljahre[Math.floor(i / 2)].bezeichnung %>)</small></label>
+    <% }); %>
+    <p class="hint">Halbjahre, in denen schon Leistungen oder Endnoten eingetragen sind, lassen sich nicht abwählen.</p>
+  </fieldset>
+
+  <label>Unterfächer <small class="hint">(eines pro Zeile)</small>
+    <textarea name="unterfaecher" rows="6" placeholder="Algebra; 3; 3-4&#10;Geometrie; 1; alle"><%= typeof eingabeText !== 'undefined' && eingabeText !== undefined ? eingabeText : unterfaecherText %></textarea>
+  </label>
+  <p class="hint">
+    Format: <strong>Name; Gewicht; Halbjahre</strong>. Das Gewicht bestimmt den Anteil an der Fachnote (leer = 1), die Halbjahre
+    nennen, wann das Unterfach gilt (z. B. <code>3-4</code> oder <code>1, 3</code>; leer oder <code>alle</code> = alle Halbjahre des Fachs).
+    Eine Zeile entfernen löscht das Unterfach -- nur, solange nichts darin eingetragen ist. Umbenennen: altes Unterfach entfernen und neu eintragen.
+    In den Halbjahren der Unterfächer setzt sich die Fachnote aus ihnen zusammen; Lehrkräfte werden dann den Unterfächern zugeordnet.
+  </p>
+
+  <% if (laufzeit.anzahlHalbjahre >= 2) { %>
+    <fieldset class="hj-auswahl">
+      <legend>Verrechnung der Halbjahre <small>(Prozent der Vorhalbjahres-Note)</small></legend>
+      <div class="verrechnung-raster">
+        <% for (var n = 1; n < laufzeit.anzahlHalbjahre; n++) { %>
+          <label class="feld"><%= n %>. → <%= n + 1 %>. Halbjahr
+            <span class="feld-mit-einheit"><input type="number" name="p_<%= n %>" min="0" max="100" step="1" value="<%= verrechnung[String(n)] || 0 %>">%</span>
+          </label>
+        <% } %>
+      </div>
+      <label class="hj-check"><input type="checkbox" name="fuer_alle" value="1"> Für alle Fächer der Klasse übernehmen</label>
+      <p class="hint">0 % = die Note des Halbjahres fließt nicht in das nächste ein.</p>
+    </fieldset>
+  <% } %>
+
+  <div class="form-actions">
+    <button type="submit">💾 Speichern</button>
+    <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">Abbrechen</a>
+  </div>
+</form>

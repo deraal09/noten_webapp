@@ -320,7 +320,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 <% if (!klasse.ist_ablage) { %>
 <h2 id="faecher-lehrkraefte">Fächer und Lehrkräftezuordnung</h2>
 <p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen.
-  <% if (istKlassenlehrer) { %>Als Klassenleitung ordnest du Lehrkräfte je Halbjahr zu (🎓) und gliederst Fächer in Unterfächer (📖).
+  <% if (istKlassenlehrer) { %>Als Klassenleitung ordnest du Lehrkräfte je Halbjahr zu (🎓); Name, Halbjahre, Unterfächer und Verrechnung stellst du über das Zahnrad (⚙) am Fach ein.
   <% } else { %>Lehrkräfte kann die Klassenleitung oder der Admin zuordnen.<% } %></small></p>
 <%
   function hjBereiche(nummern) {
@@ -341,17 +341,9 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
     nummern.forEach(function(n) { var b = laufzeit.schuljahre[Math.floor((n - 1) / 2)].bezeichnung; if (sj.indexOf(b) === -1) sj.push(b); });
     return hjBereiche(nummern) + '. Halbjahr (' + sj.join(', ') + ')';
   }
-  // Name eines (Unter-)Fachs: für die Klassenleitung ein Button, der den Dialog "Bearbeiten / Zur Noteneingabe" öffnet
-  // (nicht für vorgegebene SPA-Fächer/-Komponenten), sonst ein Link zur Noteneingabe.
-  function fachNameElement(f, anzeige, istUnterfach, erlaubteHj) {
-    var klein = !!(istKlassenlehrer && !f.spa_fach_key && !f.spa_komponente);
-    if (!klein) return '<a class="fach-name" href="/teacher/fach/' + f.id + '">' + anzeige + '</a>';
-    return '<button type="button" class="fach-name fach-name-knopf" data-fach-optionen data-fach-id="' + f.id + '"'
-      + ' data-name="' + (istUnterfach ? (f.kurzname || f.name) : f.name).replace(/"/g, '&quot;') + '"'
-      + ' data-unterfach="' + (istUnterfach ? '1' : '0') + '"'
-      + ' data-erlaubt="' + erlaubteHj.join(',') + '" data-gewaehlt="' + f.hjNummern.join(',') + '"'
-      + ' data-verrechnung="' + (verrechnungProFach[f.id] ? JSON.stringify(verrechnungProFach[f.id].werte).replace(/"/g, '&quot;') : '') + '"'
-      + ' title="Bearbeiten oder zur Noteneingabe">' + anzeige + '</button>';
+  // Name eines (Unter-)Fachs: Link zur Noteneingabe (Einstellungen: ⚙ am Fach).
+  function fachNameElement(f, anzeige) {
+    return '<a class="fach-name" href="/teacher/fach/' + f.id + '">' + anzeige + '</a>';
   }
   // Prozent-Felder der Verrechnung (p_<n>), vorbelegt mit `werte`
   function vrFelder(werte) {
@@ -405,10 +397,10 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 <details class="card" id="verrechnung">
   <summary>Verrechnung der Halbjahre</summary>
   <p class="hint">
-    Legt je Fach fest, zu wie viel Prozent die Note eines Halbjahres in das <strong>nächste</strong> Halbjahr einfließt
+    Übersicht: Je Fach steht hier, zu wie viel Prozent die Note eines Halbjahres in das <strong>nächste</strong> Halbjahr einfließt
     (0 % = gar nicht). Beispiel: 50 % bei „1. → 2. Halbjahr" – die Note des 2. Halbjahres besteht je zur Hälfte aus den
     Leistungen des 2. Halbjahres und der (endgültigen) Note des 1. Halbjahres. Gilt für Fächer, nicht für Unterfächer
-    (die fließen gewichtet ins Fach) und nicht für SPA-Fächer.
+    (die fließen gewichtet ins Fach) und nicht für SPA-Fächer. Eingestellt wird die Verrechnung über das ⚙ am Fach.
   </p>
   <table class="data">
     <thead><tr><th>Fach</th><th>Verrechnung</th><th></th></tr></thead>
@@ -420,51 +412,13 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
         <tr>
           <td><%= e.fach.name %></td>
           <td><%= teile.length ? teile.join(' · ') : 'keine' %><% if (!v.eigene && teile.length) { %> <small class="hint">(Vorgabe der Klasse)</small><% } %></td>
-          <td><button type="button" class="icon-knopf" data-verrechnung-dialog data-fach-id="<%= e.fach.id %>" data-fach-name="<%= e.fach.name %>" data-werte="<%= JSON.stringify(v.werte) %>" title="Verrechnung einstellen" aria-label="Verrechnung einstellen: <%= e.fach.name %>">⚖️</button></td>
+          <td><a class="icon-knopf" href="/teacher/faecher/<%= e.fach.id %>/einstellungen" title="Fach einstellen (Verrechnung, Halbjahre, Unterfächer)" aria-label="Fach einstellen: <%= e.fach.name %>">⚙</a></td>
         </tr>
       <% }); %>
     </tbody>
   </table>
 </details>
 
-<dialog id="verrechnung-dialog" class="notiz-dialog">
-  <form method="post" id="verrechnung-form" action="">
-    <h2>Verrechnung der Halbjahre</h2>
-    <p class="hint" id="vr-fach-name"></p>
-    <div class="verrechnung-raster">
-      <% for (var vn2 = 1; vn2 < laufzeit.anzahlHalbjahre; vn2++) { %>
-        <label class="feld"><%= vn2 %>. → <%= vn2 + 1 %>. Halbjahr
-          <span class="feld-mit-einheit"><input type="number" name="p_<%= vn2 %>" min="0" max="100" step="1" value="0">%</span>
-        </label>
-      <% } %>
-    </div>
-    <label class="hj-check"><input type="checkbox" name="fuer_alle" value="1"> Für alle Fächer der Klasse übernehmen</label>
-    <div class="form-actions">
-      <button type="submit">Speichern</button>
-      <button type="button" id="vr-zu">Abbrechen</button>
-    </div>
-  </form>
-</dialog>
-<script>
-  (function() {
-    var dialog = document.getElementById('verrechnung-dialog');
-    var form = document.getElementById('verrechnung-form');
-    document.querySelectorAll('[data-verrechnung-dialog]').forEach(function(b) {
-      b.addEventListener('click', function() {
-        var werte = {};
-        try { werte = JSON.parse(b.dataset.werte || '{}'); } catch (e) { /* leer */ }
-        form.action = '/teacher/faecher/' + b.dataset.fachId + '/verrechnung';
-        document.getElementById('vr-fach-name').textContent = b.dataset.fachName;
-        form.querySelectorAll('input[type=number]').forEach(function(i) {
-          i.value = werte[i.name.replace('p_', '')] || 0;
-        });
-        form.querySelector('input[name="fuer_alle"]').checked = false;
-        dialog.showModal();
-      });
-    });
-    document.getElementById('vr-zu').addEventListener('click', function() { dialog.close(); });
-  })();
-</script>
 <% } %>
 
 <ul class="faecher-baum">
@@ -474,7 +428,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
       <div class="fach-zeile">
         <%- fachNameElement(f, f.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), false, laufzeit.halbjahre.map(function(h, i) { return i + 1; })) %>
         <span class="hint fach-hj"><%= f.hjNummern.length === laufzeit.anzahlHalbjahre ? 'alle Halbjahre' : hjBereiche(f.hjNummern) + '. Hj.' %></span>
-        <% if (darfVerwalten) { %>
+        <% if (darfVerwalten && f.spa_fach_key) { %>
         <details class="hj-bearbeiten">
           <summary title="Halbjahre des Fachs ändern" aria-label="Halbjahre des Fachs ändern">✎</summary>
           <form method="post" action="/teacher/faecher/<%= f.id %>/halbjahre">
@@ -494,9 +448,9 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
           <% if (f.spa_fach_key) { %>
             <a class="icon-knopf" href="/teacher/faecher/<%= f.id %>/spa-schema" title="Bewertungsschema des Fachs bearbeiten" aria-label="Bewertungsschema bearbeiten: <%= f.name %>">⚙</a>
           <% } %>
-          <% if (!f.spa_fach_key) { %>
-            <button type="button" class="icon-knopf" data-unterfach-dialog data-fach-id="<%= f.id %>" data-fach-name="<%= f.name %>" data-erlaubt="<%= f.hjNummern.join(',') %>" title="Unterfach hinzufügen" aria-label="Unterfach hinzufügen: <%= f.name %>">📖</button>
-          <% } %>
+        <% } %>
+        <% if (darfVerwalten && !f.spa_fach_key) { %>
+          <a class="icon-knopf" href="/teacher/faecher/<%= f.id %>/einstellungen" title="Fach einstellen: Name, Halbjahre, Unterfächer, Verrechnung" aria-label="Fach einstellen: <%= f.name %>">⚙</a>
         <% } %>
         <% if (darfVerwalten) { %>
           <form method="post" action="/teacher/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen? Alle Noten dieses Fachs und seiner Unterfächer gehen dabei verloren.')">
@@ -521,6 +475,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
                   <span class="hint" title="<%= u.komponenteInfo.schaltbar ? 'Zusammensetzung nur durch die Klassenleitung änderbar' : 'Festes Gewicht, nicht abschaltbar' %>"><%= u.hjNummern.length ? hjBereiche(u.hjNummern) + '. Hj.' : 'abgeschaltet' %><%= u.komponenteInfo.schaltbar ? '' : ' · fest' %></span>
                 <% } else { %>
                 <span class="hint fach-hj"><%= (!u.hjNummern.length ? 'abgeschaltet' : (u.hjNummern.length === (u.komponenteInfo ? u.komponenteInfo.alle.length : laufzeit.anzahlHalbjahre) ? 'alle Halbjahre' : hjBereiche(u.hjNummern) + '. Hj.')) %></span>
+                <% if (u.komponenteInfo) { %>
                 <details class="hj-bearbeiten">
                   <summary title="<%= u.komponenteInfo ? 'In welchen Halbjahren die Komponente zählt (Zusammensetzung)' : 'Halbjahre des Unterfachs ändern' %>" aria-label="Halbjahre ändern">✎</summary>
                   <form method="post" action="/teacher/faecher/<%= u.id %>/halbjahre">
@@ -530,13 +485,9 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
                   </form>
                 </details>
                 <% } %>
+                <% } %>
                 <% if (istKlassenlehrer && u.hjNummern.length) { %>
                   <button type="button" class="icon-knopf" data-lehrkraft-dialog data-fach-id="<%= u.id %>" data-fach-name="<%= u.name %>" data-erlaubt="<%= u.hjNummern.join(',') %>" title="Lehrkraft zuordnen" aria-label="Lehrkraft zuordnen: <%= u.name %>">🎓</button>
-                <% } %>
-                <% if (darfVerwalten && !u.spa_komponente) { %>
-                  <form method="post" action="/teacher/faecher/<%= u.id %>/loeschen" class="inline" onsubmit="return confirm('Unterfach löschen? Alle Noten dieses Unterfachs gehen dabei verloren.')">
-                    <button type="submit" class="icon-knopf danger" title="Unterfach löschen" aria-label="Unterfach <%= u.kurzname || u.name %> löschen">🗑</button>
-                  </form>
                 <% } %>
               </div>
               <% zeigeLehrkraefte(u.id, u.hjNummern); %>
@@ -705,30 +656,6 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 </script>
 
 <% if (istKlassenlehrer) { %>
-<dialog id="fach-optionen-dialog" class="notiz-dialog">
-  <h2 id="fo-name"></h2>
-  <div class="form-actions fo-aktionen">
-    <button type="button" id="fo-bearbeiten">✏️ Bearbeiten</button>
-    <a class="btn" id="fo-noteneingabe" href="#">📝 Zur Noteneingabe</a>
-    <button type="button" data-dialog-zu>Abbrechen</button>
-  </div>
-</dialog>
-
-<dialog id="fach-bearbeiten-dialog" class="notiz-dialog">
-  <form method="post" id="fach-bearbeiten-form" action="">
-    <h2>Fach bearbeiten</h2>
-    <label>Name
-      <input type="text" name="name" maxlength="100" required>
-    </label>
-    <fieldset class="hj-auswahl"><legend>Gilt in Halbjahr</legend><span id="fb-halbjahre"></span></fieldset>
-    <div id="fb-verrechnung"><%- vrFelder(null) %></div>
-    <div class="form-actions">
-      <button type="submit">Speichern</button>
-      <button type="button" data-dialog-zu>Abbrechen</button>
-    </div>
-  </form>
-</dialog>
-
 <dialog id="lehrkraft-dialog" class="notiz-dialog">
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/zuweisungen/neu">
     <h2>Lehrkraft zuordnen</h2>
@@ -750,20 +677,6 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
   </form>
 </dialog>
 
-<dialog id="unterfach-dialog" class="notiz-dialog">
-  <form method="post" id="unterfach-form" action="">
-    <h2>Unterfach hinzufügen</h2>
-    <p class="hint" id="uf-fach-name"></p>
-    <label>Name des Unterfachs
-      <input type="text" name="name" maxlength="60" placeholder="z. B. Musik" required>
-    </label>
-    <fieldset class="hj-auswahl"><legend>Gilt in Halbjahr</legend><span id="uf-halbjahre"></span></fieldset>
-    <div class="form-actions">
-      <button type="submit">+ Unterfach anlegen</button>
-      <button type="button" data-dialog-zu>Abbrechen</button>
-    </div>
-  </form>
-</dialog>
 
 <script>
   (function() {
@@ -791,39 +704,6 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
         checks(document.getElementById('lk-halbjahre'), liste(b.dataset.erlaubt));
         document.getElementById('lehrkraft-dialog').showModal();
       });
-    });
-    document.querySelectorAll('[data-unterfach-dialog]').forEach(function(b) {
-      b.addEventListener('click', function() {
-        document.getElementById('unterfach-form').action = '/teacher/faecher/' + b.dataset.fachId + '/unterfaecher';
-        document.getElementById('uf-fach-name').textContent = b.dataset.fachName;
-        checks(document.getElementById('uf-halbjahre'), liste(b.dataset.erlaubt));
-        document.getElementById('unterfach-dialog').showModal();
-      });
-    });
-    var aktuellesFach = null;
-    document.querySelectorAll('[data-fach-optionen]').forEach(function(b) {
-      b.addEventListener('click', function() {
-        aktuellesFach = b;
-        document.getElementById('fo-name').textContent = b.textContent;
-        document.getElementById('fo-noteneingabe').href = '/teacher/fach/' + b.dataset.fachId;
-        document.getElementById('fach-optionen-dialog').showModal();
-      });
-    });
-    document.getElementById('fo-bearbeiten').addEventListener('click', function() {
-      var b = aktuellesFach; if (!b) return;
-      var form = document.getElementById('fach-bearbeiten-form');
-      form.action = '/teacher/faecher/' + b.dataset.fachId + '/bearbeiten';
-      form.querySelector('input[name="name"]').value = b.dataset.name;
-      form.querySelector('input[name="name"]').maxLength = b.dataset.unterfach === '1' ? 60 : 100;
-      var erlaubt = liste(b.dataset.erlaubt);
-      checks(document.getElementById('fb-halbjahre'), erlaubt, liste(b.dataset.gewaehlt));
-      var vr = document.getElementById('fb-verrechnung');
-      vr.hidden = b.dataset.unterfach === '1'; // Unterfächer haben keine eigene Verrechnung
-      var werte = {};
-      try { werte = JSON.parse(b.dataset.verrechnung || '{}'); } catch (e) { /* leer */ }
-      vr.querySelectorAll('input[type=number]').forEach(function(i) { i.value = werte[i.name.replace('p_', '')] || 0; i.disabled = vr.hidden; });
-      document.getElementById('fach-optionen-dialog').close();
-      document.getElementById('fach-bearbeiten-dialog').showModal();
     });
     document.querySelectorAll('[data-dialog-zu]').forEach(function(b) {
       b.addEventListener('click', function() { b.closest('dialog').close(); });

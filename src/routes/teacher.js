@@ -23,6 +23,7 @@ import {
   HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE,
 } from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
+import { unterfaecherAlsText, speichereFachEinstellungen } from '../fach-einstellungen.js';
 import {
   ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerSchueler, ladeFaecherFuerKlassenleitung, unterfaecherDesHalbjahrs,
 } from '../noten-service.js';
@@ -2270,6 +2271,61 @@ export default async function teacherRoutes(fastify) {
     }
     request.flash?.('success', 'Halbjahre gespeichert.');
     return reply.redirect(ziel);
+  });
+
+  // ⚙ Fach einstellen (IHK/BG): Name, Halbjahre, Unterfächer als Text und Verrechnung der Halbjahre auf einer Seite.
+  // Nur die Klassenleitung -- bzw. die erstellende Lehrkraft, solange es noch keine Klassenleitung gibt (und der Admin).
+  // SPA-Fächer stellen ihr Bewertungsschema auf /faecher/:id/spa-schema ein.
+  const ladeEinstellungsFach = (request, reply) => {
+    const fach = getDb().prepare('SELECT f.*, k.name AS klasse_name FROM faecher f JOIN klassen k ON k.id = f.klasse_id WHERE f.id = ?').get(request.params.id);
+    if (!fach || fach.ist_kurs || fach.parent_fach_id || fach.spa_komponente) {
+      reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+      return null;
+    }
+    if (!userDarfKlasseVerwalten(request.user, fach.klasse_id)) {
+      reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung (bzw. die erstellende Lehrkraft) kann Fächer einstellen.' });
+      return null;
+    }
+    if (fach.spa_fach_key) { reply.redirect(`/teacher/faecher/${fach.id}/spa-schema`); return null; }
+    return fach;
+  };
+  const zeigeFachEinstellungen = (reply, request, fach, extra = {}) => {
+    const laufzeit = klassenLaufzeit(fach.klasse_id);
+    return reply.viewEjs('teacher/fach_einstellungen.ejs', {
+      user: request.user, fach, laufzeit, gewaehlteHj: fachHalbjahrNummern(fach, laufzeit),
+      unterfaecherText: unterfaecherAlsText(fach), verrechnung: ladeVerrechnungFuerFach(fach),
+      ...extra,
+    });
+  };
+
+  fastify.get('/faecher/:id/einstellungen', async (request, reply) => {
+    const fach = ladeEinstellungsFach(request, reply); if (!fach) return;
+    return zeigeFachEinstellungen(reply, request, fach);
+  });
+
+  fastify.post('/faecher/:id/einstellungen', async (request, reply) => {
+    const fach = ladeEinstellungsFach(request, reply); if (!fach) return;
+    const laufzeit = klassenLaufzeit(fach.klasse_id);
+    const body = request.body || {};
+    const verrechnung = laufzeit.anzahlHalbjahre >= 2 ? parseVerrechnungEingabe(body, laufzeit) : null;
+    const zeigeFehler = (fehler) => zeigeFachEinstellungen(reply, request, fach, {
+      fehler, eingabeName: body.name, eingabeText: body.unterfaecher, gewaehlteHj: parseHalbjahreEingabe(body.halbjahre, laufzeit) ?? laufzeit.halbjahre.map((_, i) => i + 1),
+      verrechnung: verrechnung?.werte ?? ladeVerrechnungFuerFach(fach),
+    });
+    if (verrechnung?.fehler) return zeigeFehler(verrechnung.fehler);
+    const ergebnis = speichereFachEinstellungen(fach, {
+      name: body.name, nummern: parseHalbjahreEingabe(body.halbjahre, laufzeit), unterfaecherText: body.unterfaecher,
+    });
+    if (!ergebnis.ok) return zeigeFehler(ergebnis.fehler);
+    if (verrechnung) {
+      // Immer als eigene Einstellung speichern ("{}" = bewusst keine Verrechnung), damit die Klassen-Vorgabe nicht durchschlägt.
+      const json = JSON.stringify(verrechnung.werte);
+      if (body.fuer_alle === '1') getDb().prepare('UPDATE faecher SET verrechnung = ? WHERE klasse_id = ? AND parent_fach_id IS NULL AND spa_fach_key IS NULL').run(json, fach.klasse_id);
+      else getDb().prepare('UPDATE faecher SET verrechnung = ? WHERE id = ?').run(json, fach.id);
+    }
+    request.flash?.('success', `„${String(body.name).trim()}“ gespeichert.`);
+    for (const h of ergebnis.hinweise) request.flash?.('error', h);
+    return reply.redirect(`/teacher/klassen/${fach.klasse_id}#faecher-lehrkraefte`);
   });
 
   // Fach bearbeiten (Klassenleitung): Name, Halbjahre und -- bei Fächern -- Verrechnung in einem Dialog.

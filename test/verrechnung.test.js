@@ -132,8 +132,8 @@ test('Einstellung je Fach speichern (nur Klassenleitung), Ungültiges wird abgel
 test('Klassenseite: einklappbare Verrechnung oberhalb der Fächer mit Dialog je Fach; nicht mehr auf der Klassenleitungs-Seite', async () => {
   const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
   assert.match(html, /<details class="card" id="verrechnung">\s*<summary>Verrechnung der Halbjahre<\/summary>/);
-  assert.match(html, /<dialog id="verrechnung-dialog"/);
-  assert.match(html, new RegExp(`data-verrechnung-dialog data-fach-id="${fachId}"`));
+  assert.equal(html.includes('verrechnung-dialog'), false, 'kein eigener Dialog mehr -- die Verrechnung steht unter dem Zahnrad');
+  assert.match(html, new RegExp(`href="/teacher/faecher/${fachId}/einstellungen"`), 'Zahnrad je Fach');
   assert.match(html, /1\. → 2\.: 50 %/);
   assert.ok(html.indexOf('id="verrechnung"') < html.indexOf('class="faecher-baum"'), 'oberhalb der Fächer');
   const kl = await (await admin(`/klassenlehrer/klasse/${klasseId}?tab=klassenleitung`)).text();

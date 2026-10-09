@@ -691,3 +691,6 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .fach-weitere { opacity: 0.95; border-style: dashed; }
 .fach-weitere .kachel-titel-klein { font-weight: 600; }
 .lehrkraefte-zeile[hidden], .weitere-liste[hidden] { display: none; }
+.fach-einstellungen textarea { width: 100%; font-family: inherit; }
+.fach-einstellungen label { display: block; margin: 0.6rem 0; }
+.fach-einstellungen .hj-check { display: inline-block; margin-right: 0.75rem; }

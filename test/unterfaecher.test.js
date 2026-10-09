@@ -222,7 +222,7 @@ test('Fächer werden alphabetisch sortiert (deutsch: Groß-/Kleinschreibung egal
     await form(admin, `/teacher/klassen/${klasseId}/faecher/neu`, { name: n });
   }
   const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
-  const pos = (n) => html.indexOf(`data-fach-optionen data-fach-id="${getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasseId, n).id}"`);
+  const pos = (n) => html.indexOf(`class="fach-name" href="/teacher/fach/${getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasseId, n).id}"`);
   const reihenfolge = ['Biologie', 'Deutsch', 'englisch', 'LF2', 'LF10', 'Mathe', 'Ökonomie'].map(pos);
   assert.ok(reihenfolge.every((p) => p > 0), 'alle Fächer stehen auf der Seite');
   assert.deepEqual([...reihenfolge].sort((a, b) => a - b), reihenfolge, 'Reihenfolge ist alphabetisch');
@@ -250,9 +250,9 @@ test('Noteneingabe: Klassenfilter oben, sobald Fächer in mehreren Klassen/Kurse
 
 test('Fach bearbeiten: Name, Halbjahre, Verrechnung; Fach anlegen mit Verrechnung; Dialog am Fachnamen', async () => {
   const html = await (await admin(`/teacher/klassen/${klasseId}`)).text();
-  assert.match(html, new RegExp(`<button type="button" class="fach-name fach-name-knopf" data-fach-optionen data-fach-id="${matheId}"`));
-  assert.match(html, /<dialog id="fach-optionen-dialog"/);
-  assert.match(html, /<dialog id="fach-bearbeiten-dialog"/);
+  assert.match(html, new RegExp(`<a class="fach-name" href="/teacher/fach/${matheId}"`), 'Fachname ist ein Link zur Noteneingabe');
+  assert.match(html, new RegExp(`href="/teacher/faecher/${matheId}/einstellungen"[^>]*>⚙</a>`), 'Zahnrad am Fach');
+  for (const weg of ['fach-optionen-dialog', 'fach-bearbeiten-dialog', 'unterfach-dialog', 'data-unterfach-dialog', 'data-fach-optionen']) assert.equal(html.includes(weg), false, `${weg} ist entfernt`);
   assert.match(html, /<input type="hidden" name="verrechnung_gesetzt" value="1">/, 'Verrechnung auch beim Anlegen');
   // Nicht-Klassenleitung: normaler Link zur Noteneingabe, kein Bearbeiten
   assert.equal((await form(lehrer, `/teacher/faecher/${matheId}/bearbeiten`, { name: 'X' })).status, 403);

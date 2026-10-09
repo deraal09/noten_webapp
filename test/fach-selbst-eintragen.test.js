@@ -164,8 +164,8 @@ test('Klassenseite: Eintragen-Knopf bei freien Fächern, Austragen bei der eigen
   assert.equal(zuw(sport).length, 0);
 });
 
-test('Stift (Halbjahre des Fachs ändern) nur für die Klassenleitung bzw. -- ohne Klassenleitung -- die erstellende Lehrkraft', async () => {
-  const STIFT = /Halbjahre des Fachs ändern/;
+test('Zahnrad (Fach einstellen) nur für die Klassenleitung bzw. -- ohne Klassenleitung -- die erstellende Lehrkraft', async () => {
+  const STIFT = /\/teacher\/faecher\/\d+\/einstellungen/; // Zahnrad (Halbjahre, Unterfächer, Verrechnung)
   // dora ist Klassenleitung (aus dem vorigen Test), anna hat die Klasse erstellt, bernd hat nur ein Fach
   assert.match(await (await dora(`/teacher/klassen/${klasseId}`)).text(), STIFT);
   assert.doesNotMatch(await (await anna(`/teacher/klassen/${klasseId}`)).text(), STIFT, 'Erstellerin verliert es mit einer Klassenleitung');
