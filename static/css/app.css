@@ -743,3 +743,20 @@ table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }
 .spa-option-hj input { width: 5.5rem; }
 .spa-option label.inline, .spa-fach-kopf label.spa-entfernen, form .spa-entfernen { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0; }
 .spa-option input[type=checkbox], .spa-entfernen input[type=checkbox] { margin: 0; flex: none; }
+
+/* Fachzeilen auf der Klassenseite: Name links, Aktions-Symbole in einem festen Container mit festen Plätzen --
+   fehlende Knöpfe lassen ihren Platz frei, die Symbole wandern nicht mehr von Zeile zu Zeile. */
+.fach-zeile { justify-content: space-between; }
+.fach-kopf { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.6rem; flex: 1 1 12rem; min-width: 0; }
+.fach-aktionen { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.4rem; flex: none; }
+.aktion-platz { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; flex: none; }
+.aktion-platz form { margin: 0; }
+/* geöffnetes Halbjahre-Formular (✎) schwebt unter dem Symbol, statt die Zeile zu verbreitern */
+.aktion-platz details.hj-bearbeiten[open] form {
+  position: absolute; top: 100%; left: 0; z-index: 10; min-width: 14rem; padding: 0.6rem 0.75rem; margin-top: 0.3rem;
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 2px 8px var(--shadow-strong);
+}
+@media (max-width: 600px) {
+  /* schmal: Symbole in einer eigenen Reihe unter dem Namen, rechtsbündig */
+  .fach-aktionen { flex-basis: 100%; justify-content: flex-end; }
+}

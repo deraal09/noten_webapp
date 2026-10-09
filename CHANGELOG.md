@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.89.1 - 2026-10-09
+
+- **Klassenseite: Aktions-Icons der Fächer stehen stabil.** ✎, 👥, 🎓, ⚙ und 🗑 sitzen jetzt in einem
+  festen Container mit festen Plätzen (je Fach fünf, je Unterfach zwei). Fehlt eine Aktion, bleibt ihr
+  Platz frei, sodass die übrigen Icons in jeder Zeile an derselben Stelle stehen und nicht mehr je nach
+  Namenslänge in die nächste Zeile rutschen. Auf dem Handy stehen die Icons rechtsbündig in einer eigenen
+  Zeile unter dem Fachnamen, am Desktop rechts neben dem Namen. Das Halbjahr-Popup (✎) bleibt ein
+  schwebendes Formular und verschiebt die Zeile nicht.
+
 ## 0.89.0 - 2026-10-09
 
 - **SPA-Editor: Reiter „Allgemein" für die Fach-weiten Optionen.** Die Haken **im Abschlusszeugnis
