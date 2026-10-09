@@ -794,6 +794,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'spa_wpk_kurs', 'spa_wpk_kurs TEXT');
   // Kopie des Bewertungsschemas eines SPA-Fachs (JSON); NULL = Standard aus src/spa-schema.js.
   ensureColumn(db, 'faecher', 'spa_schema', 'spa_schema TEXT');
+  // 1 = die Lehrkraft hat sich selbst für das Fach eingetragen (und darf sich selbst wieder austragen).
+  ensureColumn(db, 'fach_zuweisungen', 'selbst_eingetragen', 'selbst_eingetragen INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
   // Laufzeit einer Klasse in Schuljahren (Startjahr, z. B. 2025 für 2025/26): siehe src/klassen-jahre.js.

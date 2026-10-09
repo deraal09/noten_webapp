@@ -11,6 +11,7 @@ import { ladeVorlagen, speicherbareFaecher, speichereVorlage, importiereVorlage,
 import {
   ladeUnterfaecher, UNTERFACH_TRENNER, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
   halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre, fachHatLehrkraftImHalbjahr,
+  freieHalbjahre, traegeMichEin, traegeMichAus,
 } from '../unterfaecher.js';
 import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, findeLaufendeKlasse, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
@@ -283,9 +284,38 @@ export default async function teacherRoutes(fastify) {
       byKlasse.get(r.klasse_id).faecher.push(eintrag);
     }
 
+    // Auch Klassen, die man nur angelegt hat oder leitet (ohne eigenes Fach), erscheinen hier -- mit den Fächern der
+    // anderen Lehrkräfte. Die Klassenleitung sieht ALLE Fächer dauerhaft; alle anderen können sie ausblenden.
+    for (const k of ladeMeineKlassen(request.user.id)) {
+      if (k.ist_ablage || byKlasse.has(k.id)) continue;
+      byKlasse.set(k.id, { id: k.id, name: k.name, notenschluessel: k.notenschluessel, schuljahr_bezeichnung: k.schuljahr_bezeichnung, faecher: [] });
+    }
+    for (const klasse of byKlasse.values()) {
+      const laufzeit = klassenLaufzeit(klasse.id);
+      const fachRows = getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? AND ist_kurs = 0').all(klasse.id);
+      const zuweisungen = ladeZuweisungenDerKlasse(klasse.id, fachRows, laufzeit);
+      const eigene = new Set(klasse.faecher.map((f) => f.id));
+      const lehrkraefteVon = (fachId) => (zuweisungen.get(fachId) ?? []).map((z) => ({
+        id: z.id, ich: z.user_id === request.user.id, selbst: z.selbst, name: z.name,
+        halbjahre: z.halbjahre.length < laufzeit.anzahlHalbjahre ? `${z.halbjahre.map((n) => `${n}.`).join(', ')} Hj.` : '',
+      }));
+      for (const f of klasse.faecher) f.lehrkraefte = lehrkraefteVon(f.id);
+      klasse.istKlassenleitung = userIstKlassenlehrer(request.user, klasse.id);
+      klasse.weitere = sortiereFaecher(fachRows.filter((f) => !eigene.has(f.id)), laufzeit).map((f) => {
+        const nummern = fachHalbjahrNummern(f, laufzeit);
+        return {
+          id: f.id, name: f.name, lehrkraefte: lehrkraefteVon(f.id), frei: freieHalbjahre(f, laufzeit),
+          halbjahreText: nummern.length < laufzeit.anzahlHalbjahre ? `${nummern.map((n) => `${n}.`).join(', ')} Halbjahr` : '',
+          schuljahre: [...new Set(nummern.map((n) => laufzeit.schuljahre[Math.floor((n - 1) / 2)]?.bezeichnung).filter(Boolean))],
+        };
+      });
+      // Freie Stellen auch an den eigenen Fächern anbieten (weitere Halbjahre ohne Lehrkraft)
+      for (const f of klasse.faecher) f.frei = freieHalbjahre(fachRows.find((r) => r.id === f.id) ?? { id: f.id, klasse_id: klasse.id, ist_kurs: 0 }, laufzeit);
+    }
+
     // Klassen alphabetisch nach Klassenname (bei gleichem Namen bleibt das neuere Schuljahr vorn).
     const klassenListe = sortiereNachName(Array.from(byKlasse.values()));
-    for (const k of klassenListe) k.schuljahre = [...new Set(k.faecher.flatMap((f) => f.schuljahre))];
+    for (const k of klassenListe) k.schuljahre = [...new Set([...k.faecher, ...k.weitere].flatMap((f) => f.schuljahre))];
     const alleSchuljahre = sortiereSchuljahreAbsteigend([...new Set([...klassenListe.flatMap((k) => k.schuljahre), ...kurse.flatMap((f) => f.schuljahre)])].map((bezeichnung) => ({ bezeichnung })));
     for (const k of klassenListe) k.faecher = sortiereFaecher(k.faecher);
     return reply.viewEjs('teacher/dashboard.ejs', {
@@ -1656,6 +1686,8 @@ export default async function teacherRoutes(fastify) {
       };
     });
     const zuweisungenProFach = Object.fromEntries(ladeZuweisungenDerKlasse(klasse.id, alleFaecher, laufzeit));
+    // Halbjahre ohne Lehrkraft je Fach: dort kann sich jede Lehrkraft mit Klassenzugriff selbst eintragen.
+    const freiProFach = Object.fromEntries(alleFaecher.map((f) => [f.id, freieHalbjahre(f, laufzeit)]));
     // Verrechnung je Fach (ohne Unterfächer und SPA-Fächer): wirksame Einstellung und ob sie eine eigene ist.
     const verrechnungProFach = Object.fromEntries(alleFaecher.filter((f) => !f.parent_fach_id && !f.spa_fach_key).map((f) => [
       f.id, { werte: ladeVerrechnungFuerFach(f), eigene: f.verrechnung !== null },
@@ -1676,7 +1708,7 @@ export default async function teacherRoutes(fastify) {
     }
 
     return reply.viewEjs('teacher/klasse_detail.ejs', {
-      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), klassenleitungNamen: klasse.ist_ablage ? [] : ladeKlassenleitungNamen(klasse.id), vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), spaVorlagen: klasse.notenschluessel === 'SPA' ? ladeSpaVorlagen(request.user.id) : [], speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
+      laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), klassenleitungNamen: klasse.ist_ablage ? [] : ladeKlassenleitungNamen(klasse.id), freiProFach, vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), spaVorlagen: klasse.notenschluessel === 'SPA' ? ladeSpaVorlagen(request.user.id) : [], speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
@@ -1760,6 +1792,33 @@ export default async function teacherRoutes(fastify) {
     }
     getDb().prepare('DELETE FROM fach_zuweisungen WHERE id = ?').run(request.params.id);
     return reply.redirect(klasseAnker(z.klasse_id));
+  });
+
+  // Selbstbedienung: Ist zu einem Fach (in einzelnen Halbjahren) noch keine Lehrkraft eingetragen, darf sich jede
+  // Lehrkraft mit Zugriff auf die Klasse dafür eintragen -- auch wenn sie das Fach nicht angelegt hat -- und sich
+  // später selbst wieder austragen. Alles andere (andere eintragen/entfernen, Halbjahre ändern) bleibt bei der Klassenleitung.
+  const zurueckNach = (request, klasseId) => (request.body?.zurueck === 'noteneingabe' ? `/teacher#klasse-${klasseId}` : klasseAnker(klasseId));
+
+  fastify.post('/faecher/:id/selbst-eintragen', async (request, reply) => {
+    const fach = getDb().prepare('SELECT * FROM faecher WHERE id = ?').get(request.params.id);
+    if (!fach || fach.ist_kurs) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userHatKlassenZugriff(request.user, fach.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung für diese Klasse.' });
+    }
+    const res = traegeMichEin(fach, request.user.id);
+    if (res.ok) request.flash?.('success', `Du bist jetzt für „${fach.name}“ eingetragen (${res.halbjahre.length === klassenLaufzeit(fach.klasse_id).anzahlHalbjahre ? 'alle Halbjahre' : `${res.halbjahre.map((n) => `${n}.`).join(', ')} Halbjahr`}).`);
+    else request.flash?.('error', res.fehler);
+    return reply.redirect(zurueckNach(request, fach.klasse_id));
+  });
+
+  fastify.post('/zuweisungen/:id/selbst-austragen', async (request, reply) => {
+    const z = getDb().prepare(`
+      SELECT fz.id, f.klasse_id, f.name FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id WHERE fz.id = ? AND fz.user_id = ?
+    `).get(request.params.id, request.user.id);
+    if (!z) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die eigene Eintragung kann hier aufgehoben werden.' });
+    if (traegeMichAus(z.id, request.user.id)) request.flash?.('success', `Du bist nicht mehr für „${z.name}“ eingetragen -- das Fach ist wieder frei.`);
+    else request.flash?.('error', 'Diese Zuordnung hat die Klassenleitung vergeben -- sie kann nur von ihr entfernt werden.');
+    return reply.redirect(zurueckNach(request, z.klasse_id));
   });
 
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {

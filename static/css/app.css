@@ -684,3 +684,10 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .app-install-dialog [hidden] { display: none; }
 .app-install-dialog ol, .app-install-dialog ul { padding-left: 1.3rem; line-height: 1.6; }
 @media (max-width: 480px) { .app-install-text { display: none; } .app-install { padding: 0.2rem 0.55rem; } }
+
+/* Noteneingabe: Fächer der Klasse (auch anderer Lehrkräfte) */
+.weitere-titel { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+.weitere-schalter { min-height: 36px; }
+.fach-weitere { opacity: 0.95; border-style: dashed; }
+.fach-weitere .kachel-titel-klein { font-weight: 600; }
+.lehrkraefte-zeile[hidden], .weitere-liste[hidden] { display: none; }

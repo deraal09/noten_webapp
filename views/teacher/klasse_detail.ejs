@@ -389,6 +389,10 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
             <form method="post" action="/teacher/zuweisungen/<%= z.id %>/loeschen" class="inline" onsubmit="return confirm('Zuordnung von <%= z.name.replace(/'/g, '') %> entfernen?')">
               <button type="submit" class="icon-knopf danger" title="Lehrkraft entfernen" aria-label="Lehrkraft <%= z.name %> entfernen">✕</button>
             </form>
+          <% } else if (z.selbst && z.user_id === user.id) { %>
+            <form method="post" action="/teacher/zuweisungen/<%= z.id %>/selbst-austragen" class="inline" onsubmit="return confirm('Dich aus diesem Fach austragen? Es ist danach wieder frei für andere Lehrkräfte.')">
+              <button type="submit" title="Dich selbst wieder austragen">Austragen</button>
+            </form>
           <% } %>
         </li>
       <% }); %>
@@ -499,6 +503,11 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
         <% } %>
       </div>
       <% zeigeLehrkraefte(f.id, eintrag.freieHj); %>
+      <% if ((freiProFach[f.id] || []).length) { %>
+        <form method="post" action="/teacher/faecher/<%= f.id %>/selbst-eintragen" class="inline">
+          <button type="submit" title="Für die Halbjahre ohne Lehrkraft (<%= freiProFach[f.id].map(function(n) { return n + '.'; }).join(', ') %> Hj.) eintragen">🎓 Für dieses Fach eintragen</button>
+        </form>
+      <% } %>
       <% if (eintrag.kinder.length) { %>
         <ul class="unterfaecher-liste">
           <% eintrag.kinder.forEach(function(u) { %>
@@ -529,6 +538,11 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
                 <% } %>
               </div>
               <% zeigeLehrkraefte(u.id, u.hjNummern); %>
+              <% if ((freiProFach[u.id] || []).length) { %>
+                <form method="post" action="/teacher/faecher/<%= u.id %>/selbst-eintragen" class="inline">
+                  <button type="submit" title="Für die Halbjahre ohne Lehrkraft eintragen">🎓 Eintragen</button>
+                </form>
+              <% } %>
             </li>
           <% }); %>
         </ul>

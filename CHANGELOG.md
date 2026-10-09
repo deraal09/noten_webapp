@@ -6,6 +6,22 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.87.0 - 2026-10-09
+
+- **Noteneingabe zeigt auch die Fächer der anderen Lehrkräfte** der eigenen Klassen
+  (Klassen, die man angelegt hat oder denen man beigetreten ist), jeweils mit den
+  eingetragenen Lehrkräften. Der Abschnitt „Weitere Fächer der Klasse" lässt sich je
+  Klasse **ausblenden** (wird im Browser gemerkt); die **Klassenleitung** sieht alle
+  Fächer der Klasse dauerhaft, auch ohne eigenes Fach. Ein Schalter blendet die
+  Lehrkräfte aller Fächer ein/aus.
+- **Fächer ohne Lehrkraft: selbst eintragen.** Ist zu einem Fach (in einzelnen
+  Halbjahren) noch niemand eingetragen, kann sich jede Lehrkraft mit Zugriff auf die
+  Klasse dafür eintragen -- auch wenn sie das Fach nicht angelegt hat (Noteneingabe und
+  Klassenseite). Es zählen die noch nicht vergangenen Halbjahre ohne Lehrkraft. Wer sich
+  selbst eingetragen hat, kann sich wieder **austragen**, das Fach ist danach wieder
+  frei. Alle anderen Zuordnungen (auch die von der Klassenleitung vergebenen) verwaltet
+  nur die Klassenleitung.
+
 ## 0.86.0 - 2026-10-09
 
 - **Klassenleitung eintragen für alle mit Klassenzugriff.** Bisher konnte sich nur die

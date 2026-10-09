@@ -12,7 +12,7 @@
  */
 
 import { getDb } from './db.js';
-import { klassenLaufzeit, fachHalbjahrNummern, halbjahrNr, halbjahrText } from './klassen-jahre.js';
+import { klassenLaufzeit, fachHalbjahrNummern, halbjahrNr, halbjahrText, istHalbjahrVergangen, jetzt } from './klassen-jahre.js';
 
 export const UNTERFACH_TRENNER = ' › ';
 
@@ -275,7 +275,7 @@ export function ladeZuweisungenDerKlasse(klasseId, faecher, laufzeit = klassenLa
   const db = getDb();
   const proFach = new Map(faecher.map((f) => [f.id, []]));
   const rows = db.prepare(`
-    SELECT fz.id, fz.user_id, fz.fach_id, fz.halbjahre, u.display_name, u.username
+    SELECT fz.id, fz.user_id, fz.fach_id, fz.halbjahre, fz.selbst_eingetragen, u.display_name, u.username
     FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id JOIN users u ON u.id = fz.user_id
     WHERE f.klasse_id = ? ORDER BY u.display_name, u.username
   `).all(klasseId);
@@ -285,8 +285,44 @@ export function ladeZuweisungenDerKlasse(klasseId, faecher, laufzeit = klassenLa
     if (!fach) continue;
     proFach.get(fach.id).push({
       id: r.id, user_id: r.user_id, name: r.display_name || r.username,
-      halbjahre: zuweisungsHalbjahre(r, fach, laufzeit), alle: !r.halbjahre,
+      halbjahre: zuweisungsHalbjahre(r, fach, laufzeit), alle: !r.halbjahre, selbst: Boolean(r.selbst_eingetragen),
     });
   }
   return proFach;
+}
+
+/**
+ * Halbjahre (Nummern), in denen sich eine Lehrkraft selbst für das Fach eintragen kann: Halbjahre des Fachs, in denen
+ * (noch) niemand eingetragen ist und die nicht schon vorbei sind. Ein Fach, das sich aus Unterfächern zusammensetzt,
+ * hat direkt keine freien Halbjahre -- die Unterfächer sind selbst Fächer. Kurse sind ausgenommen.
+ */
+export function freieHalbjahre(fach, laufzeit = klassenLaufzeit(fach.klasse_id), heute = jetzt()) {
+  if (fach.ist_kurs) return [];
+  const belegt = new Set();
+  for (const z of getDb().prepare('SELECT * FROM fach_zuweisungen WHERE fach_id = ?').all(fach.id)) {
+    for (const n of zuweisungsHalbjahre(z, fach, laufzeit)) belegt.add(n);
+  }
+  return halbjahreOhneUnterfaecher(fach, laufzeit).filter((n) => !belegt.has(n) && !istHalbjahrVergangen(laufzeit, n, heute));
+}
+
+/**
+ * Die Lehrkraft trägt sich für alle freien Halbjahre des Fachs ein (auch wenn sie das Fach nicht angelegt hat).
+ * Eine dabei NEU entstehende Zuordnung gilt als selbst eingetragen und darf von ihr wieder aufgehoben werden;
+ * eine schon bestehende (z. B. von der Klassenleitung vergebene) wird nur erweitert und bleibt Sache der Klassenleitung.
+ * @returns {{ok: true, halbjahre: number[]} | {ok: false, fehler: string}}
+ */
+export function traegeMichEin(fach, userId) {
+  const db = getDb();
+  const frei = freieHalbjahre(fach);
+  if (!frei.length) return { ok: false, fehler: 'Für dieses Fach ist keine Lehrkraft-Stelle frei -- bitte die Klassenleitung fragen.' };
+  const vorher = db.prepare('SELECT id FROM fach_zuweisungen WHERE user_id = ? AND fach_id = ?').get(userId, fach.id);
+  const res = weiseLehrkraftZu(fach, userId, frei);
+  if (!res.ok) return res;
+  if (!vorher) db.prepare('UPDATE fach_zuweisungen SET selbst_eingetragen = 1 WHERE id = ?').run(res.id);
+  return { ok: true, halbjahre: frei };
+}
+
+/** Hebt eine selbst vorgenommene Eintragung wieder auf -- das Fach ist danach wieder frei. Nur für die eigene Zuordnung. */
+export function traegeMichAus(zuweisungId, userId) {
+  return getDb().prepare('DELETE FROM fach_zuweisungen WHERE id = ? AND user_id = ? AND selbst_eingetragen = 1').run(zuweisungId, userId).changes > 0;
 }
