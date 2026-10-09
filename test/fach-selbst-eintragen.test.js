@@ -210,6 +210,42 @@ test('Beitritt zu einer freigegebenen Klasse: Fach ohne Lehrkraft übernehmen st
   assert.ok(db().prepare("SELECT 1 FROM faecher f JOIN fach_zuweisungen fz ON fz.fach_id = f.id WHERE f.name = 'Physik' AND fz.user_id = ?").get(uid('finn')));
 });
 
+test('Fach mit Unterfächern: kein Eintragen-Knopf beim Fach selbst (auch nicht serverseitig), bei den Unterfächern schon', async () => {
+  db().prepare('DELETE FROM fach_zuweisungen WHERE fach_id = ?').run(deutsch);
+  db().prepare('UPDATE faecher SET halbjahre = NULL WHERE id = ?').run(deutsch);
+  assert.deepEqual(U.freieHalbjahre(fachRow(deutsch)), [5, 6], 'ohne Unterfächer frei');
+  await form(dora, `/teacher/faecher/${deutsch}/unterfaecher`, { name: 'Grammatik', halbjahre: ['5'] });
+  const grammatik = db().prepare('SELECT id FROM faecher WHERE parent_fach_id = ?').get(deutsch).id;
+  assert.deepEqual(U.freieHalbjahre(fachRow(deutsch)), [], 'mit Unterfach nicht mehr beim Fach');
+  assert.deepEqual(U.freieHalbjahre(fachRow(grammatik)), [5]);
+  const klasseSeite = await (await anna(`/teacher/klassen/${klasseId}`)).text();
+  assert.doesNotMatch(klasseSeite, new RegExp(`/teacher/faecher/${deutsch}/selbst-eintragen`));
+  assert.match(klasseSeite, new RegExp(`/teacher/faecher/${grammatik}/selbst-eintragen`));
+  const dashboard = await (await dora('/teacher')).text();
+  assert.doesNotMatch(dashboard, new RegExp(`/teacher/faecher/${deutsch}/selbst-eintragen`));
+  assert.match(dashboard, new RegExp(`/teacher/faecher/${grammatik}/selbst-eintragen`));
+  // direkter Aufruf wird ebenfalls abgewiesen
+  await form(anna, `/teacher/faecher/${deutsch}/selbst-eintragen`);
+  assert.equal(zuw(deutsch).length, 0);
+});
+
+test('SPA-Fach mit Komponenten (Unterfächer): kein Eintragen beim Fach, nur bei den Komponenten', async () => {
+  const sj = db().prepare('SELECT id FROM schuljahre').get().id;
+  await form(anna, '/teacher/klassen/neu', { schuljahr_id: String(sj), name: '11SPA', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_REGULAR', einschulung_jahr: '2025' });
+  const spaId = db().prepare("SELECT id FROM klassen WHERE name = '11SPA'").get().id;
+  const lf3 = db().prepare("SELECT * FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF3'").get(spaId);
+  const lf1 = db().prepare("SELECT * FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF1'").get(spaId);
+  db().prepare('DELETE FROM fach_zuweisungen WHERE fach_id IN (SELECT id FROM faecher WHERE klasse_id = ?)').run(spaId);
+  assert.deepEqual(U.freieHalbjahre(lf3), [], 'LF3 hat Komponenten-Unterfächer');
+  assert.ok(U.freieHalbjahre(lf1).length, 'LF1 ohne Unterfächer bleibt frei');
+  const kind = db().prepare('SELECT * FROM faecher WHERE parent_fach_id = ? ORDER BY id').get(lf3.id);
+  assert.ok(U.freieHalbjahre(kind).length, 'eine Komponente lässt sich übernehmen');
+  const html = await (await anna(`/teacher/klassen/${spaId}`)).text();
+  assert.doesNotMatch(html, new RegExp(`/teacher/faecher/${lf3.id}/selbst-eintragen`));
+  assert.match(html, new RegExp(`/teacher/faecher/${lf1.id}/selbst-eintragen`));
+  assert.match(html, new RegExp(`/teacher/faecher/${kind.id}/selbst-eintragen`));
+});
+
 test.after(async () => {
   await fastify.close();
   fs.rmSync(tempDir, { recursive: true, force: true });

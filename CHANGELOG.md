@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.87.3 - 2026-10-09
+
+- **Kein Eintragen als Lehrkraft bei Fächern mit Unterfächern.** Der Knopf „Für dieses
+  Fach eintragen" (Noteneingabe, Klassenseite, Beitrittsseite) erscheint nur noch bei
+  Fächern **ohne** Unterfächer -- bei allen Notenschlüsseln, auch bei SPA-Fächern mit
+  Komponenten (z. B. Lernfeld 3). Eingetragen wird man dort in den Unterfächern bzw.
+  Komponenten. Das gilt auch serverseitig (Direktaufruf und Beitritt mit Fachname).
+
 ## 0.87.2 - 2026-10-09
 
 - **Stift-Symbol (Halbjahre des Fachs ändern)** erscheint auf der Klassenseite nur noch

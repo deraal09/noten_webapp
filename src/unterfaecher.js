@@ -294,10 +294,13 @@ export function ladeZuweisungenDerKlasse(klasseId, faecher, laufzeit = klassenLa
 /**
  * Halbjahre (Nummern), in denen sich eine Lehrkraft selbst für das Fach eintragen kann: Halbjahre des Fachs, in denen
  * (noch) niemand eingetragen ist und die nicht schon vorbei sind. Ein Fach, das sich aus Unterfächern zusammensetzt,
- * hat direkt keine freien Halbjahre -- die Unterfächer sind selbst Fächer. Kurse sind ausgenommen.
+ * (auch nur in einem Teil der Halbjahre, ebenso SPA-Fächer mit Komponenten) hat selbst keine freien Halbjahre -- die
+ * Unterfächer sind selbst Fächer. Kurse sind ausgenommen.
  */
 export function freieHalbjahre(fach, laufzeit = klassenLaufzeit(fach.klasse_id), heute = jetzt()) {
   if (fach.ist_kurs) return [];
+  // Hat das Fach Unterfächer (auch SPA-Komponenten), tragen sich Lehrkräfte dort ein -- nicht beim Fach selbst.
+  if (!fach.parent_fach_id && ladeUnterfaecher(fach.id).length) return [];
   const belegt = new Set();
   for (const z of getDb().prepare('SELECT * FROM fach_zuweisungen WHERE fach_id = ?').all(fach.id)) {
     for (const n of zuweisungsHalbjahre(z, fach, laufzeit)) belegt.add(n);
