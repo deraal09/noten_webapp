@@ -4,6 +4,7 @@
  */
 
 import { getDb } from '../db.js';
+import { ladeAngaben, speichereAngaben, fehlendePflichtfelder, FELDER as RECHT_FELDER, STANDARD_RECHTSGRUNDLAGE, STANDARD_SPEICHERDAUER, STANDARD_PROTOKOLLE } from '../rechtliches.js';
 import { requireAdmin, makeToken, hashPassword, isLdapConfigured } from '../auth.js';
 import { DEFAULT_NS_CSV, DEFAULT_GEWICHTUNG } from '../grade-calc.js';
 import { searchLehrkraefte } from '../auth/ldap.js';
@@ -311,6 +312,21 @@ export default async function adminRoutes(fastify) {
         .run(hashPassword(pw), request.params.id);
     }
     return reply.redirect('/admin/users');
+  });
+
+  // ---------- Rechtliches: Angaben für Datenschutzerklärung und Impressum ----------
+  fastify.get('/rechtliches', async (request, reply) => {
+    const angaben = ladeAngaben();
+    return reply.viewEjs('admin/rechtliches.ejs', {
+      user: request.user, angaben, felder: RECHT_FELDER, fehlend: fehlendePflichtfelder(angaben),
+      standard: { rechtsgrundlage: STANDARD_RECHTSGRUNDLAGE, speicherdauer: STANDARD_SPEICHERDAUER, protokolle: STANDARD_PROTOKOLLE },
+    });
+  });
+
+  fastify.post('/rechtliches', async (request, reply) => {
+    speichereAngaben(request.body);
+    request.flash?.('success', 'Angaben für Datenschutzerklärung und Impressum gespeichert.');
+    return reply.redirect('/admin/rechtliches');
   });
 
   // ---------- LDAP: Einstellungen ----------

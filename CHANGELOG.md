@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.94.0 - 2026-10-10
+
+- **Datenschutzerklärung und Impressum.** Neue öffentliche Seiten `/datenschutz` und `/impressum` (ohne
+  Anmeldung erreichbar), verlinkt in der Fußzeile jeder Seite, auch auf der Anmeldeseite. Die Datenschutzerklärung
+  deckt Verantwortliche Stelle, Datenschutzbeauftragte/n, Zwecke und Rechtsgrundlage, verarbeitete Daten,
+  Zugriff, Speicherdauer, Cookies/lokale Speicherung (nur ein technisch notwendiges Sitzungs-Cookie, kein
+  Tracking, keine Drittanbieter, daher kein Cookie-Banner), Server-Protokolle, Betroffenenrechte und
+  Beschwerderecht ab. Das Impressum nennt die Schule als Betreiberin einer schulintern genutzten Anwendung.
+- **Admin → Rechtliches** (neuer Menüpunkt): Name, Anschrift, Schulleitung, Kontakt, Datenschutzbeauftragte/r,
+  Aufsichtsbehörde sowie optional eigene Texte für Rechtsgrundlage, Speicherdauer und Server-Protokolle.
+  Fehlende Angaben stehen auf den Seiten als sichtbare Platzhalter; ohne eigenen Text gelten Standardtexte.
+  Alle Eingaben werden HTML-sicher ausgegeben.
+
 ## 0.93.0 - 2026-10-09
 
 - **Notenauswahl per Touch.** Auf Touch-Geräten (Handy/Tablet) öffnet das Antippen eines Notenfeldes

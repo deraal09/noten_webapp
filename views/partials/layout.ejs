@@ -44,6 +44,7 @@
           <a href="/admin">Dashboard</a>
           <a href="/admin/users">Lehrkräfte</a>
           <a href="/admin/ldap/einstellungen">LDAP-Einstellungen</a>
+          <a href="/admin/rechtliches">Rechtliches</a>
           <a href="/admin/ldap">LDAP-Import</a>
           <a href="/admin/einladungen">Einladungen</a>
           <a href="/admin/zuweisungen">Zuweisungen</a>
@@ -118,6 +119,7 @@
 <% } %>
 <% if (!(typeof embed !== 'undefined' && embed)) { %>
 <footer class="footer">
+  <small class="footer-links"><a href="/datenschutz">Datenschutz</a> · <a href="/impressum">Impressum</a></small><br>
   <small>Notenverwaltung · <%= now.getFullYear() %><% if (typeof appVersion !== 'undefined' && appVersion) { %> · v<%= appVersion %><%
     if (typeof appReleaseDate !== 'undefined' && appReleaseDate) { %> (<%= appReleaseDate.split('-').reverse().join('.') %>)<% } %><% } %></small>
 </footer>

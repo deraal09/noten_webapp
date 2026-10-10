@@ -1,0 +1,56 @@
+<% function ph(wert, name) { %><% if (wert) { %><%= wert %><% } else { %><span class="platzhalter">[<%= name %> – bitte unter Admin → Rechtliches eintragen]</span><% } %><% } %>
+<h1>Datenschutzerklärung</h1>
+<div class="rechtstext">
+  <p class="hint">
+    Diese Erklärung informiert darüber, welche personenbezogenen Daten die Notenverwaltung der Schule verarbeitet
+    (Informationspflichten nach Art. 13 und 14 DSGVO).
+  </p>
+
+  <h2>1. Verantwortliche Stelle</h2>
+  <p class="adresse">
+    <strong><% ph(angaben.schulname, 'Name der Schule'); %></strong><br>
+    <% ph(angaben.strasse, 'Straße und Hausnummer'); %>, <% ph(angaben.plz_ort, 'PLZ und Ort'); %><br>
+    <% if (angaben.telefon) { %>Telefon: <%= angaben.telefon %><br><% } %>
+    E-Mail: <% ph(angaben.email, 'E-Mail'); %><br>
+    Vertreten durch: <% ph(angaben.vertretung, 'Schulleitung'); %>
+  </p>
+  <p>Die Anwendung wird von der Schule selbst auf eigenen Servern betrieben und verwaltet. Eine externe Auftragsverarbeitung oder ein Hosting bei Dritten findet nicht statt.</p>
+
+  <h2>2. Datenschutzbeauftragte/r</h2>
+  <p><% ph(angaben.dsb_name, 'Datenschutzbeauftragte/r'); %><br><span class="mehrzeilig"><% ph(angaben.dsb_kontakt, 'Kontakt der/des Datenschutzbeauftragten'); %></span></p>
+
+  <h2>3. Zwecke und Rechtsgrundlagen</h2>
+  <p>Die Notenverwaltung dient Lehrkräften dazu, Leistungen von Schüler/innen zu erfassen, Noten und Zeugnisnoten zu berechnen, Fehlzeiten zu dokumentieren und den Unterricht zu organisieren (z. B. Sitzpläne, Notenbesprechung).</p>
+  <p class="mehrzeilig"><%= angaben.rechtsgrundlage || standard.rechtsgrundlage %></p>
+
+  <h2>4. Welche Daten werden verarbeitet?</h2>
+  <p><strong>Schüler/innen:</strong> Name, Klassen- und Fachzugehörigkeit, Noten und Leistungsnachweise (Klausuren, Unterrichtsleistungen, Endnoten, Zeugnisnoten), Fehlzeiten, Notizen der Lehrkräfte zum Unterricht und zur Notenbesprechung sowie Sitzplätze.</p>
+  <p><strong>Lehrkräfte:</strong> Benutzername, Anzeigename, ggf. E-Mail-Adresse, Rolle, Zuordnung zu Klassen und Fächern sowie das Anmeldekennwort (bei lokalen Konten ausschließlich als nicht umkehrbarer Hash; bei der Anmeldung über das Schulverzeichnis (LDAP) wird das Kennwort nicht gespeichert).</p>
+  <p>Besondere Kategorien personenbezogener Daten im Sinne von Art. 9 DSGVO sind nicht vorgesehen. Bitte keine Gesundheitsdaten o. Ä. in Notizfelder eintragen.</p>
+
+  <h2>5. Wer hat Zugriff?</h2>
+  <p>Zugriff haben ausschließlich angemeldete Lehrkräfte der Schule und die Administration, jeweils nur im Rahmen ihrer Aufgaben: Fachlehrkräfte sehen die Fächer, denen sie zugeordnet sind, die Klassenleitung die Daten ihrer Klasse, die Administration die Verwaltungsfunktionen. Es werden keine Daten an Dritte außerhalb der Schule weitergegeben und keine Daten in Drittländer übermittelt. Eine Einwilligung ist nicht erforderlich, da die Verarbeitung auf der oben genannten Rechtsgrundlage beruht.</p>
+  <p>Bei Bedarf kann die Anwendung mit dem schulinternen Lehrerkalender verbunden sein (Anmeldung ohne zweites Kennwort); auch dabei verlassen keine Daten die Schule.</p>
+
+  <h2>6. Speicherdauer</h2>
+  <p class="mehrzeilig"><%= angaben.speicherdauer || standard.speicherdauer %></p>
+
+  <h2>7. Cookies und lokale Speicherung im Browser</h2>
+  <p>Die Anwendung setzt <strong>ein Sitzungs-Cookie</strong>, das für die Anmeldung technisch erforderlich ist. Es enthält nur eine zufällige Sitzungskennung und wird beim Abmelden bzw. nach Ablauf der Sitzung (bei „Angemeldet bleiben“ nach spätestens 30 Tagen) ungültig. Außerdem speichert der Browser reine Bedienungs-Einstellungen lokal (z. B. Hell-/Dunkelmodus, zuletzt gewählter Reiter, ein- oder ausgeklappte Bereiche). Diese Angaben verlassen das Gerät nicht.</p>
+  <p>Es werden <strong>keine Tracking-, Analyse- oder Werbe-Cookies</strong> und keine Dienste von Drittanbietern (z. B. Schriften, Statistik, soziale Netzwerke) eingebunden. Eine Einwilligung (Cookie-Banner) ist deshalb nicht erforderlich.</p>
+
+  <h2>8. Server-Protokolle</h2>
+  <p class="mehrzeilig"><%= angaben.protokolle || standard.protokolle %></p>
+
+  <h2>9. Ihre Rechte</h2>
+  <p>Betroffene haben das Recht auf <strong>Auskunft</strong> (Art. 15 DSGVO), <strong>Berichtigung</strong> (Art. 16), <strong>Löschung</strong> (Art. 17), <strong>Einschränkung der Verarbeitung</strong> (Art. 18), <strong>Datenübertragbarkeit</strong> (Art. 20, soweit anwendbar) und <strong>Widerspruch</strong> (Art. 21). Wenden Sie sich dazu an die Schule oder die/den Datenschutzbeauftragte/n (siehe oben).</p>
+
+  <h2>10. Beschwerderecht</h2>
+  <p>Sie haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren (Art. 77 DSGVO). Zuständig ist:</p>
+  <p class="mehrzeilig"><% ph(angaben.datenschutzaufsicht, 'Datenschutz-Aufsichtsbehörde'); %></p>
+
+  <h2>11. Automatisierte Entscheidungen</h2>
+  <p>Eine automatisierte Entscheidungsfindung einschließlich Profiling findet nicht statt. Die Berechnung von Noten dient der Unterstützung der Lehrkräfte; die Bewertung und Zeugnisnoten verantworten die Lehrkräfte.</p>
+
+  <p><a href="/impressum">Impressum</a></p>
+</div>

@@ -670,6 +670,12 @@ CREATE TABLE IF NOT EXISTS sso_codes (
 );
 CREATE INDEX IF NOT EXISTS idx_sso_codes_expires_at ON sso_codes(expires_at);
 
+-- Angaben für Datenschutzerklärung und Impressum (Admin → Rechtliches): ein Eintrag je Feld.
+CREATE TABLE IF NOT EXISTS rechtliche_angaben (
+    schluessel TEXT PRIMARY KEY,
+    wert TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS login_ratelimit (
     schluessel TEXT PRIMARY KEY,
     fehlversuche INTEGER NOT NULL DEFAULT 0,

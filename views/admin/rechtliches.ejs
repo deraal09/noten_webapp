@@ -1,0 +1,41 @@
+<h1>Rechtliches: Datenschutz und Impressum</h1>
+<p class="kopf-aktionen">
+  <a class="btn" href="/datenschutz">→ Datenschutzerklärung ansehen</a>
+  <a class="btn" href="/impressum">→ Impressum ansehen</a>
+</p>
+<p class="hint">
+  Die beiden Seiten sind ohne Anmeldung erreichbar (Link in der Fußzeile). Die Texte sind eine allgemeine Vorlage für eine
+  schulintern betriebene Anwendung; die Angaben unten werden eingesetzt. Bitte vor dem Einsatz von der Schulleitung und
+  der/dem Datenschutzbeauftragten prüfen lassen und bei Bedarf unter „Rechtsgrundlage“, „Speicherdauer“ und „Server-Protokolle“ anpassen.
+</p>
+<% if (fehlend.length) { %>
+  <div class="flash flash-info">Noch nicht ausgefüllt: <%= fehlend.join(', ') %>. Auf den öffentlichen Seiten stehen dafür sichtbare Platzhalter.</div>
+<% } %>
+
+<form method="post" action="/admin/rechtliches" class="card">
+  <% var gruppen = { schule: 'Schule und Impressum', datenschutz: 'Datenschutz' };
+     Object.keys(gruppen).forEach(function(g) { %>
+    <h2><%= gruppen[g] %></h2>
+    <% felder.filter(function(f) { return f.gruppe === g; }).forEach(function(f) { %>
+      <label><%= f.label %><%= f.pflicht ? ' *' : '' %>
+        <% if (f.multiline) { %>
+          <textarea name="<%= f.key %>" rows="4" maxlength="4000"><%= angaben[f.key] %></textarea>
+        <% } else { %>
+          <input type="text" name="<%= f.key %>" maxlength="300" value="<%= angaben[f.key] %>" placeholder="<%= f.hint || '' %>">
+        <% } %>
+      </label>
+      <% if (f.multiline && f.hint) { %><p class="hint"><%= f.hint %></p><% } %>
+    <% }); %>
+  <% }); %>
+  <p class="hint">* Angaben, die auf den Seiten nicht fehlen sollten.</p>
+  <div class="form-actions"><button type="submit">💾 Speichern</button></div>
+</form>
+
+<details class="hinweis-aufklappbar">
+  <summary>Standardtexte (gelten, wenn das jeweilige Feld leer ist)</summary>
+  <div class="hint">
+    <p><strong>Rechtsgrundlage:</strong> <%= standard.rechtsgrundlage %></p>
+    <p><strong>Speicherdauer:</strong> <%= standard.speicherdauer %></p>
+    <p><strong>Server-Protokolle:</strong> <%= standard.protokolle %></p>
+  </div>
+</details>

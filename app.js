@@ -35,6 +35,7 @@ import {
 import { formatZeitLokal, jsonFuerSkript, baueEinladungsMailtoLink } from './src/format.js';
 import { klassenSchuljahrText } from './src/klassen-jahre.js';
 import authRoutes from './src/routes/auth.js';
+import rechtlichesRoutes from './src/routes/rechtliches.js';
 import adminRoutes from './src/routes/admin.js';
 import teacherRoutes from './src/routes/teacher.js';
 import klassenlehrerRoutes from './src/routes/klassenlehrer.js';
@@ -230,6 +231,7 @@ export async function buildApp(opts = {}) {
   });
 
   await app.register(authRoutes, { prefix: '' });
+  await app.register(rechtlichesRoutes, { prefix: '' });
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(startRoutes, { prefix: '/start' });
   await app.register(teacherRoutes, { prefix: '/teacher' });

@@ -1,0 +1,40 @@
+<% function ph(wert, name) { %><% if (wert) { %><%= wert %><% } else { %><span class="platzhalter">[<%= name %> – bitte unter Admin → Rechtliches eintragen]</span><% } %><% } %>
+<h1>Impressum</h1>
+<div class="rechtstext">
+  <p class="hint">
+    Diese Anwendung wird von der Schule selbst betrieben und verwaltet. Sie ist nur schulintern nutzbar
+    (Anmeldung mit persönlichem Konto) und wird nicht öffentlich angeboten.
+  </p>
+
+  <h2>Anbieterin und Betreiberin</h2>
+  <p class="adresse">
+    <strong><% ph(angaben.schulname, 'Name der Schule'); %></strong><br>
+    <% if (angaben.traeger) { %>Schulträger: <%= angaben.traeger %><br><% } %>
+    <% ph(angaben.strasse, 'Straße und Hausnummer'); %><br>
+    <% ph(angaben.plz_ort, 'PLZ und Ort'); %>
+  </p>
+
+  <h2>Vertretungsberechtigt</h2>
+  <p><% ph(angaben.vertretung, 'Schulleitung'); %></p>
+
+  <h2>Kontakt</h2>
+  <p>
+    <% if (angaben.telefon) { %>Telefon: <%= angaben.telefon %><br><% } %>
+    E-Mail: <% if (angaben.email) { %><a href="mailto:<%= angaben.email %>"><%= angaben.email %></a><% } else { %><span class="platzhalter">[E-Mail – bitte unter Admin → Rechtliches eintragen]</span><% } %>
+  </p>
+
+  <% if (angaben.aufsicht) { %>
+    <h2>Aufsichtsbehörde</h2>
+    <p class="mehrzeilig"><%= angaben.aufsicht %></p>
+  <% } %>
+
+  <% if (angaben.betreuung) { %>
+    <h2>Technische Betreuung der Anwendung</h2>
+    <p class="mehrzeilig"><%= angaben.betreuung %></p>
+  <% } %>
+
+  <h2>Verantwortlich für den Inhalt</h2>
+  <p>Verantwortlich für die Inhalte dieser Anwendung ist die oben genannte Schule, vertreten durch die Schulleitung. Die Noten und Daten selbst werden von den jeweiligen Lehrkräften eingetragen.</p>
+
+  <p><a href="/datenschutz">Datenschutzerklärung</a></p>
+</div>

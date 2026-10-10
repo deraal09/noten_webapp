@@ -790,3 +790,10 @@ table.tabelle-fix thead th, table.tafel thead th { border-top-width: 1px; }
 .note-picker-fuss button[aria-pressed="true"] { background: var(--bg-tint); }
 .note-picker-fuss button[hidden] { display: none; }
 input.note-picker-aktiv { outline: 3px solid var(--primary-text); outline-offset: 1px; }
+
+/* Datenschutz und Impressum */
+.rechtstext { max-width: 46rem; line-height: 1.55; }
+.rechtstext h2 { margin: 1.5rem 0 0.4rem; font-size: 1.1rem; }
+.rechtstext .mehrzeilig { white-space: pre-line; }
+.platzhalter { background: var(--bg-tint); border: 1px dashed var(--border-strong); border-radius: 4px; padding: 0 0.3rem; color: var(--text-muted); }
+.footer-links a { color: inherit; }

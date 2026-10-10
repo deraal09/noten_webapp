@@ -952,6 +952,17 @@ beachten — Migrationen sind nicht automatisch rückwärtskompatibel.
 | `test`      | Tests ausführen                    |
 | `seed:admin`| Admin per CLI anlegen              |
 
+## Datenschutz und Impressum
+
+`/datenschutz` und `/impressum` sind ohne Anmeldung erreichbar und in der Fußzeile jeder Seite verlinkt. Die
+Angaben der Schule (Name, Anschrift, Schulleitung, Datenschutzbeauftragte/r, Aufsichtsbehörde, optional
+Rechtsgrundlage, Speicherdauer und Server-Protokolle) pflegt die Administration unter **Admin → Rechtliches**
+(Tabelle `rechtliche_angaben`). Fehlende Angaben erscheinen als sichtbarer Platzhalter. Die Texte sind eine
+allgemeine Vorlage für eine schulintern betriebene Anwendung ohne Tracking und ohne Drittanbieter (nur ein
+technisch notwendiges Sitzungs-Cookie, daher kein Cookie-Banner) und sollten vor dem Einsatz von der
+Schulleitung und der/dem Datenschutzbeauftragten geprüft werden. Werden später Statistik-Tools oder externe
+Dienste eingebunden, müssen Erklärung und Einwilligung entsprechend angepasst werden.
+
 ## Versionsnummer
 
 Die Fußzeile zeigt eine Version im Format `0.MINOR.PATCH` samt Release-Datum
