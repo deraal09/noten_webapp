@@ -1,0 +1,102 @@
+<h1>Datensicherung</h1>
+<p class="hint">
+  Die Notendaten (die komplette Datenbank) werden in regelmäßigen Abständen an einen Speicher außerhalb dieses Servers
+  kopiert. LDAP und der Programmcode sind nicht Teil dieser Sicherung. Die Sicherungsdatei bleibt mit dem
+  <code>DB_ENCRYPTION_KEY</code> verschlüsselt; zum Wiederherstellen werden die Datei <strong>und</strong> dieser Schlüssel
+  gebraucht (außerdem <code>SECRET</code> für gespeicherte Passwörter wie das des LDAP-Service-Kontos). Beide Schlüssel
+  bitte getrennt und sicher aufbewahren, nicht am selben Ort wie die Sicherung.
+</p>
+
+<form method="post" action="/admin/backup" class="card">
+  <label class="hj-check"><input type="checkbox" name="aktiv" value="1" <%= einstellungen.aktiv ? 'checked' : '' %>> Automatische Sicherung einschalten</label>
+
+  <label>Speichertyp
+    <select name="typ" id="backup-typ">
+      <% Object.keys(typen).forEach(function(k) { %><option value="<%= k %>" <%= einstellungen.typ === k ? 'selected' : '' %>><%= typen[k] %></option><% }); %>
+    </select>
+  </label>
+  <label>Ziel
+    <input type="text" name="ziel" maxlength="300" value="<%= einstellungen.ziel %>" placeholder="Verzeichnis: /mnt/backup/noten · WebDAV: https://cloud.schule.de/remote.php/dav/files/backup/noten">
+  </label>
+  <div id="backup-zugang">
+    <label>Benutzer (nur WebDAV)
+      <input type="text" name="benutzer" maxlength="200" value="<%= einstellungen.benutzer %>" autocomplete="off">
+    </label>
+    <label>Passwort (nur WebDAV)
+      <input type="password" name="passwort" autocomplete="new-password" placeholder="<%= einstellungen.hatPasswort ? 'gespeichert – leer lassen, um es zu behalten' : '' %>">
+    </label>
+    <% if (einstellungen.hatPasswort) { %>
+      <label class="hj-check"><input type="checkbox" name="passwort_loeschen" value="1"> gespeichertes Passwort entfernen</label>
+    <% } %>
+  </div>
+  <label>Intervall (Stunden)
+    <input type="number" name="intervall_stunden" min="<%= minIntervall %>" max="<%= maxIntervall %>" value="<%= einstellungen.intervall_stunden %>" required>
+  </label>
+  <p class="hint">z. B. 24 = täglich, 168 = wöchentlich. Nach dem Einschalten wird gleich gesichert, danach im eingestellten Abstand. Nach einem Fehler wird es nach einer Stunde erneut versucht.</p>
+  <label>Aufbewahrung (Anzahl Sicherungen)
+    <input type="number" name="aufbewahren" min="1" max="365" value="<%= einstellungen.aufbewahren %>" required>
+  </label>
+  <p class="hint">So viele der neuesten Sicherungen bleiben am Ziel liegen, ältere werden gelöscht.</p>
+  <div class="form-actions"><button type="submit">💾 Speichern</button></div>
+</form>
+
+<div class="card">
+  <h2>Jetzt ausführen</h2>
+  <div class="form-actions">
+    <form method="post" action="/admin/backup/testen" class="inline"><button type="submit">🔌 Verbindung testen</button></form>
+    <form method="post" action="/admin/backup/jetzt" class="inline" onsubmit="return confirm('Jetzt eine Sicherung erstellen?')"><button type="submit">▶ Jetzt sichern</button></form>
+    <a class="btn" href="/admin/backup/herunterladen">⬇ Sicherung herunterladen</a>
+  </div>
+  <p class="hint">„Jetzt sichern“ und „Verbindung testen“ verwenden die gespeicherten Einstellungen. Der Download enthält die komplette (verschlüsselte) Datenbank – bitte entsprechend sorgfältig behandeln.</p>
+</div>
+
+<h2>Letzte Läufe</h2>
+<% if (!laeufe.length) { %>
+  <p class="hint">Noch keine Sicherung gelaufen.</p>
+<% } else { %>
+  <div class="tabelle-scroll">
+  <table class="data">
+    <thead><tr><th>Zeit</th><th>Auslöser</th><th>Ergebnis</th><th>Datei</th><th>Meldung</th></tr></thead>
+    <tbody>
+      <% laeufe.forEach(function(l) { %>
+        <tr>
+          <td><%= formatZeitLokal(l.gestartet_at) %></td>
+          <td><%= l.ausloeser === 'manuell' ? 'manuell' : 'geplant' %></td>
+          <td><% if (!l.beendet_at) { %>läuft …<% } else if (l.ok) { %>✅ ok<% } else { %>❌ Fehler<% } %></td>
+          <td><%= l.dateiname %></td>
+          <td><%= l.meldung %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+  </div>
+<% } %>
+
+<% if (einstellungen.ziel) { %>
+  <h2>Sicherungen am Ziel</h2>
+  <% if (listenFehler) { %><p class="flash flash-error">Das Ziel lässt sich gerade nicht lesen: <%= listenFehler %></p>
+  <% } else if (!sicherungen.length) { %><p class="hint">Am Ziel liegt noch keine Sicherung.</p>
+  <% } else { %><ul><% sicherungen.forEach(function(n) { %><li><code><%= n %></code></li><% }); %></ul><% } %>
+<% } %>
+
+<details class="hinweis-aufklappbar">
+  <summary>Wiederherstellen (nach einer Neuinstallation)</summary>
+  <div class="hint">
+    <ol>
+      <li>Anwendung (Code) neu aufsetzen und <strong>stoppen</strong>. Die Umgebungsvariablen <code>DB_ENCRYPTION_KEY</code> und <code>SECRET</code> wie vorher setzen (die Werte aus der getrennten Aufbewahrung).</li>
+      <li>Die gewünschte Sicherungsdatei <code>noten-backup-….sqlite3</code> vom Ziel auf den Server kopieren.</li>
+      <li><code>npm run backup:wiederherstellen -- /pfad/zur/noten-backup-….sqlite3</code> ausführen. Das Skript prüft die Datei, legt eine vorhandene Datenbank als Kopie beiseite und setzt die Sicherung ein.</li>
+      <li>Anwendung starten und anmelden. LDAP-Einstellungen sind in der Sicherung enthalten (Passwort nur mit demselben <code>SECRET</code>).</li>
+    </ol>
+  </div>
+</details>
+
+<script>
+  (function () {
+    var typ = document.getElementById('backup-typ');
+    var zugang = document.getElementById('backup-zugang');
+    function zeige() { zugang.hidden = typ.value !== 'webdav'; }
+    typ.addEventListener('change', zeige);
+    zeige();
+  })();
+</script>

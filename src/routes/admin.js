@@ -4,6 +4,13 @@
  */
 
 import { getDb } from '../db.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fuehreBackupAus, testeZiel as testeBackupZiel, listeSicherungen, erzeugeSchnappschuss as erzeugeBackupSchnappschuss } from '../backup/backup.js';
+import {
+  ladeEinstellungen as ladeBackupEinstellungen, speichereEinstellungen as speichereBackupEinstellungen, pruefeEingabe as pruefeBackupEingabe,
+  letzteLaeufe as letzteBackupLaeufe, TYPEN as BACKUP_TYPEN, MIN_INTERVALL, MAX_INTERVALL,
+} from '../backup/einstellungen.js';
 import { ladeAngaben, speichereAngaben, fehlendePflichtfelder, FELDER as RECHT_FELDER, STANDARD_RECHTSGRUNDLAGE, STANDARD_SPEICHERDAUER, STANDARD_PROTOKOLLE } from '../rechtliches.js';
 import { requireAdmin, makeToken, hashPassword, isLdapConfigured } from '../auth.js';
 import { DEFAULT_NS_CSV, DEFAULT_GEWICHTUNG } from '../grade-calc.js';
@@ -312,6 +319,57 @@ export default async function adminRoutes(fastify) {
         .run(hashPassword(pw), request.params.id);
     }
     return reply.redirect('/admin/users');
+  });
+
+  // ---------- Datensicherung: Sicherungsziel, Intervall, Läufe ----------
+  const zeigeBackup = async (request, reply, extra = {}) => {
+    const einstellungen = ladeBackupEinstellungen();
+    let sicherungen = []; let listenFehler = null;
+    if (einstellungen.ziel) {
+      try { sicherungen = await listeSicherungen(); } catch (e) { listenFehler = e.message; }
+    }
+    return reply.viewEjs('admin/backup.ejs', {
+      user: request.user, einstellungen, typen: BACKUP_TYPEN, laeufe: letzteBackupLaeufe(15), sicherungen, listenFehler,
+      minIntervall: MIN_INTERVALL, maxIntervall: MAX_INTERVALL, ...extra,
+    });
+  };
+
+  fastify.get('/backup', async (request, reply) => zeigeBackup(request, reply));
+
+  fastify.post('/backup', async (request, reply) => {
+    const pruefung = pruefeBackupEingabe(request.body);
+    if (!pruefung.ok) {
+      request.flash?.('error', pruefung.fehler);
+      return reply.redirect('/admin/backup');
+    }
+    speichereBackupEinstellungen(pruefung.werte, {
+      passwort: String(request.body?.passwort ?? ''), passwortLoeschen: Boolean(request.body?.passwort_loeschen),
+    });
+    request.flash?.('success', pruefung.werte.aktiv ? 'Einstellungen gespeichert -- die automatische Sicherung ist aktiv.' : 'Einstellungen gespeichert (automatische Sicherung aus).');
+    return reply.redirect('/admin/backup');
+  });
+
+  fastify.post('/backup/testen', async (request, reply) => {
+    const res = await testeBackupZiel();
+    request.flash?.(res.ok ? 'success' : 'error', res.ok ? `Test erfolgreich: ${res.meldung}` : `Test fehlgeschlagen: ${res.meldung}`);
+    return reply.redirect('/admin/backup');
+  });
+
+  fastify.post('/backup/jetzt', async (request, reply) => {
+    const res = await fuehreBackupAus('manuell');
+    request.flash?.(res.ok ? 'success' : 'error', res.ok ? `Sicherung erstellt: ${res.meldung}` : `Sicherung fehlgeschlagen: ${res.meldung}`);
+    return reply.redirect('/admin/backup');
+  });
+
+  // Aktueller Schnappschuss als Datei (verschlüsselt mit DB_ENCRYPTION_KEY) -- für eine manuelle Sicherung.
+  fastify.get('/backup/herunterladen', async (request, reply) => {
+    const s = await erzeugeBackupSchnappschuss();
+    const strom = fs.createReadStream(s.pfad);
+    strom.on('close', () => { fs.promises.rm(s.verzeichnis, { recursive: true, force: true }).catch(() => {}); });
+    reply.header('Content-Type', 'application/octet-stream');
+    reply.header('Content-Disposition', `attachment; filename="${path.basename(s.pfad)}"`);
+    reply.header('Cache-Control', 'no-store');
+    return reply.send(strom);
   });
 
   // ---------- Rechtliches: Angaben für Datenschutzerklärung und Impressum ----------

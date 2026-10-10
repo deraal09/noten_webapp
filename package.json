@@ -1,6 +1,6 @@
 {
   "name": "noten-webapp",
-  "version": "0.94.0",
+  "version": "0.95.0",
   "releaseDate": "2026-10-10",
   "private": true,
   "description": "Multi-User-Notenverwaltung als Single-Process-Node.js-App, deploybar via Plesk Node.js-Support ohne Reverse-Proxy.",
@@ -15,7 +15,8 @@
     "build": "node scripts/build.js",
     "test": "node --test \"test/**/*.test.js\"",
     "seed:admin": "node src/cli/seed-admin.js",
-    "ldap-test": "node src/cli/ldap-test.js"
+    "ldap-test": "node src/cli/ldap-test.js",
+    "backup:wiederherstellen": "node src/cli/backup-wiederherstellen.js"
   },
   "overrides": {
     "uuid": "^11.1.1"

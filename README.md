@@ -952,6 +952,32 @@ beachten — Migrationen sind nicht automatisch rückwärtskompatibel.
 | `test`      | Tests ausführen                    |
 | `seed:admin`| Admin per CLI anlegen              |
 
+## Datensicherung
+
+Unter **Admin → Datensicherung** lässt sich ein Speicher außerhalb des Servers hinterlegen, auf den die Notendaten
+(die komplette Datenbank) in einem einstellbaren Intervall kopiert werden. LDAP und der Programmcode gehören nicht
+dazu.
+
+- **Ziel:** ein Verzeichnis (lokal oder ein eingebundenes Netzlaufwerk, absoluter Pfad, nicht das Datenbank-Verzeichnis)
+  oder ein **WebDAV**-Speicher (Adresse, Benutzer, Passwort; das Passwort liegt verschlüsselt in der DB). Weitere Ziele
+  (SFTP, S3 …) lassen sich in `src/backup/ziele.js` ergänzen, sobald die IT feststeht.
+- **Intervall und Aufbewahrung:** alle *n* Stunden (z. B. 24); die neuesten *m* Sicherungen bleiben am Ziel, ältere
+  werden gelöscht (andere Dateien am Ziel bleiben unberührt). Nach dem Einschalten wird gleich gesichert, nach einem
+  Fehler nach einer Stunde erneut. „Verbindung testen“, „Jetzt sichern“ und ein Download des aktuellen Stands gibt es
+  ebenfalls; die letzten Läufe stehen im Protokoll.
+- **Dateien:** `noten-backup-JJJJMMTT-HHMMSS.sqlite3`, ein konsistenter Schnappschuss (`VACUUM INTO`) der
+  Datenbank, **weiterhin mit `DB_ENCRYPTION_KEY` verschlüsselt**. Am Ziel liegen also keine lesbaren Noten. Der
+  Schnappschuss wird kurz im temporären Verzeichnis des Servers angelegt (freier Platz in Größe der Datenbank nötig).
+- **Aufbewahrung der Schlüssel:** Zum Wiederherstellen werden die Sicherungsdatei, `DB_ENCRYPTION_KEY` und `SECRET`
+  (für gespeicherte Passwörter wie das LDAP-Service-Konto) gebraucht. Die beiden Schlüssel **getrennt** und sicher
+  aufbewahren -- nicht am selben Ort wie die Sicherung, und nicht nur auf diesem Server.
+- **Wiederherstellen** (nach einer Neuinstallation): Anwendung stoppen, `DB_ENCRYPTION_KEY` und `SECRET` wie zuvor
+  setzen, die Sicherungsdatei auf den Server kopieren und
+  `npm run backup:wiederherstellen -- /pfad/zu/noten-backup-….sqlite3` ausführen. Das Skript öffnet die Datei mit dem
+  Schlüssel, prüft sie (Integrität, Schema-Version nicht neuer als das Programm), legt eine vorhandene Datenbank als
+  Kopie `….vor-wiederherstellung-…` beiseite und setzt die Sicherung ein. Danach die Anwendung starten.
+- **Empfehlung:** Die Wiederherstellung einmal auf einem Testsystem durchspielen, bevor sie gebraucht wird.
+
 ## Datenschutz und Impressum
 
 `/datenschutz` und `/impressum` sind ohne Anmeldung erreichbar und in der Fußzeile jeder Seite verlinkt. Die

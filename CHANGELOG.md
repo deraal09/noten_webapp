@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.95.0 - 2026-10-10
+
+- **Datensicherung (Admin → Datensicherung).** Ein Speicher außerhalb des Servers lässt sich hinterlegen
+  (Verzeichnis bzw. eingebundenes Netzlaufwerk oder WebDAV mit Benutzer/Passwort; das Passwort wird verschlüsselt
+  gespeichert und nie angezeigt). Die Anwendung sichert dort die komplette Datenbank im eingestellten Intervall
+  (Stunden) und behält die neuesten *n* Sicherungen. Die Sicherungsdatei ist ein konsistenter Schnappschuss, der mit
+  `DB_ENCRYPTION_KEY` verschlüsselt bleibt (am Ziel keine lesbaren Notendaten) und vor dem Ablegen geprüft wird.
+  Dazu: „Verbindung testen“, „Jetzt sichern“, Download des aktuellen Stands, Protokoll der letzten Läufe und Liste der
+  Sicherungen am Ziel. Fehler (falsche Zugangsdaten, Ziel nicht beschreibbar …) erscheinen als klare Meldung; nach
+  einem Fehler wird nach einer Stunde erneut versucht.
+- **Wiederherstellen:** `npm run backup:wiederherstellen -- <datei>` prüft die Sicherung (Schlüssel, Integrität,
+  Schema-Version), legt eine vorhandene Datenbank als Kopie beiseite und setzt die Sicherung ein. Ablauf und der
+  Hinweis, `DB_ENCRYPTION_KEY` und `SECRET` getrennt aufzubewahren, stehen im README und auf der Admin-Seite.
+- Weitere Sicherungsziele (SFTP, S3 …) lassen sich in `src/backup/ziele.js` ergänzen, sobald die IT entschieden hat.
+
 ## 0.94.0 - 2026-10-10
 
 - **Datenschutzerklärung und Impressum.** Neue öffentliche Seiten `/datenschutz` und `/impressum` (ohne

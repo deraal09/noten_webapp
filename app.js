@@ -36,6 +36,7 @@ import { formatZeitLokal, jsonFuerSkript, baueEinladungsMailtoLink } from './src
 import { klassenSchuljahrText } from './src/klassen-jahre.js';
 import authRoutes from './src/routes/auth.js';
 import rechtlichesRoutes from './src/routes/rechtliches.js';
+import { starteBackupPlaner } from './src/backup/backup.js';
 import adminRoutes from './src/routes/admin.js';
 import teacherRoutes from './src/routes/teacher.js';
 import klassenlehrerRoutes from './src/routes/klassenlehrer.js';
@@ -273,6 +274,7 @@ async function start() {
   try {
     const address = await app.listen(listenOpts);
     app.log.info(`Notenverwaltung läuft auf ${address}`);
+    starteBackupPlaner();
   } catch (e) {
     app.log.error(e);
     process.exit(1);

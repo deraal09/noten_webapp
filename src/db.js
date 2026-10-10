@@ -676,6 +676,30 @@ CREATE TABLE IF NOT EXISTS rechtliche_angaben (
     wert TEXT NOT NULL DEFAULT ''
 );
 
+-- Datensicherung (Admin → Datensicherung): eine feste Zeile (id=1) mit dem Sicherungsziel und ein Protokoll der Läufe.
+-- passwort_verschluesselt ist AES-256-GCM-verschlüsselt (siehe src/auth/secret-crypto.js), nie im Klartext.
+CREATE TABLE IF NOT EXISTS backup_einstellungen (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    aktiv INTEGER NOT NULL DEFAULT 0,
+    typ TEXT NOT NULL DEFAULT 'verzeichnis',          -- 'verzeichnis' | 'webdav'
+    ziel TEXT NOT NULL DEFAULT '',                    -- absoluter Pfad bzw. WebDAV-Adresse
+    benutzer TEXT NOT NULL DEFAULT '',
+    passwort_verschluesselt TEXT NOT NULL DEFAULT '',
+    intervall_stunden INTEGER NOT NULL DEFAULT 24,
+    aufbewahren INTEGER NOT NULL DEFAULT 14           -- so viele Sicherungen bleiben am Ziel (neueste)
+);
+
+CREATE TABLE IF NOT EXISTS backup_laeufe (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gestartet_at TEXT NOT NULL,
+    beendet_at TEXT,
+    ausloeser TEXT NOT NULL DEFAULT 'geplant',        -- 'geplant' | 'manuell'
+    ok INTEGER NOT NULL DEFAULT 0,
+    dateiname TEXT NOT NULL DEFAULT '',
+    groesse INTEGER NOT NULL DEFAULT 0,
+    meldung TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS login_ratelimit (
     schluessel TEXT PRIMARY KEY,
     fehlversuche INTEGER NOT NULL DEFAULT 0,
