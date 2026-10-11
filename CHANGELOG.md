@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.95.2 - 2026-10-11
+
+- **Sicherheit: Löschbestätigung bei „Fächer ohne Lehrkraft“ (Klassenleitung).** Der Bestätigungstext stand
+  ungeschützt im `onsubmit`-Attribut: Die Rückfrage vor dem Löschen erschien nie (ein Klick löschte das Fach samt
+  Noten), und ein präparierter Fachname wie `x onmouseover=… y` wurde zu einem ausführbaren Event-Handler im Browser
+  der Klassenleitung. Jetzt HTML-maskiert; ein Test verhindert dieses Muster in allen Views.
+
 ## 0.95.1 - 2026-10-11
 
 - **Startseite: Kacheln neu angeordnet.** Reihenfolge jetzt Noteneingabe, Meine Klassen, Sitzpläne,

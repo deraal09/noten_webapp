@@ -132,7 +132,7 @@
           <li>
             <%= f.name %>
             <form method="post" action="/klassenlehrer/fach/<%= f.id %>/loeschen" class="inline"
-                  onsubmit="return confirm(<%- jsonFuerSkript(f.name + ' endgültig löschen? Alle zugehörigen Noten gehen dabei verloren.') %>)">
+                  onsubmit="return confirm(<%= jsonFuerSkript(f.name + ' endgültig löschen? Alle zugehörigen Noten gehen dabei verloren.') %>)">
               <button type="submit" class="danger">🗑 Löschen</button>
             </form>
           </li>

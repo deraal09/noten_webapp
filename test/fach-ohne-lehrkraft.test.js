@@ -86,6 +86,49 @@ test('Klassenleitungsübersicht listet nur Fächer ohne Lehrkraft', async () => 
   assert.ok(!karte.slice(0, 1500).includes('Mathematik'), 'zugewiesenes Fach fehlt in der Liste');
 });
 
+test('Fachname mit Anführungszeichen/Event-Handler bricht nicht aus dem Lösch-Formular aus (XSS)', async () => {
+  // Das Fach steht in der Liste der Klassenleitung; der Fachname landet im
+  // onsubmit-Attribut der Löschbestätigung. Früher beendete das " des JSON
+  // das Attribut -- die Rückfrage lief nie, und "onmouseover=..." wurde zu
+  // einem echten Attribut des Formulars.
+  const namen = ['x onmouseover=alert(1) y', 'z" onfocus="alert(2)" autofocus x="'];
+  for (const name of namen) await form(admin, `/admin/klassen/${klasseId}/faecher/neu`, { name });
+  const html = await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr`)).text();
+  const formulare = html.match(/<form[^>]*\/klassenlehrer\/fach\/\d+\/loeschen[^>]*>/g) || [];
+  assert.ok(formulare.length >= 3, 'Testannahme: Deutsch + beide Testfächer haben ein Lösch-Formular');
+  for (const f of formulare) {
+    // Attribute samt Wert abgreifen (ein "=" im Wert zählt nicht), Rest muss leer bleiben.
+    const attribute = [...f.matchAll(/\s([a-z-]+)="[^"]*"/g)].map((m) => m[1]);
+    assert.equal(f.replace(/^<form/, '').replace(/\s([a-z-]+)="[^"]*"/g, '').trim(), '>', `Reste außerhalb von Attributwerten in ${f}`);
+    assert.deepEqual(attribute, ['method', 'action', 'class', 'onsubmit'], `unerwartete Attribute in ${f}`);
+    assert.match(f, /onsubmit="return confirm\(&#34;.*&#34;\)"/, 'Bestätigungstext steht vollständig im Attribut');
+  }
+  for (const name of namen) {
+    const id = getDb().prepare('SELECT id FROM faecher WHERE name = ?').get(name).id;
+    getDb().prepare('DELETE FROM faecher WHERE id = ?').run(id);
+  }
+});
+
+test('Keine View schreibt JSON ungeschützt (<%-) in ein HTML-Attribut', () => {
+  // jsonFuerSkript() ist nur für <script>-Blöcke gedacht. In einem Attribut
+  // beendet sein " das Attribut -- dort muss <%= (HTML-maskiert) stehen.
+  const viewsDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'views');
+  const funde = [];
+  const durchsuche = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) durchsuche(p);
+      else if (e.name.endsWith('.ejs')) {
+        fs.readFileSync(p, 'utf8').split('\n').forEach((zeile, i) => {
+          if (/=\s*["'][^"']*<%-\s*(jsonFuerSkript|JSON\.stringify)/.test(zeile)) funde.push(`${path.relative(viewsDir, p)}:${i + 1}`);
+        });
+      }
+    }
+  };
+  durchsuche(viewsDir);
+  assert.deepEqual(funde, []);
+});
+
 test('POST /klassenlehrer/fach/:id/loeschen: nur die Klassenleitung darf, und nur ohne zugewiesene Lehrkraft', async () => {
   // Fremde Lehrkraft (keine Klassenleitung) darf nicht.
   let r = await form(lehrerFremd, `/klassenlehrer/fach/${deutschId}/loeschen`, {});
