@@ -114,6 +114,9 @@ test('/start zeigt die vier Kacheln mit den richtigen Zielen', async () => {
   assert.match(html, /href="\/teacher\/sitzplaene"[^>]*>[\s\S]*?Sitzpläne/);
   assert.match(html, /href="\/teacher"[^>]*>[\s\S]*?Noteneingabe/);
   assert.match(html, /href="\/klassenlehrer"[^>]*>[\s\S]*?Klassenleitung/);
+  // Reihenfolge: Noteneingabe, Meine Klassen, Sitzpläne, Klassenleitung
+  const titel = [...html.matchAll(/class="kachel-titel">([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(titel, ['Noteneingabe', 'Meine Klassen', 'Sitzpläne', 'Klassenleitung']);
 });
 
 test('/teacher/sitzplaene listet die eigenen Klassen mit Link zum jeweiligen Sitzplan', async () => {

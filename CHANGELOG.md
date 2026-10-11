@@ -6,6 +6,11 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.95.1 - 2026-10-11
+
+- **Startseite: Kacheln neu angeordnet.** Reihenfolge jetzt Noteneingabe, Meine Klassen, Sitzpläne,
+  Klassenleitung.
+
 ## 0.95.0 - 2026-10-10
 
 - **Datensicherung (Admin → Datensicherung).** Ein Speicher außerhalb des Servers lässt sich hinterlegen
