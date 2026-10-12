@@ -88,12 +88,14 @@ test('Vorbereitung: zwei Klassen (10A, 10B) mit je Klassenleitung, ein Kurs in 1
 
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '10A', notenschluessel: 'IHK' });
   klasseAId = getDb().prepare("SELECT id FROM klassen WHERE name = '10A'").get().id;
-  await form(lehrerA, `/teacher/klassen/${klasseAId}/klassenlehrer/eintragen`, {});
-
+  // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+  // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+  getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(klasseAId);
   await form(lehrerB, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '10B', notenschluessel: 'IHK' });
   klasseBId = getDb().prepare("SELECT id FROM klassen WHERE name = '10B'").get().id;
-  await form(lehrerB, `/teacher/klassen/${klasseBId}/klassenlehrer/eintragen`, {});
-
+  // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+  // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+  getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrerb'").run(klasseBId);
   await form(lehrerA, `/teacher/klassen/${klasseAId}/schueler/neu`, { nachname: 'Adler', vorname: 'Anna' });
   await form(lehrerA, `/teacher/klassen/${klasseAId}/schueler/neu`, { nachname: 'Berg', vorname: 'Ben' });
   await form(lehrerB, `/teacher/klassen/${klasseBId}/schueler/neu`, { nachname: 'Chor', vorname: 'Cara' });

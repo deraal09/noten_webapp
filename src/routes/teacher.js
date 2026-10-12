@@ -16,13 +16,14 @@ import {
 import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, findeLaufendeKlasse, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
   requireAuth, userHatFachZgriff, erlaubteHalbjahreImFach, userDarfTeilnehmerVerwalten, userHatKlassenZugriff, userIstKlassenlehrer, userDarfKlasseExportieren,
-  userDarfFachLoeschen, userDarfKlasseVerwalten, userDarfSichAlsKlassenleitungEintragen,
+  userDarfFachLoeschen, userDarfKlasseVerwalten, userDarfSichAlsKlassenleitungEintragen, klasseHatKlassenleitung, hatFachInKlasse,
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
   HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE,
 } from '../grade-calc.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
+import { fremdeNotenImFach, fremdeNotenInKlasse, fremdeNotenDerPerson } from '../loeschschutz.js';
 import { unterfaecherAlsText, speichereFachEinstellungen } from '../fach-einstellungen.js';
 import {
   ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerSchueler, ladeFaecherFuerKlassenleitung, unterfaecherDesHalbjahrs,
@@ -191,15 +192,26 @@ function alsGueltigesDatumOderNull(wert) {
 const KLASSE_VERWALTEN_NUR = 'Das darf nur die Klassenleitung, die Lehrkraft, die die Klasse angelegt hat, oder der Admin — '
   + 'es betrifft auch Fächer und Noten anderer Lehrkräfte.';
 
-/** Namen aller eingetragenen Klassenlehrkräfte einer Klasse (beide Quellen, siehe userIstKlassenlehrer), alphabetisch. */
+// Meldung, wenn beim Löschen Noten anderer Lehrkräfte verloren gingen (siehe src/loeschschutz.js).
+const notenAndererMeldung = (was, faecher) => `${was} enthält Noten anderer Lehrkräfte (${faecher.join(', ')}) -- `
+  + 'löschen würde sie unwiderruflich entfernen. Das kann nur der Admin.';
+
+/**
+ * Namen aller eingetragenen Klassenlehrkräfte einer Klasse (beide Quellen, siehe userIstKlassenlehrer), alphabetisch.
+ * Wer sich selbst eingetragen hat, bekommt den Zusatz "selbst eingetragen am …" -- so sehen die anderen
+ * Lehrkräfte der Klasse, wer die Verwaltung übernommen hat.
+ */
 function ladeKlassenleitungNamen(klasseId) {
   const rows = getDb().prepare(`
-    SELECT u.display_name, u.username FROM users u WHERE u.id IN (
+    SELECT u.display_name, u.username,
+      (SELECT kl.created_at FROM klassenleitung kl WHERE kl.klasse_id = ? AND kl.user_id = u.id AND kl.selbst_eingetragen = 1) AS selbst_am
+    FROM users u WHERE u.id IN (
       SELECT user_id FROM klassenleitung WHERE klasse_id = ?
       UNION SELECT user_id FROM klassen_lehrkraefte WHERE klasse_id = ?
     )
-  `).all(klasseId, klasseId);
-  return sortiereNachName(rows.map((r) => ({ name: r.display_name || r.username }))).map((r) => r.name);
+  `).all(klasseId, klasseId, klasseId);
+  return sortiereNachName(rows.map((r) => ({ name: r.display_name || r.username, selbstAm: r.selbst_am })))
+    .map((r) => (r.selbstAm ? `${r.name} (selbst eingetragen am ${formatZeitLokal(r.selbstAm).split(',')[0]})` : r.name));
 }
 
 /**
@@ -1706,6 +1718,9 @@ export default async function teacherRoutes(fastify) {
     const kannExportieren = userDarfKlasseExportieren(request.user, klasse.id);
     const kannSelbstAlsKlassenlehrerEintragen = !istKlassenlehrer && !klasse.ist_ablage
       && userDarfSichAlsKlassenleitungEintragen(request.user, klasse.id);
+    // Noch keine Klassenleitung, aber (noch) kein eigenes Fach: Hinweis statt Knopf.
+    const klassenleitungErstMitFach = !istKlassenlehrer && !klasse.ist_ablage && !kannSelbstAlsKlassenlehrerEintragen
+      && !klasseHatKlassenleitung(klasse.id) && !hatFachInKlasse(request.user, klasse.id);
 
     let zuweisbareLehrkraefte = [];
     if (istKlassenlehrer) {
@@ -1717,10 +1732,10 @@ export default async function teacherRoutes(fastify) {
     return reply.viewEjs('teacher/klasse_detail.ejs', {
       laufzeit, vorbelegungHj: aktuelleHalbjahrNummern(laufzeit), baum, zuweisungenProFach, verrechnungProFach, bulkVorbelegung: String(request.query?.bulk || '').slice(0, 2000), klassenleitungNamen: klasse.ist_ablage ? [] : ladeKlassenleitungNamen(klasse.id), freiProFach, vorlagen: klasse.ist_ablage ? [] : ladeVorlagen(request.user.id, klasse.notenschluessel), spaVorlagen: klasse.notenschluessel === 'SPA' ? ladeSpaVorlagen(request.user.id) : [], speicherbareFaecher: sortiereFaecher(speicherbareFaecher(klasse.id), laufzeit), teilnehmerVerwaltbar: userDarfTeilnehmerVerwalten(request.user, { id: 0, klasse_id: klasse.id, ist_kurs: 0 }), klassenVerrechnung: ladeVerrechnung(klasse.id),
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
-      istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, zuweisbareLehrkraefte,
+      istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, klassenleitungErstMitFach, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
-      darfVersetzen: darfVerwalten || Boolean(klasse.ist_ablage),
-      versetzZiele: darfVerwalten || klasse.ist_ablage ? ladeVersetzZiele(klasse) : [],
+      darfVersetzen: darfVerwalten,
+      versetzZiele: darfVerwalten ? ladeVersetzZiele(klasse).filter((k) => k.ist_ablage || userDarfKlasseVerwalten(request.user, k.id)) : [],
       ablagePersonen: darfVerwalten && !klasse.ist_ablage ? ladeAblagePersonen() : [],
     });
   });
@@ -1735,11 +1750,12 @@ export default async function teacherRoutes(fastify) {
     }
     const eintragen = getDb().transaction(() => {
       if (!userDarfSichAlsKlassenleitungEintragen(request.user, klasse.id)) return false;
-      getDb().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(klasse.id, request.user.id);
+      getDb().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id, selbst_eingetragen) VALUES (?, ?, 1)').run(klasse.id, request.user.id);
       return true;
     });
     if (eintragen()) request.flash?.('success', 'Du bist jetzt als Klassenleitung eingetragen und siehst alle Noten dieser Klasse.');
-    else request.flash?.('error', 'Für diese Klasse ist schon eine Klassenleitung eingetragen. Weitere Personen trägt die Klassenleitung selbst ein.');
+    else if (klasseHatKlassenleitung(klasse.id)) request.flash?.('error', 'Für diese Klasse ist schon eine Klassenleitung eingetragen. Weitere Personen trägt die Klassenleitung selbst ein.');
+    else request.flash?.('error', 'Als Klassenleitung eintragen kann sich nur, wer in dieser Klasse ein eigenes Fach hat. Bitte zuerst ein Fach anlegen.');
     return reply.redirect(`/teacher/klassen/${klasse.id}`);
   });
 
@@ -1836,9 +1852,12 @@ export default async function teacherRoutes(fastify) {
     if (!userDarfKlasseVerwalten(request.user, klasse.id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
-    const { gerettet } = loescheKlasseMitSchuelerUebernahme(klasse.id, request.user.isAdmin ? null : request.user.id);
+    const fremd = fremdeNotenInKlasse(request.user, klasse.id);
+    if (fremd.length) return reply.code(403).viewEjs('error.ejs', { code: 403, message: notenAndererMeldung('Diese Klasse', fremd) });
+    const { gerettet } = loescheKlasseMitSchuelerUebernahme(klasse.id);
     if (gerettet > 0) {
-      request.flash?.('success', `Klasse gelöscht. ${gerettet} Schüler/innen wurden in die Sammelklasse „Ohne Klasse“ übernommen.`);
+      request.flash?.('success', `Klasse gelöscht. ${gerettet} Schüler/innen wurden in die Sammelklasse „Ohne Klasse“ übernommen -- `
+        + 'von dort holst du sie über „Aus Ohne Klasse übernehmen“ in eine deiner Klassen.');
     }
     return reply.redirect('/teacher/klassen');
   });
@@ -1853,15 +1872,25 @@ export default async function teacherRoutes(fastify) {
 
   // Versetzen: die Person wechselt die Klasse, behält aber ALLE Noten (siehe
   // src/klassenwechsel.js) -- z. B. beim Wiederholen/Überspringen einer Stufe.
+  // Verlangt das Verwaltungsrecht an der bisherigen UND an der neuen Klasse. Die Sammelklasse "Ohne Klasse"
+  // ist als Ziel immer erlaubt; als Quelle verwaltet sie nur der Admin -- Lehrkräfte holen Personen von dort
+  // über "Aus Ohne Klasse übernehmen" in eine eigene Klasse.
   fastify.post('/schueler/:id/versetzen', async (request, reply) => {
     const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
     if (!s) return reply.redirect('/teacher/klassen');
-    const quelleIstAblage = getDb().prepare('SELECT ist_ablage FROM klassen WHERE id = ?').get(s.klasse_id)?.ist_ablage;
-    if (!quelleIstAblage && !userDarfKlasseVerwalten(request.user, s.klasse_id)) {
+    if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
     }
     const roh = String(request.body?.ziel_klasse_id || '');
     const zielId = roh === 'ohne-klasse' ? roh : parseInt(roh, 10);
+    if (Number.isInteger(zielId)) {
+      const ziel = getDb().prepare('SELECT id, ist_ablage FROM klassen WHERE id = ?').get(zielId);
+      if (ziel && !ziel.ist_ablage && !userDarfKlasseVerwalten(request.user, ziel.id)) {
+        return reply.code(403).viewEjs('error.ejs', {
+          code: 403, message: 'In diese Klasse darfst du niemanden versetzen -- das darf nur, wer auch die Zielklasse verwaltet (Klassenleitung, Ersteller/in, Admin).',
+        });
+      }
+    }
     const ergebnis = versetzeSchueler(request.params.id, Number.isNaN(zielId) ? null : zielId);
     if (ergebnis.ok) request.flash?.('success', 'Person versetzt -- alle Noten bleiben erhalten.');
     else request.flash?.('error', VERSETZEN_FEHLER[ergebnis.fehler] || 'Versetzen nicht möglich.');
@@ -1982,6 +2011,13 @@ export default async function teacherRoutes(fastify) {
     if (!s) return reply.redirect('/teacher/klassen');
     if (!userDarfKlasseVerwalten(request.user, s.klasse_id)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
+    }
+    const fremd = fremdeNotenDerPerson(request.user, Number(request.params.id));
+    if (fremd.length) {
+      return reply.code(403).viewEjs('error.ejs', {
+        code: 403,
+        message: `${notenAndererMeldung('Diese Person', fremd)} Verlässt die Person die Klasse, bitte stattdessen „Abgang“ eintragen -- die Noten bleiben dann erhalten.`,
+      });
     }
     getDb().prepare('DELETE FROM schueler WHERE id = ?').run(request.params.id);
     return reply.redirect(`/teacher/klassen/${s.klasse_id}`);
@@ -2551,9 +2587,11 @@ export default async function teacherRoutes(fastify) {
       return reply.redirect(`/teacher/klassen/${f.klasse_id}#faecher-lehrkraefte`);
     }
     if (!userDarfFachLoeschen(request.user, f)) {
+      const fremd = !f.ist_kurs && userDarfKlasseVerwalten(request.user, f.klasse_id) ? fremdeNotenImFach(request.user, f.id) : [];
       return reply.code(403).viewEjs('error.ejs', {
         code: 403,
-        message: !f.ist_kurs ? KLASSE_VERWALTEN_NUR
+        message: fremd.length ? notenAndererMeldung('Dieses Fach', fremd)
+          : !f.ist_kurs ? KLASSE_VERWALTEN_NUR
           : userHatFachZgriff(request.user, f.id)
             ? 'Diesem Kurs sind weitere Lehrkräfte zugeordnet — löschen würde auch deren Noten entfernen. Das kann nur der Admin.'
             : 'Keine Berechtigung.',

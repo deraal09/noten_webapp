@@ -6,6 +6,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { getDb } from './db.js';
+import { fremdeNotenImFach } from './loeschschutz.js';
 import { LdapAuthenticator } from './auth/ldap.js';
 import {
   isLdapConfigured as isLdapConfiguredIntern,
@@ -399,14 +400,15 @@ export function ladeMeineKurse(userId) {
  *     ohne Ersteller/in oder Klassenleitung, die Klassenrechte greifen dort
  *     also nicht.
  *   - Normales Fach: wer die Heimat-Klasse verwalten darf
- *     (userDarfKlasseVerwalten: Ersteller/in, Klassenleitung, Admin). Bloßer
- *     Zugriff auf die Klasse — z. B. nach einem Beitritt — reicht nicht,
- *     und die eigene Fach-Zuweisung auch nicht.
+ *     (userDarfKlasseVerwalten: Ersteller/in, Klassenleitung, Admin) -- und
+ *     nur, solange darin keine Noten anderer Lehrkräfte stehen (siehe
+ *     src/loeschschutz.js); sonst nur der Admin. Bloßer Zugriff auf die
+ *     Klasse -- z. B. nach einem Beitritt -- reicht nicht.
  */
 export function userDarfFachLoeschen(user, fach) {
   if (user.isAdmin) return true;
   if (fach.ist_kurs) return istEinzigeLehrkraftImFach(user, fach.id);
-  return userDarfKlasseVerwalten(user, fach.klasse_id);
+  return userDarfKlasseVerwalten(user, fach.klasse_id) && fremdeNotenImFach(user, fach.id).length === 0;
 }
 
 /**
@@ -437,15 +439,25 @@ export function istErstellerDerKlasse(user, klasseId) {
   return Boolean(getDb().prepare('SELECT 1 FROM klassen WHERE id = ? AND created_by_id = ?').get(klasseId, user.id));
 }
 
+/** Ist der User mindestens einem Fach dieser Klasse zugeordnet (egal, ob angelegt, beigetreten oder selbst eingetragen)? */
+export function hatFachInKlasse(user, klasseId) {
+  return Boolean(getDb().prepare(`
+    SELECT 1 FROM fach_zuweisungen fz JOIN faecher f ON f.id = fz.fach_id WHERE f.klasse_id = ? AND fz.user_id = ?
+  `).get(klasseId, user.id));
+}
+
 /**
  * Darf sich der User jetzt als Klassenleitung eintragen? Solange noch niemand eingetragen ist, kann das jede
- * Lehrkraft mit Zugriff auf die Klasse (auch ohne sie angelegt zu haben); danach ist es Sache der
- * Klassenleitung (Co-Klassenleitung eintragen) -- nur der Admin darf immer.
+ * Lehrkraft, die in der Klasse mindestens ein eigenes Fach hat (auch ohne die Klasse angelegt zu haben); danach
+ * ist es Sache der Klassenleitung (Co-Klassenleitung eintragen) -- nur der Admin darf immer.
+ *
+ * Die Klassenleitung kann Noten anderer Lehrkräfte trotzdem nicht vernichten: Fächer, Schüler/innen und Klassen
+ * mit fremden Noten löscht nur der Admin (siehe src/loeschschutz.js).
  */
 export function userDarfSichAlsKlassenleitungEintragen(user, klasseId) {
   if (user.isAdmin) return true;
   if (klasseHatKlassenleitung(klasseId)) return false;
-  return userHatKlassenZugriff(user, klasseId);
+  return hatFachInKlasse(user, klasseId);
 }
 
 /**

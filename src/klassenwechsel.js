@@ -104,9 +104,14 @@ export function versetzeSchueler(schuelerId, zielKlasseId) {
  * in die Sammelklasse "Ohne Klasse" des Schuljahres. Die Sammelklasse selbst
  * wird ohne Rettung gelöscht.
  *
+ * Die Sammelklasse verwaltet nur der Admin. Wer löscht, wird bewusst NICHT
+ * ihre Klassenleitung -- sonst sähe er die Noten aller Personen, die dort
+ * (auch aus fremden Klassen) geparkt sind. Lehrkräfte holen Personen über
+ * "Aus Ohne Klasse übernehmen" in eine Klasse, die sie selbst verwalten.
+ *
  * @returns {{gerettet: number, ablageKlasseId: number | null}}
  */
-export function loescheKlasseMitSchuelerUebernahme(klasseId, userId) {
+export function loescheKlasseMitSchuelerUebernahme(klasseId) {
   const db = getDb();
   const klasse = db.prepare('SELECT * FROM klassen WHERE id = ?').get(klasseId);
   if (!klasse) return { gerettet: 0, ablageKlasseId: null };
@@ -119,9 +124,6 @@ export function loescheKlasseMitSchuelerUebernahme(klasseId, userId) {
       if (anzahl > 0) {
         const ablage = findeOderLegeAblageKlasseAn(klasse.schuljahr_id);
         ablageKlasseId = ablage.id;
-        // Wer die Klasse löscht, muss die Geretteten auch weiterverschieben
-        // können -- dafür wird die Person Klassenleitung der Sammelklasse.
-        if (userId) db.prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(ablage.id, userId);
         gerettet = db.prepare('UPDATE schueler SET klasse_id = ? WHERE klasse_id = ?').run(ablage.id, klasseId).changes;
       }
     }

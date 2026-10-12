@@ -149,7 +149,9 @@ test('Übertragen: nur per Knopfdruck sichtbar für andere Lehrkräfte, eigener 
   await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Physik' });
   const fachId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Physik'").get(klasseId).id;
   const lehrerBId = getDb().prepare('SELECT id FROM users WHERE username = ?').get('lehrerb').id;
-  await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
+  // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+  // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+  getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(klasseId);
   await form(lehrerA, `/teacher/klassen/${klasseId}/zuweisungen/neu`, { user_id: String(lehrerBId), fach_id: String(fachId) });
 
   let r = await lehrerB(`/teacher/klassen/${klasseId}/sitzplan`);

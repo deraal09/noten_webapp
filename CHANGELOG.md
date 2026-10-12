@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.96.0 - 2026-10-12
+
+- **Klassenleitung nur mit eigenem Fach.** Als Klassenleitung eintragen kann sich (solange niemand eingetragen ist)
+  jede Lehrkraft, die in der Klasse mindestens ein eigenes Fach hat; ohne Fach erscheint ein Hinweis statt des Knopfs.
+  Selbst Eingetragene stehen für alle sichtbar mit „selbst eingetragen am …“ in der Klassenleitungs-Zeile.
+- **Löschschutz für Noten anderer Lehrkräfte.** Klassenleitung bzw. erstellende Lehrkraft löschen Fächer,
+  Schüler/innen und Klassen nur noch, wenn daran keine Noten anderer Lehrkräfte hängen (auch nicht über „Zuordnung
+  entfernen, dann als Fach ohne Lehrkraft löschen“). Alles andere löscht nur der Admin; bei Personen gibt es den
+  Hinweis auf „Abgang“.
+- **Sammelklasse „Ohne Klasse“ verwaltet nur der Admin.** Wer eine Klasse löscht, wird nicht mehr ihre Klassenleitung
+  und sieht damit keine Abgangszeugnisse fremder, dort geparkter Personen. Bestehende Einträge dieser Art entfernt die
+  Datenbank-Migration (Schema 23). Personen holt man über „Aus Ohne Klasse übernehmen“ in eine eigene Klasse.
+- **Versetzen prüft Quelle und Ziel.** Nur mit Verwaltungsrecht an beiden Klassen (Ziel „Ohne Klasse“ immer erlaubt);
+  bisher konnte man in fremde Klassen versetzen bzw. aus der Sammelklasse ganz ohne Recht.
+
 ## 0.95.2 - 2026-10-11
 
 - **Sicherheit: Löschbestätigung bei „Fächer ohne Lehrkraft“ (Klassenleitung).** Der Bestätigungstext stand

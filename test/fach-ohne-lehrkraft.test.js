@@ -140,11 +140,16 @@ test('POST /klassenlehrer/fach/:id/loeschen: nur die Klassenleitung darf, und nu
   assert.equal(r.status, 302);
   assert.ok(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(mathId));
 
-  // Deutsch ist unzugewiesen -- die Klassenleitung darf es löschen, samt Endnoten.
+  // Deutsch ist unzugewiesen, enthält aber schon Endnoten (z. B. nachdem die Zuweisung entfernt wurde): die
+  // gehören einer anderen Lehrkraft -- die Klassenleitung darf das Fach nicht löschen, nur der Admin.
   getDb().prepare("INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, 'Adler', 'Anna')").run(klasseId);
   const anna = getDb().prepare('SELECT id FROM schueler').get().id;
   getDb().prepare("INSERT INTO halbjahr_endnoten (fach_id, schueler_id, halbjahr, note) VALUES (?, ?, '1. Halbjahr', 2)").run(deutschId, anna);
   r = await form(lehrerA, `/klassenlehrer/fach/${deutschId}/loeschen`, {});
+  assert.equal(r.status, 302);
+  assert.ok(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(deutschId), 'Fach mit Noten bleibt');
+  assert.match(await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr`)).text(), /enthält bereits Noten/);
+  r = await form(admin, `/klassenlehrer/fach/${deutschId}/loeschen`, {});
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(deutschId), undefined);
   assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM halbjahr_endnoten WHERE fach_id = ?').get(deutschId).c, 0, 'Endnoten verschwinden per ON DELETE CASCADE');

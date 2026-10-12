@@ -372,9 +372,15 @@ und das per Flash-Meldung/Ergebnisseite rückgemeldet.
 
 ### Klassenleitung (selbst eintragen, nicht nur Admin)
 
-Die Person, die eine Klasse angelegt hat, kann sich auf der Klassenseite
-selbst als **Klassenleitung** eintragen (Admin kann das für jede Klasse
-ebenfalls). Als Klassenleitung:
+Solange eine Klasse noch keine Klassenleitung hat, kann sich **jede
+Lehrkraft mit eigenem Fach in der Klasse** auf der Klassenseite selbst als
+**Klassenleitung** eintragen (`userDarfSichAlsKlassenleitungEintragen` in
+`src/auth.js`) — egal, ob sie das Fach angelegt hat, beigetreten ist oder
+sich in ein freies Fach eingetragen hat. Ohne eigenes Fach erscheint statt
+des Knopfs der Hinweis, zuerst ein Fach anzulegen. Wer sich selbst
+eingetragen hat, steht für alle sichtbar mit „selbst eingetragen am …" in
+der Klassenleitungs-Zeile. Danach trägt die Klassenleitung weitere Personen
+selbst ein; der Admin kann das für jede Klasse. Als Klassenleitung:
 
 - kann sie weitere Fächer anlegen,
 - kann sie **andere Lehrkräfte** Fächern dieser Klasse zuordnen — bisher
@@ -396,6 +402,36 @@ Diese haben danach exakt dieselben Rechte — insbesondere Zugriff auf die
 Klassenleitungsseite und damit auf die Fehlzeiten-Pflege —, da die
 Berechtigungsprüfung (`userIstKlassenlehrer`) ohnehin schon jede Person in
 der `klassenleitung`-Tabelle als vollwertige Klassenleitung behandelt.
+
+### Löschschutz: keine Noten anderer Lehrkräfte vernichten
+
+Ein Fach, eine Person oder eine Klasse zu löschen entfernt alle zugehörigen
+Noten unwiderruflich. Die Klassenleitung (bzw. die erstellende Lehrkraft,
+solange es keine Klassenleitung gibt) darf deshalb nur löschen, woran
+**keine Noten anderer Lehrkräfte** hängen (`src/loeschschutz.js`):
+
+- **Fach:** ohne Noten, oder sie ist die einzige zugeordnete Lehrkraft.
+  Ein Fach mit Noten, aber ohne Lehrkraft (z. B. nach entfernter
+  Zuordnung) gilt als fremd — auch unter „Fächer ohne Lehrkraft".
+- **Klasse:** nur, wenn jedes ihrer Fächer nach dieser Regel löschbar ist.
+- **Schüler/in:** nur ohne Noten in Fächern anderer Lehrkräfte — sonst
+  „Abgang" eintragen (die Noten bleiben erhalten).
+
+Alles andere löscht nur der Admin; die Fehlermeldung nennt die betroffenen
+Fächer.
+
+### Sammelklasse „Ohne Klasse" und Versetzen
+
+Beim Löschen einer Klasse wandern ihre Schüler/innen (nur die Person) in
+die Sammelklasse „Ohne Klasse" des Schuljahres. Die Sammelklasse
+**verwaltet nur der Admin** — wer eine Klasse löscht, wird nicht ihre
+Klassenleitung (sonst sähe er die Noten aller dort geparkten Personen).
+Lehrkräfte holen Personen über **„Aus Ohne Klasse übernehmen"** in eine
+Klasse, die sie selbst verwalten.
+
+**Versetzen** verlangt das Verwaltungsrecht an der bisherigen **und** an
+der neuen Klasse; „Ohne Klasse" ist als Ziel immer erlaubt. Die
+Auswahlliste zeigt nur Klassen, in die man versetzen darf.
 
 ### Externe Lehrkräfte einladen (`/teacher/einladungen`)
 

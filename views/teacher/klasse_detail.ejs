@@ -19,7 +19,7 @@
     <a class="btn" href="/klassenlehrer/klasse/<%= klasse.id %>">🎓 Klassenleitung</a>
   <% } %>
   <% if (darfVerwalten) { %>
-    <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('<% if (klasse.ist_ablage) { %>Sammelklasse löschen? Die enthaltenen Schüler/innen gehen dabei verloren.<% } else { %>Klasse löschen? Fächer, Klausuren und Noten dieser Klasse gehen verloren. Die Schüler/innen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“ erhalten und können von dort in andere Klassen versetzt werden.<% } %>')">
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('<% if (klasse.ist_ablage) { %>Sammelklasse löschen? Die enthaltenen Schüler/innen gehen dabei verloren.<% } else { %>Klasse löschen? Fächer, Klausuren und Noten dieser Klasse gehen verloren. Die Schüler/innen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“ erhalten und können von dort in andere Klassen übernommen werden.<% } %>')">
       <button type="submit" class="danger">🗑 Klasse löschen</button>
     </form>
   <% } %>
@@ -77,6 +77,8 @@
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenlehrer/eintragen" class="inline">
     <button type="submit">Als Klassenleitung eintragen (alle Noten der Klasse sehen, Fächer zuordnen)</button>
   </form>
+<% } else if (klassenleitungErstMitFach) { %>
+  <p class="hint">Noch keine Klassenleitung eingetragen. Lege zuerst ein eigenes Fach an, dann kannst du dich als Klassenleitung eintragen.</p>
 <% } %>
 
 <h2>Schüler/innen (<%= schueler.length %>)</h2>
@@ -175,6 +177,9 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 <% } %>
 <% } %>
 
+<% if (klasse.ist_ablage && !darfVerwalten) { %>
+  <p class="hint">Die Sammelklasse verwaltet der Admin. Personen von hier holst du auf der Seite deiner Klasse über „Aus Ohne Klasse übernehmen“ in die Klasse.</p>
+<% } %>
 <% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
    var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
 <table class="data">

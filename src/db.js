@@ -54,7 +54,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 // Spalten der beiden Sitzplan-Tabellen — einmal definiert, damit SCHEMA
 // (neue Datenbanken) und der Neuaufbau in migriereSitzplanRaeume()
@@ -796,6 +796,9 @@ function migriereSitzplanRaeume(db) {
 }
 
 function migrate(db) {
+  // Schema-Version vor diesem Start (null = neue Datenbank) -- für einmalige Datenkorrekturen.
+  const versionsZeile = db.prepare("SELECT value FROM schema_meta WHERE key = 'version'").get();
+  const alteVersion = versionsZeile ? Number(versionsZeile.value) : null;
   ensureColumn(db, 'users', 'auth_source', "auth_source TEXT NOT NULL DEFAULT 'lokal'");
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
   // Partial-Index: login_sub muss nur unter LDAP-Konten eindeutig sein.
@@ -826,6 +829,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'spa_schema', 'spa_schema TEXT');
   // 1 = die Lehrkraft hat sich selbst für das Fach eingetragen (und darf sich selbst wieder austragen).
   ensureColumn(db, 'fach_zuweisungen', 'selbst_eingetragen', 'selbst_eingetragen INTEGER NOT NULL DEFAULT 0');
+  // 1 = die Lehrkraft hat sich selbst als Klassenleitung eingetragen (Anzeige "selbst eingetragen am …").
+  ensureColumn(db, 'klassenleitung', 'selbst_eingetragen', 'selbst_eingetragen INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
   // Laufzeit einer Klasse in Schuljahren (Startjahr, z. B. 2025 für 2025/26): siehe src/klassen-jahre.js.
@@ -868,6 +873,11 @@ function migrate(db) {
     }
   }
   migriereSitzplanRaeume(db);
+  // Schema 23: Die Sammelklasse "Ohne Klasse" verwaltet nur noch der Admin. Bisher wurde, wer eine Klasse
+  // löschte, automatisch ihre Klassenleitung -- und sah damit die Noten aller dort geparkten Personen.
+  if (alteVersion !== null && alteVersion < 23) {
+    db.exec('DELETE FROM klassenleitung WHERE klasse_id IN (SELECT id FROM klassen WHERE ist_ablage = 1)');
+  }
   fuelleFachTeilnehmerAuf(db);
 }
 

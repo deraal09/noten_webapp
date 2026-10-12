@@ -163,7 +163,7 @@ export default async function adminRoutes(fastify) {
 
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {
     const sjId = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(request.params.id)?.schuljahr_id;
-    loescheKlasseMitSchuelerUebernahme(Number(request.params.id), null);
+    loescheKlasseMitSchuelerUebernahme(Number(request.params.id));
     return reply.redirect(`/admin/schuljahre/${sjId}`);
   });
 
