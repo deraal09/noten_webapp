@@ -815,6 +815,9 @@ function migrate(db) {
   // Optionale Extrapunkte je Person (zählen zur Gesamtpunktzahl, Prozent darf über 100 liegen) und eine Notiz je Klausur.
   ensureColumn(db, 'klausur_ergebnisse', 'extrapunkte', 'extrapunkte REAL');
   ensureColumn(db, 'klausuren', 'notiz', "notiz TEXT NOT NULL DEFAULT ''");
+  // Höchstzahl der Extrapunkte je Klausur (NULL = nicht festgelegt). Sie zählt NICHT zur Gesamtpunktzahl der Klausur:
+  // Extra-Aufgaben müssen nicht bearbeitet werden, erreichte Extrapunkte kommen aber zu den Punkten dazu.
+  ensureColumn(db, 'klausuren', 'max_extrapunkte', 'max_extrapunkte REAL');
   ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
   // Datumstabelle: "n.a." (nicht anwesend) statt einer Note; wert bleibt dann NULL und zählt nicht in den Schnitt.
   ensureColumn(db, 'unterricht_noten', 'nicht_anwesend', 'nicht_anwesend INTEGER NOT NULL DEFAULT 0');

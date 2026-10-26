@@ -133,6 +133,42 @@ test('Extrapunkte allein ergeben keine Note; ungültige Werte und fehlende Recht
   assert.equal((await admin('/teacher/klausuren/9999/extrapunkte', { schueler_id: String(s1), wert: '1' })).status, 404);
 });
 
+test('Max. Extrapunkte: Obergrenze für die Extrapunkte, zählt nicht zur Gesamtpunktzahl, nicht unter bereits Eingetragenes senkbar', async () => {
+  const seite = async () => (await admin(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
+  const maxForm = (extra_, anzahl = '1', mp0 = '10') => admin(`/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: anzahl, mp_0: mp0, halbjahr: HJ, max_extra: extra_ });
+  assert.equal((await maxForm('3')).status, 302);
+  assert.equal(db().prepare('SELECT max_extrapunkte FROM klausuren WHERE id = ?').get(klausurId).max_extrapunkte, 3);
+  let html = await seite();
+  assert.match(html, new RegExp(`name="max_extra" form="maxpunkte-form-k${klausurId}" value="3"`));
+  assert.match(html, new RegExp(`class="extrapunkt" data-kid="${klausurId}"[^>]*max="3"`));
+  // Obergrenze gilt; die Gesamtpunktzahl der Klausur bleibt 10 (ohne die 3 Extrapunkte)
+  let r = await extra(s1, '4');
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error, /0 bis 3 \(Max\. Extrapunkte/);
+  assert.equal((await extra(s1, '3')).status, 200);
+  assert.match(await seite(), /11 \/ 10 <small>\(110 %\)<\/small>/);
+  assert.equal((await klausurZeile(s1)).note, 1);
+  // nicht unter den höchsten eingetragenen Wert senken
+  await maxForm('2');
+  assert.equal(db().prepare('SELECT max_extrapunkte FROM klausuren WHERE id = ?').get(klausurId).max_extrapunkte, 3, 'unverändert');
+  await maxForm('5');
+  assert.equal(db().prepare('SELECT max_extrapunkte FROM klausuren WHERE id = ?').get(klausurId).max_extrapunkte, 5);
+  // ungültig bleibt unverändert, leer = nicht festgelegt (Obergrenze dann die Gesamtpunktzahl)
+  await maxForm('abc');
+  assert.equal(db().prepare('SELECT max_extrapunkte FROM klausuren WHERE id = ?').get(klausurId).max_extrapunkte, 5);
+  await extra(s1, '');
+  await maxForm('');
+  assert.equal(db().prepare('SELECT max_extrapunkte FROM klausuren WHERE id = ?').get(klausurId).max_extrapunkte, null);
+  assert.equal((await extra(s1, '10')).status, 200);
+  assert.equal((await extra(s1, '11')).status, 400);
+  await extra(s1, '');
+  // das normale Speichern der Max-Punkte ohne das Feld lässt die Höchstzahl unberührt
+  await maxForm('4');
+  await admin(`/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: '1', mp_0: '10', halbjahr: HJ });
+  assert.equal(db().prepare('SELECT max_extrapunkte FROM klausuren WHERE id = ?').get(klausurId).max_extrapunkte, 4);
+  await maxForm('');
+});
+
 test('Mehrteilige Klausur: keine Extrapunkte-Spalte, Eingabe wird abgelehnt', async () => {
   await admin(`/teacher/fach/${fachId}/klausuren/neu`, { name: 'K2', aufgaben: '2', halbjahr: HJ });
   const k2 = db().prepare("SELECT id FROM klausuren WHERE name = 'K2'").get().id;

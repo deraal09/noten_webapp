@@ -227,13 +227,13 @@ test('Planer: sichert von selbst, sobald ein Lauf fällig ist', async () => {
   await new Promise((r) => setTimeout(r, 1100));
   const stopp = B.starteBackupPlaner({ intervallMs: 50 });
   try {
-    for (let i = 0; i < 60 && E.letzteLaeufe(1).length === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    // bei voller Testlast kann der Lauf etwas dauern: auf ein beendetes Protokoll warten
+    for (let i = 0; i < 300 && !E.letzteLaeufe(1)[0]?.beendet_at; i++) await new Promise((r) => setTimeout(r, 100));
   } finally { stopp(); }
   const lauf = E.letzteLaeufe(1)[0];
   assert.ok(lauf, 'ein Lauf wurde angestoßen');
   assert.equal(lauf.ausloeser, 'geplant');
-  await new Promise((r) => setTimeout(r, 300));
-  assert.equal(E.letzteLaeufe(1)[0].ok, 1);
+  assert.equal(lauf.ok, 1, lauf.meldung);
   assert.equal(fs.readdirSync(zielDir).length, vorher + 1);
 });
 

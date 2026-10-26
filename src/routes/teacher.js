@@ -791,6 +791,21 @@ export default async function teacherRoutes(fastify) {
     }
     getDb().prepare('UPDATE klausuren SET max_punkte_pro_aufgabe = ? WHERE id = ?')
       .run(JSON.stringify(neueWerte), request.params.id);
+    // Höchstzahl der Extrapunkte (nur einteilige Klausuren; leer = nicht festgelegt). Zählt nicht zur Gesamtpunktzahl.
+    if (!teileInfo && request.body && 'max_extra' in request.body) {
+      const roh = String(request.body.max_extra ?? '').trim().replace(',', '.');
+      const neuMax = roh === '' ? null : Number(roh);
+      if (neuMax !== null && (!Number.isFinite(neuMax) || neuMax < 0)) {
+        request.flash?.('error', 'Max. Extrapunkte: bitte eine Zahl ab 0 eintragen.');
+      } else {
+        const hoechster = getDb().prepare('SELECT MAX(extrapunkte) AS m FROM klausur_ergebnisse WHERE klausur_id = ?').get(request.params.id).m ?? 0;
+        if (neuMax !== null && neuMax < hoechster) {
+          request.flash?.('error', `Max. Extrapunkte nicht geändert: es sind schon Extrapunkte bis ${hoechster} eingetragen.`);
+        } else {
+          getDb().prepare('UPDATE klausuren SET max_extrapunkte = ? WHERE id = ?').run(neuMax || null, request.params.id);
+        }
+      }
+    }
     // bestehende Ergebnisse anpassen
     const ergebnisse = getDb().prepare('SELECT id, punkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(request.params.id);
     for (const e of ergebnisse) {
@@ -937,7 +952,7 @@ export default async function teacherRoutes(fastify) {
 
   // Extrapunkte je Person (optional): zählen zur Gesamtpunktzahl einer einteiligen Klausur, der Prozentwert darf über 100 liegen.
   fastify.post('/klausuren/:id/extrapunkte', async (request, reply) => {
-    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
+    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, max_extrapunkte, teile FROM klausuren WHERE id = ?').get(request.params.id);
     if (!k) return reply.code(404).send({ ok: false, error: 'not found' });
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden' });
     const schuelerId = parseInt(request.body?.schueler_id, 10);
@@ -950,12 +965,14 @@ export default async function teacherRoutes(fastify) {
     }
     const maxArr = JSON.parse(k.max_punkte_pro_aufgabe);
     const maxSumme = maxArr.reduce((a, b) => a + b, 0);
+    // Obergrenze: die für die Klausur festgelegten Max. Extrapunkte; ohne Angabe so viele, wie die Klausur Punkte hat.
+    const grenze = k.max_extrapunkte > 0 ? k.max_extrapunkte : Math.max(maxSumme, 1);
     const roh = String(request.body?.wert ?? '').trim().replace(',', '.');
     let wert = null;
     if (roh !== '') {
       wert = Number(roh);
-      if (!Number.isFinite(wert) || wert < 0 || wert > Math.max(maxSumme, 1)) {
-        return reply.code(400).send({ ok: false, error: `Extrapunkte: 0 bis ${maxSumme} (höchstens so viele wie die Klausur Punkte hat).` });
+      if (!Number.isFinite(wert) || wert < 0 || wert > grenze) {
+        return reply.code(400).send({ ok: false, error: `Extrapunkte: 0 bis ${grenze}${k.max_extrapunkte > 0 ? ' (Max. Extrapunkte dieser Klausur)' : ''}.` });
       }
       if (wert === 0) wert = null;
     }

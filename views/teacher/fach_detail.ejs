@@ -255,7 +255,7 @@
             <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
           </label>
         <% } %>
-        <span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.</span>
+        <span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.<% if (!k.teileInfo) { %> In der Spalte „Extra“ steht die Höchstzahl der Extrapunkte (optional, Extra-Aufgaben): Sie zählt nicht zur Gesamtpunktzahl, erreichte Extrapunkte kommen aber zu den Punkten dazu.<% } %></span>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
       <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
@@ -285,7 +285,7 @@
             <tr>
               <th>Schüler/in</th>
               <% maxArr.forEach(function(_, i) { %><th class="aufgabe-head">A<%= i+1 %></th><% }); %>
-              <th class="extra-head" title="Extrapunkte (optional): zählen zu den erreichten Punkten, der Prozentwert darf dadurch über 100 liegen">Extra</th>
+              <th class="extra-head" title="Extrapunkte (optional, Extra-Aufgaben): zählen zu den erreichten Punkten, aber nicht zur Gesamtpunktzahl; der Prozentwert darf dadurch über 100 liegen">Extra</th>
               <th>Punkte gesamt</th>
               <th class="note-col"><%= NL %></th>
             </tr>
@@ -296,7 +296,7 @@
               <th class="aufgabe-head"><input type="number" class="maxpunkt" name="mp_<%= i %>" form="maxpunkte-form-k<%= k.id %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>" aria-label="Max. Punkte Aufgabe <%= i+1 %>"></th>
               <% if (teilEnde[i] !== undefined) { %><th class="note-col"></th><% } %>
             <% }); %>
-            <% if (!k.teileInfo) { %><th class="aufgabe-head"></th><% } %>
+            <% if (!k.teileInfo) { %><th class="aufgabe-head"><input type="number" class="maxpunkt" name="max_extra" form="maxpunkte-form-k<%= k.id %>" value="<%= k.max_extrapunkte || '' %>" min="0" step="0.5" placeholder="–" title="Max. Extrapunkte (optional, Extra-Aufgaben): zählen nicht zur Gesamtpunktzahl" aria-label="Max. Extrapunkte"></th><% } %>
             <th class="aufgabe-head"><%= maxSumme %></th>
             <th class="note-col"></th>
           </tr>
@@ -318,7 +318,7 @@
                 <% } %>
               <% }); %>
               <% if (!k.teileInfo) { %>
-                <td><input type="number" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" min="0" max="<%= maxSumme %>" step="0.5" value="<%= extra || '' %>" placeholder="–" title="Extrapunkte (optional)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
+                <td><input type="number" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" min="0" max="<%= k.max_extrapunkte > 0 ? k.max_extrapunkte : maxSumme %>" step="0.5" value="<%= extra || '' %>" placeholder="–" title="Extrapunkte (optional<%= k.max_extrapunkte > 0 ? ', höchstens ' + k.max_extrapunkte : '' %>)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
               <% } %>
               <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe + extra %> / <%= maxSumme %><% if (extra && maxSumme > 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
               <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>

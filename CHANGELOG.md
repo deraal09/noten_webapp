@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.97.1 - 2026-10-26
+
+- **Klausur: Höchstzahl der Extrapunkte.** In der Zeile „Max. Punkte“ gibt es unter „Extra“ ein Feld für die
+  maximalen Extrapunkte (Extra-Aufgaben, die nicht bearbeitet werden müssen). Diese Höchstzahl zählt **nicht** zur
+  Gesamtpunktzahl der Klausur (die Prozentrechnung bleibt auf die Punkte der Aufgaben bezogen); erreichte
+  Extrapunkte kommen weiterhin zu den Punkten dazu, der Prozentwert kann über 100 liegen. Eingaben über der
+  Höchstzahl werden abgelehnt. Ohne Angabe gilt wie bisher die Gesamtpunktzahl als Obergrenze. Die Höchstzahl lässt
+  sich nicht unter bereits eingetragene Extrapunkte senken. Spalte `klausuren.max_extrapunkte`.
+
 ## 0.97.0 - 2026-10-26
 
 - **Klausur: optionale Extrapunkte.** Bei einteiligen Klausuren gibt es neben den Aufgaben eine Spalte „Extra“.
