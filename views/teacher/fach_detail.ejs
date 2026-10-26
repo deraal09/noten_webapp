@@ -285,6 +285,7 @@
             <tr>
               <th>Schüler/in</th>
               <% maxArr.forEach(function(_, i) { %><th class="aufgabe-head">A<%= i+1 %></th><% }); %>
+              <th class="extra-head" title="Extrapunkte (optional): zählen zu den erreichten Punkten, der Prozentwert darf dadurch über 100 liegen">Extra</th>
               <th>Punkte gesamt</th>
               <th class="note-col"><%= NL %></th>
             </tr>
@@ -295,6 +296,7 @@
               <th class="aufgabe-head"><input type="number" class="maxpunkt" name="mp_<%= i %>" form="maxpunkte-form-k<%= k.id %>" value="<%= mp %>" min="0" step="0.5" title="Max. Punkte Aufgabe <%= i+1 %>" aria-label="Max. Punkte Aufgabe <%= i+1 %>"></th>
               <% if (teilEnde[i] !== undefined) { %><th class="note-col"></th><% } %>
             <% }); %>
+            <% if (!k.teileInfo) { %><th class="aufgabe-head"></th><% } %>
             <th class="aufgabe-head"><%= maxSumme %></th>
             <th class="note-col"></th>
           </tr>
@@ -303,6 +305,7 @@
           <% rows.forEach(function(r) {
                var eintrag = r.klausuren.find(function(x) { return x.id === k.id; });
                var summe = (eintrag && eintrag.punkte) ? eintrag.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
+               var extra = (eintrag && eintrag.extrapunkte) || 0;
                var gesperrt = Boolean(sperren.get(r.schueler_id)); %>
             <tr>
               <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
@@ -314,12 +317,19 @@
                   <td class="note-cell k-teilnote" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-teil="<%= teilEnde[i] %>"><%= (tn === null || tn === undefined) ? '–' : formatNote(tn) %></td>
                 <% } %>
               <% }); %>
-              <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe %> / <%= maxSumme %></td>
+              <% if (!k.teileInfo) { %>
+                <td><input type="number" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" min="0" max="<%= maxSumme %>" step="0.5" value="<%= extra || '' %>" placeholder="–" title="Extrapunkte (optional)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
+              <% } %>
+              <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe + extra %> / <%= maxSumme %><% if (extra && maxSumme > 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
               <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
             </tr>
           <% }); %>
         </tbody>
       </table>
+      <label class="klausur-notiz-label">Notizen zur Klausur
+        <textarea class="klausur-notiz" data-kid="<%= k.id %>" rows="4" maxlength="5000" placeholder="z. B. Auffälligkeiten, Nachschreiber, Hinweise zur Korrektur"><%= k.notiz || '' %></textarea>
+      </label>
+      <p class="hint klausur-notiz-status" data-kid="<%= k.id %>" aria-live="polite"></p>
     </div>
   <% }); %>
 
@@ -686,7 +696,14 @@
         document.querySelectorAll('.k-summe[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
           const k = s.klausuren.find(function(x) { return x.id === Number(cell.dataset.kid); });
           const summe = (k && k.punkte) ? k.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
-          cell.textContent = summe + ' / ' + cell.dataset.max;
+          const extra = (k && k.extrapunkte) || 0;
+          const max = Number(cell.dataset.max);
+          cell.textContent = (summe + extra) + ' / ' + cell.dataset.max;
+          if (extra && max > 0) {
+            const prozent = document.createElement('small');
+            prozent.textContent = ' (' + Math.round((summe + extra) / max * 100) + ' %)';
+            cell.appendChild(prozent);
+          }
         });
         document.querySelectorAll('.u-summe[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
           const u = s.uls.find(function(x) { return x.id === Number(cell.dataset.kid); });
@@ -743,6 +760,35 @@
       await fetch(url, { method: 'POST', body });
       refresh();
     }, 400));
+  });
+  // Extrapunkte (optional, einteilige Klausuren): speichern, dann Summe/Note neu laden; ein abgelehnter Wert wird markiert.
+  document.querySelectorAll('input.extrapunkt').forEach(function(inp) {
+    inp.addEventListener('input', debounce(async function() {
+      const body = new URLSearchParams();
+      body.append('schueler_id', inp.dataset.sid);
+      body.append('wert', inp.value);
+      let d = null;
+      try { d = await (await fetch('/teacher/klausuren/' + inp.dataset.kid + '/extrapunkte', { method: 'POST', body })).json(); } catch (e) { /* ignorieren */ }
+      inp.classList.toggle('speicherfehler', !(d && d.ok));
+      inp.title = (d && d.ok) ? 'Extrapunkte (optional)' : ((d && d.error) || 'Nicht gespeichert.');
+      if (d && d.ok) refresh();
+    }, 400));
+  });
+  // Notizen zur Klausur: beim Tippen verzögert, beim Verlassen sofort speichern.
+  document.querySelectorAll('textarea.klausur-notiz').forEach(function(feld) {
+    const status = document.querySelector('.klausur-notiz-status[data-kid="' + feld.dataset.kid + '"]');
+    let zuletzt = feld.value;
+    const speichern = async function() {
+      if (feld.value === zuletzt) return;
+      const body = new URLSearchParams();
+      body.append('text', feld.value);
+      let d = null;
+      try { d = await (await fetch('/teacher/klausuren/' + feld.dataset.kid + '/notiz', { method: 'POST', body })).json(); } catch (e) { /* ignorieren */ }
+      if (d && d.ok) { zuletzt = feld.value; if (status) status.textContent = 'Gespeichert.'; }
+      else if (status) status.textContent = (d && d.error) || 'Nicht gespeichert – bitte erneut versuchen.';
+    };
+    feld.addEventListener('input', debounce(speichern, 800));
+    feld.addEventListener('blur', speichern);
   });
   // Direkte Endnoteneingabe: Tabelle ein-/ausklappen und beim Verlassen eines Feldes speichern.
   // Beim Öffnen der Seite ist sie eingeklappt; nur beim Wechsel des Halbjahres bleibt sie offen

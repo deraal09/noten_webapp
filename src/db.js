@@ -812,6 +812,9 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'abgeschlossen_von_id', 'abgeschlossen_von_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
   ensureColumn(db, 'klausuren', 'teile', 'teile TEXT');
+  // Optionale Extrapunkte je Person (zählen zur Gesamtpunktzahl, Prozent darf über 100 liegen) und eine Notiz je Klausur.
+  ensureColumn(db, 'klausur_ergebnisse', 'extrapunkte', 'extrapunkte REAL');
+  ensureColumn(db, 'klausuren', 'notiz', "notiz TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
   // Datumstabelle: "n.a." (nicht anwesend) statt einer Note; wert bleibt dann NULL und zählt nicht in den Schnitt.
   ensureColumn(db, 'unterricht_noten', 'nicht_anwesend', 'nicht_anwesend INTEGER NOT NULL DEFAULT 0');

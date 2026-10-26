@@ -218,6 +218,8 @@ function parseVerrechnungEingabe(body, laufzeit) {
   return { werte };
 }
 
+const MAX_KLAUSUR_NOTIZ = 5000;
+
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
 
@@ -930,6 +932,54 @@ export default async function teacherRoutes(fastify) {
         .run(request.params.id, schuelerId, JSON.stringify(arr));
     }
     syncFallsAutoAktiv(k.fach_id, k.halbjahr, request.user.id);
+    return reply.send({ ok: true });
+  });
+
+  // Extrapunkte je Person (optional): zählen zur Gesamtpunktzahl einer einteiligen Klausur, der Prozentwert darf über 100 liegen.
+  fastify.post('/klausuren/:id/extrapunkte', async (request, reply) => {
+    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
+    if (!k) return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    const schuelerId = parseInt(request.body?.schueler_id, 10);
+    if (!Number.isFinite(schuelerId)) return reply.code(400).send({ ok: false, error: 'bad params' });
+    if (parseKlausurTeile(k.teile)) {
+      return reply.code(400).send({ ok: false, error: 'Extrapunkte gibt es nur bei einteiligen Klausuren.' });
+    }
+    if (istSchuelerGesperrtInFach(k.fach_id, schuelerId, k.halbjahr)) {
+      return reply.code(403).send({ ok: false, error: 'gesperrt' });
+    }
+    const maxArr = JSON.parse(k.max_punkte_pro_aufgabe);
+    const maxSumme = maxArr.reduce((a, b) => a + b, 0);
+    const roh = String(request.body?.wert ?? '').trim().replace(',', '.');
+    let wert = null;
+    if (roh !== '') {
+      wert = Number(roh);
+      if (!Number.isFinite(wert) || wert < 0 || wert > Math.max(maxSumme, 1)) {
+        return reply.code(400).send({ ok: false, error: `Extrapunkte: 0 bis ${maxSumme} (höchstens so viele wie die Klausur Punkte hat).` });
+      }
+      if (wert === 0) wert = null;
+    }
+    const vorhanden = getDb().prepare('SELECT id FROM klausur_ergebnisse WHERE klausur_id = ? AND schueler_id = ?').get(request.params.id, schuelerId);
+    if (vorhanden) {
+      getDb().prepare('UPDATE klausur_ergebnisse SET extrapunkte = ? WHERE id = ?').run(wert, vorhanden.id);
+    } else if (wert !== null) {
+      getDb().prepare('INSERT INTO klausur_ergebnisse (klausur_id, schueler_id, punkte, extrapunkte) VALUES (?, ?, ?, ?)')
+        .run(request.params.id, schuelerId, JSON.stringify(new Array(maxArr.length).fill(null)), wert);
+    }
+    syncFallsAutoAktiv(k.fach_id, k.halbjahr, request.user.id);
+    return reply.send({ ok: true, wert });
+  });
+
+  // Notizen zur Klausur (ein Textfeld je Klausur, unter der Schülertabelle).
+  fastify.post('/klausuren/:id/notiz', async (request, reply) => {
+    const k = getDb().prepare('SELECT fach_id, halbjahr FROM klausuren WHERE id = ?').get(request.params.id);
+    if (!k) return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    const text = String(request.body?.text ?? '').replace(/\r\n/g, '\n');
+    if (text.length > MAX_KLAUSUR_NOTIZ) {
+      return reply.code(400).send({ ok: false, error: `Die Notiz ist zu lang (höchstens ${MAX_KLAUSUR_NOTIZ} Zeichen).` });
+    }
+    getDb().prepare('UPDATE klausuren SET notiz = ? WHERE id = ?').run(text, request.params.id);
     return reply.send({ ok: true });
   });
 

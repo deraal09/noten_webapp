@@ -92,14 +92,26 @@ const roundPct = (p) => Math.round(p);
 /**
  * Berechnet die Note aus erreichten/maximalen Punkten einer Klausur/UL.
  */
-export function noteAusPunkten(punkte, maxPunkte, csvStr) {
+export function noteAusPunkten(punkte, maxPunkte, csvStr, extrapunkte = 0) {
   if (!Array.isArray(punkte) || punkte.length === 0) return null;
   if (punkte.some((p) => p === null || p === undefined)) return null;
   if (punkte.length !== maxPunkte.length) return null;
   const maxP = maxPunkte.reduce((a, b) => a + b, 0);
   if (maxP === 0) return null;
-  const prozent = roundPct((punkte.reduce((a, b) => a + b, 0) / maxP) * 100);
+  const extra = Number.isFinite(Number(extrapunkte)) && Number(extrapunkte) > 0 ? Number(extrapunkte) : 0;
+  // Extrapunkte zählen zu den erreichten Punkten; der Prozentwert darf dadurch über 100 liegen (die beste Note bleibt die beste).
+  const prozent = roundPct(((punkte.reduce((a, b) => a + b, 0) + extra) / maxP) * 100);
   return nsCsvLookup(prozent, csvStr);
+}
+
+/** Prozentwert der Klausur inkl. Extrapunkte (null, solange nicht alle Aufgaben eingetragen sind). */
+export function klausurProzent(punkte, maxPunkte, extrapunkte = 0) {
+  if (!Array.isArray(punkte) || punkte.length === 0 || punkte.length !== maxPunkte.length) return null;
+  if (punkte.some((p) => p === null || p === undefined)) return null;
+  const maxP = maxPunkte.reduce((a, b) => a + b, 0);
+  if (maxP === 0) return null;
+  const extra = Number(extrapunkte) > 0 ? Number(extrapunkte) : 0;
+  return roundPct(((punkte.reduce((a, b) => a + b, 0) + extra) / maxP) * 100);
 }
 
 /**
@@ -242,8 +254,9 @@ export function klausurTeilNoten(punkte, maxPunkte, teileInfo, csvStr) {
  * @param {string} csvStr
  * @returns {number|null}
  */
-export function klausurNote(punkte, maxPunkte, teileInfo, csvStr) {
-  if (!teileInfo) return noteAusPunkten(punkte, maxPunkte, csvStr);
+export function klausurNote(punkte, maxPunkte, teileInfo, csvStr, extrapunkte = 0) {
+  // Extrapunkte gibt es nur bei einteiligen Klausuren (bei mehrteiligen bestimmen die Teilnoten das Ergebnis).
+  if (!teileInfo) return noteAusPunkten(punkte, maxPunkte, csvStr, extrapunkte);
   const teilNoten = klausurTeilNoten(punkte, maxPunkte, teileInfo, csvStr);
   if (!teilNoten || teilNoten.some((n) => n === null)) return null;
   const summeGew = teileInfo.teile.reduce((a, t) => a + t.gewichtung, 0);

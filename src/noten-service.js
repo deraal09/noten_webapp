@@ -198,9 +198,11 @@ export function berechneRohnoten(fachId, halbjahr) {
   const schriftlichPct = 100 - ulPct;
 
   const klausurErgs = new Map();
+  const klausurExtra = new Map();
   for (const k of klausuren) {
-    const rows = db.prepare('SELECT schueler_id, punkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(k.id);
+    const rows = db.prepare('SELECT schueler_id, punkte, extrapunkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(k.id);
     klausurErgs.set(k.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
+    klausurExtra.set(k.id, new Map(rows.map((r) => [r.schueler_id, r.extrapunkte ?? 0])));
   }
   const ulErgs = new Map();
   for (const u of uls) {
@@ -212,7 +214,7 @@ export function berechneRohnoten(fachId, halbjahr) {
   for (const s of schueler) {
     const klausurData = klausuren.map((k) => {
       const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
-      const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csvStr) : null;
+      const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csvStr, klausurExtra.get(k.id)?.get(s.id) ?? 0) : null;
       return { note, gewichtung: k.gewichtung };
     });
     const zusatzleistungen = uls.map((u) => {
@@ -256,7 +258,8 @@ export function berechneGesamtnoteEinerPerson(fachId, halbjahr, schuelerId) {
   };
   const klausurData = klausuren.map((k) => {
     const punkte = punkteVon('klausur_ergebnisse', 'klausur_id', k.id);
-    const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csvStr) : null;
+    const extra = db.prepare('SELECT extrapunkte FROM klausur_ergebnisse WHERE klausur_id = ? AND schueler_id = ?').get(k.id, schuelerId)?.extrapunkte ?? 0;
+    const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csvStr, extra) : null;
     return { note, gewichtung: k.gewichtung };
   });
   const zusatzleistungen = uls.map((u) => {
@@ -345,9 +348,11 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   const schriftlichPct = 100 - ulPct;
 
   const klausurErgs = new Map();
+  const klausurExtra = new Map();
   for (const k of klausuren) {
-    const rows = db.prepare('SELECT schueler_id, punkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(k.id);
+    const rows = db.prepare('SELECT schueler_id, punkte, extrapunkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(k.id);
     klausurErgs.set(k.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
+    klausurExtra.set(k.id, new Map(rows.map((r) => [r.schueler_id, r.extrapunkte ?? 0])));
   }
   const ulErgs = new Map();
   for (const u of uls) {
@@ -366,10 +371,11 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
       const maxArr = JSON.parse(k.max_punkte_pro_aufgabe);
       const teileInfo = parseKlausurTeile(k.teile);
-      const note = punkte ? klausurNote(punkte, maxArr, teileInfo, csvStr) : null;
+      const extrapunkte = teileInfo ? 0 : (klausurExtra.get(k.id)?.get(s.id) ?? 0);
+      const note = punkte ? klausurNote(punkte, maxArr, teileInfo, csvStr, extrapunkte) : null;
       // Je Teil einer mehrteiligen Klausur eine eigene Note (sonst null).
       const teilNoten = teileInfo && punkte ? klausurTeilNoten(punkte, maxArr, teileInfo, csvStr) : null;
-      return { id: k.id, name: k.name, gewichtung: k.gewichtung, punkte, note, teilNoten };
+      return { id: k.id, name: k.name, gewichtung: k.gewichtung, punkte, extrapunkte: extrapunkte || null, note, teilNoten };
     });
     const ulData = uls.map((u) => {
       const punkte = ulErgs.get(u.id)?.get(s.id) || null;

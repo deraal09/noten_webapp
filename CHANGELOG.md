@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.97.0 - 2026-10-26
+
+- **Klausur: optionale Extrapunkte.** Bei einteiligen Klausuren gibt es neben den Aufgaben eine Spalte „Extra“.
+  Extrapunkte zählen zu den erreichten Punkten; der Prozentwert darf dadurch über 100 liegen (angezeigt als z. B.
+  „11.5 / 10 (115 %)“), die Note ist dann höchstens die beste Note des Notenschlüssels. Das Feld ist optional
+  (leer oder 0 = keine Extrapunkte), erlaubt sind 0 bis zur Gesamtpunktzahl der Klausur. Allein ergeben Extrapunkte
+  keine Note, die Aufgabenpunkte müssen vollständig sein. Bei mehrteiligen Klausuren gibt es keine Extrapunkte (dort
+  bestimmen die Teilnoten das Ergebnis). Die Extrapunkte fließen in Notenübersicht, Gesamtnote, SPA-Punkte und CSV-Export ein.
+- **Notizen zur Klausur.** Unter der Schülertabelle jeder Klausur steht ein Textfeld „Notizen zur Klausur“
+  (bis 5000 Zeichen), das automatisch gespeichert wird (beim Tippen verzögert, beim Verlassen sofort).
+- Datenbank: neue Spalten `klausur_ergebnisse.extrapunkte` und `klausuren.notiz` (werden bei Bestandsdatenbanken beim Start ergänzt).
+
 ## 0.95.3 - 2026-10-26
 
 - **„Mündlich“ heißt jetzt überall „Unterrichtsleistung“.** Betroffen sind die Spaltenüberschrift „Unterrichtsleistung“

@@ -797,3 +797,10 @@ input.note-picker-aktiv { outline: 3px solid var(--primary-text); outline-offset
 .rechtstext .mehrzeilig { white-space: pre-line; }
 .platzhalter { background: var(--bg-tint); border: 1px dashed var(--border-strong); border-radius: 4px; padding: 0 0.3rem; color: var(--text-muted); }
 .footer-links a { color: inherit; }
+
+/* Klausur: Extrapunkte-Spalte und Notizfeld unter der Schülertabelle */
+input.extrapunkt { width: 4.5rem; }
+.extra-head { white-space: nowrap; }
+.klausur-notiz-label { display: block; margin-top: 1rem; }
+.klausur-notiz-label textarea { width: 100%; font-family: inherit; }
+.klausur-notiz-status { min-height: 1.2em; margin: 0.2rem 0 0; }

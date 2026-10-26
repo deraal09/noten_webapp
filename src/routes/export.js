@@ -149,10 +149,10 @@ function zeileFuerSchuelerFachHj(klasse, csv, fach, schueler, halbjahr) {
     'SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
   ).all(fach.id, halbjahr);
   const klausurData = klausuren.map((k) => {
-    const row = db.prepare('SELECT punkte FROM klausur_ergebnisse WHERE klausur_id = ? AND schueler_id = ?')
+    const row = db.prepare('SELECT punkte, extrapunkte FROM klausur_ergebnisse WHERE klausur_id = ? AND schueler_id = ?')
       .get(k.id, schueler.id);
     const punkte = row ? JSON.parse(row.punkte) : null;
-    const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csv) : null;
+    const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csv, row.extrapunkte ?? 0) : null;
     return { note, gewichtung: k.gewichtung };
   });
   const zusatzleistungen = uls.map((u) => {
