@@ -34,7 +34,7 @@ die App direkt und routet die Subdomain darauf.
   unten. Ist LDAP nicht konfiguriert, ändert sich am Verhalten nichts.
 - **Externe Lehrkräfte ohne LDAP-Zugang:** Admin erzeugt Einladungslinks,
   Lehrkräfte wählen selbst Benutzername + Passwort (lokales Konto)
-- **Notenverwaltung:** Klausuren, Unterrichtsleistungen (ULs), mündlich/schriftlich,
+- **Notenverwaltung:** Klausuren, Unterrichtsleistungen (ULs) und schriftliche Leistungen,
   mit automatischer Gewichtung
 - **Notentafel:** Live-Gesamtnoten via AJAX
 - **Fehlzeiten:** Pro Halbjahr, drei Typen (entschuldigt/unentschuldigt/betrieblich),
@@ -590,7 +590,7 @@ Die Notentafel eines Fachs (jetzt „Noteneingabe" genannt) ist neu
 strukturiert:
 
 - **Notenübersicht** oben, direkt unter den Halbjahr-Reitern: eine Tabelle
-  mit allen Schüler/innen sowie den berechneten Werten **Mündliche Note** (aus den
+  mit allen Schüler/innen sowie den berechneten Werten **Unterrichtsleistung** (aus den
   Unterrichtsleistungen), **Schriftliche Note** (aus den Klausuren) und
   **Gesamtnote**.
 - Darunter zwei **Reiter** (nebeneinander liegende Buttons) „Klausuren" und
@@ -611,7 +611,7 @@ Der Reiter „Unterrichtsleistung" hat zwei Bereiche:
 
 - **Datumstabelle**: eine Spalte je Unterrichtstermin (per „+ Datum
   hinzufügen" angelegt), eine Note je Schüler/in **ohne Einzelgewichtung** —
-  gedacht für z. B. eine mündliche Note pro Unterrichtsstunde. Der
+  gedacht für z. B. eine Note pro Unterrichtsstunde. Der
   Durchschnitt aller eingetragenen Noten (Spalte „Ø") bildet die Basis der
   Unterrichtsleistungsnote.
 - **Zusatzleistungen** (technisch weiterhin die bisherigen

@@ -1,5 +1,5 @@
 /**
- * Lehrkraft-Routen: Notentafel (AJAX), Klausuren, ULs, mündlich/schriftlich.
+ * Lehrkraft-Routen: Notentafel (AJAX), Klausuren, Unterrichtsleistungen, schriftlich.
  * Zugriffsschutz: User muss dem Fach zugewiesen sein (oder Admin).
  */
 
@@ -356,7 +356,7 @@ export default async function teacherRoutes(fastify) {
       return reply.redirect(`/teacher/fach/${fach.id}?${q}`);
     }
     // SPA-Fächer werden wie IHK/BG über Klausuren und Unterrichtsleistung
-    // (mündlich/schriftlich) bewertet, in Punkten 0-15 -- diese Seite ist die
+    // (Unterrichtsleistung/schriftlich) bewertet, in Punkten 0-15 -- diese Seite ist die
     // normale Noteneingabe. Die Punkte speisen die Endnotentabelle des Fachs
     // (siehe src/spa-leistung.js); deren eigene Ansicht mit Komponenten,
     // Vorwerten und Tendenz (src/spa-noten-service.js, spa-schema.js) ist die

@@ -1,7 +1,7 @@
 /**
  * SPA: Klausuren und Unterrichtsleistung werden wie bei IHK abgehandelt
  * (Klausuren mit Teilen, Datumstabelle, Zusatzleistungen, Gewichtung
- * schriftlich/mündlich), aber in PUNKTEN: der Punkteschlüssel übersetzt den
+ * schriftlich/Unterrichtsleistung), aber in PUNKTEN: der Punkteschlüssel übersetzt den
  * Prozentwert direkt in Punkte 0-15 (siehe getNotenschluesselCsv in
  * noten-service.js), die Tendenznote (1+ ... 6) wird daraus mit der SPA-Skala
  * berechnet. Die Leistungspunkte eines Halbjahres

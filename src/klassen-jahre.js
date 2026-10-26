@@ -150,7 +150,7 @@ export function halbjahrAusEingabe(klasseOderId, roh) {
 }
 
 /**
- * Mündlich-Anteil (%) für ein Halbjahr einer Klasse: die Einstellung des
+ * Anteil der Unterrichtsleistung (%) für ein Halbjahr einer Klasse: die Einstellung des
  * Schuljahres, in dem dieses Halbjahr liegt (siehe schuljahre.gewichtung_
  * muendlich); gibt es dieses Schuljahr nicht als Eintrag, gilt das Schuljahr
  * der Klasse, sonst `standard`.

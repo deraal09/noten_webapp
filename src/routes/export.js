@@ -57,7 +57,7 @@ export default async function exportRoutes(fastify) {
 const HEADER = [
   'Schuljahr', 'Klasse', 'Notenschlüssel',
   'Fach', 'Nachname', 'Vorname', 'Halbjahr',
-  'Mündlich (bewertet)', 'Klausuren',
+  'Unterrichtsleistung (bewertet)', 'Klausuren',
   'Gesamtnote Halbjahr',
   'Fehlzeiten entschuldigt (h)', 'Fehlzeiten unentschuldigt (h)',
   'Fehlzeiten betrieblich (h)',

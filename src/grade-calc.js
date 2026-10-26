@@ -6,7 +6,7 @@
 export const HALBJAHRE = ['1. Halbjahr', '2. Halbjahr'];
 export const FEHLZEIT_TYPEN = ['entschuldigt', 'unentschuldigt', 'betrieblich'];
 export const NOTE_TYPEN = ['muendlich', 'schriftlich'];
-export const DEFAULT_GEWICHTUNG = 60; // % mündliche Unterrichtsleistungen
+export const DEFAULT_GEWICHTUNG = 60; // % Unterrichtsleistung
 
 // "nicht teilgenommen" -- einziges nicht-numerisches Kürzel bei Endnoten
 // (siehe parseTendenzNote unten, halbjahr_endnoten.ntg in src/db.js).
@@ -259,7 +259,7 @@ export function klausurNote(punkte, maxPunkte, teileInfo, csvStr) {
 
 /**
  * Berechnet die Gesamtnote für ein Halbjahr aus der schriftlichen Note
- * (gewichteter Durchschnitt der Klausuren) und der mündlichen Note
+ * (gewichteter Durchschnitt der Klausuren) und der Note der Unterrichtsleistung
  * (gewichteter Durchschnitt der ULs), kombiniert im Verhältnis
  * schriftlichPct/ulPct.
  *
@@ -272,7 +272,7 @@ export function klausurNote(punkte, maxPunkte, teileInfo, csvStr) {
  * auf deren Gewichtungssumme).
  *
  * @param {number} schriftlichPct - Prozentanteil Schriftlich (z. B. 40)
- * @param {number} ulPct - Prozentanteil Mündlich/UL (z. B. 60)
+ * @param {number} ulPct - Prozentanteil Unterrichtsleistung (z. B. 60)
  * @param {Array<{note: number|null, gewichtung: number}>} klausuren
  * @param {Array<{note: number|null, gewichtung: number}>} uls
  * @param {string} csvStr
@@ -292,8 +292,8 @@ export function gesamtnoteHj(schriftlichPct, ulPct, klausuren, uls, csvStr) {
 
 /**
  * Gewichteter Durchschnitt einer einzelnen Gruppe (nur Klausuren ODER nur
- * ULs) — die "schriftliche Note" bzw. "mündliche Note" der Notenübersicht,
- * unabhängig vom schriftlich/mündlich-Gesamtsplit des Schuljahres.
+ * ULs) — die "schriftliche Note" bzw. die Note der Unterrichtsleistung in der Notenübersicht,
+ * unabhängig vom Gesamtsplit Unterrichtsleistung/schriftlich des Schuljahres.
  *
  * @param {Array<{note: number|null, gewichtung: number}>} items
  * @returns {number|null}

@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.95.3 - 2026-10-26
+
+- **„Mündlich“ heißt jetzt überall „Unterrichtsleistung“.** Betroffen sind die Spaltenüberschrift „Unterrichtsleistung“
+  in der Notenübersicht des Fachs und in der Notenbesprechung (statt „Mündliche Note“), die Beschriftung
+  „Gewichtung Unterrichtsleistung“ im Admin-Dashboard, die Hinweistexte (SPA-Noteneingabe), die Spalte
+  „Unterrichtsleistung (bewertet)“ im CSV-Export sowie README und Code-Kommentare. Interne Bezeichner (Datenbankspalten,
+  JSON-Schlüssel, Routen) bleiben unverändert, es ändert sich keine Berechnung.
+
 ## 0.95.1 - 2026-10-11
 
 - **Startseite: Kacheln neu angeordnet.** Reihenfolge jetzt Noteneingabe, Meine Klassen, Sitzpläne,

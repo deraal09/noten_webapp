@@ -26,7 +26,7 @@
     <p class="hint">
       Klausuren und Unterrichtsleistung werden wie bei IHK abgehandelt, aber in <strong>Punkten (0-15)</strong>
       bewertet: der Punkteschlüssel der Klasse übersetzt den Prozentwert in Punkte, die Tendenznote
-      (1+ ... 6) wird daraus berechnet. Die Halbjahrespunkte aus mündlicher und schriftlicher Leistung
+      (1+ ... 6) wird daraus berechnet. Die Halbjahrespunkte aus Unterrichtsleistung und schriftlicher Leistung
       fließen im <%= halbjahr %> in die Endnotentabelle dieses Fachs ein -- ein dort von Hand eingetragener
       Wert („Direkte Endnoteneingabe") hat Vorrang. Nur das Zeugnis folgt danach dem SPA-Bewertungssystem.
     </p>
@@ -142,7 +142,7 @@
     <thead>
       <tr>
         <th>Schüler/in</th>
-        <th>Mündliche <%= NL %></th>
+        <th>Unterrichtsleistung</th>
         <th>Schriftliche <%= NL %></th>
         <% if (verrechnung && verrechnung.prozent) { %><th title="Endgültige Note des Vorhalbjahres, die zu <%= verrechnung.prozent %> % einfließt">Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
         <th>Gesamt<%= spaLeistung ? 'punkte' : 'note' %></th>
