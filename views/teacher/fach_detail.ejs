@@ -9,6 +9,10 @@
   <% } %>
   <% if (schueler.length) { %>
     <a class="btn" href="/teacher/fach/<%= fach.id %>/besprechung/<%= schueler[0].id %>?hj=<%= encodeURIComponent(halbjahr) %>">🗣 Notenbesprechung starten</a>
+    <form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/wuerfeln" class="inline">
+      <input type="hidden" name="hj" value="<%= halbjahr %>">
+      <button type="submit" name="aktion" value="neu" title="Notenbesprechung mit zufälliger Reihenfolge starten (jede Person kommt einmal dran)">🎲 Zufällig starten</button>
+    </form>
   <% } %>
 </p>
 

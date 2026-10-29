@@ -1,4 +1,6 @@
-<h1>Notenbesprechung: <%= fach.name %><% if (!fach.ist_kurs) { %> – <%= fach.klasse_name %><% } %></h1>
+<% var fq = typeof faecherQuery !== 'undefined' ? faecherQuery : ''; %>
+<% function bUrl(id) { return '/teacher/fach/' + fach.id + '/besprechung/' + id + '?hj=' + encodeURIComponent(halbjahr) + fq; } %>
+<h1>Notenbesprechung: <%= bloecke.map(function(b) { return b.fach.name; }).join(' + ') %><% if (!fach.ist_kurs) { %> – <%= fach.klasse_name %><% } %></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/fach/<%= fach.id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück zur Noteneingabe</a>
   <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
@@ -7,24 +9,58 @@
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
     <a class="hj-tab <%= h === halbjahr ? 'active' : '' %>"
-       href="/teacher/fach/<%= fach.id %>/besprechung/<%= zeile.schueler_id %>?hj=<%= encodeURIComponent(h) %>" title="Schuljahr <%= (typeof HALBJAHR_SCHULJAHR !== 'undefined' && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
+       href="/teacher/fach/<%= fach.id %>/besprechung/<%= person.schueler_id %>?hj=<%= encodeURIComponent(h) %><%= fq %>" title="Schuljahr <%= (typeof HALBJAHR_SCHULJAHR !== 'undefined' && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
   <% }); %>
 </div>
 
+<% if (moegliche.length) { %>
+  <details class="card besprechung-faecher"<%= gewaehltIds.length ? ' open' : '' %>>
+    <summary>Weitere Fächer in diese Besprechung einbeziehen</summary>
+    <form method="get" action="/teacher/fach/<%= fach.id %>/besprechung/<%= person.schueler_id %>">
+      <input type="hidden" name="hj" value="<%= halbjahr %>">
+      <p class="hint">Fächer dieser Klasse, für die du eingetragen bist. Die Besprechung zeigt dann alle gewählten Fächer je Person.</p>
+      <% moegliche.forEach(function(m) { %>
+        <label class="hj-check"><input type="checkbox" name="faecher" value="<%= m.id %>" <%= gewaehltIds.indexOf(m.id) !== -1 ? 'checked' : '' %>> <%= m.name %></label>
+      <% }); %>
+      <button type="submit">Übernehmen</button>
+    </form>
+  </details>
+<% } %>
+
 <div class="card besprechung-nav">
   <% if (vorherige) { %>
-    <a class="btn" href="/teacher/fach/<%= fach.id %>/besprechung/<%= vorherige.schueler_id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück</a>
+    <a class="btn" href="<%= bUrl(vorherige.schueler_id) %>">← Zurück</a>
   <% } else { %>
     <span class="btn disabled">← Zurück</span>
   <% } %>
-  <strong><%= position %> / <%= anzahl %>: <%= zeile.nachname %>, <%= zeile.vorname %></strong>
+  <strong><%= position %> / <%= anzahl %>: <%= person.nachname %>, <%= person.vorname %></strong>
   <% if (naechste) { %>
-    <a class="btn" href="/teacher/fach/<%= fach.id %>/besprechung/<%= naechste.schueler_id %>?hj=<%= encodeURIComponent(halbjahr) %>">Weiter →</a>
+    <a class="btn" href="<%= bUrl(naechste.schueler_id) %>">Weiter →</a>
   <% } else { %>
     <span class="btn disabled">Weiter →</span>
   <% } %>
 </div>
+<form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/wuerfeln" class="card wuerfel-leiste">
+  <input type="hidden" name="hj" value="<%= halbjahr %>">
+  <% if (gewaehltIds.length) { %><input type="hidden" name="faecher" value="<%= gewaehltIds.join(',') %>"><% } %>
+  <input type="hidden" name="schueler_id" value="<%= person.schueler_id %>">
+  <button type="submit" name="aktion" value="wuerfeln" <%= runde && runde.uebrig === 0 ? 'disabled' : '' %>>🎲 Würfeln</button>
+  <% if (runde) { %>
+    <span class="wuerfel-stand"><strong><%= runde.gerufen %> von <%= anzahl %></strong> aufgerufen<%= runde.uebrig ? ', noch ' + runde.uebrig : ' – alle waren dran' %>.</span>
+    <button type="submit" name="aktion" value="neu" class="sekundaer">Neue Runde</button>
+    <button type="submit" name="aktion" value="ende" class="sekundaer">Runde beenden</button>
+    <% if (!imRunde) { %><span class="hint">Diese Person gehört noch nicht zur Würfelrunde.</span><% } %>
+  <% } else { %>
+    <span class="hint">Würfelt die nächste Person; jede kommt nur einmal dran, die Zählung läuft in der Reihenfolge des Aufrufs.</span>
+  <% } %>
+</form>
 
+<% bloecke.forEach(function(blk) { var zeile = blk.zeile; var blockFach = blk.fach; var notizen = blk.notizen; %>
+<section class="besprechung-fach">
+<% if (mehrere) { %><h2 class="besprechung-fach-titel"><%= blockFach.name %></h2><% } %>
+<% if (!zeile) { %>
+  <p class="hint"><%= person.vorname %> nimmt an diesem Fach nicht teil.</p>
+<% } else { %>
 <h2>Noten <%= halbjahr %></h2>
 <table class="data">
   <thead><tr><th>Gesamtnote</th><th>Schriftliche Note</th><th>Unterrichtsleistung</th></tr></thead>
@@ -92,14 +128,25 @@
     <% }); %>
   </tbody>
 </table>
+<% } %>
+</section>
+<% }); %>
 
 <h2>Notizen</h2>
-<form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/<%= zeile.schueler_id %>/notiz" class="card">
+<form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/<%= person.schueler_id %>/notiz" class="card">
   <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+  <% if (gewaehltIds.length) { %><input type="hidden" name="faecher" value="<%= gewaehltIds.join(',') %>"><% } %>
+  <% if (mehrere) { %>
+    <label>Fach
+      <select name="fach_id">
+        <% bloecke.forEach(function(b) { %><option value="<%= b.fach.id %>"><%= b.fach.name %></option><% }); %>
+      </select>
+    </label>
+  <% } %>
   <label>Art
     <select name="typ">
-      <option value="besprechung">Notenbesprechung (dieses Fach)</option>
-      <option value="unterricht">Unterricht / Datumstabelle (dieses Fach)</option>
+      <option value="besprechung">Notenbesprechung (<%= mehrere ? 'gewähltes Fach' : 'dieses Fach' %>)</option>
+      <option value="unterricht">Unterricht / Datumstabelle (<%= mehrere ? 'gewähltes Fach' : 'dieses Fach' %>)</option>
       <option value="konferenz">Notenkonferenz-Entscheidung (klassenweit)</option>
     </select>
   </label>
@@ -113,11 +160,12 @@
   <p class="hint">Noch keine Notizen für dieses Halbjahr.</p>
 <% } else { %>
   <table class="data">
-    <thead><tr><th>Datum</th><th>Art</th><th>Von</th><th>Notiz</th></tr></thead>
+    <thead><tr><th>Datum</th><% if (mehrere) { %><th>Fach</th><% } %><th>Art</th><th>Von</th><th>Notiz</th></tr></thead>
     <tbody>
       <% notizen.forEach(function(n) { %>
         <tr>
           <td><%= n.created_at %></td>
+          <% if (mehrere) { %><td><%= n.fach_name || 'klassenweit' %></td><% } %>
           <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : (n.typ === 'unterricht' ? 'Unterricht (Datumstabelle)' : 'Besprechung') %></td>
           <td><%= n.display_name || n.username || '—' %></td>
           <td><%= n.text %></td>

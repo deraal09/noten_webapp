@@ -22,6 +22,7 @@ import {
 import {
   HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE,
 } from '../grade-calc.js';
+import { parseFaecherIds, rundenSchluessel, aktuelleRunde, starteRunde, beendeRunde, waehleZufaellig, rundenAnsicht } from '../besprechung.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import { unterfaecherAlsText, speichereFachEinstellungen } from '../fach-einstellungen.js';
 import {
@@ -574,6 +575,31 @@ export default async function teacherRoutes(fastify) {
   });
 
   // ---------- Notenbesprechungsmodus (eine Schüler:in nach der anderen) ----------
+  // Mehrere Fächer: neben dem Fach der Adresse lassen sich weitere Fächer derselben Klasse wählen, für die man eingetragen ist
+  // (Parameter `faecher`, kommagetrennte IDs). Die Personen sind dann alle aus diesen Fächern; jedes Fach hat einen Block.
+  // Würfelrunde: zufällige Reihenfolge, jede Person nur einmal; Zählung nach Aufrufreihenfolge (siehe src/besprechung.js).
+  const nachNamen = (a, b) => (a.nachname < b.nachname ? -1 : a.nachname > b.nachname ? 1 : (a.vorname < b.vorname ? -1 : a.vorname > b.vorname ? 1 : 0));
+
+  const ladeBesprechungsfaecher = (request, fach, halbjahr) => {
+    const gewuenscht = parseFaecherIds(request.query?.faecher ?? request.body?.faecher);
+    const moegliche = getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ? AND ist_kurs = 0 AND id != ?').all(fach.klasse_id, fach.id)
+      .map((r) => ladeFachMitUmfeld(r.id))
+      .filter((f) => f && fachGiltInHalbjahr(f, halbjahr) && userHatFachZgriff(request.user, f.id, halbjahr))
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    const gewaehlt = moegliche.filter((f) => gewuenscht.includes(f.id));
+    const faecher = [fach, ...gewaehlt];
+    const uebersichten = new Map(faecher.map((f) => [f.id, ladeNotenuebersicht(f, halbjahr)]));
+    // Personen aller gewählten Fächer (einmal je Person); bei einem Fach genau die Reihenfolge der Notenübersicht.
+    const personen = new Map();
+    for (const f of faecher) for (const r of uebersichten.get(f.id).rows) if (!personen.has(r.schueler_id)) personen.set(r.schueler_id, { schueler_id: r.schueler_id, nachname: r.nachname, vorname: r.vorname });
+    const liste = faecher.length === 1 ? uebersichten.get(fach.id).rows.map((r) => personen.get(r.schueler_id)) : [...personen.values()].sort(nachNamen);
+    return {
+      moegliche, faecher, uebersichten, personen: liste, gewaehltIds: gewaehlt.map((f) => f.id),
+      faecherQuery: gewaehlt.length ? `&faecher=${gewaehlt.map((f) => f.id).join(',')}` : '',
+    };
+  };
+  const besprechungsUrl = (fachId, schuelerId, halbjahr, faecherQuery) => `/teacher/fach/${fachId}/besprechung/${schuelerId}?hj=${encodeURIComponent(halbjahr)}${faecherQuery}`;
+
   fastify.get('/fach/:id/besprechung/:schuelerId', async (request, reply) => {
     const fach = ladeFachMitUmfeld(request.params.id);
     if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
@@ -581,22 +607,67 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = halbjahrFuerFachId(fach.id, request.query?.hj);
-    const uebersicht = ladeNotenuebersicht(fach, halbjahr);
-    const idx = uebersicht.rows.findIndex((r) => r.schueler_id === Number(request.params.schuelerId));
+    const auswahl = ladeBesprechungsfaecher(request, fach, halbjahr);
+    const schuelerId = Number(request.params.schuelerId);
+    const idx = auswahl.personen.findIndex((p) => p.schueler_id === schuelerId);
     if (idx === -1) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in diesem Fach.' });
-    const zeile = uebersicht.rows[idx];
-    const notizen = getDb().prepare(`
-      SELECT n.*, u.display_name, u.username FROM notenbesprechung_notizen n
+    const person = auswahl.personen[idx];
+    const fachIds = auswahl.faecher.map((f) => f.id);
+    const notizenAlle = getDb().prepare(`
+      SELECT n.*, u.display_name, u.username, f.name AS fach_name FROM notenbesprechung_notizen n
       LEFT JOIN users u ON u.id = n.created_by_id
-      WHERE n.schueler_id = ? AND n.halbjahr = ? AND (n.fach_id = ? OR n.fach_id IS NULL)
+      LEFT JOIN faecher f ON f.id = n.fach_id
+      WHERE n.schueler_id = ? AND n.halbjahr = ? AND (n.fach_id IN (${fachIds.map(() => '?').join(',')}) OR n.fach_id IS NULL)
       ORDER BY n.created_at DESC
-    `).all(zeile.schueler_id, halbjahr, fach.id);
+    `).all(person.schueler_id, halbjahr, ...fachIds);
+    const bloecke = auswahl.faecher.map((f) => ({
+      fach: f,
+      zeile: auswahl.uebersichten.get(f.id).rows.find((r) => r.schueler_id === person.schueler_id) ?? null,
+      notizen: notizenAlle.filter((n) => n.fach_id === f.id || n.fach_id === null),
+    }));
+    // Navigation: Würfelrunde (Aufrufreihenfolge) oder alphabetisch
+    const alleIds = auswahl.personen.map((p) => p.schueler_id);
+    const runde = rundenAnsicht(aktuelleRunde(request.session, rundenSchluessel(fachIds, halbjahr)), alleIds, person.schueler_id);
+    const nach = (id) => (id === null ? null : auswahl.personen.find((p) => p.schueler_id === id) ?? null);
+    const imRunde = Boolean(runde?.imRundenmodus);
     return reply.viewEjs('teacher/notenbesprechung.ejs', {
-      user: request.user, fach, halbjahr, HALBJAHRE: halbjahreFuerFach(fach), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id), zeile, notizen,
-      vorherige: idx > 0 ? uebersicht.rows[idx - 1] : null,
-      naechste: idx < uebersicht.rows.length - 1 ? uebersicht.rows[idx + 1] : null,
-      position: idx + 1, anzahl: uebersicht.rows.length,
+      user: request.user, fach, halbjahr, HALBJAHRE: halbjahreFuerFach(fach), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id),
+      person, bloecke, notizen: notizenAlle, mehrere: bloecke.length > 1,
+      moegliche: auswahl.moegliche, gewaehltIds: auswahl.gewaehltIds, faecherQuery: auswahl.faecherQuery,
+      runde, imRunde,
+      vorherige: imRunde ? nach(runde.vorherigeId) : (idx > 0 ? auswahl.personen[idx - 1] : null),
+      naechste: imRunde ? nach(runde.naechsteId) : (idx < auswahl.personen.length - 1 ? auswahl.personen[idx + 1] : null),
+      position: imRunde ? runde.position : idx + 1, anzahl: auswahl.personen.length,
     });
+  });
+
+  // Würfeln: eine zufällige, noch nicht aufgerufene Person (aktion "neu" beginnt eine neue Runde, "ende" beendet sie).
+  fastify.post('/fach/:id/besprechung/wuerfeln', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    if (!userHatFachZgriff(request.user, fach.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const halbjahr = halbjahrFuerFachId(fach.id, request.body?.hj);
+    const auswahl = ladeBesprechungsfaecher(request, fach, halbjahr);
+    const alleIds = auswahl.personen.map((p) => p.schueler_id);
+    if (!alleIds.length) return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
+    const schluessel = rundenSchluessel(auswahl.faecher.map((f) => f.id), halbjahr);
+    const aktuell = alleIds.includes(Number(request.body?.schueler_id)) ? Number(request.body.schueler_id) : null;
+    const aktion = request.body?.aktion;
+    if (aktion === 'ende') {
+      beendeRunde(request.session);
+      return reply.redirect(besprechungsUrl(fach.id, aktuell ?? alleIds[0], halbjahr, auswahl.faecherQuery));
+    }
+    let runde = aktuelleRunde(request.session, schluessel);
+    if (!runde || aktion === 'neu') runde = starteRunde(request.session, schluessel);
+    const naechste = waehleZufaellig(alleIds, runde.gerufen);
+    if (naechste === null) {
+      request.flash?.('info', 'Alle Personen sind schon dran gewesen -- mit „Neue Runde“ geht es von vorn los.');
+      return reply.redirect(besprechungsUrl(fach.id, runde.gerufen[runde.gerufen.length - 1], halbjahr, auswahl.faecherQuery));
+    }
+    runde.gerufen.push(naechste);
+    return reply.redirect(besprechungsUrl(fach.id, naechste, halbjahr, auswahl.faecherQuery));
   });
 
   fastify.post('/fach/:id/besprechung/:schuelerId/notiz', async (request, reply) => {
@@ -604,13 +675,22 @@ export default async function teacherRoutes(fastify) {
     const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
     const typ = ['konferenz', 'unterricht'].includes(request.body?.typ) ? request.body.typ : 'besprechung';
     const text = String(request.body?.text || '').trim();
+    // Bei mehreren Fächern darf die Notiz zu einem der gewählten Fächer gehören (nur eigene Fächer derselben Klasse).
+    let notizFachId = Number(request.params.id);
+    const gewaehltesFach = parseInt(request.body?.fach_id, 10);
+    if (Number.isInteger(gewaehltesFach) && gewaehltesFach !== notizFachId) {
+      const haupt = ladeFachMitUmfeld(request.params.id);
+      const anderes = ladeFachMitUmfeld(gewaehltesFach);
+      if (anderes && haupt && anderes.klasse_id === haupt.klasse_id && !anderes.ist_kurs && userHatFachZgriff(request.user, anderes.id, halbjahr)) notizFachId = anderes.id;
+    }
     if (text) {
       getDb().prepare(`
         INSERT INTO notenbesprechung_notizen (schueler_id, fach_id, halbjahr, typ, text, created_by_id)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(request.params.schuelerId, typ === 'konferenz' ? null : request.params.id, halbjahr, typ, text, request.user.id);
+      `).run(request.params.schuelerId, typ === 'konferenz' ? null : notizFachId, halbjahr, typ, text, request.user.id);
     }
-    return reply.redirect(`/teacher/fach/${request.params.id}/besprechung/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}`);
+    const faecherQuery = parseFaecherIds(request.body?.faecher).length ? `&faecher=${parseFaecherIds(request.body.faecher).join(',')}` : '';
+    return reply.redirect(`/teacher/fach/${request.params.id}/besprechung/${request.params.schuelerId}?hj=${encodeURIComponent(halbjahr)}${faecherQuery}`);
   });
 
   // ---------- Direkte Endnoteneingabe (je Fach, Person und Halbjahr) ----------

@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.98.0 - 2026-10-29
+
+- **Notenbesprechung: Würfelbutton.** „🎲 Würfeln“ ruft die nächste Person zufällig auf; jede Person kommt in
+  einer Runde nur einmal dran. Die Zählung läuft linear nach der Reihenfolge des Aufrufs (1 / 24, 2 / 24, …), dazu
+  steht, wie viele schon aufgerufen wurden und wie viele noch kommen. ◀ Zurück / Weiter ▶ folgen in der Runde der
+  Aufrufreihenfolge. „Neue Runde“ beginnt von vorn, „Runde beenden“ kehrt zur alphabetischen Reihenfolge zurück; sind
+  alle dran gewesen, ist der Würfel gesperrt. Auf der Fachseite startet „🎲 Zufällig starten“ die Besprechung gleich
+  mit einer zufälligen Person. Der Stand liegt in der Sitzung (getrennt je Fächerwahl und Halbjahr).
+- **Notenbesprechung über mehrere Fächer.** In einer aufklappbaren Auswahl lassen sich weitere Fächer derselben Klasse
+  hinzunehmen, für die man eingetragen ist. Die Besprechung zeigt dann je Person einen Block pro Fach (Noten,
+  Klausuren, Datumstabelle, Zusatzleistungen); die Personen sind alle aus den gewählten Fächern (wer in einem Fach nicht
+  teilnimmt, bekommt dort einen Hinweis). Notizen lassen sich einem der gewählten Fächer zuordnen; die Fachwahl bleibt in
+  allen Links erhalten. Würfelrunde und Navigation gelten für die gewählte Fächerkombination.
+
 ## 0.97.1 - 2026-10-26
 
 - **Klausur: Höchstzahl der Extrapunkte.** In der Zeile „Max. Punkte“ gibt es unter „Extra“ ein Feld für die

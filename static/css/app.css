@@ -804,3 +804,13 @@ input.extrapunkt { width: 4.5rem; }
 .klausur-notiz-label { display: block; margin-top: 1rem; }
 .klausur-notiz-label textarea { width: 100%; font-family: inherit; }
 .klausur-notiz-status { min-height: 1.2em; margin: 0.2rem 0 0; }
+
+/* Notenbesprechung: Würfelrunde und Fächerauswahl */
+.wuerfel-leiste { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.wuerfel-stand { flex: 1 1 12rem; }
+button.sekundaer { background: var(--bg-card); color: var(--primary-text); border: 1px solid var(--primary-text); }
+button[disabled] { opacity: 0.5; cursor: not-allowed; }
+.besprechung-faecher label { margin-right: 1rem; }
+.besprechung-fach { margin-top: 1.5rem; }
+.besprechung-fach + .besprechung-fach { border-top: 2px dashed var(--border-strong); padding-top: 0.5rem; }
+.besprechung-fach-titel { margin: 0 0 0.3rem; }
