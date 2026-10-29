@@ -384,7 +384,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     });
     const eigeneTerminNoten = terminNoten.get(s.id) || new Map();
     const eigeneNa = terminNa.get(s.id) || new Set();
-    const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null, na: eigeneNa.has(t.id) }));
+    const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null, na: eigeneNa.has(t.id), korrektur: Boolean(t.korrektur) }));
     const datumsWerte = datumsWerteFuerSchueler(s.id, termine, terminNoten);
     const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, ulData);
     const ohneVerrechnung = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);

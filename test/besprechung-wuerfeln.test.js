@@ -148,27 +148,31 @@ test('Neue Runde beginnt von vorn; Runde beenden kehrt zur alphabetischen Reihen
   assert.equal((await wuerfeln(fremd, 'neu')).status, 403);
 });
 
-test('Mehrere Fächer: nur eigene Fächer der Klasse wählbar, Blöcke je Fach, Personen aus allen gewählten Fächern', async () => {
+test('Mehrere Fächer: Reiter zum Umschalten, nur das gewählte Fach ist zu sehen, Personen aus allen gewählten Fächern', async () => {
   // Sport gehört nicht zu den Fächern der Lehrkraft; Esser nimmt nur an Deutsch teil
   db().prepare('DELETE FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').run(mathe, schueler[4]);
   let html = await seite(lehrer, schueler[0]);
   assert.match(html, /Weitere Fächer in diese Besprechung einbeziehen/);
   assert.match(html, new RegExp(`name="faecher" value="${deutsch}"`));
   assert.doesNotMatch(html, new RegExp(`name="faecher" value="${sport}"`), 'Fach ohne Zuordnung nicht wählbar');
-  assert.doesNotMatch(html, /besprechung-fach-titel/, 'ein Fach: kein Fach-Titel');
+  assert.doesNotMatch(html, /fach-tabs/, 'ein Fach: keine Fach-Reiter');
   assert.match(html, /1 \/ 4: /, 'ohne Esser nur vier Personen in Mathe');
 
   html = await seite(lehrer, schueler[0], `&faecher=${deutsch},${sport}`);
-  assert.match(html, /Notenbesprechung: Mathe \+ Deutsch/);
-  assert.doesNotMatch(html, /Sport/);
-  assert.match(html, /<h2 class="besprechung-fach-titel">Mathe<\/h2>/);
-  assert.match(html, /<h2 class="besprechung-fach-titel">Deutsch<\/h2>/);
+  assert.match(html, /<h1>Notenbesprechung: Mathe – 11A<\/h1>/);
+  const reiter = html.slice(html.indexOf('class="hj-tabs fach-tabs"'), html.indexOf('</div>', html.indexOf('class="hj-tabs fach-tabs"')));
+  assert.match(reiter, new RegExp(`class="hj-tab active" href="[^"]*/fach/${mathe}/besprechung/${schueler[0]}\\?[^"]*faecher=${deutsch}">Mathe`), 'Mathe aktiv, die anderen Fächer stehen im Link');
+  assert.match(reiter, new RegExp(`/fach/${deutsch}/besprechung/${schueler[0]}\\?[^"]*faecher=${mathe}">Deutsch`), 'Deutsch-Reiter zeigt Mathe als weiteres Fach');
+  assert.doesNotMatch(reiter, /Sport/);
   assert.match(html, /1 \/ 5: /, 'Esser kommt über Deutsch dazu');
-  assert.match(html, new RegExp(`name="faecher" value="${deutsch}" checked`));
-  // Esser: Mathe-Block zeigt "nimmt nicht teil", Deutsch-Block die Noten
+  // Esser: im Mathe-Reiter "nimmt nicht teil", im Deutsch-Reiter die Noten
   html = await seite(lehrer, schueler[4], `&faecher=${deutsch}`);
   assert.match(html, /X nimmt an diesem Fach nicht teil/);
   assert.match(html, /5 \/ 5: Esser/);
+  const deutschSeite = await (await lehrer(`/teacher/fach/${deutsch}/besprechung/${schueler[4]}?${hjQ}&faecher=${mathe}`)).text();
+  assert.doesNotMatch(deutschSeite, /nimmt an diesem Fach nicht teil/);
+  assert.match(deutschSeite, /<h1>Notenbesprechung: Deutsch – 11A<\/h1>/);
+  assert.match(deutschSeite, /5 \/ 5: Esser/);
   // Links tragen die Fachwahl weiter
   html = await seite(lehrer, schueler[1], `&faecher=${deutsch}`);
   assert.match(html, new RegExp(`/besprechung/${schueler[2]}\\?hj=[^"]*&amp;faecher=${deutsch}">Weiter`));
@@ -192,23 +196,21 @@ test('Würfelrunde über mehrere Fächer: eigene Runde je Fächerwahl, alle fün
   await wuerfeln(lehrer, 'ende', q);
 });
 
-test('Notizen bei mehreren Fächern: Fach wählbar, fremdes Fach wird ignoriert, Fachwahl bleibt erhalten', async () => {
-  const notiz = (body) => lehrer(`/teacher/fach/${mathe}/besprechung/${schueler[0]}/notiz`, { halbjahr: HJ, typ: 'besprechung', ...body });
-  let r = await notiz({ text: 'Zu Deutsch', fach_id: String(deutsch), faecher: String(deutsch) });
+test('Notizen gehören zum angezeigten Fach: im anderen Reiter stehen die des anderen Fachs', async () => {
+  const notiz = (fachId, body) => lehrer(`/teacher/fach/${fachId}/besprechung/${schueler[0]}/notiz`, { halbjahr: HJ, typ: 'besprechung', ...body });
+  let r = await notiz(deutsch, { text: 'Zu Deutsch', faecher: String(mathe) });
   assert.equal(r.status, 302);
-  assert.match(r.headers.get('location'), new RegExp(`faecher=${deutsch}$`));
+  assert.match(r.headers.get('location'), new RegExp(`/fach/${deutsch}/besprechung/.*faecher=${mathe}$`));
   assert.equal(db().prepare("SELECT fach_id FROM notenbesprechung_notizen WHERE text = 'Zu Deutsch'").get().fach_id, deutsch);
-  await notiz({ text: 'Fremdes Fach', fach_id: String(sport) });
-  assert.equal(db().prepare("SELECT fach_id FROM notenbesprechung_notizen WHERE text = 'Fremdes Fach'").get().fach_id, mathe, 'ohne Zuordnung zum Fach: Hauptfach');
-  await notiz({ text: 'Zu Mathe' });
+  await notiz(mathe, { text: 'Zu Mathe' });
   assert.equal(db().prepare("SELECT fach_id FROM notenbesprechung_notizen WHERE text = 'Zu Mathe'").get().fach_id, mathe);
-  const html = await seite(lehrer, schueler[0], `&faecher=${deutsch}`);
-  assert.match(html, /<th>Fach<\/th>/);
-  assert.match(html, /Zu Deutsch/);
-  assert.match(html, /Zu Mathe/);
-  assert.match(html, /<select name="fach_id">/);
-  const nurMathe = await seite(lehrer, schueler[0]);
-  assert.doesNotMatch(nurMathe, /Zu Deutsch/, 'Notizen anderer Fächer erscheinen nur bei gewähltem Fach');
+  const deutschSeite = await (await lehrer(`/teacher/fach/${deutsch}/besprechung/${schueler[0]}?${hjQ}&faecher=${mathe}`)).text();
+  assert.match(deutschSeite, /Zu Deutsch/);
+  assert.doesNotMatch(deutschSeite, /Zu Mathe/);
+  const matheSeite = await seite(lehrer, schueler[0], `&faecher=${deutsch}`);
+  assert.match(matheSeite, /Zu Mathe/);
+  assert.doesNotMatch(matheSeite, /Zu Deutsch/);
+  assert.doesNotMatch(matheSeite, /<select name="fach_id">/, 'keine Fachauswahl mehr im Notizformular');
 });
 
 test('Fachseite bietet „Zufällig starten“ an', async () => {

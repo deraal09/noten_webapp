@@ -811,6 +811,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'abgeschlossen_am', 'abgeschlossen_am TEXT');
   ensureColumn(db, 'faecher', 'abgeschlossen_von_id', 'abgeschlossen_von_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
+  // 1 = Korrektur-Termin der Datumstabelle (Notenkorrektur in der Notenbesprechung, siehe src/notenkorrektur.js).
+  ensureColumn(db, 'unterricht_termine', 'korrektur', 'korrektur INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klausuren', 'teile', 'teile TEXT');
   // Optionale Extrapunkte je Person (zählen zur Gesamtpunktzahl, Prozent darf über 100 liegen) und eine Notiz je Klausur.
   ensureColumn(db, 'klausur_ergebnisse', 'extrapunkte', 'extrapunkte REAL');

@@ -387,10 +387,10 @@
           <tr>
             <th>Schüler/in</th>
             <% termine.forEach(function(t) { %>
-              <th class="datum-head">
-                <%= t.datum.split('-').reverse().join('.') %>
+              <th class="datum-head<%= t.korrektur ? ' korrektur-head' : '' %>">
+                <%= t.datum.split('-').reverse().join('.') %><% if (t.korrektur) { %> <small class="hint" title="Korrekturwerte aus der Notenbesprechung">Korrektur</small><% } %>
                 <form method="post" action="/teacher/unterricht/termine/<%= t.id %>/loeschen" class="inline"
-                      onsubmit="return confirm('Termin löschen? Alle Noten dieses Termins gehen verloren.')">
+                      onsubmit="return confirm('<%= t.korrektur ? 'Korrektur-Termin löschen? Alle Korrekturwerte dieses Tages gehen verloren.' : 'Termin löschen? Alle Noten dieses Termins gehen verloren.' %>')">
                   <button type="submit" class="danger" title="Termin löschen">🗑</button>
                 </form>
               </th>

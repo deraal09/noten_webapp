@@ -22,6 +22,7 @@ import {
 import {
   HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE,
 } from '../grade-calc.js';
+import { korrekturMoeglich, korrigiereGesamtnote, nimmKorrekturenZurueck, datumText } from '../notenkorrektur.js';
 import { parseFaecherIds, rundenSchluessel, aktuelleRunde, starteRunde, beendeRunde, waehleZufaellig, rundenAnsicht } from '../besprechung.js';
 import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verknuepfung.js';
 import { unterfaecherAlsText, speichereFachEinstellungen } from '../fach-einstellungen.js';
@@ -613,18 +614,24 @@ export default async function teacherRoutes(fastify) {
     if (idx === -1) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Schüler/in nicht in diesem Fach.' });
     const person = auswahl.personen[idx];
     const fachIds = auswahl.faecher.map((f) => f.id);
-    const notizenAlle = getDb().prepare(`
+    // Angezeigt wird das Fach der Adresse; die weiteren gewählten Fächer sind als Reiter wählbar.
+    const notizen = getDb().prepare(`
       SELECT n.*, u.display_name, u.username, f.name AS fach_name FROM notenbesprechung_notizen n
       LEFT JOIN users u ON u.id = n.created_by_id
       LEFT JOIN faecher f ON f.id = n.fach_id
-      WHERE n.schueler_id = ? AND n.halbjahr = ? AND (n.fach_id IN (${fachIds.map(() => '?').join(',')}) OR n.fach_id IS NULL)
+      WHERE n.schueler_id = ? AND n.halbjahr = ? AND (n.fach_id = ? OR n.fach_id IS NULL)
       ORDER BY n.created_at DESC
-    `).all(person.schueler_id, halbjahr, ...fachIds);
-    const bloecke = auswahl.faecher.map((f) => ({
-      fach: f,
-      zeile: auswahl.uebersichten.get(f.id).rows.find((r) => r.schueler_id === person.schueler_id) ?? null,
-      notizen: notizenAlle.filter((n) => n.fach_id === f.id || n.fach_id === null),
-    }));
+    `).all(person.schueler_id, halbjahr, fach.id);
+    const zeile = auswahl.uebersichten.get(fach.id).rows.find((r) => r.schueler_id === person.schueler_id) ?? null;
+    const fachReiter = fachIds.length > 1 ? auswahl.faecher.map((f) => {
+      const andere = fachIds.filter((id) => id !== f.id);
+      return {
+        fach: f, aktiv: f.id === fach.id,
+        url: besprechungsUrl(f.id, person.schueler_id, halbjahr, andere.length ? `&faecher=${andere.join(',')}` : ''),
+      };
+    }) : [];
+    const korrektur = zeile ? korrekturMoeglich(fach, halbjahr, person.schueler_id) : { ok: false, grund: 'Die Person nimmt an diesem Fach nicht teil.' };
+    const hatKorrektur = Boolean(zeile && zeile.terminNoten.some((t) => t.korrektur && t.wert !== null));
     // Navigation: Würfelrunde (Aufrufreihenfolge) oder alphabetisch
     const alleIds = auswahl.personen.map((p) => p.schueler_id);
     const runde = rundenAnsicht(aktuelleRunde(request.session, rundenSchluessel(fachIds, halbjahr)), alleIds, person.schueler_id);
@@ -632,7 +639,7 @@ export default async function teacherRoutes(fastify) {
     const imRunde = Boolean(runde?.imRundenmodus);
     return reply.viewEjs('teacher/notenbesprechung.ejs', {
       user: request.user, fach, halbjahr, HALBJAHRE: halbjahreFuerFach(fach), HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id),
-      person, bloecke, notizen: notizenAlle, mehrere: bloecke.length > 1,
+      person, zeile, notizen, fachReiter, korrektur, hatKorrektur,
       moegliche: auswahl.moegliche, gewaehltIds: auswahl.gewaehltIds, faecherQuery: auswahl.faecherQuery,
       runde, imRunde,
       vorherige: imRunde ? nach(runde.vorherigeId) : (idx > 0 ? auswahl.personen[idx - 1] : null),
@@ -668,6 +675,43 @@ export default async function teacherRoutes(fastify) {
     }
     runde.gerufen.push(naechste);
     return reply.redirect(besprechungsUrl(fach.id, naechste, halbjahr, auswahl.faecherQuery));
+  });
+
+  // Notenkorrektur: Gesamtnote korrigieren; der Korrekturwert steht danach mit Datum in der Datumstabelle.
+  fastify.post('/fach/:id/besprechung/:schuelerId/korrektur', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    const halbjahr = halbjahrFuerFachId(fach.id, request.body?.hj);
+    if (!userHatFachZgriff(request.user, fach.id, halbjahr)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const schuelerId = Number(request.params.schuelerId);
+    const faecherIds = parseFaecherIds(request.body?.faecher);
+    const zurueck = besprechungsUrl(fach.id, schuelerId, halbjahr, faecherIds.length ? `&faecher=${faecherIds.join(',')}` : '');
+    const fm = (zahl) => (zahl === null ? '–' : String(zahl).replace('.', ','));
+    if (request.body?.aktion === 'zuruecknehmen') {
+      const n = nimmKorrekturenZurueck({ fach, halbjahr, schuelerId });
+      if (n) syncFallsAutoAktiv(fach.id, halbjahr, request.user.id);
+      request.flash?.(n ? 'success' : 'info', n ? 'Die Korrekturwerte dieser Person wurden aus der Datumstabelle entfernt.' : 'Es gibt keine Korrekturwerte, die zurückgenommen werden könnten.');
+      return reply.redirect(zurueck);
+    }
+    const ziel = Number(String(request.body?.ziel ?? '').trim().replace(',', '.'));
+    const res = korrigiereGesamtnote({ fach, halbjahr, schuelerId, ziel: String(request.body?.ziel ?? '').trim() === '' ? NaN : ziel, datum: datumText(jetzt()) });
+    if (!res.ok) {
+      request.flash?.('error', res.fehler);
+      return reply.redirect(zurueck);
+    }
+    const datumDe = res.datum.split('-').reverse().join('.');
+    const text = `Notenkorrektur: Gesamtnote ${fm(res.alt)} → ${fm(res.neu)}; Korrekturwert ${fm(res.wert)} in der Datumstabelle (${datumDe}).`;
+    getDb().prepare(`
+      INSERT INTO notenbesprechung_notizen (schueler_id, fach_id, halbjahr, typ, text, created_by_id)
+      VALUES (?, ?, ?, 'besprechung', ?, ?)
+    `).run(schuelerId, fach.id, halbjahr, text, request.user.id);
+    syncFallsAutoAktiv(fach.id, halbjahr, request.user.id);
+    request.flash?.(res.erreicht ? 'success' : 'info', res.erreicht
+      ? `Gesamtnote korrigiert: ${fm(res.alt)} → ${fm(res.neu)} (Korrekturwert ${fm(res.wert)} am ${datumDe} in der Datumstabelle).`
+      : `Gesamtnote ${fm(res.alt)} → ${fm(res.neu)}: ${fm(ziel)} war mit einem Korrekturwert im Notenbereich nicht erreichbar (Korrekturwert ${fm(res.wert)} am ${datumDe}).`);
+    return reply.redirect(zurueck);
   });
 
   fastify.post('/fach/:id/besprechung/:schuelerId/notiz', async (request, reply) => {

@@ -814,3 +814,7 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 .besprechung-fach { margin-top: 1.5rem; }
 .besprechung-fach + .besprechung-fach { border-top: 2px dashed var(--border-strong); padding-top: 0.5rem; }
 .besprechung-fach-titel { margin: 0 0 0.3rem; }
+.fach-tabs .hj-tab { font-weight: 600; }
+.korrektur-form label { display: inline-block; margin-right: 0.5rem; }
+.tag.korrektur { border-style: dashed; }
+.datum-head.korrektur-head { background: var(--bg-tint); }

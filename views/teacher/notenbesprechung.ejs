@@ -1,6 +1,6 @@
 <% var fq = typeof faecherQuery !== 'undefined' ? faecherQuery : ''; %>
 <% function bUrl(id) { return '/teacher/fach/' + fach.id + '/besprechung/' + id + '?hj=' + encodeURIComponent(halbjahr) + fq; } %>
-<h1>Notenbesprechung: <%= bloecke.map(function(b) { return b.fach.name; }).join(' + ') %><% if (!fach.ist_kurs) { %> – <%= fach.klasse_name %><% } %></h1>
+<h1>Notenbesprechung: <%= fach.name %><% if (!fach.ist_kurs) { %> – <%= fach.klasse_name %><% } %></h1>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher/fach/<%= fach.id %>?hj=<%= encodeURIComponent(halbjahr) %>">← Zurück zur Noteneingabe</a>
   <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
@@ -12,6 +12,14 @@
        href="/teacher/fach/<%= fach.id %>/besprechung/<%= person.schueler_id %>?hj=<%= encodeURIComponent(h) %><%= fq %>" title="Schuljahr <%= (typeof HALBJAHR_SCHULJAHR !== 'undefined' && HALBJAHR_SCHULJAHR[h]) || '' %>"><%= h %></a>
   <% }); %>
 </div>
+
+<% if (fachReiter.length) { %>
+  <div class="hj-tabs fach-tabs" aria-label="Fächer dieser Besprechung">
+    <% fachReiter.forEach(function(t) { %>
+      <a class="hj-tab <%= t.aktiv ? 'active' : '' %>" href="<%= t.url %>"><%= t.fach.name %></a>
+    <% }); %>
+  </div>
+<% } %>
 
 <% if (moegliche.length) { %>
   <details class="card besprechung-faecher"<%= gewaehltIds.length ? ' open' : '' %>>
@@ -55,9 +63,7 @@
   <% } %>
 </form>
 
-<% bloecke.forEach(function(blk) { var zeile = blk.zeile; var blockFach = blk.fach; var notizen = blk.notizen; %>
 <section class="besprechung-fach">
-<% if (mehrere) { %><h2 class="besprechung-fach-titel"><%= blockFach.name %></h2><% } %>
 <% if (!zeile) { %>
   <p class="hint"><%= person.vorname %> nimmt an diesem Fach nicht teil.</p>
 <% } else { %>
@@ -72,6 +78,25 @@
     </tr>
   </tbody>
 </table>
+
+<form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/<%= person.schueler_id %>/korrektur" class="card korrektur-form">
+  <strong>Notenkorrektur</strong>
+  <% if (!korrektur.ok) { %>
+    <p class="hint"><%= korrektur.grund %></p>
+  <% } else { %>
+    <p class="hint">Aktuelle Gesamtnote: <strong><%= zeile.gesamtBerechnet === null ? '–' : formatNote(zeile.gesamtBerechnet) %></strong>.
+      Die Korrektur trägt einen Korrekturwert mit dem heutigen Datum in die Datumstabelle ein, sodass die Gesamtnote möglichst der gewünschten Note entspricht.</p>
+    <input type="hidden" name="hj" value="<%= halbjahr %>">
+    <% if (gewaehltIds.length) { %><input type="hidden" name="faecher" value="<%= gewaehltIds.join(',') %>"><% } %>
+    <label>Gesamtnote korrigieren auf
+      <input type="text" name="ziel" inputmode="decimal" autocomplete="off" size="6" placeholder="<%= fach.notenschluessel === 'BG' ? '0–15' : '1–6' %>">
+    </label>
+    <button type="submit" name="aktion" value="korrigieren">Korrigieren</button>
+    <% if (hatKorrektur) { %>
+      <button type="submit" name="aktion" value="zuruecknehmen" class="sekundaer" formnovalidate>Korrekturen zurücknehmen</button>
+    <% } %>
+  <% } %>
+</form>
 
 <h3>Klausuren</h3>
 <% if (!zeile.klausuren.length) { %><p class="hint">Keine Klausuren in diesem Halbjahr.</p><% } %>
@@ -93,7 +118,7 @@
 <% if (!zeile.terminNoten.length) { %><p class="hint">Noch keine Termine in diesem Halbjahr.</p><% } else { %>
   <p>
     <% zeile.terminNoten.forEach(function(tn) { %>
-      <span class="tag" title="<%= tn.datum %>"><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.na ? 'n.a.' : (tn.wert === null ? '–' : Number(tn.wert).toString().replace('.', ',')) %></span>
+      <span class="tag<%= tn.korrektur ? ' korrektur' : '' %>" title="<%= tn.korrektur ? 'Korrekturwert' : '' %> <%= tn.datum %>"><%= tn.korrektur ? 'Korrektur ' : '' %><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.na ? 'n.a.' : (tn.wert === null ? '–' : Number(tn.wert).toString().replace('.', ',')) %></span>
     <% }); %>
   </p>
   <p>Ø Datumstabelle: <strong><%= zeile.datumsDurchschnitt === null ? '–' : formatNote(zeile.datumsDurchschnitt) %></strong> · nicht anwesend (n.a.): <strong><%= zeile.naAnzahl %></strong></p>
@@ -130,23 +155,15 @@
 </table>
 <% } %>
 </section>
-<% }); %>
 
 <h2>Notizen</h2>
 <form method="post" action="/teacher/fach/<%= fach.id %>/besprechung/<%= person.schueler_id %>/notiz" class="card">
   <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
   <% if (gewaehltIds.length) { %><input type="hidden" name="faecher" value="<%= gewaehltIds.join(',') %>"><% } %>
-  <% if (mehrere) { %>
-    <label>Fach
-      <select name="fach_id">
-        <% bloecke.forEach(function(b) { %><option value="<%= b.fach.id %>"><%= b.fach.name %></option><% }); %>
-      </select>
-    </label>
-  <% } %>
   <label>Art
     <select name="typ">
-      <option value="besprechung">Notenbesprechung (<%= mehrere ? 'gewähltes Fach' : 'dieses Fach' %>)</option>
-      <option value="unterricht">Unterricht / Datumstabelle (<%= mehrere ? 'gewähltes Fach' : 'dieses Fach' %>)</option>
+      <option value="besprechung">Notenbesprechung (dieses Fach)</option>
+      <option value="unterricht">Unterricht / Datumstabelle (dieses Fach)</option>
       <option value="konferenz">Notenkonferenz-Entscheidung (klassenweit)</option>
     </select>
   </label>
@@ -160,12 +177,11 @@
   <p class="hint">Noch keine Notizen für dieses Halbjahr.</p>
 <% } else { %>
   <table class="data">
-    <thead><tr><th>Datum</th><% if (mehrere) { %><th>Fach</th><% } %><th>Art</th><th>Von</th><th>Notiz</th></tr></thead>
+    <thead><tr><th>Datum</th><th>Art</th><th>Von</th><th>Notiz</th></tr></thead>
     <tbody>
       <% notizen.forEach(function(n) { %>
         <tr>
           <td><%= n.created_at %></td>
-          <% if (mehrere) { %><td><%= n.fach_name || 'klassenweit' %></td><% } %>
           <td><%= n.typ === 'konferenz' ? 'Notenkonferenz' : (n.typ === 'unterricht' ? 'Unterricht (Datumstabelle)' : 'Besprechung') %></td>
           <td><%= n.display_name || n.username || '—' %></td>
           <td><%= n.text %></td>

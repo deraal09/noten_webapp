@@ -6,6 +6,22 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.99.0 - 2026-10-29
+
+- **Notenbesprechung: Fächer umschalten statt untereinander.** Sind mehrere Fächer einbezogen, stehen sie wie die
+  Halbjahre als Reiter (Buttons) oben; angezeigt wird immer nur das gewählte Fach (Noten, Klausuren, Datumstabelle,
+  Zusatzleistungen, Notizen). Beim Umschalten bleiben Person, Halbjahr, Fächerwahl und die Würfelrunde erhalten.
+  Notizen gehören zum angezeigten Fach.
+- **Notenkorrektur in der Notenbesprechung.** Unter den Noten lässt sich die Gesamtnote einer Person auf einen
+  Wunschwert korrigieren. Dafür wird ein Korrekturwert errechnet und mit dem heutigen Datum als eigener Termin
+  („Korrektur“) in die Datumstabelle eingetragen; er fließt wie jeder Termin in die Unterrichtsleistung und damit in die
+  Gesamtnote ein (auch die Verrechnung mit dem Vorhalbjahr wird berücksichtigt). Ist die Wunschnote nicht erreichbar,
+  wird der beste erreichbare Wert genommen und das gemeldet. Eine erneute Korrektur am selben Tag überschreibt den
+  Korrekturwert, „Korrekturen zurücknehmen“ entfernt ihn wieder. Jede Korrektur steht zusätzlich als Notiz in der
+  Besprechung. Nicht möglich ist sie bei direkt eingetragener Endnote, gesperrten Personen, Fächern aus Unterfächern, SPA
+  und wenn ein Korrekturwert die Gesamtnote nicht verändern würde (z. B. Zusatzleistungen mit 100 % Gewicht).
+  Neue Spalte `unterricht_termine.korrektur`; Korrektur-Termine sind in der Datumstabelle gekennzeichnet.
+
 ## 0.98.0 - 2026-10-29
 
 - **Notenbesprechung: Würfelbutton.** „🎲 Würfeln“ ruft die nächste Person zufällig auf; jede Person kommt in
