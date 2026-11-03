@@ -413,6 +413,7 @@ export default async function adminRoutes(fastify) {
         tls_ca_pem: String(b.tls_ca_pem || '').trim(),
         tls_reject_unauthorized: !b.tls_insecure,
         auto_provision: Boolean(b.auto_provision),
+        required_group: String(b.required_group || '').trim(),
       });
       request.flash?.('success', 'LDAP-Einstellungen gespeichert.');
     } catch (e) {

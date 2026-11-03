@@ -71,10 +71,24 @@
     Zertifikatsprüfung deaktivieren (nur Notlösung in vertrauenswürdigen Netzen)
   </label>
 
+  <h2>Erforderliche AD-Gruppe</h2>
+  <label>Nur Mitglieder dieser Gruppe dürfen sich anmelden (Name oder DN)
+    <input type="text" name="required_group" value="<%= settings?.required_group || '' %>" placeholder="AAD-LUL oder CN=AAD-LUL,OU=Gruppen,DC=schule,DC=local">
+  </label>
+  <p><small>
+    Gilt für <strong>jede</strong> LDAP-Anmeldung (bestehende Konten, automatisch angelegte Konten) und für die Suche unter
+    „Lehrkräfte importieren“; verschachtelte Gruppen zählen mit. Wer sich mit gültigem Kennwort anmeldet, aber nicht
+    Mitglied ist, wird abgewiesen. Lässt sich die Mitgliedschaft nicht prüfen (Gruppe nicht gefunden, fehlende
+    Leserechte), wird <strong>nicht</strong> angemeldet. <strong>Leer = keine Gruppenprüfung</strong> (dann kann sich jedes
+    Konto anmelden, das Base-DN/Suchfilter erfassen). Ein bereits angemeldeter Browser bleibt bis zum Ablauf der Sitzung
+    angemeldet; lokale Konten (z. B. der Admin) sind nicht betroffen. Der Service-Account (oder bei Direkt-Bind die
+    angemeldete Person) braucht Leserecht auf Gruppen und <code>memberOf</code>.
+  </small></p>
+
   <h2>Anmeldung ohne Vorab-Import</h2>
   <label>
     <input type="checkbox" name="auto_provision" value="1" <%= Boolean(settings && settings.auto_provision) ? 'checked' : '' %>>
-    Jede Person mit gültigem LDAP-Konto darf sich anmelden — das Konto wird beim ersten
+    Jede Person mit gültigem LDAP-Konto (und in der erforderlichen Gruppe) darf sich anmelden — das Konto wird beim ersten
     erfolgreichen Login automatisch angelegt (kein manueller Import durch den Admin nötig)
   </label>
   <p><small>

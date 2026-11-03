@@ -27,6 +27,7 @@ async function main(benutzer, passwort) {
   console.log('  URL        :', cfg.url);
   console.log('  bindDn     :', cfg.bindDn || '(kein Service-Account – Direkt-Bind)');
   console.log('  baseDn     :', cfg.baseDn);
+  console.log('  Gruppe     :', cfg.requiredGroup || '(keine Gruppenprüfung)');
   console.log('  userFilter :', cfg.userFilter.replace('{{username}}', benutzer));
   console.log('  loginAttr  :', cfg.loginAttr);
   console.log(

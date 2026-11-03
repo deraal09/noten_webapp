@@ -56,8 +56,8 @@ export function saveLdapSettings(input) {
     INSERT INTO ldap_settings
       (id, url, base_dn, user_filter, bind_user_template, bind_dn, bind_pw_encrypted,
        login_attr, name_attr, teacher_search_filter, tls_ca_pem, tls_reject_unauthorized,
-       auto_provision, updated_at)
-    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       auto_provision, required_group, updated_at)
+    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       url = excluded.url,
       base_dn = excluded.base_dn,
@@ -71,6 +71,7 @@ export function saveLdapSettings(input) {
       tls_ca_pem = excluded.tls_ca_pem,
       tls_reject_unauthorized = excluded.tls_reject_unauthorized,
       auto_provision = excluded.auto_provision,
+      required_group = excluded.required_group,
       updated_at = datetime('now')
   `).run(
     input.url || null,
@@ -85,6 +86,7 @@ export function saveLdapSettings(input) {
     input.tls_ca_pem || null,
     input.tls_reject_unauthorized ? 1 : 0,
     input.auto_provision ? 1 : 0,
+    String(input.required_group || '').trim() || null,
   );
 }
 

@@ -127,6 +127,7 @@ Zwei Modi, einstellbar unter Admin → LDAP-Einstellungen:
 | `LDAP_LOGIN_ATTR` | optional | Default `sAMAccountName` |
 | `LDAP_NAME_ATTR` | optional | Default `displayName` |
 | `LDAP_TEACHER_SEARCH_FILTER` | optional | Filter für die Admin-Suche, `{{query}}` wird ersetzt |
+| `LDAP_REQUIRED_GROUP` | optional | Nur Mitglieder dieser AD-Gruppe (Name oder DN, z. B. `AAD-LUL`) dürfen sich anmelden, auch über verschachtelte Gruppen; die Admin-Suche zeigt dann nur sie. Leer = keine Gruppenprüfung. Lässt sich die Mitgliedschaft nicht prüfen, wird nicht angemeldet. Auch in Admin → LDAP-Einstellungen einstellbar. |
 | `LDAP_TLS_CA_PFAD` | optional | Pfad zur PEM-Datei der internen CA |
 | `LDAP_TLS_REJECT_UNAUTHORIZED` | optional | `false` schaltet die Zertifikatsprüfung ab (nur Notlösung) |
 

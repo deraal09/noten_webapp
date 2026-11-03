@@ -50,6 +50,8 @@ export function ldapConfigAusEnv(env = process.env) {
     teacherSearchFilter:
       env['LDAP_TEACHER_SEARCH_FILTER'] ??
       '(&(objectClass=person)(|(cn=*{{query}}*)(sAMAccountName=*{{query}}*)(displayName=*{{query}}*)))',
+    // Nur Mitglieder dieser AD-Gruppe dürfen sich anmelden (Name oder DN; leer = keine Gruppenprüfung).
+    requiredGroup: (env['LDAP_REQUIRED_GROUP'] ?? '').trim(),
     ...(Object.keys(tlsOptions).length ? { tlsOptions } : {}),
     ...(userBindTemplate ? { userBindTemplate } : {}),
   };
@@ -85,6 +87,7 @@ export function ldapConfigAusSettings(row, decrypt) {
     teacherSearchFilter:
       row.teacher_search_filter ||
       '(&(objectClass=person)(|(cn=*{{query}}*)(sAMAccountName=*{{query}}*)(displayName=*{{query}}*)))',
+    requiredGroup: String(row.required_group || '').trim(),
     ...(Object.keys(tlsOptions).length ? { tlsOptions } : {}),
     ...(direkt ? { userBindTemplate: row.bind_user_template } : {}),
   };
@@ -93,6 +96,45 @@ export function ldapConfigAusSettings(row, decrypt) {
 function escapeFilter(wert) {
   // RFC 4515: Sonderzeichen im Suchfilter maskieren (Injection vermeiden).
   return wert.replace(/[\\*() ]/g, (c) => '\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));
+}
+
+/** Das Konto ist richtig angemeldet, gehört aber nicht zur geforderten AD-Gruppe (z. B. AD-LUL). */
+export class NichtInGruppeError extends Error {
+  constructor(gruppe) {
+    super(`Das Konto gehört nicht zur Gruppe „${gruppe}“.`);
+    this.name = 'NichtInGruppeError';
+    this.gruppe = gruppe;
+  }
+}
+
+// AD-Suchregel "LDAP_MATCHING_RULE_IN_CHAIN": findet Mitglieder auch über verschachtelte Gruppen.
+const IN_CHAIN = '1.2.840.113556.1.4.1941';
+
+/** Löst die geforderte Gruppe (Name oder DN) zur DN auf. Wirft bei unbekannter oder mehrdeutiger Gruppe. */
+async function loeseGruppenDnAuf(client, cfg) {
+  const roh = cfg.requiredGroup;
+  if (/^[A-Za-z]+\s*=/.test(roh)) return roh; // sieht wie eine DN aus (CN=…,OU=…,DC=…)
+  const name = escapeFilter(roh);
+  const { searchEntries } = await client.search(cfg.baseDn, {
+    scope: 'sub',
+    filter: `(&(objectClass=group)(|(cn=${name})(sAMAccountName=${name})))`,
+    attributes: ['dn'],
+  });
+  if (searchEntries.length !== 1) {
+    throw new Error(`Die geforderte AD-Gruppe „${roh}“ ist im Verzeichnis ${searchEntries.length === 0 ? 'nicht zu finden' : 'nicht eindeutig'} -- bitte in den LDAP-Einstellungen prüfen (ggf. die vollständige DN eintragen).`);
+  }
+  return String(searchEntries[0].dn);
+}
+
+/** Ist das Konto (DN) Mitglied der geforderten Gruppe, auch über verschachtelte Gruppen? */
+async function istGruppenMitglied(client, cfg, benutzerDn) {
+  const gruppenDn = await loeseGruppenDnAuf(client, cfg);
+  const { searchEntries } = await client.search(benutzerDn, {
+    scope: 'base',
+    filter: `(memberOf:${IN_CHAIN}:=${escapeFilter(gruppenDn)})`,
+    attributes: ['dn'],
+  });
+  return searchEntries.length > 0;
 }
 
 function alsString(v) {
@@ -106,8 +148,10 @@ function alsString(v) {
  * Rollen kommen NICHT aus dem AD, sondern aus der DB (Tabelle `users`).
  */
 export class LdapAuthenticator {
-  constructor(cfg) {
+  /** `clientFactory` ersetzt in Tests die Verbindung zum Verzeichnis (siehe test/ldap-gruppe.test.js). */
+  constructor(cfg, clientFactory = (opts) => new Client(opts)) {
     this.cfg = cfg;
+    this.neuerClient = clientFactory;
   }
 
   clientOptions() {
@@ -124,10 +168,11 @@ export class LdapAuthenticator {
     }
 
     const clientOpts = this.clientOptions();
-    const suchClient = new Client(clientOpts);
+    const suchClient = this.neuerClient(clientOpts);
     let benutzerDn;
     let loginSub;
     let name;
+    let mitglied = true;
     try {
       try {
         await suchClient.bind(this.cfg.bindDn, this.cfg.bindPasswort);
@@ -151,12 +196,14 @@ export class LdapAuthenticator {
       benutzerDn = String(eintrag.dn);
       loginSub = alsString(eintrag[this.cfg.loginAttr]) ?? benutzername;
       name = alsString(eintrag[this.cfg.nameAttr]);
+      // Gruppenprüfung mit dem Service-Account; ausgewertet wird sie erst, wenn das Passwort stimmt.
+      if (this.cfg.requiredGroup) mitglied = await istGruppenMitglied(suchClient, this.cfg, benutzerDn);
     } finally {
       await suchClient.unbind().catch(() => undefined);
     }
 
     // Schritt 2: Passwort gegen die Benutzer-DN prüfen.
-    const verifyClient = new Client(clientOpts);
+    const verifyClient = this.neuerClient(clientOpts);
     try {
       await verifyClient.bind(benutzerDn, passwort);
     } catch (e) {
@@ -166,6 +213,7 @@ export class LdapAuthenticator {
       await verifyClient.unbind().catch(() => undefined);
     }
 
+    if (!mitglied) throw new NichtInGruppeError(this.cfg.requiredGroup);
     return name !== undefined ? { loginSub, name } : { loginSub };
   }
 
@@ -176,7 +224,7 @@ export class LdapAuthenticator {
    */
   async authenticateDirekt(benutzername, passwort) {
     const bindName = this.cfg.userBindTemplate.replace('{{username}}', benutzername);
-    const client = new Client(this.clientOptions());
+    const client = this.neuerClient(this.clientOptions());
     try {
       try {
         await client.bind(bindName, passwort);
@@ -190,6 +238,7 @@ export class LdapAuthenticator {
       // (z. B. fehlende Leserechte), fällt loginSub auf den Eingabenamen zurück.
       let loginSub = benutzername;
       let name;
+      let benutzerDn;
       try {
         const filter = this.cfg.userFilter.replace('{{username}}', escapeFilter(benutzername));
         const { searchEntries } = await client.search(this.cfg.baseDn, {
@@ -199,11 +248,18 @@ export class LdapAuthenticator {
         });
         if (searchEntries.length === 1) {
           const eintrag = searchEntries[0];
+          benutzerDn = String(eintrag.dn);
           loginSub = alsString(eintrag[this.cfg.loginAttr]) ?? benutzername;
           name = alsString(eintrag[this.cfg.nameAttr]);
         }
-      } catch {
-        /* Attributsuche optional — Anmeldung gilt bereits als erfolgreich */
+      } catch (e) {
+        // Ohne Gruppenprüfung ist die Attributsuche optional (Anmeldung gilt bereits als erfolgreich);
+        // mit Gruppenprüfung darf sie nicht scheitern -- im Zweifel wird nicht angemeldet.
+        if (this.cfg.requiredGroup) throw e;
+      }
+      if (this.cfg.requiredGroup) {
+        if (!benutzerDn) throw new Error('Gruppenprüfung nicht möglich: das Konto wurde im Verzeichnis nicht eindeutig gefunden (Benutzer-Suchfilter und Base-DN prüfen).');
+        if (!(await istGruppenMitglied(client, this.cfg, benutzerDn))) throw new NichtInGruppeError(this.cfg.requiredGroup);
       }
       return name !== undefined ? { loginSub, name } : { loginSub };
     } finally {
@@ -220,20 +276,22 @@ export class LdapAuthenticator {
  *
  * @returns {Promise<Array<{loginSub: string, name: string|undefined, dn: string}>>}
  */
-export async function searchLehrkraefte(cfg, { query = '', limit = 50 } = {}) {
+export async function searchLehrkraefte(cfg, { query = '', limit = 50 } = {}, clientFactory = (opts) => new Client(opts)) {
   if (!cfg.bindDn || !cfg.bindPasswort) {
     throw new Error(
       'Für die LDAP-Verzeichnis-Suche wird ein Service-Account benötigt (LDAP_BIND_DN/LDAP_BIND_PW setzen), ' +
       'auch wenn der Login selbst per Direkt-Bind läuft.',
     );
   }
-  const client = new Client({
+  const client = clientFactory({
     url: cfg.url,
     ...(cfg.tlsOptions ? { tlsOptions: cfg.tlsOptions } : {}),
   });
   try {
     await client.bind(cfg.bindDn, cfg.bindPasswort);
-    const filter = cfg.teacherSearchFilter.replace(/\{\{query\}\}/g, escapeFilter(query));
+    let filter = cfg.teacherSearchFilter.replace(/\{\{query\}\}/g, escapeFilter(query));
+    // Mit geforderter Gruppe zeigt die Suche nur deren Mitglieder (auch verschachtelt) -- nur sie können sich anmelden.
+    if (cfg.requiredGroup) filter = `(&${filter}(memberOf:${IN_CHAIN}:=${escapeFilter(await loeseGruppenDnAuf(client, cfg))}))`;
     const { searchEntries } = await client.search(cfg.baseDn, {
       scope: 'sub',
       filter,

@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.100.0 - 2026-11-03
+
+- **LDAP-Anmeldung mit AD-Gruppenprüfung.** Bisher prüfte die Anmeldung nur Benutzername und Kennwort; mit dem Haken
+  „Anmeldung ohne Vorab-Import“ konnte sich deshalb jedes Konto des Verzeichnisses (auch von Schüler/innen) ein
+  Konto anlegen. Neu: unter Admin → LDAP-Einstellungen (bzw. `LDAP_REQUIRED_GROUP`) lässt sich eine **erforderliche
+  AD-Gruppe** eintragen, z. B. `AAD-LUL` (Name oder DN). Nur Mitglieder (auch über verschachtelte Gruppen) dürfen sich
+  anmelden; das gilt für bestehende und automatisch angelegte Konten und im Service-Account- wie im Direkt-Bind-Modus.
+  Wer mit gültigem Kennwort, aber ohne Mitgliedschaft anmeldet, erhält die Meldung „Dein Konto gehört nicht zur
+  Gruppe …“ (kein Konto, keine Sitzung); bei falschem Kennwort bleibt es bei der allgemeinen Meldung. Lässt sich die
+  Mitgliedschaft nicht prüfen (Gruppe nicht gefunden, fehlende Leserechte), wird nicht angemeldet. Die Lehrkräfte-Suche
+  im Admin-Import zeigt nur Gruppenmitglieder. **Leer = keine Gruppenprüfung** (wie bisher). Bereits angemeldete
+  Browser bleiben bis zum Ablauf der Sitzung angemeldet; lokale Konten (z. B. der Admin) sind nicht betroffen.
+
 ## 0.99.0 - 2026-10-29
 
 - **Notenbesprechung: Fächer umschalten statt untereinander.** Sind mehrere Fächer einbezogen, stehen sie wie die

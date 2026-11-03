@@ -8,9 +8,12 @@ import {
   getLdapAuthenticator, isLdapConfigured, isAutoProvisionEnabled, provisionLdapUser,
   findeBenutzerFuerLogin,
 } from '../auth.js';
+import { NichtInGruppeError } from '../auth/ldap.js';
 import { pruefeSperre, vermerkeFehlversuch, setzeZurueck } from '../auth/login-ratelimit.js';
 
 const MIN_PW_LEN = 8;
+
+const nichtInGruppeText = (e) => `Anmeldung nicht möglich: Dein Konto gehört nicht zur Gruppe „${e.gruppe}“. Bitte an den Admin wenden.`;
 const MIN_USER_LEN = 3;
 
 // Ohne Haken "Angemeldet bleiben": deckt sich mit der Cookie-Voreinstellung
@@ -121,6 +124,10 @@ export default async function authRoutes(fastify) {
         const ldap = getLdapAuthenticator();
         ergebnis = ldap ? await ldap.authenticate(uname, password) : null;
       } catch (e) {
+        if (e instanceof NichtInGruppeError) {
+          request.log.warn({ username: uname, gruppe: e.gruppe }, 'Auto-Provisioning abgelehnt: nicht in der erforderlichen AD-Gruppe');
+          return reply.viewEjs('auth/login.ejs', { user: null, error: nichtInGruppeText(e), next: '' });
+        }
         technischerFehler = true;
         request.log.error({ err: e }, 'Auto-Provisioning: LDAP-Anmeldung fehlgeschlagen (technischer Fehler)');
       }
@@ -165,6 +172,10 @@ export default async function authRoutes(fastify) {
         if (!ldap) throw new Error('LDAP_URL fehlt');
         ergebnis = await ldap.authenticate(row.login_sub || row.username, password);
       } catch (e) {
+        if (e instanceof NichtInGruppeError) {
+          request.log.warn({ username: uname, gruppe: e.gruppe }, 'LDAP-Login abgelehnt: nicht in der erforderlichen AD-Gruppe');
+          return reply.viewEjs('auth/login.ejs', { user: null, error: nichtInGruppeText(e), next: '' });
+        }
         request.log.error({ err: e }, 'LDAP-Login fehlgeschlagen (technischer Fehler)');
         return reply.viewEjs('auth/login.ejs', {
           user: null,
