@@ -45,6 +45,7 @@
           <a href="/admin/users">Lehrkräfte</a>
           <a href="/admin/ldap/einstellungen">LDAP-Einstellungen</a>
           <a href="/admin/backup">Datensicherung</a>
+          <a href="/admin/notenschluessel">Notenschlüssel</a>
           <a href="/admin/rechtliches">Rechtliches</a>
           <a href="/admin/ldap">LDAP-Import</a>
           <a href="/admin/einladungen">Einladungen</a>
@@ -55,6 +56,7 @@
             <a href="/teacher/einladungen">Einladungen</a>
           <% } %>
         <% } %>
+        <% if (!user.isAdmin) { %><a href="/notenschluessel">Notenschlüssel</a><% } %>
         <a href="/teacher/sitzplaene">Sitzpläne</a>
         <a href="/teacher">Noteneingabe</a>
         <a href="/klassenlehrer">Klassenleitung</a>
@@ -83,6 +85,19 @@
 <% if (typeof flash !== 'undefined' && flash && flash.length) { %>
   <% flash.forEach(function (f) { %>
     <div class="flash flash-<%= f.type %>"><%= f.message %></div>
+  <% }) %>
+<% } %>
+<% if (typeof notenschluesselHinweise !== 'undefined' && notenschluesselHinweise && notenschluesselHinweise.length) { %>
+  <% notenschluesselHinweise.forEach(function (h) { %>
+    <div class="flash flash-info ns-hinweis">
+      <span>Der Notenschlüssel <strong><%= h.typ %></strong> wurde angepasst (<%= formatZeitLokal(h.geaendertAt) %>).<% if (h.hinweis) { %> <em><%= h.hinweis %></em><% } %></span>
+      <form method="post" action="/notenschluessel/gelesen" class="ns-hinweis-form">
+        <input type="hidden" name="typ" value="<%= h.typ %>">
+        <input type="hidden" name="weiter" value="<%= typeof currentPath !== 'undefined' ? currentPath : '/start' %>">
+        <a class="btn" href="/notenschluessel#ns-<%= h.typ %>">Ansehen</a>
+        <button type="submit">Verstanden</button>
+      </form>
+    </div>
   <% }) %>
 <% } %>
 <main class="container">

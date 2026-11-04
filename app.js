@@ -36,6 +36,8 @@ import { formatZeitLokal, jsonFuerSkript, baueEinladungsMailtoLink } from './src
 import { klassenSchuljahrText } from './src/klassen-jahre.js';
 import authRoutes from './src/routes/auth.js';
 import rechtlichesRoutes from './src/routes/rechtliches.js';
+import notenschluesselRoutes from './src/routes/notenschluessel.js';
+import { hinweiseFuer as notenschluesselHinweiseFuer } from './src/notenschluessel.js';
 import { starteBackupPlaner } from './src/backup/backup.js';
 import adminRoutes from './src/routes/admin.js';
 import teacherRoutes from './src/routes/teacher.js';
@@ -184,6 +186,12 @@ export async function buildApp(opts = {}) {
     // Link "Lehrerkalender" in der Navigation, sobald LEHRERKALENDER_URL gesetzt
     // ist — dank SSO ohne zweite Anmeldung (siehe src/sso.js).
     reply.locals.kalenderUrl = ssoConfig().kalenderUrl || null;
+    // Hinweis "Notenschlüssel wurde geändert" (Banner im Layout), solange die Person ihn nicht angesehen/bestätigt hat.
+    reply.locals.notenschluesselHinweise = [];
+    reply.locals.currentPath = request.url.split('#')[0];
+    if (request.user && request.method === 'GET' && !request.url.startsWith('/static')) {
+      try { reply.locals.notenschluesselHinweise = notenschluesselHinweiseFuer(request.user); } catch { /* Hinweis ist optional */ }
+    }
     // Embed-Modus: laeuft diese Seite in einem <iframe> (z. B. im
     // Lehrerkalender)? Erkennung ueber den Fetch-Metadata-Header
     // Sec-Fetch-Dest, den Browser bei JEDER Navigation innerhalb eines
@@ -233,6 +241,7 @@ export async function buildApp(opts = {}) {
 
   await app.register(authRoutes, { prefix: '' });
   await app.register(rechtlichesRoutes, { prefix: '' });
+  await app.register(notenschluesselRoutes, { prefix: '' });
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(startRoutes, { prefix: '/start' });
   await app.register(teacherRoutes, { prefix: '/teacher' });

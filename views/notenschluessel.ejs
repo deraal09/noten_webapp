@@ -1,0 +1,42 @@
+<h1>Notenschlüssel</h1>
+<p class="hint">
+  Hier sehen Sie die Umrechnung von Prozent in Note bzw. Punkte, die für Klausuren und Unterrichtsleistung gilt.
+  Die übergeordneten Schlüssel pflegt die Administration; Sie können sie ansehen, aber nicht ändern.
+</p>
+
+<% schluessel.forEach(function(s) { %>
+  <section class="card ns-karte" id="ns-<%= s.typ %>">
+    <h2><%= s.bezeichnung %>
+      <% if (s.genutzt) { %><small class="hint">· von Ihren Klassen genutzt</small><% } %>
+    </h2>
+    <% if (s.angepasst) { %>
+      <p class="hint">
+        Zuletzt angepasst am <%= formatZeitLokal(s.geaendertAt) %><% if (s.von) { %> von <%= s.von %><% } %>.
+        <% if (s.hinweis) { %><br>Hinweis: <strong><%= s.hinweis %></strong><% } %>
+      </p>
+    <% } else { %>
+      <p class="hint">Standardschlüssel, bisher nicht angepasst.</p>
+    <% } %>
+    <table class="ns-tabelle">
+      <thead><tr><th>Ab Prozent</th><th><%= s.typ === 'BG' ? 'Punkte' : 'Note' %></th></tr></thead>
+      <tbody>
+        <% s.zeilen.forEach(function(z) { %>
+          <tr><td><%= String(z.ab).replace('.', ',') %> %</td><td><%= String(z.note).replace('.', ',') %></td></tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </section>
+<% }); %>
+
+<% if (eigene.length) { %>
+  <p class="hint">
+    Für diese Ihrer Klassen hat die Administration einen eigenen, abweichenden Schlüssel hinterlegt:
+    <%= eigene.map(function(k) { return k.name + ' (' + k.typ + ')'; }).join(', ') %>.
+  </p>
+<% } %>
+<% if (hatSpa) { %>
+  <p class="hint">SPA-Klassen bewerten Klausuren und Unterrichtsleistung in Punkten nach dem Punkteschlüssel der BG.</p>
+<% } %>
+<% if (user.isAdmin) { %>
+  <p><a class="btn" href="/admin/notenschluessel">✏️ Notenschlüssel bearbeiten</a></p>
+<% } %>

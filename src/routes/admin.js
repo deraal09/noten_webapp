@@ -25,6 +25,7 @@ import {
   istGueltigesSchuljahrFormat, sortiereSchuljahreAbsteigend, aktuellesStartjahr, parseSchuljahr,
 } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE } from '../spa-schema.js';
+import { TYPEN as NS_TYPEN, globalerSchluessel, effektiveCsv, folgtGlobal, pruefeCsv, speichereGlobal, klassenZahlen, MAX_HINWEIS } from '../notenschluessel.js';
 import { seedeSpaFaecher } from '../spa-noten-service.js';
 
 export default async function adminRoutes(fastify) {
@@ -235,6 +236,7 @@ export default async function adminRoutes(fastify) {
     const anzahlFaecher = getDb().prepare('SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ?').get(klasse.id).c;
     return reply.viewEjs('admin/notenschluessel.ejs', {
       user: request.user, klasse, anzahlFaecher, bildungsgaenge: BILDUNGSGAENGE,
+      effektiv: effektiveCsv(klasse), folgtGlobal: folgtGlobal(klasse),
     });
   });
 
@@ -276,7 +278,10 @@ export default async function adminRoutes(fastify) {
       return reply.redirect(`/admin/klassen/${klasse.id}`);
     }
 
-    const csv = String(request.body?.csv || '').trim();
+    // Entspricht die Eingabe dem bisher geltenden, der Vorgabe oder dem übergeordneten Schlüssel des (neuen) Typs,
+    // bleibt die Klasse bei diesem (leer gespeichert): spätere Änderungen des Admins gelten dann auch hier.
+    let csv = String(request.body?.csv || '').trim();
+    if (csv === effektiveCsv(klasse) || csv === DEFAULT_NS_CSV[ns] || csv === globalerSchluessel(ns).csv) csv = '';
     const pruefung = pruefeNotenschluesselWechsel(klasse.id, ns);
     if (!pruefung.ok) {
       request.flash?.('error',
@@ -286,6 +291,39 @@ export default async function adminRoutes(fastify) {
     getDb().prepare('UPDATE klassen SET notenschluessel = ?, notenschluessel_csv = ? WHERE id = ?')
       .run(ns, csv, klasse.id);
     return reply.redirect(`/admin/klassen/${klasse.id}/notenschluessel`);
+  });
+
+  // ---------- Übergeordnete Notenschlüssel (IHK, BG) ----------
+  const zeigeNsUebersicht = (request, reply, extra = {}) => reply.viewEjs('admin/notenschluessel_uebersicht.ejs', {
+    user: request.user,
+    schluessel: NS_TYPEN.map((typ) => ({ ...globalerSchluessel(typ), vorgabe: DEFAULT_NS_CSV[typ], ...klassenZahlen(typ) })),
+    maxHinweis: MAX_HINWEIS,
+    eingabe: {},
+    ...extra,
+  });
+
+  fastify.get('/notenschluessel', async (request, reply) => zeigeNsUebersicht(request, reply));
+
+  fastify.post('/notenschluessel/:typ', async (request, reply) => {
+    const typ = request.params.typ;
+    if (!NS_TYPEN.includes(typ)) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Notenschlüssel nicht gefunden.' });
+    const zuruecksetzen = request.body?.aktion === 'zuruecksetzen';
+    const roh = zuruecksetzen ? DEFAULT_NS_CSV[typ] : request.body?.csv;
+    const hinweis = String(request.body?.hinweis || '').trim().slice(0, MAX_HINWEIS);
+    const pruefung = pruefeCsv(typ, roh);
+    if (!pruefung.ok) {
+      return reply.code(400).viewEjs('admin/notenschluessel_uebersicht.ejs', {
+        user: request.user,
+        schluessel: NS_TYPEN.map((t) => ({ ...globalerSchluessel(t), vorgabe: DEFAULT_NS_CSV[t], ...klassenZahlen(t) })),
+        maxHinweis: MAX_HINWEIS,
+        eingabe: { typ, csv: String(roh ?? ''), hinweis }, fehler: pruefung.fehler,
+      });
+    }
+    const ergebnis = speichereGlobal(typ, pruefung.csv, request.user.id, hinweis);
+    request.flash?.('success', ergebnis.geaendert
+      ? `Notenschlüssel ${typ} gespeichert. Lehrkräfte, die ihn nutzen, sehen einen Hinweis.`
+      : `Notenschlüssel ${typ} unverändert.`);
+    return reply.redirect('/admin/notenschluessel');
   });
 
   // ---------- User-Verwaltung ----------

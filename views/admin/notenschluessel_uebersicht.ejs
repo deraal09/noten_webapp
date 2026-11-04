@@ -1,0 +1,32 @@
+<h1>Notenschlüssel (übergeordnet)</h1>
+<p class="kopf-aktionen"><a class="btn" href="/notenschluessel">👁 So sehen es die Lehrkräfte</a></p>
+<p class="hint">
+  Diese Schlüssel gelten für alle Klassen, die keinen eigenen Schlüssel hinterlegt haben (Admin → Klasse → Notenschlüssel).
+  Nach jeder inhaltlichen Änderung sehen alle Lehrkräfte, die den Schlüssel nutzen, einen Hinweis, bis sie ihn bestätigt oder angesehen haben.
+  Bereits eingetragene Noten werden dabei sofort nach dem neuen Schlüssel berechnet.
+</p>
+<% if (typeof fehler !== 'undefined' && fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
+
+<% schluessel.forEach(function(s) { %>
+  <% var meine = eingabe && eingabe.typ === s.typ; %>
+  <form method="post" action="/admin/notenschluessel/<%= s.typ %>" class="card ns-karte" id="ns-<%= s.typ %>">
+    <h2><%= s.typ === 'IHK' ? 'IHK (Noten 1–6)' : 'BG (Punkte 0–15)' %></h2>
+    <p class="hint">
+      <%= s.angepasst ? 'Angepasst am ' + formatZeitLokal(s.geaendertAt) + ' (Fassung ' + s.version + ').' : 'Standardschlüssel, bisher nicht angepasst.' %>
+      Gilt für <%= s.folgen %> Klasse<%= s.folgen === 1 ? '' : 'n' %>; <%= s.eigene %> Klasse<%= s.eigene === 1 ? ' hat' : 'n haben' %> einen eigenen Schlüssel.
+    </p>
+    <label>Definition <small>(Prozent,Note; absteigend, mit Punkt als Dezimaltrenner)</small>
+      <textarea name="csv" rows="6"><%= meine ? eingabe.csv : s.csv %></textarea>
+    </label>
+    <label>Kurzer Hinweis an die Lehrkräfte <small>(optional, max. <%= maxHinweis %> Zeichen)</small>
+      <input type="text" name="hinweis" maxlength="<%= maxHinweis %>" value="<%= meine ? eingabe.hinweis : '' %>" placeholder="z. B. Schwelle für Note 4 auf 50 % angepasst">
+    </label>
+    <p class="hint">Beispiel: <code><%= s.vorgabe %></code></p>
+    <div class="form-actions">
+      <button type="submit">💾 Speichern</button>
+      <% if (s.angepasst) { %>
+        <button type="submit" name="aktion" value="zuruecksetzen" class="btn" formnovalidate>↺ Auf Standard zurücksetzen</button>
+      <% } %>
+    </div>
+  </form>
+<% }); %>

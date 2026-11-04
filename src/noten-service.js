@@ -4,6 +4,7 @@
  * brauchen. Ausgelagert, damit beide dieselbe Logik verwenden.
  */
 
+import { effektiveCsv } from './notenschluessel.js';
 import { getDb } from './db.js';
 import {
   noteAusPunkten, gesamtnoteHj, teilNote, unterrichtsleistungNote, nichtBestanden,
@@ -104,12 +105,11 @@ export function ladeFaecherFuerSchueler(schuelerId) {
 export function getNotenschluesselCsv(fach) {
   const k = getDb().prepare('SELECT notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
     .get(fach.klasse_id);
-  if (k?.notenschluessel_csv) return k.notenschluessel_csv;
-  // SPA-Klassen bewerten Klausuren/Unterrichtsleistung in Punkten (0-15): der
-  // Punkteschlüssel Prozent -> Punkte entspricht dem der BG; die Tendenznote
-  // (1+ ... 6) wird erst daraus berechnet (siehe src/spa-leistung.js). Nur die
-  // Zeugnisnoten haben ein eigenes Bewertungssystem.
-  return DEFAULT_NS_CSV[k?.notenschluessel === 'SPA' ? 'BG' : k?.notenschluessel] || '';
+  // Eigene Definition der Klasse, sonst der übergeordnete Schlüssel (Admin → Notenschlüssel, ohne Anpassung die Vorgabe).
+  // SPA-Klassen bewerten Klausuren/Unterrichtsleistung in Punkten (0-15): der Punkteschlüssel Prozent -> Punkte
+  // entspricht dem der BG; die Tendenznote (1+ ... 6) wird erst daraus berechnet (siehe src/spa-leistung.js).
+  // Nur die Zeugnisnoten haben ein eigenes Bewertungssystem.
+  return k ? effektiveCsv(k) : '';
 }
 
 /**

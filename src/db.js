@@ -700,6 +700,24 @@ CREATE TABLE IF NOT EXISTS backup_laeufe (
     meldung TEXT NOT NULL DEFAULT ''
 );
 
+-- Übergeordnete Notenschlüssel (IHK, BG): Admin → Notenschlüssel. Ohne Zeile gilt die Vorgabe aus src/grade-calc.js.
+-- Jede Änderung zählt version hoch; wer den Schlüssel nutzt, bekommt einmalig einen Hinweis (notenschluessel_gelesen).
+CREATE TABLE IF NOT EXISTS notenschluessel_global (
+    typ TEXT PRIMARY KEY CHECK (typ IN ('IHK', 'BG')),
+    csv TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    hinweis TEXT NOT NULL DEFAULT '',
+    geaendert_at TEXT NOT NULL DEFAULT (datetime('now')),
+    geaendert_von_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS notenschluessel_gelesen (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    typ TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    PRIMARY KEY (user_id, typ)
+);
+
 CREATE TABLE IF NOT EXISTS login_ratelimit (
     schluessel TEXT PRIMARY KEY,
     fehlversuche INTEGER NOT NULL DEFAULT 0,

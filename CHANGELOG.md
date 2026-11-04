@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.102.0 - 2026-11-04
+
+- **Übergeordnete Notenschlüssel (IHK, BG) durch den Admin anpassbar.** Neue Seite *Admin → Notenschlüssel*: je Schlüssel
+  Prozent-/Noten-Definition, optionaler kurzer Hinweis an die Lehrkräfte und „Auf Standard zurücksetzen“. Die Eingabe wird
+  geprüft (Wertebereich, keine doppelten Prozentwerte, Ende bei 0 %, Note wird mit sinkender Prozentzahl nicht besser).
+  Alle Klassen ohne eigenen Schlüssel folgen dem übergeordneten Schlüssel (Noten, Notenübersicht und CSV-Export);
+  Klassen mit eigener Definition (Admin → Klasse → Notenschlüssel) behalten sie. Speichert man dort eine Definition, die
+  dem Standard oder dem übergeordneten Schlüssel entspricht, folgt die Klasse künftig diesem.
+- **Hinweis bei Änderungen.** Lehrkräfte, die einen angepassten Schlüssel nutzen (Klasse, der sie zugeordnet sind, ohne
+  eigenen Schlüssel), sehen oben auf jeder Seite eine Meldung mit Datum und Hinweistext, bis sie „Verstanden“ wählen oder
+  sich den Schlüssel ansehen. Jede inhaltliche Änderung löst sie erneut aus; unveränderte Eingaben nicht.
+- **Notenschlüssel ansehen.** Neuer Menüpunkt *Notenschlüssel* (`/notenschluessel`) für alle angemeldeten Personen:
+  nur lesend, mit Tabelle je Schlüssel, Datum der letzten Anpassung und Hinweis.
+- Neue Tabellen `notenschluessel_global` und `notenschluessel_gelesen` (werden automatisch angelegt).
+
 ## 0.101.0 - 2026-11-04
 
 - **Datumstabelle: Notiz zum Unterrichtsinhalt je Datum.** Unter jedem Datum im Spaltenkopf steht ein kleines Textfeld
