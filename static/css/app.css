@@ -818,3 +818,6 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 .korrektur-form label { display: inline-block; margin-right: 0.5rem; }
 .tag.korrektur { border-style: dashed; }
 .datum-head.korrektur-head { background: var(--bg-tint); }
+
+/* Datumstabelle: kurze Notiz zum Unterrichtsinhalt unter dem Datum */
+textarea.termin-inhalt { display: block; width: 9rem; height: 3.2rem; min-height: 2.4rem; margin: 0.3rem auto 0; font: inherit; font-size: 0.8rem; white-space: normal; resize: vertical; }

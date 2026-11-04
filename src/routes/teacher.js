@@ -221,6 +221,7 @@ function parseVerrechnungEingabe(body, laufzeit) {
 }
 
 const MAX_KLAUSUR_NOTIZ = 5000;
+const MAX_TERMIN_INHALT = 300;
 
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -1264,6 +1265,19 @@ export default async function teacherRoutes(fastify) {
     getDb().prepare('DELETE FROM unterricht_termine WHERE id = ?').run(request.params.id);
     syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.user.id);
     return reply.redirect(`/teacher/fach/${t.fach_id}?hj=${encodeURIComponent(t.halbjahr)}`);
+  });
+
+  // Kurze Notiz zum Unterrichtsinhalt eines Termins der Datumstabelle (leer = Notiz entfernen).
+  fastify.post('/unterricht/termine/:id/inhalt', async (request, reply) => {
+    const t = getDb().prepare('SELECT fach_id, halbjahr FROM unterricht_termine WHERE id = ?').get(request.params.id);
+    if (!t) return reply.code(404).send({ ok: false, error: 'not found' });
+    if (!userHatFachZgriff(request.user, t.fach_id, t.halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden' });
+    const text = String(request.body?.text ?? '').replace(/\s+/g, ' ').trim();
+    if (text.length > MAX_TERMIN_INHALT) {
+      return reply.code(400).send({ ok: false, error: `Der Unterrichtsinhalt ist zu lang (höchstens ${MAX_TERMIN_INHALT} Zeichen).` });
+    }
+    getDb().prepare('UPDATE unterricht_termine SET inhalt = ? WHERE id = ?').run(text, request.params.id);
+    return reply.send({ ok: true, text });
   });
 
   fastify.post('/unterricht/termine/:id/note', async (request, reply) => {

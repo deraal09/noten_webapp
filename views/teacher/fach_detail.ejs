@@ -393,6 +393,7 @@
                       onsubmit="return confirm('<%= t.korrektur ? 'Korrektur-Termin löschen? Alle Korrekturwerte dieses Tages gehen verloren.' : 'Termin löschen? Alle Noten dieses Termins gehen verloren.' %>')">
                   <button type="submit" class="danger" title="Termin löschen">🗑</button>
                 </form>
+                <textarea class="termin-inhalt" data-termin="<%= t.id %>" rows="2" maxlength="300" placeholder="Unterrichtsinhalt" title="Unterrichtsinhalt dieses Termins (kurze Notiz)" aria-label="Unterrichtsinhalt am <%= t.datum.split('-').reverse().join('.') %>"><%= t.inhalt || '' %></textarea>
               </th>
             <% }); %>
             <th>Ø</th>
@@ -777,6 +778,19 @@
       inp.title = (d && d.ok) ? 'Extrapunkte (optional)' : ((d && d.error) || 'Nicht gespeichert.');
       if (d && d.ok) refresh();
     }, 400));
+  });
+  // Unterrichtsinhalt je Termin der Datumstabelle: beim Verlassen des Feldes speichern.
+  document.querySelectorAll('textarea.termin-inhalt').forEach(function(feld) {
+    let zuletzt = feld.value;
+    feld.addEventListener('change', async function() {
+      if (feld.value === zuletzt) return;
+      const body = new URLSearchParams();
+      body.append('text', feld.value);
+      let d = null;
+      try { d = await (await fetch('/teacher/unterricht/termine/' + feld.dataset.termin + '/inhalt', { method: 'POST', body })).json(); } catch (e) { /* ignorieren */ }
+      if (d && d.ok) { zuletzt = d.text; feld.value = d.text; feld.classList.remove('speicherfehler'); feld.title = 'Unterrichtsinhalt dieses Termins (kurze Notiz)'; }
+      else { feld.classList.add('speicherfehler'); feld.title = (d && d.error) || 'Nicht gespeichert.'; }
+    });
   });
   // Notizen zur Klausur: beim Tippen verzögert, beim Verlassen sofort speichern.
   document.querySelectorAll('textarea.klausur-notiz').forEach(function(feld) {

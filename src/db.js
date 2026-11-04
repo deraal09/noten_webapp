@@ -811,6 +811,8 @@ function migrate(db) {
   ensureColumn(db, 'faecher', 'abgeschlossen_am', 'abgeschlossen_am TEXT');
   ensureColumn(db, 'faecher', 'abgeschlossen_von_id', 'abgeschlossen_von_id INTEGER REFERENCES users(id)');
   ensureColumn(db, 'klausuren', 'datum', 'datum TEXT');
+  // Kurze Notiz zum Unterrichtsinhalt je Termin der Datumstabelle.
+  ensureColumn(db, 'unterricht_termine', 'inhalt', "inhalt TEXT NOT NULL DEFAULT ''");
   // Geforderte AD-Gruppe für die LDAP-Anmeldung (Name oder DN, z. B. AD-LUL); NULL/leer = keine Gruppenprüfung.
   ensureColumn(db, 'ldap_settings', 'required_group', 'required_group TEXT');
   // 1 = Korrektur-Termin der Datumstabelle (Notenkorrektur in der Notenbesprechung, siehe src/notenkorrektur.js).

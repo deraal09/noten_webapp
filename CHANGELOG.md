@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.101.0 - 2026-11-04
+
+- **Datumstabelle: Notiz zum Unterrichtsinhalt je Datum.** Unter jedem Datum im Spaltenkopf steht ein kleines Textfeld
+  „Unterrichtsinhalt“ (bis 300 Zeichen), das beim Verlassen des Feldes gespeichert wird; leer lassen entfernt die
+  Notiz. Die Inhalte erscheinen auch in der Notenbesprechung bei der Datumstabelle (als Liste „Unterrichtsinhalte“ und im
+  Hinweistext der Termine). Neue Spalte `unterricht_termine.inhalt`.
+
 ## 0.100.0 - 2026-11-03
 
 - **LDAP-Anmeldung mit AD-Gruppenprüfung.** Bisher prüfte die Anmeldung nur Benutzername und Kennwort; mit dem Haken
