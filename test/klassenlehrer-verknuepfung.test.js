@@ -104,7 +104,10 @@ test('Klassenleitung: Selbstregistrierung nur für Ersteller/in, KEIN Live-Zugri
   r = await form(lehrerB, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
   assert.equal(r.status, 403);
 
-  // Lehrer A (Ersteller) darf sich eintragen
+  // Lehrer A (Ersteller) darf sich eintragen -- sobald er ein eigenes Fach in der Klasse hat.
+  r = await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
+  assert.equal(getDb().prepare('SELECT 1 FROM klassenleitung WHERE klasse_id = ?').get(klasseId), undefined, 'ohne eigenes Fach noch nicht');
+  await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Erdkunde' });
   r = await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
   assert.equal(r.status, 302);
   const eintrag = getDb().prepare('SELECT 1 FROM klassenleitung WHERE klasse_id = ? AND user_id = ?')

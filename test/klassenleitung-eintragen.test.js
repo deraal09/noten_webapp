@@ -106,12 +106,40 @@ test('Solange niemand eingetragen ist, verwaltet die Erstellerin; wird die Klass
   assert.equal(auth.userDarfSichAlsKlassenleitungEintragen(user('carla'), klasseId), false, 'ohne Zugriff nicht');
 });
 
+test('Ohne eigenes Fach in der Klasse: kein Knopf, sondern Hinweis -- und die Route trägt nicht ein', async () => {
+  // Anna hat die Klasse angelegt, ihre Fach-Zuweisung wurde oben entfernt: Zugriff ja, eigenes Fach nein.
+  assert.equal(auth.userHatKlassenZugriff(user('anna'), klasseId), true);
+  assert.equal(auth.hatFachInKlasse(user('anna'), klasseId), false);
+  assert.equal(auth.userDarfSichAlsKlassenleitungEintragen(user('anna'), klasseId), false);
+  const html = await (await a(`/teacher/klassen/${klasseId}`)).text();
+  assert.doesNotMatch(html, EINTRAGEN);
+  assert.match(html, /Lege zuerst ein eigenes Fach an/);
+  await form(a, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`);
+  assert.deepEqual(leitung(), []);
+  assert.match(await (await a(`/teacher/klassen/${klasseId}`)).text(), /nur, wer in dieser Klasse ein eigenes Fach hat/);
+  // Mit eigenem Fach klappt es -- egal, ob angelegt oder zugeordnet.
+  await form(a, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Biologie' });
+  assert.equal(auth.userDarfSichAlsKlassenleitungEintragen(user('anna'), klasseId), true);
+  db().prepare('DELETE FROM faecher WHERE klasse_id = ? AND name = ?').run(klasseId, 'Biologie');
+});
+
 test('Zwei gleichzeitig: nur die erste Eintragung gilt; der Admin darf immer', async () => {
   db().prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(user('carla').id, fachId);
   await Promise.all([form(b, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`), form(c, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`)]);
   assert.equal(leitung().length, 1);
   await form(admin, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`);
   assert.equal(leitung().length, 2);
+});
+
+test('Wer sich selbst eingetragen hat, ist für alle in der Klasse als "selbst eingetragen am …" erkennbar', async () => {
+  const selbst = leitung().find((n) => n !== 'admin');
+  const html = await (await a(`/teacher/klassen/${klasseId}`)).text();
+  const zeile = html.slice(html.indexOf('klassenleitung-zeile'), html.indexOf('</p>', html.indexOf('klassenleitung-zeile')));
+  assert.match(zeile, new RegExp(`${selbst} \\(selbst eingetragen am \\d{2}\\.\\d{2}\\.\\d{4}\\)`));
+  // Vom Admin bzw. der Klassenleitung Eingetragene bekommen keinen Zusatz.
+  db().prepare('INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(klasseId, user('anna').id);
+  const html2 = await (await a(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html2, /anna(,|\s*<\/p>)/);
 });
 
 test.after(async () => {

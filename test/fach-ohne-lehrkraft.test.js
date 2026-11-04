@@ -86,6 +86,49 @@ test('Klassenleitungsübersicht listet nur Fächer ohne Lehrkraft', async () => 
   assert.ok(!karte.slice(0, 1500).includes('Mathematik'), 'zugewiesenes Fach fehlt in der Liste');
 });
 
+test('Fachname mit Anführungszeichen/Event-Handler bricht nicht aus dem Lösch-Formular aus (XSS)', async () => {
+  // Das Fach steht in der Liste der Klassenleitung; der Fachname landet im
+  // onsubmit-Attribut der Löschbestätigung. Früher beendete das " des JSON
+  // das Attribut -- die Rückfrage lief nie, und "onmouseover=..." wurde zu
+  // einem echten Attribut des Formulars.
+  const namen = ['x onmouseover=alert(1) y', 'z" onfocus="alert(2)" autofocus x="'];
+  for (const name of namen) await form(admin, `/admin/klassen/${klasseId}/faecher/neu`, { name });
+  const html = await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr`)).text();
+  const formulare = html.match(/<form[^>]*\/klassenlehrer\/fach\/\d+\/loeschen[^>]*>/g) || [];
+  assert.ok(formulare.length >= 3, 'Testannahme: Deutsch + beide Testfächer haben ein Lösch-Formular');
+  for (const f of formulare) {
+    // Attribute samt Wert abgreifen (ein "=" im Wert zählt nicht), Rest muss leer bleiben.
+    const attribute = [...f.matchAll(/\s([a-z-]+)="[^"]*"/g)].map((m) => m[1]);
+    assert.equal(f.replace(/^<form/, '').replace(/\s([a-z-]+)="[^"]*"/g, '').trim(), '>', `Reste außerhalb von Attributwerten in ${f}`);
+    assert.deepEqual(attribute, ['method', 'action', 'class', 'onsubmit'], `unerwartete Attribute in ${f}`);
+    assert.match(f, /onsubmit="return confirm\(&#34;.*&#34;\)"/, 'Bestätigungstext steht vollständig im Attribut');
+  }
+  for (const name of namen) {
+    const id = getDb().prepare('SELECT id FROM faecher WHERE name = ?').get(name).id;
+    getDb().prepare('DELETE FROM faecher WHERE id = ?').run(id);
+  }
+});
+
+test('Keine View schreibt JSON ungeschützt (<%-) in ein HTML-Attribut', () => {
+  // jsonFuerSkript() ist nur für <script>-Blöcke gedacht. In einem Attribut
+  // beendet sein " das Attribut -- dort muss <%= (HTML-maskiert) stehen.
+  const viewsDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'views');
+  const funde = [];
+  const durchsuche = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) durchsuche(p);
+      else if (e.name.endsWith('.ejs')) {
+        fs.readFileSync(p, 'utf8').split('\n').forEach((zeile, i) => {
+          if (/=\s*["'][^"']*<%-\s*(jsonFuerSkript|JSON\.stringify)/.test(zeile)) funde.push(`${path.relative(viewsDir, p)}:${i + 1}`);
+        });
+      }
+    }
+  };
+  durchsuche(viewsDir);
+  assert.deepEqual(funde, []);
+});
+
 test('POST /klassenlehrer/fach/:id/loeschen: nur die Klassenleitung darf, und nur ohne zugewiesene Lehrkraft', async () => {
   // Fremde Lehrkraft (keine Klassenleitung) darf nicht.
   let r = await form(lehrerFremd, `/klassenlehrer/fach/${deutschId}/loeschen`, {});
@@ -97,11 +140,16 @@ test('POST /klassenlehrer/fach/:id/loeschen: nur die Klassenleitung darf, und nu
   assert.equal(r.status, 302);
   assert.ok(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(mathId));
 
-  // Deutsch ist unzugewiesen -- die Klassenleitung darf es löschen, samt Endnoten.
+  // Deutsch ist unzugewiesen, enthält aber schon Endnoten (z. B. nachdem die Zuweisung entfernt wurde): die
+  // gehören einer anderen Lehrkraft -- die Klassenleitung darf das Fach nicht löschen, nur der Admin.
   getDb().prepare("INSERT INTO schueler (klasse_id, nachname, vorname) VALUES (?, 'Adler', 'Anna')").run(klasseId);
   const anna = getDb().prepare('SELECT id FROM schueler').get().id;
   getDb().prepare("INSERT INTO halbjahr_endnoten (fach_id, schueler_id, halbjahr, note) VALUES (?, ?, '1. Halbjahr', 2)").run(deutschId, anna);
   r = await form(lehrerA, `/klassenlehrer/fach/${deutschId}/loeschen`, {});
+  assert.equal(r.status, 302);
+  assert.ok(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(deutschId), 'Fach mit Noten bleibt');
+  assert.match(await (await lehrerA(`/klassenlehrer/klasse/${klasseId}?tab=halbjahr`)).text(), /enthält bereits Noten/);
+  r = await form(admin, `/klassenlehrer/fach/${deutschId}/loeschen`, {});
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(deutschId), undefined);
   assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM halbjahr_endnoten WHERE fach_id = ?').get(deutschId).c, 0, 'Endnoten verschwinden per ON DELETE CASCADE');

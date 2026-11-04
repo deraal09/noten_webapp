@@ -81,7 +81,9 @@ test('Vorbereitung: Admin, Schuljahr, zwei Lehrkräfte, Klasse mit Klassenleitun
 
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '9A', notenschluessel: 'IHK' });
   const klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '9A'").get().id;
-  await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
+  // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+  // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+  getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(klasseId);
   await form(lehrerA, `/teacher/klassen/${klasseId}/klassenleitung/hinzufuegen`, { user_id: String(lehrerBId) });
 });
 

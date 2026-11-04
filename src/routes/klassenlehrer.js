@@ -9,6 +9,7 @@
 
 import { sortiereNachName } from '../format.js';
 import { getDb } from '../db.js';
+import { fachHatNoten } from '../loeschschutz.js';
 import { requireAuth, userIstKlassenlehrer } from '../auth.js';
 import { FEHLZEIT_TYPEN } from '../grade-calc.js';
 import { ladeEndnotenRaster } from '../endnoten-raster.js';
@@ -173,6 +174,12 @@ export default async function klassenlehrerRoutes(fastify) {
     const anzahlZuweisungen = getDb().prepare('SELECT COUNT(*) AS c FROM fach_zuweisungen WHERE fach_id = ?').get(fach.id).c;
     if (anzahlZuweisungen > 0) {
       request.flash?.('error', `„${fach.name}" ist noch einer Lehrkraft zugewiesen -- bitte zuerst die Zuweisung entfernen.`);
+      return reply.redirect(zielRedirect);
+    }
+    // Ohne Lehrkraft, aber mit Noten (z. B. nachdem die Zuweisung entfernt wurde): die Noten gehören einer
+    // anderen Lehrkraft -- löschen darf nur der Admin (siehe src/loeschschutz.js).
+    if (!request.user.isAdmin && fachHatNoten(fach.id)) {
+      request.flash?.('error', `„${fach.name}" enthält bereits Noten -- löschen würde sie unwiderruflich entfernen. Das kann nur der Admin.`);
       return reply.redirect(zielRedirect);
     }
     getDb().prepare('DELETE FROM faecher WHERE id = ?').run(fach.id);

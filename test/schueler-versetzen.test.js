@@ -88,7 +88,9 @@ test('Vorbereitung: zwei Schuljahre, Klasse 9A (2024/25) mit Mathematik und Note
   const legeKlasseAn = async (sjId, name, ns) => {
     await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name, notenschluessel: ns });
     const id = getDb().prepare('SELECT id FROM klassen WHERE name = ?').get(name).id;
-    await form(lehrerA, `/teacher/klassen/${id}/klassenlehrer/eintragen`, {});
+    // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+    // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+    getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(id);
     return id;
   };
   klasse9A = await legeKlasseAn(sjAltId, '9A', 'IHK');
@@ -169,10 +171,12 @@ test('Versetzen nach "Ohne Klasse": Sammelklasse des Schuljahres wird angelegt u
 
 });
 
-test('Klasse löschen: Schüler/innen (nur die Person) wandern in "Ohne Klasse", Fächer und Noten der Klasse verschwinden, der Löschende wird Klassenleitung der Sammelklasse', async () => {
+test('Klasse löschen: Schüler/innen (nur die Person) wandern in "Ohne Klasse", Fächer und Noten der Klasse verschwinden; die Sammelklasse bleibt beim Admin', async () => {
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjAltId), name: '9C', notenschluessel: 'IHK' });
   const klasse9C = getDb().prepare("SELECT id FROM klassen WHERE name = '9C'").get().id;
-  await form(lehrerA, `/teacher/klassen/${klasse9C}/klassenlehrer/eintragen`, {});
+  // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+  // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+  getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(klasse9C);
   await form(lehrerA, `/teacher/klassen/${klasse9C}/faecher/neu`, { name: 'Physik' });
   const physikId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ?").get(klasse9C).id;
   await form(lehrerA, `/teacher/klassen/${klasse9C}/schueler/neu`, { nachname: 'Claus', vorname: 'Cem' });
@@ -188,11 +192,15 @@ test('Klasse löschen: Schüler/innen (nur die Person) wandern in "Ohne Klasse",
   assert.ok(cem, 'Person bleibt als Datensatz erhalten');
   assert.equal(cem.klasse_id, ablage.id);
   assert.equal(getDb().prepare('SELECT COUNT(*) AS c FROM klassen WHERE ist_ablage = 1').get().c, 1, 'Sammelklasse wird wiederverwendet');
-  const lehrerAId = getDb().prepare("SELECT id FROM users WHERE username = 'lehrera'").get().id;
-  assert.ok(getDb().prepare('SELECT 1 FROM klassenleitung WHERE klasse_id = ? AND user_id = ?').get(ablage.id, lehrerAId));
+  // Wer löscht, wird NICHT Klassenleitung der Sammelklasse (sonst sähe er die Noten aller dort geparkten Personen).
+  assert.equal(getDb().prepare('SELECT 1 FROM klassenleitung WHERE klasse_id = ?').get(ablage.id), undefined);
+  assert.equal((await lehrerA(`/teacher/schueler/${cemId}/abgangszeugnis`)).status, 403);
 
-  // Aus der Sammelklasse lässt sich die Person wieder in eine echte Klasse versetzen.
-  const r2 = await form(lehrerA, `/teacher/schueler/${cemId}/versetzen`, { ziel_klasse_id: String(klasse10A) });
+  // Direkt aus der Sammelklasse versetzen darf nur der Admin ...
+  let r2 = await form(lehrerA, `/teacher/schueler/${cemId}/versetzen`, { ziel_klasse_id: String(klasse10A) });
+  assert.equal(r2.status, 403);
+  // ... Lehrkräfte holen die Person per "Aus Ohne Klasse übernehmen" in eine Klasse, die sie verwalten.
+  r2 = await form(lehrerA, `/teacher/klassen/${klasse10A}/schueler/aus-ablage`, { schueler_id: String(cemId) });
   assert.equal(r2.status, 302);
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(cemId).klasse_id, klasse10A);
 });
@@ -206,19 +214,23 @@ test('Sammelklasse ist für jede Lehrkraft einsehbar; übernehmen geht per Reite
   const ablage = getDb().prepare('SELECT * FROM klassen WHERE ist_ablage = 1').get();
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(doraId).klasse_id, ablage.id);
 
-  // Lehrer Fremd hat nichts mit den Klassen zu tun und sieht trotzdem die Sammelklasse -- ohne Lösch-/Abgangs-Aktionen.
+  // Lehrer Fremd hat nichts mit den Klassen zu tun und sieht trotzdem die Sammelklasse -- ohne Aktionen
+  // (versetzen, löschen, Abgang), nur mit dem Hinweis auf "Aus Ohne Klasse übernehmen".
   const liste = await (await lehrerFremd('/teacher/klassen')).text();
   assert.match(liste, /Ohne Klasse/);
   let r = await lehrerFremd(`/teacher/klassen/${ablage.id}`);
   assert.equal(r.status, 200);
   const htmlAblage = await r.text();
   assert.match(htmlAblage, /Dietz/);
-  assert.match(htmlAblage, /data-versetzen data-sid="\d+"/);
-  assert.match(htmlAblage, /<dialog id="versetzen-dialog"/);
+  assert.doesNotMatch(htmlAblage, /data-versetzen data-sid="\d+"/);
+  assert.match(htmlAblage, /Die Sammelklasse verwaltet der Admin/);
   assert.doesNotMatch(htmlAblage, /Klasse löschen/);
   assert.doesNotMatch(htmlAblage, /\/abgang/);
   assert.equal((await form(lehrerFremd, `/teacher/klassen/${ablage.id}/loeschen`, {})).status, 403);
   assert.equal((await form(lehrerFremd, `/teacher/schueler/${doraId}/loeschen`, {})).status, 403);
+  // Ganz ohne Rechte niemanden aus der Sammelklasse in eine fremde Klasse schieben.
+  assert.equal((await form(lehrerFremd, `/teacher/schueler/${doraId}/versetzen`, { ziel_klasse_id: String(klasse10A) })).status, 403);
+  assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(doraId).klasse_id, ablage.id);
 
   // Übernehmen in eine Klasse, die man nicht verwaltet: abgelehnt.
   assert.equal((await form(lehrerFremd, `/teacher/klassen/${klasse10A}/schueler/aus-ablage`, { schueler_id: String(doraId) })).status, 403);
@@ -249,7 +261,9 @@ test('SPA-Klassen: Personen aus "Ohne Klasse" übernehmen, nach "Ohne Klasse" ve
       schuljahr_id: String(sjNeuId), name, notenschluessel: 'SPA', spa_bildungsgang: bildungsgang,
     });
     const id = getDb().prepare('SELECT id FROM klassen WHERE name = ?').get(name).id;
-    await form(lehrerA, `/teacher/klassen/${id}/klassenlehrer/eintragen`, {});
+    // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+    // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+    getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(id);
     return id;
   };
   const spaA = await legeSpaKlasseAn('13SPA1', 'SPA_REGULAR');
@@ -291,9 +305,10 @@ test('SPA-Klassen: Personen aus "Ohne Klasse" übernehmen, nach "Ohne Klasse" ve
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(evaId).klasse_id, spaB);
 });
 
-test('Die Sammelklasse selbst zu löschen entfernt ihre Schüler/innen endgültig', async () => {
+test('Die Sammelklasse selbst zu löschen (nur Admin) entfernt ihre Schüler/innen endgültig', async () => {
   const ablage = getDb().prepare('SELECT * FROM klassen WHERE ist_ablage = 1').get();
-  const r = await form(lehrerA, `/teacher/klassen/${ablage.id}/loeschen`, {});
+  assert.equal((await form(lehrerA, `/teacher/klassen/${ablage.id}/loeschen`, {})).status, 403, 'die Sammelklasse verwaltet nur der Admin');
+  const r = await form(admin, `/teacher/klassen/${ablage.id}/loeschen`, {});
   assert.equal(r.status, 302);
   assert.equal(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(ablage.id), undefined);
   assert.equal(getDb().prepare('SELECT 1 FROM schueler WHERE id = ?').get(benId), undefined, 'Ben war in der Sammelklasse -> mit ihr gelöscht');

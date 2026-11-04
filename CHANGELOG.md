@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.104.0 - 2026-11-04
+
+- **Zusammenführung des Branchs `claude/noten-webapp-ldap-integration-cknkop`.** Übernimmt die dort entwickelten Änderungen
+  0.95.2 (Löschbestätigung „Fächer ohne Lehrkraft“: XSS behoben) und 0.96.0 (Klassenleitung nur mit eigenem Fach, Löschschutz
+  für Noten anderer Lehrkräfte, Sammelklasse „Ohne Klasse“ nur durch den Admin, Versetzen prüft Quelle und Ziel; Datenbank-Migration
+  „Schema 23“). Die beiden Einträge stehen unten unter ihren ursprünglichen Nummern.
+
 ## 0.103.0 - 2026-11-04
 
 - **SPA: Klausuren und Unterrichtsleistung nach dem IHK-Notenschlüssel.** Bisher rechneten SPA-Klassen den Prozentwert
@@ -110,6 +117,28 @@ Versionen sind hier nicht rückwirkend erfasst.
   „Gewichtung Unterrichtsleistung“ im Admin-Dashboard, die Hinweistexte (SPA-Noteneingabe), die Spalte
   „Unterrichtsleistung (bewertet)“ im CSV-Export sowie README und Code-Kommentare. Interne Bezeichner (Datenbankspalten,
   JSON-Schlüssel, Routen) bleiben unverändert, es ändert sich keine Berechnung.
+
+## 0.96.0 - 2026-10-12
+
+- **Klassenleitung nur mit eigenem Fach.** Als Klassenleitung eintragen kann sich (solange niemand eingetragen ist)
+  jede Lehrkraft, die in der Klasse mindestens ein eigenes Fach hat; ohne Fach erscheint ein Hinweis statt des Knopfs.
+  Selbst Eingetragene stehen für alle sichtbar mit „selbst eingetragen am …“ in der Klassenleitungs-Zeile.
+- **Löschschutz für Noten anderer Lehrkräfte.** Klassenleitung bzw. erstellende Lehrkraft löschen Fächer,
+  Schüler/innen und Klassen nur noch, wenn daran keine Noten anderer Lehrkräfte hängen (auch nicht über „Zuordnung
+  entfernen, dann als Fach ohne Lehrkraft löschen“). Alles andere löscht nur der Admin; bei Personen gibt es den
+  Hinweis auf „Abgang“.
+- **Sammelklasse „Ohne Klasse“ verwaltet nur der Admin.** Wer eine Klasse löscht, wird nicht mehr ihre Klassenleitung
+  und sieht damit keine Abgangszeugnisse fremder, dort geparkter Personen. Bestehende Einträge dieser Art entfernt die
+  Datenbank-Migration (Schema 23). Personen holt man über „Aus Ohne Klasse übernehmen“ in eine eigene Klasse.
+- **Versetzen prüft Quelle und Ziel.** Nur mit Verwaltungsrecht an beiden Klassen (Ziel „Ohne Klasse“ immer erlaubt);
+  bisher konnte man in fremde Klassen versetzen bzw. aus der Sammelklasse ganz ohne Recht.
+
+## 0.95.2 - 2026-10-11
+
+- **Sicherheit: Löschbestätigung bei „Fächer ohne Lehrkraft“ (Klassenleitung).** Der Bestätigungstext stand
+  ungeschützt im `onsubmit`-Attribut: Die Rückfrage vor dem Löschen erschien nie (ein Klick löschte das Fach samt
+  Noten), und ein präparierter Fachname wie `x onmouseover=… y` wurde zu einem ausführbaren Event-Handler im Browser
+  der Klassenleitung. Jetzt HTML-maskiert; ein Test verhindert dieses Muster in allen Views.
 
 ## 0.95.1 - 2026-10-11
 

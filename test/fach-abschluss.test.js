@@ -125,8 +125,9 @@ test('Direkte Endnote (3. Halbjahr): zugewiesene Lehrkraft darf sie eintragen, o
   assert.equal(r.status, 200);
 
   // Für die Zuweisung weiterer Lehrkräfte (unten) muss Lehrer A Klassenleitung sein.
-  await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
-
+  // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+  // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+  getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(klasseId);
   // Lehrer C ist immer noch nicht zugewiesen -> darf nichts ändern.
   r = await endnote(lehrerC, s2, '4');
   assert.equal(r.status, 403);

@@ -75,7 +75,9 @@ test('Vorbereitung: Klasse mit Einschulung 2023 (6 Halbjahre) mit Physik (alle H
 
   await form(lehrerA, '/teacher/klassen/neu', { schuljahr_id: String(sjId), name: '12B', notenschluessel: 'IHK', einschulung_jahr: '2023' });
   klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '12B'").get().id;
-  await form(lehrerA, `/teacher/klassen/${klasseId}/klassenlehrer/eintragen`, {});
+  // Klassenleitung direkt setzen: der Knopf "Als Klassenleitung eintragen" verlangt ein eigenes Fach
+  // in der Klasse (siehe klassenleitung-eintragen.test.js) -- hier geht es um etwas anderes.
+  getDb().prepare("INSERT OR IGNORE INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = 'lehrera'").run(klasseId);
   await form(lehrerA, `/teacher/klassen/${klasseId}/schueler/neu`, { nachname: 'Adler', vorname: 'Anna' });
 
   const mitHalbjahren = (name, nummern) => {
