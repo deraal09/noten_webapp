@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.106.0 - 2026-11-04
+
+- **Notenschlüssel standardmäßig eingeklappt** -- in der Übersicht für alle (`/notenschluessel`) und im Adminbereich
+  (*Admin → Notenschlüssel*); nach einem Eingabefehler bleibt der betroffene Schlüssel offen.
+- **SPA-Notenschlüssel im Adminbereich editierbar.** Neben IHK und BG gibt es einen eigenen SPA-Schlüssel (Prozent → Note 1–6,
+  Vorgabe: die IHK-Werte). SPA-Klassen verwenden ihn für Klausuren und Unterrichtsleistung; Leistungspunkte (0–15) und
+  Tendenznote werden daraus abgeleitet, die SPA-Tabelle in der Übersicht zeigt das Schritt für Schritt. Änderungen lösen den
+  Hinweis für SPA-Lehrkräfte aus. Die Datenbank-Tabelle wird beim Start automatisch erweitert.
+- **Pro Klasse nur noch der Typ.** *Admin → Klasse → Notenschluessel* hat kein Zahlenfeld mehr: die Zahlen der Schlüssel gelten
+  für alle Klassen (Admin → Notenschlüssel), die Verrechnung der Halbjahre wird je Fach bzw. in der Klasse eingestellt.
+  Eine früher hinterlegte eigene Definition einer Klasse bleibt erhalten und lässt sich mit „Auf übergeordneten Schlüssel
+  zurücksetzen“ entfernen.
+
 ## 0.105.0 - 2026-11-04
 
 - **Notenschlüssel-Übersicht (`/notenschluessel`): einklappbar und mit SPA.** IHK, BG und SPA stehen als aufklappbare Abschnitte

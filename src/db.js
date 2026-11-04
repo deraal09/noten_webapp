@@ -703,7 +703,7 @@ CREATE TABLE IF NOT EXISTS backup_laeufe (
 -- Übergeordnete Notenschlüssel (IHK, BG): Admin → Notenschlüssel. Ohne Zeile gilt die Vorgabe aus src/grade-calc.js.
 -- Jede Änderung zählt version hoch; wer den Schlüssel nutzt, bekommt einmalig einen Hinweis (notenschluessel_gelesen).
 CREATE TABLE IF NOT EXISTS notenschluessel_global (
-    typ TEXT PRIMARY KEY CHECK (typ IN ('IHK', 'BG')),
+    typ TEXT PRIMARY KEY CHECK (typ IN ('IHK', 'BG', 'SPA')),
     csv TEXT NOT NULL,
     version INTEGER NOT NULL DEFAULT 1,
     hinweis TEXT NOT NULL DEFAULT '',
@@ -903,6 +903,23 @@ function migrate(db) {
     }
   }
   migriereSitzplanRaeume(db);
+  // Übergeordnete Notenschlüssel: neben IHK und BG gibt es jetzt auch einen eigenen SPA-Schlüssel (CHECK erweitern).
+  const nsSql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notenschluessel_global'").get()?.sql || '';
+  if (nsSql && !nsSql.includes("'SPA'")) {
+    db.exec(`
+      ALTER TABLE notenschluessel_global RENAME TO notenschluessel_global_alt;
+      CREATE TABLE notenschluessel_global (
+        typ TEXT PRIMARY KEY CHECK (typ IN ('IHK', 'BG', 'SPA')),
+        csv TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        hinweis TEXT NOT NULL DEFAULT '',
+        geaendert_at TEXT NOT NULL DEFAULT (datetime('now')),
+        geaendert_von_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      INSERT INTO notenschluessel_global SELECT typ, csv, version, hinweis, geaendert_at, geaendert_von_id FROM notenschluessel_global_alt;
+      DROP TABLE notenschluessel_global_alt;
+    `);
+  }
   // Schema 23: Die Sammelklasse "Ohne Klasse" verwaltet nur noch der Admin. Bisher wurde, wer eine Klasse
   // löschte, automatisch ihre Klassenleitung -- und sah damit die Noten aller dort geparkten Personen.
   if (alteVersion !== null && alteVersion < 23) {

@@ -134,17 +134,24 @@ test('Erneute Änderung zeigt den Hinweis wieder; "Verstanden" blendet ihn aus',
   assert.equal(offen.headers.get('location'), '/start', 'kein Open Redirect');
 });
 
-test('Klasse mit eigenem Schlüssel behält ihn und bekommt keinen Hinweis; Klassen-Admin normalisiert', async () => {
+test('Früher hinterlegte eigene Definition bleibt, bis sie zurückgesetzt wird; die Zahlen pro Klasse lassen sich nicht mehr eingeben', async () => {
   const k = klasseVon('11B');
   const eigen = '100,15;70,10;50,6;0,0';
-  await admin(`/admin/klassen/${k.id}/notenschluessel`, { notenschluessel: 'BG', csv: eigen });
+  getDb().prepare('UPDATE klassen SET notenschluessel_csv = ? WHERE id = ?').run(eigen, k.id); // Altbestand
   assert.equal(getNotenschluesselCsv({ klasse_id: k.id }), eigen);
   await admin('/admin/notenschluessel/BG', { csv: NEU_BG, hinweis: '' });
-  assert.equal(getNotenschluesselCsv({ klasse_id: k.id }), eigen);
+  assert.equal(getNotenschluesselCsv({ klasse_id: k.id }), eigen, 'eigener Schlüssel bleibt');
   assert.doesNotMatch(await (await ben('/start')).text(), /ns-hinweis/, 'eigener Schlüssel: kein Hinweis');
+  const seite = await (await admin(`/admin/klassen/${k.id}/notenschluessel`)).text();
+  assert.match(seite, /eigene, abweichende Definition/);
+  assert.doesNotMatch(seite, /<textarea/, 'keine Eingabe der Zahlen pro Klasse');
 
-  // Wieder auf den übergeordneten Schlüssel zurück: Inhalt entspricht ihm -> folgt ihm
-  await admin(`/admin/klassen/${k.id}/notenschluessel`, { notenschluessel: 'BG', csv: NEU_BG });
+  // Eine Eingabe im Feld "csv" wird ignoriert
+  await admin(`/admin/klassen/${k.id}/notenschluessel`, { notenschluessel: 'BG', csv: '100,15;60,9;0,0' });
+  assert.equal(getNotenschluesselCsv({ klasse_id: k.id }), eigen);
+
+  // Zurücksetzen: folgt dem übergeordneten Schlüssel
+  await admin(`/admin/klassen/${k.id}/notenschluessel`, { notenschluessel: 'BG', aktion: 'zuruecksetzen' });
   assert.equal(getDb().prepare('SELECT notenschluessel_csv AS c FROM klassen WHERE id = ?').get(k.id).c, '');
   assert.equal(getNotenschluesselCsv({ klasse_id: k.id }), NEU_BG);
   await admin('/admin/notenschluessel/BG', { csv: '100,15;75,11;50,6;0,0' });
@@ -160,21 +167,31 @@ test('Zurücksetzen auf Standard; Admin-Seite zeigt beide Schlüssel', async () 
   assert.equal(getNotenschluesselCsv({ klasse_id: klasseVon('11I').id }), DEFAULT_NS_CSV.IHK);
 });
 
-test('SPA-Klassen bewerten Klausuren/Unterrichtsleistung nach dem IHK-Schlüssel (folgen dem übergeordneten IHK-Schlüssel)', async () => {
+test('SPA hat einen eigenen, editierbaren Schlüssel (Vorgabe wie IHK, unabhängig davon)', async () => {
   const sj = getDb().prepare('SELECT id FROM schuljahre').get().id;
-  const id = getDb().prepare("INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, spa_bildungsgang) VALUES (?, 'SPA1', 'SPA', '', 'SPA')").run(sj).lastInsertRowid;
-  assert.equal(getNotenschluesselCsv({ klasse_id: Number(id) }), DEFAULT_NS_CSV.IHK);
-  await admin('/admin/notenschluessel/IHK', { csv: NEU_IHK });
-  assert.equal(getNotenschluesselCsv({ klasse_id: Number(id) }), NEU_IHK);
+  const id = Number(getDb().prepare("INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, spa_bildungsgang) VALUES (?, 'SPA1', 'SPA', '', 'SPA')").run(sj).lastInsertRowid);
+  assert.equal(getNotenschluesselCsv({ klasse_id: id }), DEFAULT_NS_CSV.IHK, 'Vorgabe = IHK-Werte');
+  const neuSpa = '100,1;85,2;60,4;0,6';
+  assert.match(await (await admin('/admin/notenschluessel')).text(), /id="ns-SPA"/);
+  assert.equal((await admin('/admin/notenschluessel/SPA', { csv: neuSpa, hinweis: 'SPA angepasst' })).status, 302);
+  assert.equal(getNotenschluesselCsv({ klasse_id: id }), neuSpa);
+  assert.equal(getNotenschluesselCsv({ klasse_id: klasseVon('11I').id }), DEFAULT_NS_CSV.IHK, 'IHK bleibt unberührt');
+  assert.equal(pruefeCsv('SPA', '100,4;50,1;0,6').ok, false);
+  await admin('/admin/notenschluessel/SPA', { aktion: 'zuruecksetzen' });
+  assert.equal(getNotenschluesselCsv({ klasse_id: id }), DEFAULT_NS_CSV.IHK);
+  await admin('/admin/notenschluessel/SPA', { csv: neuSpa });
 });
 
-test('Übersicht: Schlüssel sind einklappbar, SPA zeigt Prozent → IHK-Note → Punkte → Tendenz', async () => {
+test('Übersicht: Schlüssel sind eingeklappt, SPA zeigt Prozent → Note → Punkte → Tendenz aus dem SPA-Schlüssel', async () => {
   const html = await (await cora('/notenschluessel')).text();
-  for (const typ of ['IHK', 'BG', 'SPA']) assert.match(html, new RegExp(`<details class="card ns-karte" id="ns-${typ}"`), typ);
-  assert.match(html, /<summary><h2>SPA/);
+  for (const typ of ['IHK', 'BG', 'SPA']) assert.match(html, new RegExp(`<details class="card ns-karte" id="ns-${typ}">`), typ);
+  assert.doesNotMatch(html, /<details[^>]* open/, 'standardmäßig eingeklappt');
   assert.match(html, /Punkte = 17 − 3 × Note/);
-  // 100 % = IHK 1 = 14 Punkte = Tendenz 1; 50 % = IHK 4 (Schlüssel aus dem vorigen Test) = 5 Punkte = Tendenz 4
+  // SPA-Schlüssel aus dem vorigen Test: 100 % = 1 -> 14 Punkte (Tendenz 1); 60 % = 4 -> 5 Punkte (Tendenz 4); 85 % = 2 -> 11 (Tendenz 2)
   assert.match(html, /<tr><td>100 %<\/td><td>1<\/td><td>14<\/td><td>14<\/td><td>1<\/td><\/tr>/);
-  assert.match(html, /<tr><td>50 %<\/td><td>4<\/td><td>5<\/td><td>5<\/td><td>4<\/td><\/tr>/);
+  assert.match(html, /<tr><td>60 %<\/td><td>4<\/td><td>5<\/td><td>5<\/td><td>4<\/td><\/tr>/);
+  assert.match(html, /<tr><td>85 %<\/td><td>2<\/td><td>11<\/td><td>11<\/td><td>2<\/td><\/tr>/);
   assert.match(html, /<tr><td>15<\/td><td>1\+<\/td><\/tr>/, 'Punkteskala 15 = 1+');
+  const admHtml = await (await admin('/admin/notenschluessel')).text();
+  assert.doesNotMatch(admHtml, /<details[^>]* open/, 'auch im Adminbereich eingeklappt');
 });

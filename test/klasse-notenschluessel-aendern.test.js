@@ -110,7 +110,7 @@ test('Admin kann den Notenschlüssel einer unbeteiligten Klasse nachträglich ko
   assert.equal(r.status, 302);
   const klasse = getDb().prepare('SELECT notenschluessel, notenschluessel_csv FROM klassen WHERE id = ?').get(klasseBId);
   assert.equal(klasse.notenschluessel, 'BG');
-  assert.equal(klasse.notenschluessel_csv, csvBg);
+  assert.equal(klasse.notenschluessel_csv, '', 'die Zahlen stehen im übergeordneten Schlüssel, nicht pro Klasse'); // csvBg wird ignoriert
 
   // Zurücksetzen für die nachfolgenden Tests.
   const r2 = await form(admin, `/admin/klassen/${klasseBId}/notenschluessel`, { notenschluessel: 'IHK', csv: '100,1;95,1.3;90,1.6;50,4;0,6' });

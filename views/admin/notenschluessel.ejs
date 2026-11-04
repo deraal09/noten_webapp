@@ -25,11 +25,19 @@
         <% } %>
       </select>
     </label>
-    <label>CSV-Definition <small>(Prozent,Note;… absteigend)</small>
-      <textarea name="csv" rows="10"><%= klasse.notenschluessel_csv %></textarea>
-    </label>
-    <p class="hint">Beispiel IHK: <code>100,1;95,1.3;90,1.6;50,4;0,6</code></p>
-    <p class="hint">Beispiel BG:  <code>100,15;85,13;50,6;33,3;20,1;0,0</code></p>
+    <p class="hint">
+      Die Zahlen der Schlüssel (Prozent → Note bzw. Punkte) gelten für alle Klassen und stehen unter
+      <a href="/admin/notenschluessel">Admin → Notenschlüssel</a>. Pro Klasse wird nur der Typ festgelegt; die Verrechnung der
+      Halbjahre stellt man je Fach ein (⚙ am Fach bzw. in der Klasse).
+    </p>
+    <% if (!folgtGlobal) { %>
+      <p class="flash flash-info">
+        Diese Klasse hat noch eine <strong>eigene, abweichende Definition</strong> (früher hier hinterlegt) und folgt deshalb nicht dem
+        übergeordneten Schlüssel:
+        <code><%= klasse.notenschluessel_csv.length > 120 ? klasse.notenschluessel_csv.slice(0, 120) + '…' : klasse.notenschluessel_csv %></code>
+        <button type="submit" name="aktion" value="zuruecksetzen" class="btn">↺ Auf übergeordneten Schlüssel zurücksetzen</button>
+      </p>
+    <% } %>
     <% if (anzahlFaecher === 0) { %>
       <div class="spa-bildungsgang-auswahl" style="display:none;">
         <p class="hint">

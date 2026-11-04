@@ -1,29 +1,34 @@
 /**
  * Übergeordnete Notenschlüssel (IHK, BG): Der Admin pflegt sie zentral (Admin → Notenschlüssel), alle Klassen, die
- * keinen eigenen Schlüssel haben, folgen ihnen (auch SPA-Klassen: IHK). Ändert der Admin einen Schlüssel, bekommen alle Lehrkräfte, die ihn nutzen,
+ * keinen eigenen Schlüssel haben, folgen ihnen. Es gibt drei: IHK (Noten 1-6), BG (Punkte 0-15) und SPA. Ändert der Admin einen Schlüssel, bekommen alle Lehrkräfte, die ihn nutzen,
  * einmalig einen Hinweis. Ansehen (ohne ändern) können ihn alle angemeldeten Personen (/notenschluessel).
  *
  * Klassen mit eigener CSV-Definition (Admin → Klasse → Notenschlüssel, abweichend von Vorgabe und übergeordnetem
- * Schlüssel) behalten diese. SPA-Klassen bewerten Klausuren und Unterrichtsleistung nach dem IHK-Schlüssel.
+ * Schlüssel) behalten diese (neu einstellen lässt sich das nicht mehr, nur auf den übergeordneten Schlüssel zurücksetzen).
+ * SPA-Klassen bewerten Klausuren und Unterrichtsleistung mit dem SPA-Schlüssel: Prozent -> Note 1-6 (Vorgabe wie IHK),
+ * daraus werden Leistungspunkte (0-15) und Tendenznote abgeleitet (src/spa-leistung.js).
  */
 
 import { getDb } from './db.js';
 import { DEFAULT_NS_CSV, nsCsvParse } from './grade-calc.js';
 import { ladeMeineKlassen } from './auth.js';
 
-export const TYPEN = ['IHK', 'BG'];
-export const BEREICH = { IHK: [1, 6], BG: [0, 15] };
+export const TYPEN = ['IHK', 'BG', 'SPA'];
+export const BEREICH = { IHK: [1, 6], BG: [0, 15], SPA: [1, 6] };
 export const MAX_HINWEIS = 200;
 
-/** Schlüsseltyp, dessen Tabelle eine Klasse verwendet (SPA: Klausuren/Unterrichtsleistung nach dem IHK-Schlüssel, siehe src/spa-leistung.js). */
-export const schluesselTypVon = (notenschluessel) => (notenschluessel === 'SPA' ? 'IHK' : notenschluessel);
+/** Schlüsseltyp, dessen Tabelle eine Klasse verwendet. */
+export const schluesselTypVon = (notenschluessel) => notenschluessel;
+
+/** Eingebaute Vorgabe eines Schlüssels (SPA startet mit den Werten des IHK-Schlüssels). */
+export const vorgabeCsv = (typ) => DEFAULT_NS_CSV[typ] || DEFAULT_NS_CSV.IHK || '';
 
 /** Der übergeordnete Schlüssel: gespeicherte Fassung oder die Vorgabe. */
 export function globalerSchluessel(typ) {
   const row = getDb().prepare('SELECT * FROM notenschluessel_global WHERE typ = ?').get(typ);
   return {
     typ,
-    csv: row?.csv || DEFAULT_NS_CSV[typ] || '',
+    csv: row?.csv || vorgabeCsv(typ),
     angepasst: Boolean(row),
     version: row?.version ?? 0,
     hinweis: row?.hinweis ?? '',
@@ -35,7 +40,7 @@ export function globalerSchluessel(typ) {
 /** Folgt die Klasse dem übergeordneten Schlüssel? (leere oder der Vorgabe entsprechende CSV = ja) */
 export function folgtGlobal(klasse) {
   const csv = (klasse?.notenschluessel_csv || '').trim();
-  return !csv || csv === DEFAULT_NS_CSV[schluesselTypVon(klasse.notenschluessel)];
+  return !csv || csv === vorgabeCsv(klasse.notenschluessel);
 }
 
 /** Die für diese Klasse geltende CSV (eigene Definition oder übergeordneter Schlüssel). */
@@ -76,7 +81,7 @@ export function pruefeCsv(typ, roh) {
     if (eintraege[i][0] === eintraege[i - 1][0]) return { ok: false, fehler: `Der Prozentwert ${eintraege[i][0]} kommt doppelt vor.` };
   }
   if (eintraege[eintraege.length - 1][0] !== 0) return { ok: false, fehler: 'Der Schlüssel muss bei 0 Prozent enden, damit jedes Ergebnis eine Note bekommt.' };
-  const besserBeiMehr = typ === 'BG'; // BG: mehr Prozent = mehr Punkte; IHK: mehr Prozent = kleinere (bessere) Note
+  const besserBeiMehr = typ === 'BG'; // BG: mehr Prozent = mehr Punkte; IHK/SPA: mehr Prozent = kleinere (bessere) Note
   for (let i = 1; i < eintraege.length; i++) {
     const vorher = eintraege[i - 1][1];
     const jetzt = eintraege[i][1];
