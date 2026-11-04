@@ -221,6 +221,9 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 /* Hinweis "Notenschlüssel angepasst": Text links, Knöpfe rechts (umbrechend) */
 .ns-hinweis { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; justify-content: space-between; }
 .ns-hinweis-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }
+.ns-karte > summary { cursor: pointer; list-style-position: inside; }
+.ns-karte > summary h2 { display: inline; margin: 0; border: 0; padding: 0; font-size: 1.15rem; }
+.ns-karte h3 { margin: 1rem 0 0.25rem; font-size: 1rem; }
 .ns-tabelle { border-collapse: collapse; }
 .ns-tabelle th, .ns-tabelle td { padding: 0.25rem 1rem 0.25rem 0; text-align: left; }
 .flash-error, .err { background: var(--flash-error-bg); color: var(--flash-error-text); border: 1px solid var(--flash-error-border); padding: 0.5rem 0.75rem; border-radius: 4px; }

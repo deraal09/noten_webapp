@@ -2,13 +2,17 @@
 <p class="hint">
   Hier sehen Sie die Umrechnung von Prozent in Note bzw. Punkte, die für Klausuren und Unterrichtsleistung gilt.
   Die übergeordneten Schlüssel pflegt die Administration; Sie können sie ansehen, aber nicht ändern.
+  Ein Klick auf die Überschrift klappt den jeweiligen Schlüssel auf oder zu.
 </p>
 
+<% var fmt = function(n) { return String(n).replace('.', ','); }; %>
+
 <% schluessel.forEach(function(s) { %>
-  <section class="card ns-karte" id="ns-<%= s.typ %>">
-    <h2><%= s.bezeichnung %>
+  <details class="card ns-karte" id="ns-<%= s.typ %>" <%= s.genutzt ? 'open' : '' %>>
+    <summary><h2><%= s.bezeichnung %>
       <% if (s.genutzt) { %><small class="hint">· von Ihren Klassen genutzt</small><% } %>
-    </h2>
+      <% if (s.angepasst) { %><small class="hint">· angepasst</small><% } %>
+    </h2></summary>
     <% if (s.angepasst) { %>
       <p class="hint">
         Zuletzt angepasst am <%= formatZeitLokal(s.geaendertAt) %><% if (s.von) { %> von <%= s.von %><% } %>.
@@ -21,12 +25,43 @@
       <thead><tr><th>Ab Prozent</th><th><%= s.typ === 'BG' ? 'Punkte' : 'Note' %></th></tr></thead>
       <tbody>
         <% s.zeilen.forEach(function(z) { %>
-          <tr><td><%= String(z.ab).replace('.', ',') %> %</td><td><%= String(z.note).replace('.', ',') %></td></tr>
+          <tr><td><%= fmt(z.ab) %> %</td><td><%= fmt(z.note) %></td></tr>
         <% }); %>
       </tbody>
     </table>
-  </section>
+  </details>
 <% }); %>
+
+<details class="card ns-karte" id="ns-SPA" <%= hatSpa ? 'open' : '' %>>
+  <summary><h2>SPA (Sozialpädagogische Assistenz)
+    <% if (hatSpa) { %><small class="hint">· von Ihren Klassen genutzt</small><% } %>
+  </h2></summary>
+  <p class="hint">
+    Klausuren und Unterrichtsleistung werden in SPA-Klassen wie bei IHK bewertet: Der <strong>IHK-Schlüssel</strong>
+    (siehe oben<% if (spa.angepasst) { %>, von der Administration angepasst<% } %>) macht aus dem Prozentwert eine Note.
+    Daraus entstehen die <strong>Leistungspunkte (0–15)</strong>: Punkte = 17 − 3 × Note (mindestens 0, höchstens 15).
+    Die <strong>Tendenznote</strong> ergibt sich aus den auf ganze Punkte gerundeten Punkten nach der SPA-Notenskala unten.
+    Die Leistungspunkte fließen in das SPA-Fach bzw. die gewählte Komponente ein; das Zeugnis folgt danach dem SPA-Bewertungssystem.
+  </p>
+
+  <h3>Punkte und Tendenznote</h3>
+  <table class="ns-tabelle">
+    <thead><tr><th>Punkte</th><th>Tendenznote</th></tr></thead>
+    <tbody>
+      <% spa.skala.forEach(function(z) { %><tr><td><%= z.punkte %></td><td><%= z.tendenz %></td></tr><% }); %>
+    </tbody>
+  </table>
+
+  <h3>So setzt sich das zusammen</h3>
+  <table class="ns-tabelle">
+    <thead><tr><th>Ab Prozent</th><th>IHK-Note</th><th>Punkte</th><th>Gerundet</th><th>Tendenznote</th></tr></thead>
+    <tbody>
+      <% spa.zeilen.forEach(function(z) { %>
+        <tr><td><%= fmt(z.ab) %> %</td><td><%= fmt(z.note) %></td><td><%= fmt(z.punkte) %></td><td><%= z.gerundet %></td><td><%= z.tendenz %></td></tr>
+      <% }); %>
+    </tbody>
+  </table>
+</details>
 
 <% if (eigene.length) { %>
   <p class="hint">
@@ -34,9 +69,14 @@
     <%= eigene.map(function(k) { return k.name + ' (' + k.typ + ')'; }).join(', ') %>.
   </p>
 <% } %>
-<% if (hatSpa) { %>
-  <p class="hint">SPA-Klassen bewerten Klausuren und Unterrichtsleistung nach dem IHK-Schlüssel; die Leistungspunkte (0–15) werden daraus umgerechnet.</p>
-<% } %>
 <% if (user.isAdmin) { %>
   <p><a class="btn" href="/admin/notenschluessel">✏️ Notenschlüssel bearbeiten</a></p>
 <% } %>
+
+<script>
+  // Verlinkter Schlüssel (z. B. aus dem Änderungshinweis) wird aufgeklappt.
+  (function() {
+    var d = location.hash ? document.querySelector('details' + location.hash) : null;
+    if (d) { d.open = true; d.scrollIntoView(); }
+  })();
+</script>

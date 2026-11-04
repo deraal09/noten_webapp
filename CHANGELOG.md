@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.105.0 - 2026-11-04
+
+- **Notenschlüssel-Übersicht (`/notenschluessel`): einklappbar und mit SPA.** IHK, BG und SPA stehen als aufklappbare Abschnitte
+  untereinander (die von den eigenen Klassen genutzten sind vorgeöffnet, ein Link aus dem Änderungshinweis öffnet den
+  jeweiligen Schlüssel). Der SPA-Abschnitt erklärt die Berechnung und zeigt je Prozentstufe des IHK-Schlüssels die IHK-Note,
+  die Leistungspunkte (0–15, auch gerundet) und die Tendenznote, dazu die Skala Punkte → Tendenznote.
+
 ## 0.104.0 - 2026-11-04
 
 - **Zusammenführung des Branchs `claude/noten-webapp-ldap-integration-cknkop`.** Übernimmt die dort entwickelten Änderungen

@@ -7,6 +7,8 @@ import { requireAuth } from '../auth.js';
 import { ladeMeineKlassen } from '../auth.js';
 import { TYPEN, globalerSchluessel, folgtGlobal, schluesselTypVon, tabelle, markiereGelesen } from '../notenschluessel.js';
 import { getDb } from '../db.js';
+import { punkteAusIhkNote, spaTendenz } from '../spa-leistung.js';
+import { STANDARD_NOTENSKALA } from '../spa-grade-calc.js';
 
 const anzeigeTyp = { IHK: 'IHK (Noten 1–6)', BG: 'BG (Punkte 0–15)' };
 
@@ -26,7 +28,18 @@ export default async function notenschluesselRoutes(fastify) {
     // Wer sich den Schlüssel ansieht, hat die Änderung zur Kenntnis genommen.
     if (!user.isAdmin) markiereGelesen(user.id);
     reply.locals.notenschluesselHinweise = [];
-    return reply.viewEjs('notenschluessel.ejs', { user, schluessel, eigene, hatSpa: klassen.some((k) => k.notenschluessel === 'SPA') });
+    // SPA: Klausuren/Unterrichtsleistung nach dem IHK-Schlüssel; Punkte (0-15) und Tendenz werden aus der Note abgeleitet.
+    const ihk = schluessel.find((s) => s.typ === 'IHK');
+    const spa = {
+      zeilen: ihk.zeilen.map(({ ab, note }) => {
+        const punkte = punkteAusIhkNote(note);
+        return { ab, note, punkte, gerundet: Math.round(punkte), tendenz: spaTendenz(punkte) };
+      }),
+      skala: [...STANDARD_NOTENSKALA.entries()].sort((a, b) => b[0] - a[0]).map(([punkte, tendenz]) => ({ punkte, tendenz })),
+      angepasst: ihk.angepasst,
+    };
+    const hatSpa = klassen.some((k) => k.notenschluessel === 'SPA');
+    return reply.viewEjs('notenschluessel.ejs', { user, schluessel, eigene, hatSpa, spa });
   });
 
   fastify.post('/notenschluessel/gelesen', async (request, reply) => {

@@ -167,3 +167,14 @@ test('SPA-Klassen bewerten Klausuren/Unterrichtsleistung nach dem IHK-Schlüssel
   await admin('/admin/notenschluessel/IHK', { csv: NEU_IHK });
   assert.equal(getNotenschluesselCsv({ klasse_id: Number(id) }), NEU_IHK);
 });
+
+test('Übersicht: Schlüssel sind einklappbar, SPA zeigt Prozent → IHK-Note → Punkte → Tendenz', async () => {
+  const html = await (await cora('/notenschluessel')).text();
+  for (const typ of ['IHK', 'BG', 'SPA']) assert.match(html, new RegExp(`<details class="card ns-karte" id="ns-${typ}"`), typ);
+  assert.match(html, /<summary><h2>SPA/);
+  assert.match(html, /Punkte = 17 − 3 × Note/);
+  // 100 % = IHK 1 = 14 Punkte = Tendenz 1; 50 % = IHK 4 (Schlüssel aus dem vorigen Test) = 5 Punkte = Tendenz 4
+  assert.match(html, /<tr><td>100 %<\/td><td>1<\/td><td>14<\/td><td>14<\/td><td>1<\/td><\/tr>/);
+  assert.match(html, /<tr><td>50 %<\/td><td>4<\/td><td>5<\/td><td>5<\/td><td>4<\/td><\/tr>/);
+  assert.match(html, /<tr><td>15<\/td><td>1\+<\/td><\/tr>/, 'Punkteskala 15 = 1+');
+});
