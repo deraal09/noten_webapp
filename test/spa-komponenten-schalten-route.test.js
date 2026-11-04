@@ -161,11 +161,11 @@ test('Leistungspunkte eines Komponenten-Unterfachs füttern die Komponente des L
   const db = getDb();
   const schemaHj = spaSchemaFuerFach(db, lf3Id).schema.find((x) => x.halbjahr === 2);
   const anzeige = ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj);
-  assert.equal(anzeige.komponentenLeistung.kunst, 15, 'volle Punktzahl = 15 Punkte');
+  assert.equal(anzeige.komponentenLeistung.kunst, 14, 'volle Punktzahl = IHK 1 = 14 Punkte');
   assert.equal(anzeige.komponentenLeistung.spiel, null);
   assert.equal(anzeige.komponenten.kunst, null, 'die Leistung ist Platzhalter, kein Handwert');
   const lf3Html = await (await admin(`/teacher/fach/${lf3Id}?ansicht=endnoten&hj=2`)).text();
-  assert.match(lf3Html, /placeholder="15"/);
+  assert.match(lf3Html, /placeholder="14"/);
 });
 
 test('Komponenten lassen sich komplett abwählen (kein Halbjahr) und wieder zuschalten; feste Gewichte werden hochgerechnet', async () => {
@@ -241,10 +241,10 @@ test('Komponenten-Unterfach: direkte Eingabe der Gesamtpunkte ersetzt die berech
   assert.equal(r.status, 200);
   assert.deepEqual(await r.json(), { ok: true, note: 11, ntg: false });
   const schemaHj = spaSchemaFuerFach(db, lf3Id).schema.find((x) => x.halbjahr === 2);
-  assert.equal(ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj).komponentenLeistung.kunst, 11, 'Direkteingabe vor der berechneten Leistung (15)');
+  assert.equal(ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj).komponentenLeistung.kunst, 11, 'Direkteingabe vor der berechneten Leistung (14)');
   assert.equal((await form(admin, `/teacher/fach/${kunst.id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '2. Halbjahr', wert: '16' })).status, 400, 'nur 0-15');
   await form(admin, `/teacher/fach/${kunst.id}/endnote`, { schueler_id: String(schuelerId), halbjahr: '2. Halbjahr', wert: '' });
-  assert.equal(ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj).komponentenLeistung.kunst, 15, 'leer = wieder die berechneten Leistungspunkte');
+  assert.equal(ladeEingabeAnzeige(db, lf3Id, schuelerId, 2, schemaHj).komponentenLeistung.kunst, 14, 'leer = wieder die berechneten Leistungspunkte');
 });
 
 test('Klassenleitung: SPA-Fächer stehen in der Direkteingabe; Gesamtpunkte gelten als Endpunkte des Halbjahres', async () => {

@@ -1,10 +1,10 @@
 /**
  * Übergeordnete Notenschlüssel (IHK, BG): Der Admin pflegt sie zentral (Admin → Notenschlüssel), alle Klassen, die
- * keinen eigenen Schlüssel haben, folgen ihnen. Ändert der Admin einen Schlüssel, bekommen alle Lehrkräfte, die ihn nutzen,
+ * keinen eigenen Schlüssel haben, folgen ihnen (auch SPA-Klassen: IHK). Ändert der Admin einen Schlüssel, bekommen alle Lehrkräfte, die ihn nutzen,
  * einmalig einen Hinweis. Ansehen (ohne ändern) können ihn alle angemeldeten Personen (/notenschluessel).
  *
  * Klassen mit eigener CSV-Definition (Admin → Klasse → Notenschlüssel, abweichend von Vorgabe und übergeordnetem
- * Schlüssel) behalten diese. SPA-Klassen bewerten Klausuren in Punkten mit dem Punkteschlüssel der BG.
+ * Schlüssel) behalten diese. SPA-Klassen bewerten Klausuren und Unterrichtsleistung nach dem IHK-Schlüssel.
  */
 
 import { getDb } from './db.js';
@@ -15,8 +15,8 @@ export const TYPEN = ['IHK', 'BG'];
 export const BEREICH = { IHK: [1, 6], BG: [0, 15] };
 export const MAX_HINWEIS = 200;
 
-/** Schlüsseltyp, dessen Tabelle eine Klasse verwendet (SPA: Punkteschlüssel der BG). */
-export const schluesselTypVon = (notenschluessel) => (notenschluessel === 'SPA' ? 'BG' : notenschluessel);
+/** Schlüsseltyp, dessen Tabelle eine Klasse verwendet (SPA: Klausuren/Unterrichtsleistung nach dem IHK-Schlüssel, siehe src/spa-leistung.js). */
+export const schluesselTypVon = (notenschluessel) => (notenschluessel === 'SPA' ? 'IHK' : notenschluessel);
 
 /** Der übergeordnete Schlüssel: gespeicherte Fassung oder die Vorgabe. */
 export function globalerSchluessel(typ) {
@@ -35,7 +35,7 @@ export function globalerSchluessel(typ) {
 /** Folgt die Klasse dem übergeordneten Schlüssel? (leere oder der Vorgabe entsprechende CSV = ja) */
 export function folgtGlobal(klasse) {
   const csv = (klasse?.notenschluessel_csv || '').trim();
-  return !csv || csv === DEFAULT_NS_CSV[klasse.notenschluessel];
+  return !csv || csv === DEFAULT_NS_CSV[schluesselTypVon(klasse.notenschluessel)];
 }
 
 /** Die für diese Klasse geltende CSV (eigene Definition oder übergeordneter Schlüssel). */

@@ -102,12 +102,18 @@ export function ladeFaecherFuerSchueler(schuelerId) {
   `).all(schuelerId)).map(mitAbschlussStatus);
 }
 
+/** Für "nicht bestanden": SPA rechnet nach IHK-Noten, nur direkt eingetragene Gesamtpunkte (0-15) gelten wie BG-Punkte (ab 4). */
+function nsTypFuerGesamt(fach, endnote) {
+  if (fach.notenschluessel !== 'SPA') return fach.notenschluessel;
+  return endnote ? 'BG' : 'IHK';
+}
+
 export function getNotenschluesselCsv(fach) {
   const k = getDb().prepare('SELECT notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
     .get(fach.klasse_id);
   // Eigene Definition der Klasse, sonst der übergeordnete Schlüssel (Admin → Notenschlüssel, ohne Anpassung die Vorgabe).
-  // SPA-Klassen bewerten Klausuren/Unterrichtsleistung in Punkten (0-15): der Punkteschlüssel Prozent -> Punkte
-  // entspricht dem der BG; die Tendenznote (1+ ... 6) wird erst daraus berechnet (siehe src/spa-leistung.js).
+  // SPA-Klassen bewerten Klausuren/Unterrichtsleistung ebenfalls nach dem IHK-Schlüssel (Noten 1-6); die Leistungspunkte
+  // (0-15) und die Tendenznote (1+ ... 6) werden erst daraus abgeleitet (siehe src/spa-leistung.js).
   // Nur die Zeugnisnoten haben ein eigenes Bewertungssystem.
   return k ? effektiveCsv(k) : '';
 }
@@ -300,7 +306,7 @@ function ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler) {
       schriftlicheNote: null, datumsDurchschnitt: null, naAnzahl: 0, muendlicheNote: null,
       unterfachNoten: proUnterfach.map(({ noten }) => noten.get(s.id) ?? null),
       gesamt: gn,
-      nicht_bestanden: gn !== null ? nichtBestanden(gn, fach.notenschluessel === 'SPA' ? 'BG' : fach.notenschluessel) : false,
+      nicht_bestanden: gn !== null ? nichtBestanden(gn, nsTypFuerGesamt(fach, endnote)) : false,
     };
   });
   return {
@@ -405,8 +411,8 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       naAnzahl: eigeneNa.size,
       muendlicheNote,
       gesamt: gn,
-      // SPA-Punkte (0-15) bestehen wie BG-Punkte ab 4.
-      nicht_bestanden: gn !== null ? nichtBestanden(gn, fach.notenschluessel === 'SPA' ? 'BG' : fach.notenschluessel) : false,
+      // SPA: berechnete Noten wie IHK, direkt eingetragene Punkte (0-15) bestehen wie BG-Punkte ab 4.
+      nicht_bestanden: gn !== null ? nichtBestanden(gn, nsTypFuerGesamt(fach, endnote)) : false,
     };
   });
 

@@ -1,10 +1,9 @@
 /**
  * SPA: Klausuren und Unterrichtsleistung werden wie bei IHK abgehandelt
  * (Klausuren mit Teilen, Datumstabelle, Zusatzleistungen, Gewichtung
- * schriftlich/Unterrichtsleistung), aber in PUNKTEN: der Punkteschlüssel übersetzt den
- * Prozentwert direkt in Punkte 0-15 (siehe getNotenschluesselCsv in
- * noten-service.js), die Tendenznote (1+ ... 6) wird daraus mit der SPA-Skala
- * berechnet. Die Leistungspunkte eines Halbjahres
+ * schriftlich/Unterrichtsleistung), aber mit Leistungspunkten: der Prozentwert wird nach dem IHK-Schlüssel in eine Note (1-6, siehe getNotenschluesselCsv in
+ * noten-service.js); daraus werden die Leistungspunkte 0-15 (punkteAusIhkNote) und die
+ * Tendenznote (1+ ... 6) mit der SPA-Skala abgeleitet. Die Leistungspunkte eines Halbjahres
  *  - ersetzen bei Fächern mit einem Punktwert je Halbjahr (halbjahrModus
  *    'direkt') den Direktwert,
  *  - füttern bei Fächern mit Komponenten (z. B. LF2/LF3) die Komponente, die
@@ -16,6 +15,20 @@
 import { berechneGesamtnoteEinerPerson } from './noten-service.js';
 import { tendenzAusEndpunkten, STANDARD_NOTENSKALA } from './spa-grade-calc.js';
 import { verrechnungsProzent, wendeVerrechnungAn } from './klassen-jahre.js';
+
+/**
+ * IHK-Note (1-6) -> Punkte 0-15, passend zur SPA-Notenskala (1 = 14, 2 = 11, 3 = 8, 4 = 5, 5 = 2, 6 = 0;
+ * 1,3 = 13 = 1-, 1,7 = 12 = 2+ usw.): Punkte = 17 - 3 x Note, auf 0-15 begrenzt, auf zwei Stellen gerundet.
+ */
+export function punkteAusIhkNote(note) {
+  if (note === null || note === undefined) return null;
+  return Math.round(Math.max(0, Math.min(15, 17 - 3 * note)) * 100) / 100;
+}
+
+/** Tendenznote einer IHK-Note (Klausur-/Unterrichtsleistungs-Gesamtnote) über die Punkte. */
+export function spaTendenzAusNote(note) {
+  return spaTendenz(punkteAusIhkNote(note));
+}
 
 /** Tendenznote (1+ ... 6) zu Punkten 0-15 nach der SPA-Notenskala; null bei fehlendem Wert. */
 export function spaTendenz(punkte) {
@@ -35,7 +48,7 @@ export function leistungsPunkte(db, fachId, halbjahrNr, schuelerId) {
       .get(fachId, schuelerId, `${halbjahrNr}. Halbjahr`);
     if (direkt) return direkt.ntg || direkt.note === null ? null : Math.round(direkt.note * 100) / 100;
   }
-  const punkte = berechneGesamtnoteEinerPerson(fachId, `${halbjahrNr}. Halbjahr`, schuelerId);
+  const punkte = punkteAusIhkNote(berechneGesamtnoteEinerPerson(fachId, `${halbjahrNr}. Halbjahr`, schuelerId));
   if (punkte === null) return null;
   const prozent = fach ? verrechnungsProzent(fach.klasse_id, `${halbjahrNr}. Halbjahr`, fach) : 0;
   const vorher = prozent ? leistungsPunkte(db, fachId, halbjahrNr - 1, schuelerId) : null;

@@ -159,3 +159,11 @@ test('Zurücksetzen auf Standard; Admin-Seite zeigt beide Schlüssel', async () 
   await admin('/admin/notenschluessel/IHK', { aktion: 'zuruecksetzen', csv: 'x' });
   assert.equal(getNotenschluesselCsv({ klasse_id: klasseVon('11I').id }), DEFAULT_NS_CSV.IHK);
 });
+
+test('SPA-Klassen bewerten Klausuren/Unterrichtsleistung nach dem IHK-Schlüssel (folgen dem übergeordneten IHK-Schlüssel)', async () => {
+  const sj = getDb().prepare('SELECT id FROM schuljahre').get().id;
+  const id = getDb().prepare("INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, spa_bildungsgang) VALUES (?, 'SPA1', 'SPA', '', 'SPA')").run(sj).lastInsertRowid;
+  assert.equal(getNotenschluesselCsv({ klasse_id: Number(id) }), DEFAULT_NS_CSV.IHK);
+  await admin('/admin/notenschluessel/IHK', { csv: NEU_IHK });
+  assert.equal(getNotenschluesselCsv({ klasse_id: Number(id) }), NEU_IHK);
+});

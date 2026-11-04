@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.103.0 - 2026-11-04
+
+- **SPA: Klausuren und Unterrichtsleistung nach dem IHK-Notenschlüssel.** Bisher rechneten SPA-Klassen den Prozentwert
+  über den BG-Punkteschlüssel. Jetzt gilt der IHK-Schlüssel (der übergeordnete aus *Admin → Notenschlüssel*, siehe 0.102.0):
+  Klausuren, Unterrichtsleistung und Gesamt zeigen Noten (1–6). Für die Leistungspunkte (0–15) und die Tendenznote wird die
+  Note umgerechnet: Punkte = 17 − 3 × Note (1 = 14, 2 = 11, 3 = 8, 4 = 5, 5 = 2, 6 = 0), sodass 1,7 → 2+, 2,3 → 2− usw.
+  genau auf der SPA-Notenskala landen. Direkt eingetragene Gesamtpunkte (0–15) bleiben Punkte und haben weiter Vorrang.
+  Der Änderungshinweis zu geänderten IHK-Schlüsseln erreicht damit auch SPA-Lehrkräfte.
+- Hinweis: Bereits bewertete SPA-Klausuren werden sofort nach dem neuen Schlüssel berechnet; die Leistungspunkte können
+  sich dadurch geringfügig ändern (z. B. 100 % ergibt 14 statt 15 Punkte, Tendenz „1“ statt „1+“).
+
 ## 0.102.0 - 2026-11-04
 
 - **Übergeordnete Notenschlüssel (IHK, BG) durch den Admin anpassbar.** Neue Seite *Admin → Notenschlüssel*: je Schlüssel

@@ -61,7 +61,7 @@ import {
 import {
   zeugnisMitQuellen, ladeQuellenSeite, speichereQuellenAuswahl, loescheQuellenAuswahl,
 } from '../spa-zeugnis-quellen.js';
-import { leistungsZiel, setzeLeistungsZiel, spaTendenz } from '../spa-leistung.js';
+import { leistungsZiel, setzeLeistungsZiel, spaTendenz, spaTendenzAusNote } from '../spa-leistung.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -415,7 +415,7 @@ export default async function teacherRoutes(fastify) {
     }
     return reply.viewEjs('teacher/fach_detail.ejs', {
       HALBJAHRE: halbjahreFuerFach(fach).filter((h) => !erlaubteHj || erlaubteHj.includes(halbjahrNr(h))),
-      HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id), spaLeistung, spaTendenz,
+      HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id), spaLeistung, spaTendenz, spaTendenzAusNote,
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
       termine: uebersicht.termine, unterrichtNotizAnzahl,

@@ -28,9 +28,9 @@
 <% } else if (spaLeistung) { %>
   <div class="card">
     <p class="hint">
-      Klausuren und Unterrichtsleistung werden wie bei IHK abgehandelt, aber in <strong>Punkten (0-15)</strong>
-      bewertet: der Punkteschlüssel der Klasse übersetzt den Prozentwert in Punkte, die Tendenznote
-      (1+ ... 6) wird daraus berechnet. Die Halbjahrespunkte aus Unterrichtsleistung und schriftlicher Leistung
+      Klausuren und Unterrichtsleistung werden wie bei IHK abgehandelt: der <strong>IHK-Notenschlüssel</strong>
+      übersetzt den Prozentwert in eine Note (1-6). Für die Leistungspunkte (0-15) wird die Note umgerechnet
+      (1 = 14, 2 = 11, 3 = 8, 4 = 5, 5 = 2, 6 = 0 Punkte) und daraus die Tendenznote (1+ ... 6) berechnet. Die Halbjahrespunkte aus Unterrichtsleistung und schriftlicher Leistung
       fließen im <%= halbjahr %> in die Endnotentabelle dieses Fachs ein -- ein dort von Hand eingetragener
       Wert („Direkte Endnoteneingabe") hat Vorrang. Nur das Zeugnis folgt danach dem SPA-Bewertungssystem.
     </p>
@@ -101,7 +101,7 @@
 </div>
 
 <%
-  var NL = spaLeistung ? 'Punkte' : 'Note'; // SPA bewertet Klausuren/UL in Punkten (0-15)
+  var NL = 'Note'; // auch SPA bewertet Klausuren/UL nach dem IHK-Schlüssel (Punkte werden daraus abgeleitet)
   var zeigeNaSpalte = termine.length > 0;
   var sichtbareSpalten = 2 + (zeigeNaSpalte ? 1 : 0) + (verrechnung && verrechnung.prozent ? 1 : 0) + 2 + (spaLeistung ? (spaLeistung.komponente ? 1 : 2) : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
@@ -149,7 +149,7 @@
         <th>Unterrichtsleistung</th>
         <th>Schriftliche <%= NL %></th>
         <% if (verrechnung && verrechnung.prozent) { %><th title="Endgültige Note des Vorhalbjahres, die zu <%= verrechnung.prozent %> % einfließt">Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
-        <th>Gesamt<%= spaLeistung ? 'punkte' : 'note' %></th>
+        <th>Gesamtnote</th>
         <% if (spaLeistung) { %><th title="Tendenznote aus den Leistungspunkten (SPA-Notenskala)">Tendenz</th><% } %>
         <% if (spaLeistung && !spaLeistung.komponente) { %><th title="Endpunkte laut Endnotentabelle (inkl. Vorwerten, Komponenten und Handeingaben)">Endpunkte <small>(Endnotentabelle)</small></th><% } %>
         <% if (zeigeNaSpalte) { %><th title="Summe der Termine mit n.a. (nicht anwesend) in der Datumstabelle">n.a.</th><% } %>
@@ -169,7 +169,7 @@
           <td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td>
           <% if (verrechnung && verrechnung.prozent) { %><td class="note-cell vorhalbjahr-zelle"><%= r.vorhalbjahrNote === null ? '–' : formatNote(r.vorhalbjahrNote) %></td><% } %>
           <td class="gesamt-cell<%= r.endnote ? ' direkt' : '' %>"<% if (r.endnote) { %> title="Direkt eingetragene Endnote"<% } %>><%= r.gesamt === null ? (r.endnote && r.endnote.ntg ? 'ntg' : '–') : formatNote(r.gesamt) %></td>
-          <% if (spaLeistung) { %><td class="note-cell spa-tendenz-cell"><%= r.gesamt === null ? '–' : spaTendenz(r.gesamt) %></td><% } %>
+          <% if (spaLeistung) { %><td class="note-cell spa-tendenz-cell"><%= r.gesamt === null ? '–' : (r.endnote ? spaTendenz(r.gesamt) : spaTendenzAusNote(r.gesamt)) %></td><% } %>
           <% if (spaLeistung && !spaLeistung.komponente) { var spaE = spaLeistung.endpunkte.get(r.schueler_id); %><td class="note-cell spa-endpunkte-cell"><%= spaE && spaE.endpunkte !== null && spaE.endpunkte !== undefined ? spaE.endpunkte.toFixed(2) + ' (' + spaE.tendenz + ')' : '–' %></td><% } %>
           <% if (zeigeNaSpalte) { %><td class="note-cell na-summe" data-sid="<%= r.schueler_id %>"><%= r.naAnzahl %></td><% } %>
           <% if (fach.abgeschlossen) { %>
@@ -277,7 +277,7 @@
                 <th colspan="<%= t.aufgaben + 1 %>" class="teil-head"><%= t.name %> <small>(<%= t.gewichtung %>%)</small><%= k.teileInfo.bestimmend === ti ? ' ★' : '' %></th>
               <% }); %>
               <th rowspan="2">Punkte gesamt</th>
-              <th rowspan="2" class="note-col">Gesamt<%= spaLeistung ? 'punkte' : 'note' %></th>
+              <th rowspan="2" class="note-col">Gesamtnote</th>
             </tr>
             <tr>
               <% maxArr.forEach(function(_, i) { %>
@@ -733,7 +733,9 @@
           if (spaTendenzZelle) {
             // Tendenznote zu Punkten 0-15 (SPA-Notenskala, siehe src/spa-grade-calc.js)
             const skala = ['6', '5-', '5', '5+', '4-', '4', '4+', '3-', '3', '3+', '2-', '2', '2+', '1-', '1', '1+'];
-            spaTendenzZelle.textContent = s.gesamt !== null ? skala[Math.max(0, Math.min(15, Math.round(s.gesamt)))] : '–';
+            // Berechnete Gesamtnote (IHK) -> Punkte; direkt eingetragene Gesamtpunkte gelten unverändert.
+            const pkt = s.gesamt === null ? null : (s.endnote ? s.gesamt : 17 - 3 * s.gesamt);
+            spaTendenzZelle.textContent = pkt !== null ? skala[Math.max(0, Math.min(15, Math.round(pkt)))] : '–';
           }
         }
         document.querySelectorAll('.na-summe[data-sid="' + s.schueler_id + '"]').forEach(function(z) { z.textContent = String(s.naAnzahl); });
