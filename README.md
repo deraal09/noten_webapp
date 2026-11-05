@@ -788,8 +788,27 @@ Der Deploy läuft vollständig über die Plesk-Web-UI, **kein** SSH nötig.
 
 1. Plesk → `noten.bbz-rd-eck.com` → **Node.js**
 2. **Anwendungs-Wurzel:** das Verzeichnis mit `app.js` (i. d. R. das Repo-Root)
-3. **Anwendungs-Startdatei:** `app.js`
-4. **Anwendungsmodus:** `production`
+3. **Dokumentenstamm:** der Ordner **`public`** im Anwendungsverzeichnis (z. B. `/httpdocs/public`) —
+   **nicht** das Anwendungsverzeichnis selbst, siehe Kasten unten
+4. **Anwendungs-Startdatei:** `app.js`
+5. **Anwendungsmodus:** `production`
+
+> **Sicherheit: Dokumentenstamm = `public`.** nginx liefert alle Dateien im
+> Dokumentenstamm direkt aus, **bevor** die Anwendung gefragt wird — ohne
+> Anmeldung. Zeigt der Dokumentenstamm auf das Anwendungsverzeichnis (Plesk-
+> Standard), sind Datenbank (`data/`), Quellcode, `package.json` usw. für jeden
+> abrufbar. Der Ordner `public/` enthält nur eine `robots.txt`; alles andere
+> (auch `/static/…`) liefert die Anwendung selbst aus. Nach jeder Änderung an
+> Plesk/nginx von außen prüfen:
+> `npm run pruefe:oeffentlich -- https://noten.bbz-rd-eck.com`
+> (fragt je Datei nur das erste Byte ab; Exit-Code 1 = etwas ist abrufbar).
+> Zusätzlich lässt sich unter „Apache & nginx-Einstellungen" → „Zusätzliche
+> nginx-Anweisungen" eine Sperre eintragen (zweite Sicherung, falls der
+> Dokumentenstamm einmal versehentlich zurückgestellt wird):
+> ```
+> location ~ ^/(data|src|test|views|node_modules|tmp|scripts)/ { return 404; }
+> location ~ ^/(app\.js|package(-lock)?\.json|README\.md|CHANGELOG\.md|\.gitignore|\.env.*)$ { return 404; }
+> ```
 
 Plesk/Passenger weist der App automatisch einen Port **oder einen Unix-Socket**
 zu und konfiguriert nginx dorthin. `app.js` erkennt beides automatisch
@@ -803,7 +822,7 @@ zu und konfiguriert nginx dorthin. `app.js` erkennt beides automatisch
 | `SECRET`      | 64+ zufällige Zeichen (z. B. `openssl rand -hex 32`) |
 | `DB_ENCRYPTION_KEY` | 64+ zufällige Zeichen, unabhängig von `SECRET` (z. B. `openssl rand -hex 32`) — verschlüsselt die Datenbankdatei, siehe unten |
 | `PUBLIC_URL`  | `https://noten.bbz-rd-eck.com`                  |
-| `DB_PFAD`     | (optional, Default: `data/noten.sqlite3`)       |
+| `DB_PFAD`     | **empfohlen:** Pfad außerhalb des Webverzeichnisses, z. B. `/var/www/vhosts/bbz-rd-eck.com/private/noten/noten.sqlite3` (Default: `data/noten.sqlite3` im Anwendungsverzeichnis) |
 
 Wichtig: `SECRET` ist das Session-Secret — wenn die App neu gestartet
 wird, werden alle Sessions ungültig, wenn du es änderst.
@@ -825,6 +844,27 @@ unlesbar, auch für uns nicht wiederherstellbar.
 > der Node-Version in der Plesk-UI sicherheitshalber `npm rebuild` (oder
 > erneut `npm ci`) laufen lassen.
 
+#### Datenbank aus dem Webverzeichnis verschieben (einmalig)
+
+Liegt die Datenbank noch unter `data/` im Anwendungsverzeichnis, gehört sie an
+einen Ort, den der Webserver nie ausliefert — bei Plesk z. B. der Ordner
+`private` der Domain (liegt neben `httpdocs`):
+
+1. Plesk → Node.js → **„Node.js deaktivieren"** (die App muss gestoppt sein,
+   sonst schreibt sie während des Verschiebens weiter).
+2. Im Dateimanager einen Ordner `private/noten` anlegen und
+   `data/noten.sqlite3` dorthin **verschieben** — liegen daneben
+   `noten.sqlite3-wal` und `noten.sqlite3-shm`, diese mit verschieben
+   (sie gehören zur Datenbank).
+3. Umgebungsvariable `DB_PFAD` auf den neuen Pfad setzen, z. B.
+   `/var/www/vhosts/bbz-rd-eck.com/private/noten/noten.sqlite3`.
+4. **„Node.js aktivieren"**, Anmeldung testen (alle bleiben angemeldet — die
+   Sitzungen liegen in derselben Datei).
+5. Erst danach den leeren Ordner `data/` löschen.
+
+Eine eingerichtete Datensicherung (Admin → Datensicherung) bleibt gültig; ihr
+Ziel darf nur nicht das neue Datenbankverzeichnis sein.
+
 ### 4. Dependencies installieren (über Plesk-UI)
 
 Plesk → Node.js → **„npm-Installation"** klicken. Damit wird
@@ -840,7 +880,7 @@ Die App wird **nicht** per Hand auf der Shell gestartet. Plesk übernimmt das:
 2. Prüfen, dass dort steht:
    - **Anwendungs-Startdatei:** `app.js`
    - **Anwendungsmodus:** `production`
-   - **Dokumentenstamm:** (Standard, wird von Plesk verwaltet)
+   - **Dokumentenstamm:** `public` (siehe Schritt 2 — **nicht** der Plesk-Standard)
 3. **„Anwendung neu starten"** klicken
 4. Warte ein paar Sekunden, dann im Browser testen:
    ```
@@ -909,9 +949,11 @@ webapp/
 │   ├── teacher/
 │   ├── klassenlehrer/
 │   └── partials/layout.ejs
-├── static/css/app.css
+├── static/css/app.css  # liefert die App unter /static/… selbst aus
+├── public/             # Dokumentenstamm in Plesk: absichtlich leer (nur robots.txt)
 ├── scripts/
-│   └── build.js        # Pre-Deploy-Check (package.json, Syntax, Views)
+│   ├── build.js        # Pre-Deploy-Check (package.json, Syntax, Views)
+│   └── pruefe-oeffentliche-dateien.js  # npm run pruefe:oeffentlich -- <URL>
 ├── test/
 │   ├── grade-calc.test.js
 │   └── e2e.test.js

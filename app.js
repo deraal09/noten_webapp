@@ -104,6 +104,17 @@ export async function buildApp(opts = {}) {
     trustProxy: true,
   });
 
+  // Sicherheits-Header für jede Antwort der Anwendung (auch statische Dateien unter /static):
+  // - nosniff: Browser raten keinen anderen Inhaltstyp (z. B. hochgeladener Text als Skript).
+  // - Referrer-Policy: Adressen (mit Klassen-/Schüler-IDs) gehen nicht an fremde Seiten.
+  // - HSTS: Browser nutzen die Seite ein Jahr lang nur noch per HTTPS (nur über HTTPS gesendet).
+  app.addHook('onSend', async (request, reply, payload) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Referrer-Policy', 'same-origin');
+    if (request.protocol === 'https') reply.header('Strict-Transport-Security', 'max-age=31536000');
+    return payload;
+  });
+
   await app.register(fastifyCookie);
   await app.register(fastifySession, {
     secret: SECRET,

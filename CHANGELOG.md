@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.108.1 - 2026-11-05
+
+- **Sicherheit: Dokumentenstamm `public/`.** Zeigte der Dokumentenstamm in Plesk auf das Anwendungsverzeichnis
+  (Plesk-Standard), lieferte nginx alle Dateien darin ohne Anmeldung aus -- auch die Datenbank unter `data/` und eine
+  alte unverschlüsselte Sicherung. Neu ist der leere Ordner `public/` (nur `robots.txt`) als Dokumentenstamm; die
+  README beschreibt die Plesk-Einstellung, eine zusätzliche nginx-Sperre und das Verschieben der Datenbank aus dem
+  Webverzeichnis (`DB_PFAD`).
+- **Prüfskript** `npm run pruefe:oeffentlich -- <URL>`: fragt von außen ab, ob Datenbank, Quellcode oder
+  Konfiguration abrufbar sind (je Datei nur das erste Byte).
+- **Sicherheits-Header** auf allen Antworten: `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`,
+  über HTTPS `Strict-Transport-Security` (ein Jahr).
+
 ## 0.108.0 - 2026-11-05
 
 - **Sicherheit: keine Weiterleitung auf fremde Seiten.** Nach dem Login (`?next=`) und beim Bestätigen des
