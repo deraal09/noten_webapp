@@ -163,6 +163,14 @@ SQLite-Store übersteht eine Anmeldung den Neustart, solange die Sitzung
 selbst noch nicht abgelaufen ist. Abgelaufene Zeilen werden beiläufig bei
 jedem Login mit aufgeräumt, ein separater Cronjob ist nicht nötig.
 
+**Neue Sitzung bei jeder Anmeldung:** Nach erfolgreichem Login (auch Setup und
+Einladung) bekommt der Browser eine neue Sitzungs-ID, die bisherige wird
+verworfen (Schutz gegen Session-Fixation). Das Weiterleitungsziel nach dem
+Login (`?next=`) muss ein Pfad dieser Anwendung sein (`src/weiterleitung.js`;
+Formen wie `/\evil.example` werden abgelehnt). Unter Admin → LDAP-Einstellungen
+lassen sich beim Speichern alle laufenden Anmeldungen von LDAP-Konten beenden,
+damit z. B. eine neue Gruppenprüfung sofort für alle gilt.
+
 ### Haken „Angemeldet bleiben" auf der Login-Seite
 
 Die Login-Seite hat ein vorausgewähltes Kontrollkästchen **„Angemeldet
@@ -1005,7 +1013,8 @@ Unter **Admin → Datensicherung** lässt sich ein Speicher außerhalb des Serve
 dazu.
 
 - **Ziel:** ein Verzeichnis (lokal oder ein eingebundenes Netzlaufwerk, absoluter Pfad, nicht das Datenbank-Verzeichnis)
-  oder ein **WebDAV**-Speicher (Adresse, Benutzer, Passwort; das Passwort liegt verschlüsselt in der DB). Weitere Ziele
+  oder ein **WebDAV**-Speicher (Adresse mit `https://`, Benutzer, Passwort; das Passwort liegt verschlüsselt in der DB;
+  `http://` nur für localhost, sonst gingen die Zugangsdaten unverschlüsselt durchs Netz). Weitere Ziele
   (SFTP, S3 …) lassen sich in `src/backup/ziele.js` ergänzen, sobald die IT feststeht.
 - **Intervall und Aufbewahrung:** alle *n* Stunden (z. B. 24); die neuesten *m* Sicherungen bleiben am Ziel, ältere
   werden gelöscht (andere Dateien am Ziel bleiben unberührt). Nach dem Einschalten wird gleich gesichert, nach einem

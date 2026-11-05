@@ -6,6 +6,24 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.108.0 - 2026-11-05
+
+- **Sicherheit: keine Weiterleitung auf fremde Seiten.** Nach dem Login (`?next=`) und beim Bestätigen des
+  Notenschlüssel-Hinweises wurde ein Ziel wie `/\evil.example` akzeptiert -- der Browser landete auf einer fremden
+  Seite (z. B. Phishing direkt nach der Anmeldung). Jetzt sind nur Pfade dieser Anwendung erlaubt.
+- **Sicherheit: neue Sitzung bei jeder Anmeldung** (Schutz gegen Session-Fixation); die bisherige Sitzung wird
+  verworfen.
+- **Auf Halbjahre begrenzte Zuordnung gilt auch ohne Halbjahres-Angabe.** Ohne `hj` fielen Notenbesprechung,
+  Notenliste, Synchronisieren und das Anlegen von Klausuren, Unterrichtsleistungen und Terminen auf das aktuelle
+  Halbjahr zurück -- ohne zu prüfen, ob die Lehrkraft dort zugeordnet ist. Jetzt wird das tatsächlich verwendete
+  Halbjahr geprüft.
+- **Punkte, Extrapunkte, Termin-Noten, SPA-Eingaben und Besprechungsnotizen nur für Teilnehmer/innen des Fachs.**
+  Bisher ließen sich Einträge für beliebige Schüler-IDs anlegen.
+- **WebDAV nur per https** (http:// nur für localhost), sonst gingen Benutzer und Passwort unverschlüsselt durchs Netz.
+- **LDAP-Einstellungen:** neuer Haken „Beim Speichern alle laufenden Anmeldungen von LDAP-Konten beenden“ -- damit gilt
+  eine neue Gruppenprüfung sofort.
+- Der Hinweis auf geänderte Notenschlüssel lädt die Klassen der Person nur noch einmal je Seitenaufruf.
+
 ## 0.107.2 - 2026-11-05
 
 - **Keine Halbjahre mit Daten mehr entfernen.** Beim Kürzen der Laufzeit einer Klasse wurden nur Klausuren,

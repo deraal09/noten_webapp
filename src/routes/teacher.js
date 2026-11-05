@@ -190,6 +190,15 @@ function alsGueltigesDatumOderNull(wert) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
+// Auf bestimmte Halbjahre begrenzte Zuordnung (fach_zuweisungen.halbjahre): Routen prüfen das Halbjahr, mit dem sie
+// tatsächlich arbeiten -- auch wenn keines mitgeschickt wurde und sie auf das aktuelle zurückfallen.
+const KEIN_HALBJAHR = 'Keine Berechtigung für dieses Halbjahr.';
+
+// Eintragungen (Punkte, Noten, Notizen) nur für Personen, die am Fach teilnehmen -- sonst ließen sich Einträge für
+// beliebige Schüler-IDs anlegen (die dann z. B. den Löschschutz für diese Person auslösen).
+const nimmtTeil = (fachId, schuelerId) => Boolean(getDb()
+  .prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(fachId, schuelerId));
+
 // Meldung für alles, was userDarfKlasseVerwalten() verlangt (siehe src/auth.js).
 const KLASSE_VERWALTEN_NUR = 'Das darf nur die Klassenleitung, die Lehrkraft, die die Klasse angelegt hat, oder der Admin — '
   + 'es betrifft auch Fächer und Noten anderer Lehrkräfte.';
@@ -465,6 +474,7 @@ export default async function teacherRoutes(fastify) {
     if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
     const { schema } = spaSchemaFuerFach(getDb(), fach.id);
     const halbjahr = spaAktivesHalbjahr(schema, request.query);
+    if (!userHatFachZgriff(request.user, fach.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     const teilnehmer = ladeTeilnehmerMitHerkunft(fach);
     const { zeilen, vorwertLabel } = spaZeilenFuerHalbjahr(fach, teilnehmer, halbjahr);
     return reply.send({
@@ -491,6 +501,7 @@ export default async function teacherRoutes(fastify) {
     if (!Number.isFinite(schuelerId) || !schema.some((s) => s.halbjahr === halbjahr)) {
       return reply.code(400).send({ ok: false, error: 'bad params' });
     }
+    if (!nimmtTeil(fach.id, schuelerId)) return reply.code(404).send({ ok: false, error: 'Die Person nimmt nicht an diesem Fach teil.' });
     if (istSchuelerGesperrtInFach(fach.id, schuelerId, String(halbjahr))) {
       return reply.code(403).send({ ok: false, error: 'gesperrt' });
     }
@@ -560,6 +571,7 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/fach/:id/sync', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, request.params.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     syncFach(request.params.id, halbjahr, request.user.id);
     request.flash?.('success', 'Noten mit der Klassenleitung synchronisiert.');
     return reply.redirect(`/teacher/fach/${request.params.id}?hj=${halbjahr}`);
@@ -568,6 +580,7 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/fach/:id/auto-sync', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, request.params.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     const aktiv = request.body?.aktiv === '1';
     getDb().prepare('UPDATE fach_zuweisungen SET auto_sync = ? WHERE fach_id = ? AND user_id = ?')
       .run(aktiv ? 1 : 0, request.params.id, request.user.id);
@@ -581,6 +594,7 @@ export default async function teacherRoutes(fastify) {
     if (!fach) return reply.code(404).send({ error: 'not found' });
     if (!userHatFachZgriff(request.user, fach.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = halbjahrFuerFachId(request.params.id, request.query?.hj);
+    if (!userHatFachZgriff(request.user, fach.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     const uebersicht = ladeNotenuebersicht(fach, halbjahr);
     return reply.send({
       schueler: uebersicht.rows, halbjahr, csv_typ: fach.notenschluessel,
@@ -621,6 +635,7 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = halbjahrFuerFachId(fach.id, request.query?.hj);
+    if (!userHatFachZgriff(request.user, fach.id, halbjahr)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: KEIN_HALBJAHR });
     const auswahl = ladeBesprechungsfaecher(request, fach, halbjahr);
     const schuelerId = Number(request.params.schuelerId);
     const idx = auswahl.personen.findIndex((p) => p.schueler_id === schuelerId);
@@ -669,6 +684,7 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = halbjahrFuerFachId(fach.id, request.body?.hj);
+    if (!userHatFachZgriff(request.user, fach.id, halbjahr)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: KEIN_HALBJAHR });
     const auswahl = ladeBesprechungsfaecher(request, fach, halbjahr);
     const alleIds = auswahl.personen.map((p) => p.schueler_id);
     if (!alleIds.length) return reply.redirect(`/teacher/fach/${fach.id}?hj=${encodeURIComponent(halbjahr)}`);
@@ -730,6 +746,7 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/fach/:id/besprechung/:schuelerId/notiz', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, request.params.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     const typ = ['konferenz', 'unterricht'].includes(request.body?.typ) ? request.body.typ : 'besprechung';
     const text = String(request.body?.text || '').trim();
     // Bei mehreren Fächern darf die Notiz zu einem der gewählten Fächer gehören (nur eigene Fächer derselben Klasse).
@@ -739,6 +756,11 @@ export default async function teacherRoutes(fastify) {
       const haupt = ladeFachMitUmfeld(request.params.id);
       const anderes = ladeFachMitUmfeld(gewaehltesFach);
       if (anderes && haupt && anderes.klasse_id === haupt.klasse_id && !anderes.ist_kurs && userHatFachZgriff(request.user, anderes.id, halbjahr)) notizFachId = anderes.id;
+    }
+    // Nur für Personen, die an diesem bzw. dem gewählten Fach teilnehmen (Besprechung über mehrere Fächer).
+    const schuelerId = Number(request.params.schuelerId);
+    if (!nimmtTeil(notizFachId, schuelerId) && !nimmtTeil(Number(request.params.id), schuelerId)) {
+      return reply.code(404).send({ ok: false, error: 'Die Person nimmt nicht an diesem Fach teil.' });
     }
     if (text) {
       getDb().prepare(`
@@ -830,7 +852,9 @@ export default async function teacherRoutes(fastify) {
       reply.code(404).send({ ok: false, error: 'not found' });
       return null;
     }
-    return { fach, schuelerId, halbjahr: halbjahrFuerFachId(fach.id, request.query?.hj ?? request.body?.halbjahr) };
+    const halbjahr = halbjahrFuerFachId(fach.id, request.query?.hj ?? request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, fach.id, halbjahr)) { reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR }); return null; }
+    return { fach, schuelerId, halbjahr };
   };
 
   fastify.get('/fach/:id/unterricht/notizen/:schuelerId', async (request, reply) => {
@@ -864,6 +888,7 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/fach/:id/klausuren/neu', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, request.params.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     const name = String(request.body?.name || '').trim();
     const aufgaben = Math.max(1, parseInt(request.body?.aufgaben, 10) || 1);
     const datum = alsGueltigesDatumOderNull(request.body?.datum);
@@ -1054,6 +1079,7 @@ export default async function teacherRoutes(fastify) {
     if (!Number.isFinite(schuelerId) || !Number.isFinite(idx) || idx < 0 || idx >= maxArr.length) {
       return reply.code(400).send({ ok: false, error: 'bad params' });
     }
+    if (!nimmtTeil(k.fach_id, schuelerId)) return reply.code(404).send({ ok: false, error: 'Die Person nimmt nicht an diesem Fach teil.' });
     if (istSchuelerGesperrtInFach(k.fach_id, schuelerId, k.halbjahr)) {
       return reply.code(403).send({ ok: false, error: 'gesperrt' });
     }
@@ -1097,6 +1123,7 @@ export default async function teacherRoutes(fastify) {
     if (parseKlausurTeile(k.teile)) {
       return reply.code(400).send({ ok: false, error: 'Extrapunkte gibt es nur bei einteiligen Klausuren.' });
     }
+    if (!nimmtTeil(k.fach_id, schuelerId)) return reply.code(404).send({ ok: false, error: 'Die Person nimmt nicht an diesem Fach teil.' });
     if (istSchuelerGesperrtInFach(k.fach_id, schuelerId, k.halbjahr)) {
       return reply.code(403).send({ ok: false, error: 'gesperrt' });
     }
@@ -1141,6 +1168,7 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/fach/:id/uls/neu', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, request.params.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     const name = String(request.body?.name || '').trim();
     const aufgaben = Math.max(1, parseInt(request.body?.aufgaben, 10) || 1);
     const datum = alsGueltigesDatumOderNull(request.body?.datum);
@@ -1223,6 +1251,7 @@ export default async function teacherRoutes(fastify) {
     if (!Number.isFinite(schuelerId) || !Number.isFinite(idx) || idx < 0 || idx >= maxArr.length) {
       return reply.code(400).send({ ok: false, error: 'bad params' });
     }
+    if (!nimmtTeil(u.fach_id, schuelerId)) return reply.code(404).send({ ok: false, error: 'Die Person nimmt nicht an diesem Fach teil.' });
     if (istSchuelerGesperrtInFach(u.fach_id, schuelerId, u.halbjahr)) {
       return reply.code(403).send({ ok: false, error: 'gesperrt' });
     }
@@ -1260,6 +1289,7 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/fach/:id/unterricht/termine/neu', async (request, reply) => {
     if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
     const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, request.params.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
     const datum = String(request.body?.datum || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) {
       request.flash?.('error', 'Ungültiges Datum.');
@@ -1298,6 +1328,7 @@ export default async function teacherRoutes(fastify) {
     if (!userHatFachZgriff(request.user, t.fach_id, t.halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden' });
     const schuelerId = parseInt(request.body?.schueler_id, 10);
     if (!Number.isFinite(schuelerId)) return reply.code(400).send({ ok: false, error: 'bad params' });
+    if (!nimmtTeil(t.fach_id, schuelerId)) return reply.code(404).send({ ok: false, error: 'Die Person nimmt nicht an diesem Fach teil.' });
     if (istSchuelerGesperrtInFach(t.fach_id, schuelerId, t.halbjahr)) {
       return reply.code(403).send({ ok: false, error: 'gesperrt' });
     }
@@ -1329,6 +1360,7 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
     const halbjahr = halbjahrFuerFach(fach, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, fach.id, halbjahr)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: KEIN_HALBJAHR });
     const grund = String(request.body?.grund || '').trim();
     const gefunden = aufhebungAnfragen(fach.klasse_id, request.params.schuelerId, halbjahr, request.user.id, grund);
     request.flash?.(gefunden ? 'success' : 'error',

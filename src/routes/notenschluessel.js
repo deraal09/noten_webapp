@@ -7,6 +7,7 @@ import { requireAuth } from '../auth.js';
 import { ladeMeineKlassen } from '../auth.js';
 import { TYPEN, globalerSchluessel, folgtGlobal, schluesselTypVon, tabelle, markiereGelesen } from '../notenschluessel.js';
 import { getDb } from '../db.js';
+import { sicheresZiel } from '../weiterleitung.js';
 import { punkteAusIhkNote, spaTendenz } from '../spa-leistung.js';
 import { STANDARD_NOTENSKALA } from '../spa-grade-calc.js';
 
@@ -43,7 +44,6 @@ export default async function notenschluesselRoutes(fastify) {
   fastify.post('/notenschluessel/gelesen', async (request, reply) => {
     const typ = TYPEN.includes(request.body?.typ) ? request.body.typ : null;
     markiereGelesen(request.user.id, typ);
-    const ziel = String(request.body?.weiter || '');
-    return reply.redirect(ziel.startsWith('/') && !ziel.startsWith('//') ? ziel : '/start');
+    return reply.redirect(sicheresZiel(request.body?.weiter, '/start'));
   });
 }

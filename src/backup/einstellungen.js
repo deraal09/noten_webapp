@@ -71,7 +71,12 @@ export function pruefeEingabe(body) {
     } else {
       let url;
       try { url = new URL(ziel); } catch { return { ok: false, fehler: 'Bitte eine gültige WebDAV-Adresse eintragen (https://…).' }; }
-      if (url.protocol !== 'https:' && url.protocol !== 'http:') return { ok: false, fehler: 'Die WebDAV-Adresse muss mit https:// (oder http://) beginnen.' };
+      // Benutzer und Passwort gehen per Basic-Auth mit -- über http:// im Klartext. Nur auf demselben Rechner
+      // (localhost, z. B. ein lokal laufender WebDAV-Dienst) ist http:// zulässig.
+      const lokal = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+      if (url.protocol !== 'https:' && !(url.protocol === 'http:' && lokal)) {
+        return { ok: false, fehler: 'Die WebDAV-Adresse muss mit https:// beginnen -- über http:// gingen Benutzer und Passwort unverschlüsselt durchs Netz (nur für localhost erlaubt).' };
+      }
       if (url.username || url.password) return { ok: false, fehler: 'Benutzer und Passwort bitte in die eigenen Felder eintragen, nicht in die Adresse.' };
       zielNormal = ziel.replace(/\/+$/, '');
     }

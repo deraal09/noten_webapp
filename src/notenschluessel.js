@@ -183,9 +183,9 @@ export function klassenZahlen(typ) {
   return { folgen, eigene: klassen.length - folgen };
 }
 
-/** Klassen der Person, die dem übergeordneten Schlüssel `typ` folgen. */
-function nutztGlobal(userId, typ) {
-  return ladeMeineKlassen(userId).some((k) => schluesselTypVon(k.notenschluessel) === typ && folgtGlobal(k));
+/** Schlüsseltypen, denen mindestens eine Klasse der Person folgt (einmal geladen statt je Typ). */
+function genutzteGlobaleTypen(userId) {
+  return new Set(ladeMeineKlassen(userId).filter(folgtGlobal).map((k) => schluesselTypVon(k.notenschluessel)));
 }
 
 /**
@@ -199,8 +199,11 @@ export function hinweiseFuer(user) {
   if (!globale.length) return [];
   const konto = db.prepare('SELECT created_at FROM users WHERE id = ?').get(user.id);
   const gelesen = new Map(db.prepare('SELECT typ, version FROM notenschluessel_gelesen WHERE user_id = ?').all(user.id).map((r) => [r.typ, r.version]));
-  return globale
-    .filter((g) => (gelesen.get(g.typ) ?? 0) < g.version && (!konto || g.geaendert_at >= konto.created_at) && nutztGlobal(user.id, g.typ))
+  const offen = globale.filter((g) => (gelesen.get(g.typ) ?? 0) < g.version && (!konto || g.geaendert_at >= konto.created_at));
+  if (!offen.length) return [];
+  const genutzt = genutzteGlobaleTypen(user.id);
+  return offen
+    .filter((g) => genutzt.has(g.typ))
     .map((g) => ({ typ: g.typ, version: g.version, hinweis: g.hinweis, geaendertAt: g.geaendert_at }));
 }
 

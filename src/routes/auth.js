@@ -10,6 +10,7 @@ import {
 } from '../auth.js';
 import { NichtInGruppeError } from '../auth/ldap.js';
 import { pruefeSperre, vermerkeFehlversuch, setzeZurueck } from '../auth/login-ratelimit.js';
+import { sicheresZiel } from '../weiterleitung.js';
 
 const MIN_PW_LEN = 8;
 
@@ -27,6 +28,18 @@ const MAXAGE_ANGEMELDET_BLEIBEN = 1000 * 60 * 60 * 24 * 30; // 30 Tage
 function wendeSessionDauerAn(request) {
   const bleibenAngemeldet = Boolean(request.body?.angemeldet_bleiben);
   request.session.cookie.maxAge = bleibenAngemeldet ? MAXAGE_ANGEMELDET_BLEIBEN : MAXAGE_STANDARD;
+}
+
+/**
+ * Meldet die Person in einer NEUEN Sitzung an (neue Sitzungs-ID). Sonst könnte jemand, der einem Browser vorab eine
+ * ihm bekannte Sitzungs-ID untergeschoben hat, nach dem Login dieselbe Sitzung mitbenutzen (Session-Fixation).
+ */
+async function meldeAn(request, userId) {
+  const alteId = request.session.sessionId;
+  await request.session.regenerate();
+  request.session.userId = userId;
+  // Die bisherige Sitzung verwerfen (z. B. bei erneuter Anmeldung im selben Browser).
+  await new Promise((resolve) => request.sessionStore.destroy(alteId, () => resolve()));
 }
 
 /** Der Einladungslink wurde in der Zwischenzeit schon verwendet oder ist abgelaufen. */
@@ -66,7 +79,7 @@ export default async function authRoutes(fastify) {
         .prepare(`INSERT INTO users (username, display_name, password_hash, role, active)
                   VALUES (?, ?, ?, 'admin', 1)`)
         .run(u, String(display_name).trim() || u, hashPassword(password));
-      request.session.userId = info.lastInsertRowid;
+      await meldeAn(request, info.lastInsertRowid);
       return reply.redirect('/admin');
     } catch (e) {
       return reply.viewEjs('auth/setup.ejs', {
@@ -141,10 +154,10 @@ export default async function authRoutes(fastify) {
       if (ergebnis) {
         try {
           const neu = provisionLdapUser(ergebnis, uname);
-          request.session.userId = neu.id;
+          await meldeAn(request, neu.id);
           setzeZurueck(uname);
           wendeSessionDauerAn(request);
-          const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';
+          const safeNext = sicheresZiel(next);
           return reply.redirect(safeNext);
         } catch (e) {
           request.log.error({ err: e }, 'Auto-Provisioning: Kontoerstellung fehlgeschlagen');
@@ -196,11 +209,11 @@ export default async function authRoutes(fastify) {
       });
     }
 
-    request.session.userId = row.id;
+    await meldeAn(request, row.id);
     setzeZurueck(uname);
     wendeSessionDauerAn(request);
-    // Nur relative Pfade ohne Host erlauben (Open-Redirect-Schutz).
-    const safeNext = /^\/(?!\/)/.test(String(next)) ? String(next) : '/';
+    // Nur Pfade dieser Anwendung erlauben (Open-Redirect-Schutz, siehe src/weiterleitung.js).
+    const safeNext = sicheresZiel(next);
     return reply.redirect(safeNext);
   });
 
@@ -279,7 +292,7 @@ export default async function authRoutes(fastify) {
         return info.lastInsertRowid;
       });
       const newId = tx();
-      request.session.userId = newId;
+      await meldeAn(request, newId);
       return reply.redirect('/');
     } catch (e) {
       if (e instanceof EinladungVergeben) return reply.redirect('/login?msg=invite_expired');

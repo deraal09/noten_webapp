@@ -81,9 +81,14 @@
     Mitglied ist, wird abgewiesen. Lässt sich die Mitgliedschaft nicht prüfen (Gruppe nicht gefunden, fehlende
     Leserechte), wird <strong>nicht</strong> angemeldet. <strong>Leer = keine Gruppenprüfung</strong> (dann kann sich jedes
     Konto anmelden, das Base-DN/Suchfilter erfassen). Ein bereits angemeldeter Browser bleibt bis zum Ablauf der Sitzung
-    angemeldet; lokale Konten (z. B. der Admin) sind nicht betroffen. Der Service-Account (oder bei Direkt-Bind die
+    angemeldet (siehe Haken unten); lokale Konten (z. B. der Admin) sind nicht betroffen. Der Service-Account (oder bei Direkt-Bind die
     angemeldete Person) braucht Leserecht auf Gruppen und <code>memberOf</code>.
   </small></p>
+  <label>
+    <input type="checkbox" name="ldap_sitzungen_beenden" value="1">
+    Beim Speichern alle laufenden Anmeldungen von LDAP-Konten beenden — damit gilt eine neue Gruppenprüfung sofort
+    (alle müssen sich neu anmelden; lokale Konten wie der Admin bleiben angemeldet)
+  </label>
 
   <h2>Anmeldung ohne Vorab-Import</h2>
   <label>

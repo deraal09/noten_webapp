@@ -452,6 +452,15 @@ export default async function adminRoutes(fastify) {
         auto_provision: Boolean(b.auto_provision),
         required_group: String(b.required_group || '').trim(),
       });
+      // Eine neue Gruppenprüfung greift erst bei der nächsten Anmeldung -- auf Wunsch sofort für alle: laufende
+      // Sitzungen von LDAP-Konten beenden (lokale Konten wie der Admin bleiben angemeldet).
+      if (b.ldap_sitzungen_beenden) {
+        const beendet = getDb().prepare(`
+          DELETE FROM sessions WHERE json_extract(data, '$.userId') IN (SELECT id FROM users WHERE auth_source = 'ldap')
+        `).run().changes;
+        request.flash?.('success', `LDAP-Einstellungen gespeichert. ${beendet} laufende Anmeldung(en) von LDAP-Konten beendet.`);
+        return reply.redirect('/admin/ldap/einstellungen');
+      }
       request.flash?.('success', 'LDAP-Einstellungen gespeichert.');
     } catch (e) {
       request.flash?.('error', 'Speichern fehlgeschlagen: ' + e.message);
