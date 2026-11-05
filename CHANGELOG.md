@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.109.0 - 2026-11-05
+
+- **Eigenes Passwort ändern** (Menü → „Passwort ändern“, `/konto/passwort`) für lokale Konten, vor allem den Admin:
+  aktuelles Passwort erforderlich (Fehlversuche führen zur Sperre), neues mit mindestens 8 Zeichen; danach bleibt man
+  angemeldet, andere Sitzungen des Kontos werden beendet. LDAP-Konten ändern ihr Passwort im Schulverzeichnis.
+- **Kopfzeile mit Menü (☰) auf jeder Bildschirmbreite:** Navigation, Name/Rolle, „Passwort ändern“, Abmelden,
+  „App installieren“ und Farbschema liegen im aufklappbaren Menü; die Leiste zeigt nur noch den Namen der Anwendung.
+  Schließt mit ☰, Escape, Klick daneben oder nach Wahl eines Links.
+
 ## 0.108.1 - 2026-11-05
 
 - **Sicherheit: Dokumentenstamm `public/`.** Zeigte der Dokumentenstamm in Plesk auf das Anwendungsverzeichnis

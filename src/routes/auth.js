@@ -217,6 +217,48 @@ export default async function authRoutes(fastify) {
     return reply.redirect(safeNext);
   });
 
+  // ---------- /konto/passwort: eigenes Passwort ändern (lokale Konten, z. B. der Admin) ----------
+  // LDAP-Konten haben kein lokales Passwort -- es wird im Verzeichnis geändert. Das aktuelle Passwort muss
+  // stimmen (Fehlversuche zählen wie beim Login, eigener Zähler je Konto). Nach der Änderung bekommt der Browser eine
+  // neue Sitzung, alle anderen Sitzungen des Kontos (andere Geräte, ein möglicher Angreifer) werden beendet.
+  const zeigePasswortSeite = (request, reply, extra = {}) => reply.viewEjs('auth/passwort_aendern.ejs', {
+    user: request.user, error: null, ldap: request.user.authSource === 'ldap', minLaenge: MIN_PW_LEN, ...extra,
+  });
+
+  fastify.get('/konto/passwort', { preHandler: requireAuth }, async (request, reply) => zeigePasswortSeite(request, reply));
+
+  fastify.post('/konto/passwort', { preHandler: requireAuth }, async (request, reply) => {
+    if (request.user.authSource === 'ldap') return reply.code(400).send({ ok: false, error: 'LDAP-Konten ändern ihr Passwort im Verzeichnis.' });
+    const zaehler = `passwort-aendern:${request.user.id}`;
+    const sperre = pruefeSperre(zaehler);
+    if (sperre.gesperrt) {
+      return zeigePasswortSeite(request, reply.code(429), { error: `Zu viele Fehlversuche. Bitte in ${Math.ceil(sperre.restSekunden / 60)} Minute(n) erneut versuchen.` });
+    }
+    const aktuell = String(request.body?.aktuell ?? '');
+    const neu = String(request.body?.neu ?? '');
+    const neu2 = String(request.body?.neu2 ?? '');
+    const row = getDb().prepare('SELECT password_hash FROM users WHERE id = ?').get(request.user.id);
+    if (!row || !checkPassword(aktuell, row.password_hash)) {
+      vermerkeFehlversuch(zaehler);
+      return zeigePasswortSeite(request, reply.code(400), { error: 'Das aktuelle Passwort stimmt nicht.' });
+    }
+    let fehler = null;
+    if (neu.length < MIN_PW_LEN) fehler = `Das neue Passwort muss mindestens ${MIN_PW_LEN} Zeichen haben.`;
+    else if (neu !== neu2) fehler = 'Die beiden neuen Passwörter stimmen nicht überein.';
+    else if (neu === aktuell) fehler = 'Das neue Passwort muss sich vom bisherigen unterscheiden.';
+    if (fehler) return zeigePasswortSeite(request, reply.code(400), { error: fehler });
+
+    getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(neu), request.user.id);
+    setzeZurueck(zaehler);
+    const maxAge = request.session.cookie.maxAge;
+    await meldeAn(request, request.user.id);
+    request.session.cookie.maxAge = maxAge; // "Angemeldet bleiben" bleibt, wie es war
+    getDb().prepare("DELETE FROM sessions WHERE json_extract(data, '$.userId') = ? AND sid != ?")
+      .run(request.user.id, request.session.sessionId);
+    request.flash?.('success', 'Passwort geändert. Auf anderen Geräten musst du dich neu anmelden.');
+    return reply.redirect('/konto/passwort');
+  });
+
   // ---------- /logout ----------
   fastify.get('/logout', { preHandler: requireAuth }, async (request, reply) => {
     await destroySession(request);

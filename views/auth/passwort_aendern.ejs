@@ -1,0 +1,22 @@
+<h1>Passwort ändern</h1>
+<% if (ldap) { %>
+  <p class="hint">
+    Du meldest dich mit deinem Schulkonto (LDAP) an. Das Passwort wird dort verwaltet und lässt sich hier nicht ändern —
+    bitte über die üblichen Wege der Schule ändern.
+  </p>
+<% } else { %>
+  <% if (error) { %><p class="err"><%= error %></p><% } %>
+  <form method="post" action="/konto/passwort" class="card">
+    <label>Aktuelles Passwort
+      <input type="password" name="aktuell" required autocomplete="current-password" autofocus>
+    </label>
+    <label>Neues Passwort <small>(min. <%= minLaenge %> Zeichen)</small>
+      <input type="password" name="neu" required minlength="<%= minLaenge %>" autocomplete="new-password">
+    </label>
+    <label>Neues Passwort bestätigen
+      <input type="password" name="neu2" required minlength="<%= minLaenge %>" autocomplete="new-password">
+    </label>
+    <button type="submit">Passwort ändern</button>
+  </form>
+  <p class="hint">Nach der Änderung bleibst du hier angemeldet; auf anderen Geräten musst du dich neu anmelden.</p>
+<% } %>

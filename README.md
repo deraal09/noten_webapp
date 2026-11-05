@@ -171,6 +171,15 @@ Formen wie `/\evil.example` werden abgelehnt). Unter Admin → LDAP-Einstellunge
 lassen sich beim Speichern alle laufenden Anmeldungen von LDAP-Konten beenden,
 damit z. B. eine neue Gruppenprüfung sofort für alle gilt.
 
+### Eigenes Passwort ändern
+
+Lokale Konten (der Admin, über eine Einladung registrierte Lehrkräfte) ändern
+ihr Passwort im Menü (☰) unter **„Passwort ändern"** (`/konto/passwort`). Das
+aktuelle Passwort muss stimmen (Fehlversuche führen wie beim Login zu einer
+Sperre), das neue braucht mindestens 8 Zeichen. Danach bleibt man im aktuellen
+Browser angemeldet, alle anderen Sitzungen des Kontos werden beendet.
+LDAP-Konten ändern ihr Passwort im Schulverzeichnis; für sie fehlt der Eintrag.
+
 ### Haken „Angemeldet bleiben" auf der Login-Seite
 
 Die Login-Seite hat ein vorausgewähltes Kontrollkästchen **„Angemeldet
@@ -617,6 +626,14 @@ Dateneingabe/-bearbeitung (Notentafel, Fehlzeiten-Pflege, Schüler- und
 Fächer-Verwaltungstabellen) — dort bleibt die kompakte, tabellarische
 Darstellung erhalten, da sie für Zeilen-für-Zeilen-Bearbeitung besser
 geeignet ist als Kacheln.
+
+### Menü (☰) in der Kopfzeile
+
+Die Kopfzeile zeigt nur den Namen der Anwendung und den Menü-Button. Alle
+Optionen — Navigation, Name/Rolle, „Passwort ändern", Abmelden, „App
+installieren" und der Farbschema-Umschalter — liegen im aufklappbaren Menü
+(auf jeder Bildschirmbreite gleich). Es schließt mit erneutem Klick auf ☰,
+Escape, einem Klick daneben oder nach Wahl eines Links.
 
 ### Theme-Umschalter: System/Hell/Dunkel
 

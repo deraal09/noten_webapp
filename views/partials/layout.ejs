@@ -36,48 +36,56 @@
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="/">📚 <%= appName %></a>
-    <% if (typeof user !== 'undefined' && user) { %>
-      <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false">☰</button>
-      <nav class="nav">
-        <a href="/start">Start</a>
-        <% if (user.isAdmin) { %>
-          <a href="/admin">Dashboard</a>
-          <a href="/admin/users">Lehrkräfte</a>
-          <a href="/admin/ldap/einstellungen">LDAP-Einstellungen</a>
-          <a href="/admin/backup">Datensicherung</a>
-          <a href="/admin/notenschluessel">Notenschlüssel</a>
-          <a href="/admin/rechtliches">Rechtliches</a>
-          <a href="/admin/ldap">LDAP-Import</a>
-          <a href="/admin/einladungen">Einladungen</a>
-          <a href="/admin/zuweisungen">Zuweisungen</a>
-        <% } else { %>
-          <a href="/teacher/klassen">Meine Klassen</a>
-          <% if (typeof kannEinladen !== 'undefined' && kannEinladen) { %>
-            <a href="/teacher/einladungen">Einladungen</a>
+    <%# Alle Optionen der Leiste stecken im Menü (☰): Navigation, Konto, App installieren, Farbschema. %>
+    <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue">☰</button>
+    <div class="menue" id="hauptmenue" hidden>
+      <% if (typeof user !== 'undefined' && user) { %>
+        <div class="menue-kopf">
+          <span class="user"><%= user.displayName || user.username %></span>
+          <% if (user.isAdmin) { %><span class="role">Admin</span><% } %>
+        </div>
+        <nav class="nav">
+          <a href="/start">Start</a>
+          <% if (user.isAdmin) { %>
+            <a href="/admin">Dashboard</a>
+            <a href="/admin/users">Lehrkräfte</a>
+            <a href="/admin/ldap/einstellungen">LDAP-Einstellungen</a>
+            <a href="/admin/backup">Datensicherung</a>
+            <a href="/admin/notenschluessel">Notenschlüssel</a>
+            <a href="/admin/rechtliches">Rechtliches</a>
+            <a href="/admin/ldap">LDAP-Import</a>
+            <a href="/admin/einladungen">Einladungen</a>
+            <a href="/admin/zuweisungen">Zuweisungen</a>
+          <% } else { %>
+            <a href="/teacher/klassen">Meine Klassen</a>
+            <% if (typeof kannEinladen !== 'undefined' && kannEinladen) { %>
+              <a href="/teacher/einladungen">Einladungen</a>
+            <% } %>
           <% } %>
-        <% } %>
-        <% if (!user.isAdmin) { %><a href="/notenschluessel">Notenschlüssel</a><% } %>
-        <a href="/teacher/sitzplaene">Sitzpläne</a>
-        <a href="/teacher">Noteneingabe</a>
-        <a href="/klassenlehrer">Klassenleitung</a>
-        <% if (typeof kalenderUrl !== 'undefined' && kalenderUrl) { %>
-          <%# Schwester-App: dank Single Sign-on ohne zweite Anmeldung (src/sso.js) %>
-          <a href="<%= kalenderUrl %>" target="_blank" rel="noopener">Lehrerkalender ↗</a>
-        <% } %>
-      </nav>
-      <div class="userbox">
-        <span class="user"><%= user.displayName || user.username %></span>
-        <% if (user.isAdmin) { %><span class="role">Admin</span><% } %>
-        <a class="logout" href="/logout">Abmelden</a>
+          <% if (!user.isAdmin) { %><a href="/notenschluessel">Notenschlüssel</a><% } %>
+          <a href="/teacher/sitzplaene">Sitzpläne</a>
+          <a href="/teacher">Noteneingabe</a>
+          <a href="/klassenlehrer">Klassenleitung</a>
+          <% if (typeof kalenderUrl !== 'undefined' && kalenderUrl) { %>
+            <%# Schwester-App: dank Single Sign-on ohne zweite Anmeldung (src/sso.js) %>
+            <a href="<%= kalenderUrl %>" target="_blank" rel="noopener">Lehrerkalender ↗</a>
+          <% } %>
+        </nav>
+        <div class="userbox">
+          <% if (user.authSource !== 'ldap') { %><a href="/konto/passwort">🔑 Passwort ändern</a><% } %>
+          <a class="logout" href="/logout">Abmelden</a>
+        </div>
+      <% } %>
+      <div class="menue-extras">
+        <button type="button" class="app-install" id="app-install-knopf" hidden title="Notenverwaltung als App installieren">
+          <span aria-hidden="true">📲</span><span class="app-install-text"> App installieren</span>
+        </button>
+        <div class="theme-switch" role="group" aria-label="Farbschema">
+          <button type="button" data-theme-choice="system" title="System">🖥️</button>
+          <button type="button" data-theme-choice="light" title="Hell">☀️</button>
+          <button type="button" data-theme-choice="dark" title="Dunkel">🌙</button>
+        </div>
       </div>
-    <% } %>
-    <button type="button" class="app-install" id="app-install-knopf" hidden title="Notenverwaltung als App installieren">
-      <span aria-hidden="true">📲</span><span class="app-install-text"> App installieren</span>
-    </button>
-    <div class="theme-switch" role="group" aria-label="Farbschema">
-      <button type="button" data-theme-choice="system" title="System">🖥️</button>
-      <button type="button" data-theme-choice="light" title="Hell">☀️</button>
-      <button type="button" data-theme-choice="dark" title="Dunkel">🌙</button>
     </div>
   </div>
 </header>
@@ -143,13 +151,19 @@
 <script src="/static/js/noten-picker.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script>
   (function () {
+    // Menü (☰): auf- und zuklappen; schließt bei Klick daneben, mit Escape und nach Wahl eines Links.
     var toggle = document.querySelector('.nav-toggle');
-    var inner = document.querySelector('.topbar-inner');
-    if (toggle && inner) {
-      toggle.addEventListener('click', function () {
-        var offen = inner.classList.toggle('nav-open');
+    var menue = document.getElementById('hauptmenue');
+    if (toggle && menue) {
+      var setze = function (offen) {
+        menue.hidden = !offen;
         toggle.setAttribute('aria-expanded', offen ? 'true' : 'false');
-      });
+        toggle.setAttribute('aria-label', offen ? 'Menü schließen' : 'Menü öffnen');
+      };
+      toggle.addEventListener('click', function (e) { e.stopPropagation(); setze(menue.hidden); });
+      document.addEventListener('click', function (e) { if (!menue.hidden && !menue.contains(e.target)) setze(false); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menue.hidden) { setze(false); toggle.focus(); } });
+      menue.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { setze(false); }); });
     }
   })();
   // App installieren: Chrome/Edge (Android, Windows, Linux) bieten per "beforeinstallprompt" die Installation direkt

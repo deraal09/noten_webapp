@@ -177,42 +177,41 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 
 .container { max-width: 1100px; margin: 1rem auto; padding: 0 1rem; }
 
-.topbar { background: var(--primary); color: var(--on-dark); box-shadow: 0 2px 4px var(--shadow-strong); }
-.topbar-inner { max-width: 1100px; margin: 0 auto; padding: 0 1rem; display: flex; align-items: center; gap: 1rem; height: 56px; }
-.topbar .brand { color: var(--on-dark); font-weight: 600; font-size: 1.1rem; }
+.topbar { background: var(--primary); color: var(--on-dark); box-shadow: 0 2px 4px var(--shadow-strong); position: relative; z-index: 50; }
+.topbar-inner { max-width: 1100px; margin: 0 auto; padding: 0 1rem; display: flex; align-items: center; gap: 1rem; height: 56px; position: relative; }
+.topbar .brand { color: var(--on-dark); font-weight: 600; font-size: 1.1rem; margin-right: auto; }
 .topbar a { color: var(--topbar-link); }
 .topbar a:hover { color: var(--on-dark); }
-.topbar .nav { display: flex; gap: 1rem; flex: 1; }
-.topbar .userbox { display: flex; align-items: center; gap: 0.5rem; }
 .topbar .role { background: var(--danger); color: var(--on-dark); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.75rem; }
 .badge { display: inline-block; color: #fff; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.75rem; }
-.topbar .logout { font-size: 0.9rem; }
 
-/* Menü-Button (☰): nur sichtbar, sobald die Navigation nicht mehr in eine
-   Zeile passt (siehe Media Query unten) -- ohne Nutzerkonto (Login/Setup-
-   Seiten) gibt es weder Nav noch Button. */
+/* Menü-Button (☰): alle Optionen der Leiste (Navigation, Konto, App installieren, Farbschema) liegen in einem
+   aufklappbaren Menü unter dem Button -- auf jeder Bildschirmbreite gleich (views/partials/layout.ejs). */
 .nav-toggle {
-  display: none; background: transparent; border: none; color: var(--on-dark);
-  font-size: 1.3rem; line-height: 1; padding: 0.25rem 0.4rem; cursor: pointer; border-radius: 4px;
+  display: inline-block; background: transparent; border: none; color: var(--on-dark);
+  font-size: 1.5rem; line-height: 1; padding: 0.3rem 0.55rem; cursor: pointer; border-radius: 4px;
 }
-.nav-toggle:hover { background: rgba(255,255,255,0.12); }
-
-/* Die vollständige Nav (bis zu 10 Links für den Admin) plus Userbox braucht
-   in einer Zeile ca. 1570px -- deutlich mehr als ein Smartphone, aber auch
-   mehr als viele Laptop-Displays. Unterhalb der Grenze klappt ein
-   Menü-Button die Navigation auf, statt sie über den Bildschirmrand hinaus
-   laufen zu lassen (vorher: die ganze Seite bekam dadurch horizontales
-   Scrollen, nicht nur die Kopfzeile). */
-@media (max-width: 1600px) {
-  .topbar-inner { flex-wrap: wrap; height: auto; padding: 0.6rem 1rem; row-gap: 0.4rem; }
-  .nav-toggle { display: inline-block; }
-  .topbar .nav, .topbar .userbox { flex-basis: 100%; display: none; }
-  .topbar-inner.nav-open .nav, .topbar-inner.nav-open .userbox { display: flex; }
-  .topbar .nav { flex-direction: column; gap: 0; order: 3; }
-  .topbar .nav a { padding: 0.6rem 0.2rem; border-top: 1px solid rgba(255,255,255,0.15); }
-  .topbar .userbox {
-    order: 4; flex-wrap: wrap; padding-top: 0.6rem; border-top: 1px solid rgba(255,255,255,0.15);
-  }
+.nav-toggle:hover, .nav-toggle[aria-expanded="true"] { background: rgba(255,255,255,0.14); }
+.menue {
+  position: absolute; top: 100%; right: 1rem; width: min(320px, calc(100vw - 2rem));
+  max-height: calc(100vh - 70px); overflow-y: auto;
+  background: var(--primary); color: var(--on-dark); border-radius: 0 0 8px 8px;
+  box-shadow: 0 8px 20px var(--shadow-strong); padding: 0.4rem 0 0.6rem;
+}
+.menue[hidden] { display: none; }
+.menue-kopf { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem 0.6rem; font-weight: 600; }
+.menue .nav, .menue .userbox { display: flex; flex-direction: column; }
+.menue .nav a, .menue .userbox a {
+  display: block; padding: 0.42rem 1rem; border-top: 1px solid rgba(255,255,255,0.12); text-decoration: none;
+}
+.menue .nav a:hover, .menue .userbox a:hover, .menue a:focus-visible { background: rgba(255,255,255,0.1); }
+.menue .userbox { margin-top: 0.3rem; border-top: 1px solid rgba(255,255,255,0.3); }
+.menue-extras {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.6rem 1rem 0; border-top: 1px solid rgba(255,255,255,0.3);
+}
+@media (max-width: 480px) {
+  .menue { right: 0; width: 100vw; border-radius: 0; }
 }
 
 .flash { padding: 0.75rem 1rem; border-radius: 4px; margin: 0.5rem 1rem; }
@@ -692,7 +691,7 @@ a.icon-knopf { display: inline-flex; align-items: center; justify-content: cente
 .app-install-dialog { max-width: 520px; }
 .app-install-dialog [hidden] { display: none; }
 .app-install-dialog ol, .app-install-dialog ul { padding-left: 1.3rem; line-height: 1.6; }
-@media (max-width: 480px) { .app-install-text { display: none; } .app-install { padding: 0.2rem 0.55rem; } }
+
 
 .fach-einstellungen textarea { width: 100%; font-family: inherit; }
 .fach-einstellungen label { display: block; margin: 0.6rem 0; }

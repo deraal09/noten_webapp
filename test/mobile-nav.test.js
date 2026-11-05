@@ -1,10 +1,7 @@
 /**
- * Menü-Button (☰) in der Kopfzeile (views/partials/layout.ejs, static/css/app.css):
- * die vollständige Navigation (bis zu 10 Links für den Admin) plus Userbox passt
- * in einer Zeile nur auf sehr breiten Bildschirmen -- darunter (Media Query bis
- * 1600px, deckt Smartphones ebenso wie die meisten Laptop-Displays ab) klappt ein
- * Menü-Button sie auf, statt sie über den Bildschirmrand hinauslaufen zu lassen
- * und damit die ganze Seite horizontal scrollbar zu machen.
+ * Menü-Button (☰) in der Kopfzeile (views/partials/layout.ejs, static/css/app.css): ALLE Optionen der Leiste
+ * (Navigation, Konto mit "Passwort ändern"/Abmelden, App installieren, Farbschema) liegen auf jeder Bildschirmbreite
+ * in einem aufklappbaren Menü -- die Leiste selbst zeigt nur noch Name der Anwendung und Menü-Button.
  */
 
 import { test } from 'node:test';
@@ -58,7 +55,28 @@ await form(admin, '/setup', {
 
 test('Menü-Button vorhanden, standardmäßig zugeklappt (aria-expanded=false)', async () => {
   const html = await (await admin('/start')).text();
-  assert.match(html, /<button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false">☰<\/button>/);
+  assert.match(html, /<button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue">☰<\/button>/);
+  assert.match(html, /<div class="menue" id="hauptmenue" hidden>/);
+});
+
+test('Alle Optionen der Leiste stecken im Menü: Navigation, Konto, App installieren, Farbschema', async () => {
+  const html = await (await admin('/start')).text();
+  const kopf = html.slice(html.indexOf('<header class="topbar">'), html.indexOf('</header>'));
+  const menue = kopf.slice(kopf.indexOf('<div class="menue"'));
+  const vorMenue = kopf.slice(0, kopf.indexOf('<div class="menue"'));
+  for (const teil of ['<nav class="nav">', 'href="/logout"', 'href="/konto/passwort"', 'id="app-install-knopf"', 'class="theme-switch"']) {
+    assert.ok(menue.includes(teil), `${teil} im Menü`);
+    assert.ok(!vorMenue.includes(teil), `${teil} nicht direkt in der Leiste`);
+  }
+  // In der Leiste selbst: nur Name der Anwendung und Menü-Button.
+  assert.deepEqual([...vorMenue.matchAll(/<(a|button)\b[^>]*class="([^"]+)"/g)].map((m) => m[2]), ['brand', 'nav-toggle']);
+});
+
+test('Ohne Anmeldung (Login-Seite): Menü mit Farbschema, aber ohne Navigation', async () => {
+  const html = await (await fetch(base + '/login')).text();
+  assert.match(html, /class="nav-toggle"/);
+  assert.match(html, /class="theme-switch"/);
+  assert.doesNotMatch(html, /<nav class="nav">/);
 });
 
 test('Nav-Links und Userbox stehen weiterhin im HTML (nur per CSS je nach Breite ein-/ausgeblendet)', async () => {
