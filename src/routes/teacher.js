@@ -11,7 +11,7 @@ import { ladeVorlagen, speicherbareFaecher, speichereVorlage, importiereVorlage,
 import {
   ladeUnterfaecher, UNTERFACH_TRENNER, legeUnterfachAn, setzeFachHalbjahre, weiseLehrkraftZu, setzeZuweisungHalbjahre,
   halbjahreOhneUnterfaecher, ladeZuweisungenDerKlasse, zuweisungsHalbjahre, fachHatLehrkraftImHalbjahr,
-  freieHalbjahre, traegeMichEin, traegeMichAus,
+  freieHalbjahre, traegeMichEin, traegeMichAus, halbjahreMitDatenInKlasse,
 } from '../unterfaecher.js';
 import { halbjahrAusEingabeFuerFach, halbjahreFuerFach, fachGiltInHalbjahr, fachHalbjahrNummern, parseHalbjahreEingabe, aktuelleHalbjahrNummern, halbjahrAusEingabe, halbjahreFuerKlasse, halbjahrSchuljahrMap, halbjahrNr, muendlichProzentFuerHalbjahr, klassenLaufzeit, findeLaufendeKlasse, sortiereFaecher, ladeVerrechnung, ladeVerrechnungFuerFach, klasseLaeuftImSchuljahr, istHalbjahrVergangen, jetzt, jahresOptionen, parseJahrEingabe, MAX_SCHULJAHRE } from '../klassen-jahre.js';
 import {
@@ -1506,11 +1506,10 @@ export default async function teacherRoutes(fastify) {
     // Nicht kürzen, wenn in den wegfallenden Halbjahren schon Daten stehen.
     const standardJahre = klasse.notenschluessel === 'SPA' ? 2 : 3;
     const neueHalbjahre = ((abschluss ?? (einschulung + standardJahre - 1)) - einschulung + 1) * 2;
-    const hatDaten = (tabelle) => getDb().prepare(`
-      SELECT halbjahr FROM ${tabelle} t JOIN faecher f ON f.id = t.fach_id WHERE f.klasse_id = ?
-    `).all(klasse.id).some((r) => (halbjahrNr(r.halbjahr) ?? 0) > neueHalbjahre);
-    if (['klausuren', 'unterrichtsleistungen', 'unterricht_termine'].some(hatDaten)) {
-      request.flash?.('error', 'In Halbjahren, die dabei wegfallen würden, sind bereits Noten oder Leistungen eingetragen. Das Abschlussschuljahr kann nicht davor liegen.');
+    // Gleiche Prüfung wie beim Ändern der Halbjahre eines Fachs (Leistungen, Endnoten, SPA-Noten) plus Fehlzeiten.
+    const belegt = [...halbjahreMitDatenInKlasse(klasse.id)].filter((n) => n > neueHalbjahre).sort((a, b) => a - b);
+    if (belegt.length) {
+      request.flash?.('error', `Im ${belegt.map((n) => `${n}.`).join(', ')} Halbjahr sind bereits Noten, Leistungen oder Fehlzeiten eingetragen -- diese Halbjahre würden wegfallen. Das Abschlussschuljahr kann nicht davor liegen.`);
       return reply.redirect(zurueck);
     }
     getDb().prepare('UPDATE klassen SET einschulung_jahr = ?, abschluss_jahr = ? WHERE id = ?').run(einschulung, abschluss, klasse.id);

@@ -16,7 +16,25 @@ import { klassenLaufzeit, fachHalbjahrNummern, halbjahrNr, halbjahrText, istHalb
 
 export const UNTERFACH_TRENNER = ' › ';
 
-const DATEN_TABELLEN = ['klausuren', 'unterrichtsleistungen', 'unterricht_termine', 'halbjahr_endnoten'];
+// Tabellen mit Leistungen/Noten je Fach und Halbjahr. Das Halbjahr steht je nach Tabelle als Text ("3. Halbjahr")
+// oder als Zahl (SPA). SPA-Eingabezeilen bleiben nach dem Leeren eines Feldes stehen -- sie zählen nur mit Inhalt.
+// Die alte Tabelle `noten` wird nicht mehr beschrieben und nirgends angezeigt; Altbestand darin blockiert nichts.
+const DATEN_ABFRAGEN = [
+  'SELECT DISTINCT halbjahr FROM klausuren WHERE fach_id = ?',
+  'SELECT DISTINCT halbjahr FROM unterrichtsleistungen WHERE fach_id = ?',
+  'SELECT DISTINCT halbjahr FROM unterricht_termine WHERE fach_id = ?',
+  'SELECT DISTINCT halbjahr FROM halbjahr_endnoten WHERE fach_id = ?',
+  `SELECT DISTINCT halbjahr FROM spa_eingaben WHERE fach_id = ?
+     AND (ist_na = 1 OR direktwert IS NOT NULL OR pruefungswert IS NOT NULL OR importierte_endnote IS NOT NULL)`,
+  'SELECT DISTINCT halbjahr FROM spa_komponenten_noten WHERE fach_id = ? AND punkte IS NOT NULL',
+];
+
+/** Halbjahr-Nummer aus einem gespeicherten Halbjahr: Zahl (SPA), Ziffer oder "N. Halbjahr". */
+function halbjahrNummerAus(wert) {
+  if (typeof wert === 'number') return Number.isInteger(wert) && wert > 0 ? wert : null;
+  if (/^\d{1,2}$/.test(String(wert ?? ''))) return parseInt(wert, 10);
+  return halbjahrNr(wert);
+}
 
 /** Unterfächer eines Fachs (alle Halbjahre), in Anlagereihenfolge. */
 export function ladeUnterfaecher(parentId) {
@@ -45,13 +63,35 @@ export function halbjahreOhneUnterfaecher(fach, laufzeit = klassenLaufzeit(fach.
   return eigene.filter((n) => !belegt.has(n));
 }
 
-/** Halbjahr-Nummern, in denen für das Fach schon Leistungen oder Endnoten eingetragen sind. */
+/** Halbjahr-Nummern, in denen für das Fach schon Leistungen oder Noten eingetragen sind (auch SPA). */
 export function halbjahreMitDaten(fachId) {
   const db = getDb();
   const belegt = new Set();
-  for (const tabelle of DATEN_TABELLEN) {
-    for (const r of db.prepare(`SELECT DISTINCT halbjahr FROM ${tabelle} WHERE fach_id = ?`).all(fachId)) {
-      const nr = halbjahrNr(r.halbjahr);
+  for (const sql of DATEN_ABFRAGEN) {
+    for (const r of db.prepare(sql).all(fachId)) {
+      const nr = halbjahrNummerAus(r.halbjahr);
+      if (nr) belegt.add(nr);
+    }
+  }
+  return belegt;
+}
+
+/**
+ * Halbjahr-Nummern, in denen in der Klasse schon etwas eingetragen ist: Leistungen und Noten aller ihrer Fächer
+ * (samt Unterfächern) und die Fehlzeiten ihrer Schüler/innen. Maßstab dafür, ob die Laufzeit gekürzt werden darf.
+ */
+export function halbjahreMitDatenInKlasse(klasseId) {
+  const db = getDb();
+  const belegt = new Set();
+  for (const f of db.prepare('SELECT id FROM faecher WHERE klasse_id = ?').all(klasseId)) {
+    for (const n of halbjahreMitDaten(f.id)) belegt.add(n);
+  }
+  for (const tabelle of ['fehlzeiten', 'fehlzeiten_schule2']) {
+    for (const r of db.prepare(`
+      SELECT DISTINCT fz.halbjahr FROM ${tabelle} fz JOIN schueler s ON s.id = fz.schueler_id
+      WHERE s.klasse_id = ? AND fz.stunden > 0
+    `).all(klasseId)) {
+      const nr = halbjahrNummerAus(r.halbjahr);
       if (nr) belegt.add(nr);
     }
   }

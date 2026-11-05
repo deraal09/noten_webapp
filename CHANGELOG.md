@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.107.2 - 2026-11-05
+
+- **Keine Halbjahre mit Daten mehr entfernen.** Beim Kürzen der Laufzeit einer Klasse wurden nur Klausuren,
+  Unterrichtsleistungen und Termine geprüft -- direkt eingetragene Endnoten, SPA-Noten und Fehlzeiten in wegfallenden
+  Halbjahren verschwanden aus der Anzeige. Beim Ändern der Halbjahre eines Fachs (und beim Entfernen von Unterfächern)
+  zählten SPA-Noten nicht mit, weil sie das Halbjahr als Zahl speichern. Beide Stellen nutzen jetzt dieselbe Prüfung;
+  die Meldung nennt die betroffenen Halbjahre. Wieder geleerte SPA-Eingabefelder zählen nicht als Eintragung.
+
 ## 0.107.1 - 2026-11-05
 
 - **Wiederherstellen ohne Datenverlust in der Sicherheitskopie.** Bisher wurde das Write-Ahead-Log (`-wal`) der

@@ -308,6 +308,12 @@ im **aktuellen Halbjahr** nach Datum (in Tests ist „heute" eingefroren,
 
 - **Fächer je Halbjahr:** `faecher.halbjahre` (JSON, NULL = alle) legt fest,
   in welchen Halbjahren ein Fach gilt (Haken beim Anlegen, später änderbar).
+- **Keine Halbjahre mit Daten entfernen:** Weder die Laufzeit einer Klasse noch
+  die Halbjahre eines Fachs lassen sich so ändern, dass Halbjahre mit
+  Eintragungen wegfallen — gezählt werden Klausuren, Unterrichtsleistungen,
+  Termine der Datumstabelle, direkte Endnoten und SPA-Noten, bei der Laufzeit
+  zusätzlich Fehlzeiten (`halbjahreMitDaten`/`halbjahreMitDatenInKlasse` in
+  `src/unterfaecher.js`).
 - **Direkte Endnote:** `halbjahr_endnoten` (je Fach, Person, Halbjahr; Zahl oder
   `ntg`) ersetzt die berechnete Halbjahresnote. Fachseite: Button „Direkte
   Endnoteneingabe"; Klassenleitung: Reiter „Endnoten (Direkteingabe)" für
