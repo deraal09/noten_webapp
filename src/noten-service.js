@@ -4,7 +4,7 @@
  * brauchen. Ausgelagert, damit beide dieselbe Logik verwenden.
  */
 
-import { effektiveCsv } from './notenschluessel.js';
+import { effektiveCsv, csvRechner } from './notenschluessel.js';
 import { getDb } from './db.js';
 import {
   noteAusPunkten, gesamtnoteHj, teilNote, unterrichtsleistungNote, nichtBestanden,
@@ -109,13 +109,22 @@ function nsTypFuerGesamt(fach, endnote) {
 }
 
 export function getNotenschluesselCsv(fach) {
-  const k = getDb().prepare('SELECT notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
+  const k = getDb().prepare('SELECT id, notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?')
     .get(fach.klasse_id);
   // Eigene Definition der Klasse, sonst der übergeordnete Schlüssel (Admin → Notenschlüssel, ohne Anpassung die Vorgabe).
   // SPA-Klassen bewerten Klausuren/Unterrichtsleistung ebenfalls nach dem IHK-Schlüssel (Noten 1-6); die Leistungspunkte
   // (0-15) und die Tendenznote (1+ ... 6) werden erst daraus abgeleitet (siehe src/spa-leistung.js).
   // Nur die Zeugnisnoten haben ein eigenes Bewertungssystem.
   return k ? effektiveCsv(k) : '';
+}
+
+/**
+ * Notenschlüssel eines Fachs für ein Halbjahr als Funktion (schuelerId) => CSV: die Fassung, die zum Ende des
+ * Halbjahrs galt, für gesperrte Personen die vom Zeitpunkt der Sperre (siehe csvRechner in src/notenschluessel.js).
+ */
+export function notenschluesselFuerHalbjahr(fach, halbjahr) {
+  const k = getDb().prepare('SELECT id, notenschluessel_csv, notenschluessel FROM klassen WHERE id = ?').get(fach.klasse_id);
+  return csvRechner(k, halbjahr);
 }
 
 /**
@@ -199,7 +208,7 @@ export function berechneRohnoten(fachId, halbjahr) {
   ).all(fachId);
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
-  const csvStr = getNotenschluesselCsv(fach);
+  const csvFuer = notenschluesselFuerHalbjahr(fach, halbjahr);
   const ulPct = muendlichProzentFuerHalbjahr(fach.klasse_id, halbjahr, DEFAULT_GEWICHTUNG);
   const schriftlichPct = 100 - ulPct;
 
@@ -218,6 +227,7 @@ export function berechneRohnoten(fachId, halbjahr) {
   const { termine, noten: terminNoten } = ladeUnterrichtTermine(fachId, halbjahr);
 
   for (const s of schueler) {
+    const csvStr = csvFuer(s.id);
     const klausurData = klausuren.map((k) => {
       const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
       const note = punkte ? klausurNote(punkte, JSON.parse(k.max_punkte_pro_aufgabe), parseKlausurTeile(k.teile), csvStr, klausurExtra.get(k.id)?.get(s.id) ?? 0) : null;
@@ -253,7 +263,7 @@ export function berechneGesamtnoteEinerPerson(fachId, halbjahr, schuelerId) {
   if (!vorhanden) return null;
   const fach = ladeFachMitUmfeld(fachId);
   if (!fach) return null;
-  const csvStr = getNotenschluesselCsv(fach);
+  const csvStr = notenschluesselFuerHalbjahr(fach, halbjahr)(schuelerId);
   const ulPct = muendlichProzentFuerHalbjahr(fach.klasse_id, halbjahr, DEFAULT_GEWICHTUNG);
 
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fachId, halbjahr);
@@ -310,7 +320,7 @@ function ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler) {
     };
   });
   return {
-    schriftlichPct: 0, ulPct: 0, csvStr: getNotenschluesselCsv(fach), uls: [], termine: [], schueler, rows,
+    schriftlichPct: 0, ulPct: 0, csvStr: notenschluesselFuerHalbjahr(fach, halbjahr)(), uls: [], termine: [], schueler, rows,
     verrechnung: { prozent: verrechnungProzent, vorhalbjahr }, klausuren: [],
     komposition: {
       unterfaecher: proUnterfach.map(({ u }) => ({
@@ -349,7 +359,8 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   if (unterfaecher.length) return ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler);
   const klausuren = db.prepare('SELECT * FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
   const uls = db.prepare('SELECT * FROM unterrichtsleistungen WHERE fach_id = ? AND halbjahr = ? ORDER BY id').all(fach.id, halbjahr);
-  const csvStr = getNotenschluesselCsv(fach);
+  const csvFuer = notenschluesselFuerHalbjahr(fach, halbjahr);
+  const csvStr = csvFuer();
   const ulPct = muendlichProzentFuerHalbjahr(fach.klasse_id, halbjahr, DEFAULT_GEWICHTUNG);
   const schriftlichPct = 100 - ulPct;
 
@@ -373,6 +384,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   const vorhalbjahr = verrechnungProzent ? halbjahrText(halbjahrNr(halbjahr) - 1) : null;
   const vorherNoten = verrechnungProzent ? berechneGesamtnoten(fach.id, vorhalbjahr) : new Map();
   const rows = schueler.map((s) => {
+    const csvStr = csvFuer(s.id);
     const klausurData = klausuren.map((k) => {
       const punkte = klausurErgs.get(k.id)?.get(s.id) || null;
       const maxArr = JSON.parse(k.max_punkte_pro_aufgabe);

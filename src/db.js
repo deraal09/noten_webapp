@@ -711,6 +711,17 @@ CREATE TABLE IF NOT EXISTS notenschluessel_global (
     geaendert_von_id INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Verlauf der übergeordneten Notenschlüssel: jede Fassung gilt ab gueltig_ab (UTC). Ein Halbjahr wird mit der
+-- Fassung berechnet, die zum Ende des Halbjahrs galt; gesperrte Noten (Notenkonferenz) mit der Fassung vom Zeitpunkt
+-- der Sperre (siehe csvRechner in src/notenschluessel.js). Die beim Einführen geltende Fassung gilt rückwirkend für alles.
+CREATE TABLE IF NOT EXISTS notenschluessel_fassungen (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    typ TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    csv TEXT NOT NULL,
+    gueltig_ab TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS notenschluessel_gelesen (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     typ TEXT NOT NULL,
@@ -920,6 +931,13 @@ function migrate(db) {
       DROP TABLE notenschluessel_global_alt;
     `);
   }
+  // Verlauf der Notenschlüssel: die heute gespeicherten Fassungen sind die ersten und gelten für alle bisherigen
+  // Halbjahre (nicht angepasste Schlüssel bekommen ihre erste Fassung beim ersten Speichern).
+  db.exec(`
+    INSERT INTO notenschluessel_fassungen (typ, version, csv, gueltig_ab)
+    SELECT g.typ, g.version, g.csv, '0000-01-01 00:00:00' FROM notenschluessel_global g
+    WHERE NOT EXISTS (SELECT 1 FROM notenschluessel_fassungen f WHERE f.typ = g.typ)
+  `);
   // Schema 23: Die Sammelklasse "Ohne Klasse" verwaltet nur noch der Admin. Bisher wurde, wer eine Klasse
   // löschte, automatisch ihre Klassenleitung -- und sah damit die Noten aller dort geparkten Personen.
   if (alteVersion !== null && alteVersion < 23) {

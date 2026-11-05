@@ -3,7 +3,7 @@
  * Excel-freundlich (UTF-8 BOM, ; als Trennzeichen).
  */
 
-import { effektiveCsv } from '../notenschluessel.js';
+import { csvRechner } from '../notenschluessel.js';
 import { sortiereNachName } from '../format.js';
 import { klassenLaufzeit, halbjahrNr, schuljahrDesHalbjahrs, muendlichProzentFuerHalbjahr } from '../klassen-jahre.js';
 import { getDb } from '../db.js';
@@ -95,7 +95,12 @@ function baueKlasseCsv(klasse) {
   const db = getDb();
   const schueler = db.prepare('SELECT * FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
   const faecher = sortiereNachName(db.prepare('SELECT * FROM faecher WHERE klasse_id = ? AND parent_fach_id IS NULL').all(klasse.id));
-  const csv = effektiveCsv(klasse);
+  // Notenschlüssel je Halbjahr (Fassung zum Ende des Halbjahrs bzw. zur Notensperre der Person).
+  const rechner = new Map();
+  const csvFuer = (hj, schuelerId) => {
+    if (!rechner.has(hj)) rechner.set(hj, csvRechner(klasse, hj));
+    return rechner.get(hj)(schuelerId);
+  };
   const fzRows = db.prepare(`
     SELECT fz.schueler_id, fz.halbjahr, fz.typ, fz.stunden
     FROM fehlzeiten fz JOIN schueler s ON s.id = fz.schueler_id
@@ -113,7 +118,7 @@ function baueKlasseCsv(klasse) {
   for (const f of faecher) {
     for (const s of schueler) {
       for (const hj of HALBJAHRE) {
-        const zeile = zeileFuerSchuelerFachHj(klasse, csv, f, s, hj);
+        const zeile = zeileFuerSchuelerFachHj(klasse, csvFuer(hj, s.id), f, s, hj);
         const fzHj = fzMap[s.id]?.[hj] || {};
         lines.push([
           schuljahrDesHalbjahrs(laufzeit, halbjahrNr(hj)) ?? klasse.schuljahr_bezeichnung, klasse.name, klasse.notenschluessel,
@@ -131,7 +136,7 @@ function baueKlasseCsv(klasse) {
   lines.push(['Schuljahr', 'Klasse', 'Fach', 'Nachname', 'Vorname', 'Jahresnote'].map(escapeCell).join(';'));
   for (const f of faecher) {
     for (const s of schueler) {
-      const hjNoten = HALBJAHRE.map((hj) => zeileFuerSchuelerFachHj(klasse, csv, f, s, hj).gn);
+      const hjNoten = HALBJAHRE.map((hj) => zeileFuerSchuelerFachHj(klasse, csvFuer(hj, s.id), f, s, hj).gn);
       const jn = gesamtnoteJahr(hjNoten);
       lines.push([
         klasse.schuljahr_bezeichnung, klasse.name, f.name, s.nachname, s.vorname, fmtNote(jn),

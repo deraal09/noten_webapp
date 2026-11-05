@@ -40,7 +40,10 @@ die App direkt und routet die Subdomain darauf.
 - **Fehlzeiten:** Pro Halbjahr, drei Typen (entschuldigt/unentschuldigt/betrieblich),
   optional mit zweiter Schule (siehe unten)
 - **CSV-Export:** Pro Klasse oder komplettes Schuljahr (UTF-8 BOM, Excel-freundlich)
-- **Notenschlüssel:** IHK (1–6) und BG (0–15), pro Klasse mit eigenem CSV
+- **Notenschlüssel:** IHK (1–6), BG (0–15) und SPA, zentral unter Admin → Notenschlüssel. Änderungen gelten
+  ab dem laufenden Halbjahr: abgeschlossene Halbjahre rechnen mit der Fassung zu ihrem Ende, durch die
+  Notenkonferenz gesperrte Noten mit der Fassung vom Zeitpunkt der Sperre (`notenschluessel_fassungen`,
+  `csvRechner` in `src/notenschluessel.js`)
 
 ## Lokal starten
 

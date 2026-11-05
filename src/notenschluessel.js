@@ -12,6 +12,7 @@
 import { getDb } from './db.js';
 import { DEFAULT_NS_CSV, nsCsvParse } from './grade-calc.js';
 import { ladeMeineKlassen } from './auth.js';
+import { klassenLaufzeit, halbjahrNr } from './klassen-jahre.js';
 
 export const TYPEN = ['IHK', 'BG', 'SPA'];
 export const BEREICH = { IHK: [1, 6], BG: [0, 15], SPA: [1, 6] };
@@ -43,7 +44,60 @@ export function folgtGlobal(klasse) {
   return !csv || csv === vorgabeCsv(klasse.notenschluessel);
 }
 
-/** Die für diese Klasse geltende CSV (eigene Definition oder übergeordneter Schlüssel). */
+const ANFANG = '0000-01-01 00:00:00';
+
+/** Alle Fassungen eines übergeordneten Schlüssels, älteste zuerst. */
+function fassungen(typ) {
+  return getDb().prepare('SELECT csv, gueltig_ab FROM notenschluessel_fassungen WHERE typ = ? ORDER BY gueltig_ab, id').all(typ);
+}
+
+/** Ende eines Halbjahrs der Klasse (ausschließlich): 1. Hälfte bis 1. Februar, 2. Hälfte bis 1. August. */
+export function halbjahrEnde(laufzeit, nr) {
+  const startJahr = laufzeit.einschulungJahr + Math.floor((nr - 1) / 2);
+  return nr % 2 === 1 ? `${startJahr + 1}-02-01 00:00:00` : `${startJahr + 1}-08-01 00:00:00`;
+}
+
+/**
+ * Notenschlüssel für ein Halbjahr einer Klasse -- als Funktion (schuelerId) => CSV.
+ *
+ * Folgt die Klasse dem übergeordneten Schlüssel, gilt die Fassung, die zum Ende des Halbjahrs galt: Eine Änderung durch
+ * den Admin wirkt also ab dem laufenden Halbjahr, abgeschlossene Halbjahre behalten ihre Noten. Ist eine Person für das
+ * Halbjahr gesperrt (Notenkonferenz), gilt für sie die Fassung vom Zeitpunkt der Sperre -- beschlossene Noten bleiben.
+ * Klassen mit eigener Definition rechnen unverändert mit dieser.
+ */
+export function csvRechner(klasse, halbjahr) {
+  if (!klasse) return () => '';
+  if (!folgtGlobal(klasse)) {
+    const eigene = klasse.notenschluessel_csv.trim();
+    return () => eigene;
+  }
+  const typ = schluesselTypVon(klasse.notenschluessel);
+  if (!TYPEN.includes(typ)) return () => '';
+  const verlauf = fassungen(typ);
+  const aktuell = globalerSchluessel(typ).csv;
+  if (verlauf.length <= 1) return () => aktuell;
+  const zum = (zeitpunkt) => {
+    let treffer = verlauf[0].csv;
+    for (const f of verlauf) if (f.gueltig_ab < zeitpunkt) treffer = f.csv;
+    return treffer;
+  };
+  const nr = halbjahrNr(halbjahr);
+  const laufzeit = nr && klasse.id ? klassenLaufzeit(klasse.id) : null;
+  const ende = laufzeit ? halbjahrEnde(laufzeit, nr) : null;
+  const standard = ende ? zum(ende) : aktuell;
+  const sperre = getDb().prepare(`
+    SELECT n.gesperrt_am FROM notensperren n JOIN schueler s ON s.id = n.schueler_id AND s.klasse_id = n.klasse_id
+    WHERE n.schueler_id = ? AND n.halbjahr = ?
+  `);
+  return (schuelerId = null) => {
+    if (schuelerId === null || schuelerId === undefined) return standard;
+    const gesperrtAm = sperre.get(schuelerId, halbjahr)?.gesperrt_am;
+    if (!gesperrtAm || (ende && gesperrtAm >= ende)) return standard;
+    return zum(gesperrtAm);
+  };
+}
+
+/** Die für diese Klasse aktuell geltende CSV (eigene Definition oder neueste Fassung des übergeordneten Schlüssels). */
 export function effektiveCsv(klasse) {
   if (!klasse) return '';
   if (!folgtGlobal(klasse)) return klasse.notenschluessel_csv.trim();
@@ -92,18 +146,33 @@ export function pruefeCsv(typ, roh) {
   return { ok: true, csv: eintraege.map(([p, n]) => `${p},${n}`).join(';') };
 }
 
-/** Speichert einen übergeordneten Schlüssel; ohne inhaltliche Änderung bleibt die Version gleich. */
+/**
+ * Speichert einen übergeordneten Schlüssel; ohne inhaltliche Änderung bleibt die Version gleich. Jede Änderung wird als
+ * neue Fassung (gültig ab jetzt) in den Verlauf geschrieben; die bisherige Fassung gilt weiter für vergangene Halbjahre.
+ */
 export function speichereGlobal(typ, csv, userId, hinweis = '') {
   const aktuell = globalerSchluessel(typ);
   if (aktuell.csv === csv) return { geaendert: false, version: aktuell.version };
   const version = aktuell.version + 1;
+  const db = getDb();
+  db.transaction(() => {
+    // Erste Änderung eines bisher nicht angepassten Schlüssels: die bisherige Fassung (Vorgabe) gilt für alles davor.
+    if (!db.prepare('SELECT 1 FROM notenschluessel_fassungen WHERE typ = ?').get(typ)) {
+      db.prepare('INSERT INTO notenschluessel_fassungen (typ, version, csv, gueltig_ab) VALUES (?, ?, ?, ?)').run(typ, aktuell.version, aktuell.csv, ANFANG);
+    }
+    db.prepare("INSERT INTO notenschluessel_fassungen (typ, version, csv, gueltig_ab) VALUES (?, ?, ?, datetime('now'))").run(typ, version, csv);
+    speichereZeile(typ, csv, version, hinweis, userId);
+  })();
+  return { geaendert: true, version };
+}
+
+function speichereZeile(typ, csv, version, hinweis, userId) {
   getDb().prepare(`
     INSERT INTO notenschluessel_global (typ, csv, version, hinweis, geaendert_at, geaendert_von_id)
     VALUES (?, ?, ?, ?, datetime('now'), ?)
     ON CONFLICT(typ) DO UPDATE SET csv = excluded.csv, version = excluded.version, hinweis = excluded.hinweis,
       geaendert_at = excluded.geaendert_at, geaendert_von_id = excluded.geaendert_von_id
   `).run(typ, csv, version, String(hinweis || '').trim().slice(0, MAX_HINWEIS), userId ?? null);
-  return { geaendert: true, version };
 }
 
 /** Wie viele Klassen folgen dem übergeordneten Schlüssel, wie viele haben einen eigenen? */

@@ -17,6 +17,7 @@
       <p class="hint">
         Zuletzt angepasst am <%= formatZeitLokal(s.geaendertAt) %><% if (s.von) { %> von <%= s.von %><% } %>.
         <% if (s.hinweis) { %><br>Hinweis: <strong><%= s.hinweis %></strong><% } %>
+        <br>Die Änderung gilt ab dem laufenden Halbjahr; abgeschlossene Halbjahre und gesperrte Noten bleiben unverändert.
       </p>
     <% } else { %>
       <p class="hint">Standardschlüssel, bisher nicht angepasst.</p>

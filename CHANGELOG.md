@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.107.0 - 2026-11-05
+
+- **Notenschlüssel-Änderungen nicht mehr rückwirkend.** Ändert der Admin einen übergeordneten Notenschlüssel (IHK,
+  BG, SPA), gilt die neue Fassung ab dem laufenden Halbjahr. Abgeschlossene Halbjahre rechnen mit der Fassung, die zu
+  ihrem Ende galt; durch die Notenkonferenz gesperrte Noten mit der Fassung vom Zeitpunkt der Sperre. Bisher änderten
+  sich mit jeder Anpassung sofort alle Noten aller Halbjahre, auch gesperrte. Die heute gespeicherten Schlüssel sind die
+  ersten Fassungen und gelten für alle bisherigen Halbjahre -- an bestehenden Noten ändert sich nichts. Gilt auch für
+  den CSV-Export.
+
 ## 0.106.0 - 2026-11-04
 
 - **Notenschlüssel standardmäßig eingeklappt** -- in der Übersicht für alle (`/notenschluessel`) und im Adminbereich
