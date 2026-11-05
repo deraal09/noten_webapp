@@ -54,19 +54,39 @@ export async function erzeugeSchnappschuss(datum = new Date()) {
   }
 }
 
-let laeuft = false;
+// Länger dauert kein Lauf (WebDAV bricht nach 15 Minuten ab). Ein älterer, nie beendeter Lauf stammt von einem
+// beendeten oder abgestürzten Prozess und blockiert nicht mehr.
+export const LAUF_FRIST_MS = 2 * 3600_000;
+
+/**
+ * Beansprucht den nächsten Lauf -- über die Datenbank, damit auch mehrere Prozesse der Anwendung (z. B. Passenger mit
+ * mehreren Instanzen) nie gleichzeitig sichern. In einer IMMEDIATE-Transaktion: verwaiste Läufe werden als abgebrochen
+ * beendet, ein noch laufender verhindert den neuen; `nurWennFaellig` prüft die Fälligkeit erneut (ein anderer Prozess
+ * kann gerade gesichert haben).
+ * @returns {number|null} id des Protokolleintrags oder null, wenn nicht gesichert werden soll
+ */
+function beanspruche(ausloeser, cfg, { nurWennFaellig = false, jetzt = new Date() } = {}) {
+  const db = getDb();
+  return db.transaction(() => {
+    for (const offen of db.prepare('SELECT id, gestartet_at FROM backup_laeufe WHERE beendet_at IS NULL').all()) {
+      if (jetzt.getTime() - new Date(offen.gestartet_at).getTime() < LAUF_FRIST_MS) return null;
+      protokolliereEnde(offen.id, { ok: false, meldung: 'Abgebrochen: der Lauf wurde nicht beendet (Anwendung neu gestartet oder abgestürzt).' }, jetzt);
+    }
+    if (nurWennFaellig && !istFaellig(cfg, letzterLauf(), jetzt)) return null;
+    return protokolliereStart(ausloeser, jetzt);
+  }).immediate();
+}
 
 /**
  * Ein Sicherungslauf: Schnappschuss erzeugen, ans Ziel schreiben, alte Sicherungen über die Aufbewahrung hinaus löschen,
- * alles im Protokoll festhalten. Es läuft höchstens ein Lauf gleichzeitig.
- * @returns {Promise<{ok: boolean, meldung: string, dateiname?: string, groesse?: number}>}
+ * alles im Protokoll festhalten. Es läuft höchstens ein Lauf gleichzeitig, auch über mehrere Prozesse hinweg.
+ * @returns {Promise<{ok: boolean, meldung: string, dateiname?: string, groesse?: number, uebersprungen?: boolean}>}
  */
-export async function fuehreBackupAus(ausloeser = 'manuell') {
+export async function fuehreBackupAus(ausloeser = 'manuell', { nurWennFaellig = false } = {}) {
   const cfg = ladeEinstellungenMitPasswort();
   if (!cfg.ziel) return { ok: false, meldung: 'Es ist noch kein Sicherungsziel eingetragen.' };
-  if (laeuft) return { ok: false, meldung: 'Es läuft bereits eine Sicherung.' };
-  laeuft = true;
-  const id = protokolliereStart(ausloeser);
+  const id = beanspruche(ausloeser, cfg, { nurWennFaellig });
+  if (id === null) return { ok: false, uebersprungen: true, meldung: 'Es läuft bereits eine Sicherung.' };
   let schnappschuss = null;
   try {
     const ziel_ = ziel(cfg.typ);
@@ -90,7 +110,6 @@ export async function fuehreBackupAus(ausloeser = 'manuell') {
     protokolliereEnde(id, { ok: false, meldung });
     return { ok: false, meldung };
   } finally {
-    laeuft = false;
     if (schnappschuss) await fs.promises.rm(schnappschuss.verzeichnis, { recursive: true, force: true }).catch(() => {});
   }
 }
@@ -118,7 +137,7 @@ export async function listeSicherungen(cfg = ladeEinstellungenMitPasswort()) {
 export function starteBackupPlaner({ intervallMs = 60_000 } = {}) {
   const tick = async () => {
     try {
-      if (istFaellig(ladeEinstellungenMitPasswort(), letzterLauf())) await fuehreBackupAus('geplant');
+      if (istFaellig(ladeEinstellungenMitPasswort(), letzterLauf())) await fuehreBackupAus('geplant', { nurWennFaellig: true });
     } catch (e) {
       console.error('[backup] Planer:', bereinige(e.message));
     }

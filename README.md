@@ -1004,7 +1004,9 @@ dazu.
 - **Intervall und Aufbewahrung:** alle *n* Stunden (z. B. 24); die neuesten *m* Sicherungen bleiben am Ziel, ältere
   werden gelöscht (andere Dateien am Ziel bleiben unberührt). Nach dem Einschalten wird gleich gesichert, nach einem
   Fehler nach einer Stunde erneut. „Verbindung testen“, „Jetzt sichern“ und ein Download des aktuellen Stands gibt es
-  ebenfalls; die letzten Läufe stehen im Protokoll.
+  ebenfalls; die letzten Läufe stehen im Protokoll. Es läuft nie mehr als ein Lauf gleichzeitig -- auch nicht, wenn
+  Passenger mehrere Instanzen der Anwendung startet (die Sperre liegt in der Datenbank). Ein Lauf, der nach zwei
+  Stunden nicht beendet ist (Absturz, Neustart), gilt als abgebrochen und blockiert nicht.
 - **Dateien:** `noten-backup-JJJJMMTT-HHMMSS.sqlite3`, ein konsistenter Schnappschuss (`VACUUM INTO`) der
   Datenbank, **weiterhin mit `DB_ENCRYPTION_KEY` verschlüsselt**. Am Ziel liegen also keine lesbaren Noten. Der
   Schnappschuss wird kurz im temporären Verzeichnis des Servers angelegt (freier Platz in Größe der Datenbank nötig).
@@ -1015,7 +1017,10 @@ dazu.
   setzen, die Sicherungsdatei auf den Server kopieren und
   `npm run backup:wiederherstellen -- /pfad/zu/noten-backup-….sqlite3` ausführen. Das Skript öffnet die Datei mit dem
   Schlüssel, prüft sie (Integrität, Schema-Version nicht neuer als das Programm), legt eine vorhandene Datenbank als
-  Kopie `….vor-wiederherstellung-…` beiseite und setzt die Sicherung ein. Danach die Anwendung starten.
+  Kopie `….vor-wiederherstellung-…` beiseite und setzt die Sicherung ein. Änderungen, die nur noch im Write-Ahead-Log
+  (`-wal`) der bisherigen Datenbank stehen, werden vorher eingearbeitet bzw. wandern mit der Kopie -- sie bleibt
+  vollständig. Danach die Anwendung starten. (Beim normalen Beenden per SIGTERM schließt die Anwendung die Datenbank
+  selbst sauber.)
 - **Empfehlung:** Die Wiederherstellung einmal auf einem Testsystem durchspielen, bevor sie gebraucht wird.
 
 ## Datenschutz und Impressum

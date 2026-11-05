@@ -40,8 +40,31 @@ export function pruefeSicherung(datei, schluessel, maxVersion = Infinity) {
 }
 
 /**
+ * Arbeitet das Write-Ahead-Log (`<pfad>-wal`) einer Datenbank in die Hauptdatei ein. Ist die Anwendung nicht sauber
+ * beendet worden, stehen die zuletzt geschriebenen Änderungen nur dort. Gibt false zurück, wenn das nicht gelingt
+ * (z. B. anderer Schlüssel, keine Datenbank) -- die Dateien werden dann unverändert mit beiseitegelegt.
+ */
+function arbeiteWalEin(pfad, schluessel) {
+  if (!fs.existsSync(`${pfad}-wal`)) return true;
+  let db;
+  try {
+    db = new Database(pfad, { fileMustExist: true });
+    db.pragma("cipher='sqlcipher'");
+    db.pragma(`key='${alsSqlLiteral(schluessel)}'`);
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    db?.close();
+  }
+}
+
+/**
  * Legt `quelle` als Datenbank unter `zielPfad` ab. Eine vorhandene Datenbank wird nicht gelöscht, sondern als
  * `<ziel>.vor-wiederherstellung-<Zeit>` beiseitegelegt (verschlüsselt wie das Original; nach erfolgreicher Prüfung löschen).
+ * Vorher wird ihr Write-Ahead-Log eingearbeitet; was sich nicht einarbeiten lässt, wandert als `<kopie>-wal`/`-shm` mit,
+ * damit die Kopie vollständig bleibt.
  */
 export function stelleWiederHer({ quelle, zielPfad, schluessel, maxVersion = Infinity, jetzt = new Date() }) {
   const pruefung = pruefeSicherung(quelle, schluessel, maxVersion);
@@ -49,9 +72,14 @@ export function stelleWiederHer({ quelle, zielPfad, schluessel, maxVersion = Inf
   fs.mkdirSync(path.dirname(zielPfad), { recursive: true });
   let beiseite = null;
   if (fs.existsSync(zielPfad)) {
+    arbeiteWalEin(zielPfad, schluessel);
     beiseite = `${zielPfad}.vor-wiederherstellung-${jetzt.toISOString().replace(/[:.]/g, '-')}`;
     fs.renameSync(zielPfad, beiseite);
+    for (const suffix of ['-wal', '-shm']) {
+      if (fs.existsSync(zielPfad + suffix)) fs.renameSync(zielPfad + suffix, beiseite + suffix);
+    }
   }
+  // Ohne bisherige Datenbank gehört ein liegengebliebenes Log zu nichts mehr -- es darf die Sicherung nicht verfälschen.
   for (const suffix of ['-wal', '-shm']) fs.rmSync(zielPfad + suffix, { force: true });
   const tmp = `${zielPfad}.wiederherstellung-tmp`;
   fs.copyFileSync(quelle, tmp);

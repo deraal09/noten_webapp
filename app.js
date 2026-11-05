@@ -25,7 +25,7 @@ import ejs from 'ejs';
 import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 
-import { getDb } from './src/db.js';
+import { getDb, closeDb } from './src/db.js';
 import { ssoConfig } from './src/sso.js';
 import { authPreHandler, SESSION_COOKIE, istIrgendeineKlassenleitung } from './src/auth.js';
 import { SqliteSessionStore } from './src/auth/sqlite-session-store.js';
@@ -283,7 +283,21 @@ async function start() {
   try {
     const address = await app.listen(listenOpts);
     app.log.info(`Notenverwaltung läuft auf ${address}`);
-    starteBackupPlaner();
+    const stoppePlaner = starteBackupPlaner();
+    // Sauber beenden (Passenger/Plesk schickt SIGTERM): offene Anfragen abschließen und die Datenbank schließen --
+    // dabei wird das Write-Ahead-Log in die Datenbankdatei eingearbeitet, statt als -wal-Datei liegen zu bleiben.
+    let beendet = false;
+    const beende = async (signal) => {
+      if (beendet) return;
+      beendet = true;
+      app.log.info(`${signal} empfangen -- beende die Anwendung`);
+      stoppePlaner();
+      try { await app.close(); } catch (e) { app.log.error(e); }
+      try { closeDb(); } catch (e) { app.log.error(e); }
+      process.exit(0);
+    };
+    process.once('SIGTERM', () => beende('SIGTERM'));
+    process.once('SIGINT', () => beende('SIGINT'));
   } catch (e) {
     app.log.error(e);
     process.exit(1);

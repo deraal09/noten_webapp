@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.107.1 - 2026-11-05
+
+- **Wiederherstellen ohne Datenverlust in der Sicherheitskopie.** Bisher wurde das Write-Ahead-Log (`-wal`) der
+  bisherigen Datenbank gelöscht -- Änderungen, die nur dort standen (z. B. nach einem harten Abbruch), fehlten in der
+  beiseitegelegten Kopie. Jetzt wird es vorher eingearbeitet bzw. mit der Kopie aufbewahrt.
+- **Nie zwei Sicherungsläufe gleichzeitig, auch über mehrere Prozesse.** Die Sperre lag nur im Arbeitsspeicher eines
+  Prozesses; startete Passenger mehrere Instanzen, sicherte jede. Und schlug schon das Protokollieren fehl, blieb die
+  Sperre für immer gesetzt. Jetzt liegt sie in der Datenbank; ein nach zwei Stunden nicht beendeter Lauf gilt als
+  abgebrochen.
+- **Sauberes Beenden:** Auf SIGTERM/SIGINT schließt die Anwendung offene Anfragen und die Datenbank.
+
 ## 0.107.0 - 2026-11-05
 
 - **Notenschlüssel-Änderungen nicht mehr rückwirkend.** Ändert der Admin einen übergeordneten Notenschlüssel (IHK,
