@@ -228,28 +228,53 @@
           </label>
         </form>
       </div>
-      <p class="hint">Anzahl Teile: 1 = normale Klausur. Bei mehreren Teilen bekommt jeder Teil eine eigene Note, die Gesamtnote wird prozentual aus den Teilnoten berechnet.</p>
+      <p class="hint">Anzahl Teile: 1 = normale Klausur. Bei mehreren Teilen bekommt jeder Teil eine eigene Note, die Gesamtnote wird prozentual aus den Teilnoten berechnet.
+        Jeder Teil hat eine Art: <strong>Standard</strong> (Punkte der Aufgaben ergeben die Teilnote), <strong>Hörverstehen</strong> (eine Aufgabe mit den
+        Verrechnungspunkten, meist 15; die Note folgt der Verrechnungstabelle) oder <strong>Inhalt &amp; Sprache</strong> (Mediation, Textaufgabe: je eine Note für
+        Inhalt und Sprache, im einstellbaren Verhältnis, meist 50:50, zur Teilnote verrechnet).</p>
       <% if (k.teileInfo) { %>
         <form method="post" action="/teacher/klausuren/<%= k.id %>/teile" class="auto-speichern-sofort" autocomplete="off">
           <table class="data">
-            <thead><tr><th>Teil</th><th>Name</th><th>Aufgaben</th><th>Gewichtung %</th><th>Bestimmt beste Note</th></tr></thead>
+            <thead><tr><th>Teil</th><th>Name</th><th>Art</th><th>Aufgaben</th><th title="Nur bei Inhalt &amp; Sprache: Anteil von Inhalt an der Teilnote, der Rest ist Sprache">Inhalt : Sprache</th><th>Gewichtung %</th><th>Bestimmt beste Note</th></tr></thead>
             <tbody>
               <% k.teileInfo.teile.forEach(function(teil, ti) { %>
                 <tr>
                   <td><%= ti + 1 %></td>
                   <td><input type="text" name="teil_name" value="<%= teil.name %>" placeholder="Teil <%= ti + 1 %>" maxlength="60"></td>
-                  <td><input type="number" name="teil_aufgaben" value="<%= teil.aufgaben %>" min="1" max="20"></td>
+                  <td><select name="teil_art" aria-label="Art von Teil <%= ti + 1 %>">
+                    <% TEIL_ARTEN.forEach(function(a) { %><option value="<%= a %>" <%= teil.art === a ? 'selected' : '' %>><%= TEIL_ART_NAMEN[a] %></option><% }); %>
+                  </select></td>
+                  <td><input type="number" name="teil_aufgaben" value="<%= teil.aufgaben %>" min="1" max="20" <%= teil.art !== 'standard' ? 'readonly' : '' %>></td>
+                  <td>
+                    <input type="number" name="teil_anteil" value="<%= teil.inhaltAnteil %>" min="0" max="100" step="1" <%- teil.art === 'inhalt_sprache' ? '' : 'style="display:none"' %> aria-label="Anteil Inhalt in Prozent">
+                    <% if (teil.art === 'inhalt_sprache') { %><small class="hint">% Inhalt, <%= 100 - teil.inhaltAnteil %> % Sprache</small><% } %>
+                  </td>
                   <td><input type="number" name="teil_gewichtung" value="<%= teil.gewichtung %>" min="0" max="100" step="0.1"></td>
                   <td><input type="radio" name="bestimmend" value="<%= ti %>" <%= k.teileInfo.bestimmend === ti ? 'checked' : '' %> aria-label="Teil <%= ti + 1 %> bestimmt die beste Note"></td>
                 </tr>
               <% }); %>
               <tr>
-                <td colspan="4"><small class="hint">Kein Teil begrenzt die Gesamtnote. Bestimmt ein Teil die <strong>beste</strong> erreichbare Note, können die anderen Teile die Gesamtnote nicht darüber hinaus verbessern, wohl aber verschlechtern.</small></td>
+                <td colspan="6"><small class="hint">Kein Teil begrenzt die Gesamtnote. Bestimmt ein Teil die <strong>beste</strong> erreichbare Note, können die anderen Teile die Gesamtnote nicht darüber hinaus verbessern, wohl aber verschlechtern.</small></td>
                 <td><input type="radio" name="bestimmend" value="" <%= k.teileInfo.bestimmend === null ? 'checked' : '' %> aria-label="Kein Teil bestimmt die beste Note"></td>
               </tr>
             </tbody>
           </table>
         </form>
+        <% var maxStart = 0; k.teileInfo.teile.forEach(function(teil, ti) {
+             if (teil.art === 'hoeren') { var hm = maxArr[maxStart] || 0; %>
+          <details class="verrechnung-tabelle">
+            <summary>Verrechnungstabelle Hörverstehen (<%= teil.name %>, <%= hm %> Verrechnungspunkte)</summary>
+            <table class="data">
+              <thead><tr><th>Ab Punkten</th><th>Ab Prozent</th><th>Note</th></tr></thead>
+              <tbody>
+                <% verrechnungsTabelle(csvStr, hm).forEach(function(z) { %>
+                  <tr><td><%= String(z.abPunkte).replace('.', ',') %></td><td><%= String(z.abProzent).replace('.', ',') %> %</td><td><%= String(z.note).replace('.', ',') %></td></tr>
+                <% }); %>
+              </tbody>
+            </table>
+            <small class="hint">Die Tabelle folgt dem Notenschlüssel der Klasse; die Verrechnungspunkte (hier <%= hm %>) trägst du über „Max. Punkte“ unter der Überschrift ein, meist 15, auch 20 oder 25. Es wird nicht nach dem Komma gerundet.</small>
+          </details>
+        <% } maxStart += teil.aufgaben; }); %>
       <% } %>
       <form method="post" action="/teacher/klausuren/<%= k.id %>/maxpunkte" id="maxpunkte-form-k<%= k.id %>" class="einstellungen auto-speichern">
         <% if (k.teileInfo) { %>
@@ -267,21 +292,29 @@
         <%
           // Aufgaben-Index -> Teil (nur bei mehrteiliger Klausur): ein Teil-Block endet mit seiner Teilnote.
           var teilEnde = {};
-          if (k.teileInfo) { var pos = 0; k.teileInfo.teile.forEach(function(t, ti) { pos += t.aufgaben; teilEnde[pos - 1] = ti; }); }
+          var aufgabenKopf = {};
+          if (k.teileInfo) {
+            var pos = 0;
+            k.teileInfo.teile.forEach(function(t, ti) {
+              if (t.art === 'hoeren') aufgabenKopf[pos] = 'Verrech-nungs-punkte';
+              if (t.art === 'inhalt_sprache') { aufgabenKopf[pos] = 'Inhalt'; aufgabenKopf[pos + 1] = 'Sprache'; }
+              pos += t.aufgaben; teilEnde[pos - 1] = ti;
+            });
+          }
         %>
         <thead>
           <% if (k.teileInfo) { %>
             <tr>
               <th rowspan="2">Schüler/in</th>
               <% k.teileInfo.teile.forEach(function(t, ti) { %>
-                <th colspan="<%= t.aufgaben + 1 %>" class="teil-head"><%= t.name %> <small>(<%= t.gewichtung %>%)</small><%= k.teileInfo.bestimmend === ti ? ' ★' : '' %></th>
+                <th colspan="<%= t.aufgaben + 1 %>" class="teil-head"><%= t.name %> <small>(<%= t.gewichtung %>%<%= t.art === 'hoeren' ? ', Hörverstehen' : (t.art === 'inhalt_sprache' ? ', Inhalt ' + t.inhaltAnteil + ' : Sprache ' + (100 - t.inhaltAnteil) : '') %>)</small><%= k.teileInfo.bestimmend === ti ? ' ★' : '' %></th>
               <% }); %>
               <th rowspan="2">Punkte gesamt</th>
               <th rowspan="2" class="note-col">Gesamtnote</th>
             </tr>
             <tr>
               <% maxArr.forEach(function(_, i) { %>
-                <th class="aufgabe-head">A<%= i+1 %></th>
+                <th class="aufgabe-head"><%= aufgabenKopf[i] ? aufgabenKopf[i].replace(/-/g, '\u00AD') : 'A' + (i+1) %></th>
                 <% if (teilEnde[i] !== undefined) { %><th class="note-col"><%= NL %></th><% } %>
               <% }); %>
             </tr>
@@ -941,7 +974,7 @@
       }
     }
   }
-  function inputsVon(form) { return Array.from(form.elements).filter(function(el) { return el.tagName === 'INPUT'; }); }
+  function inputsVon(form) { return Array.from(form.elements).filter(function(el) { return el.tagName === 'INPUT' || el.tagName === 'SELECT'; }); }
   document.querySelectorAll('form.auto-speichern').forEach(function(form) {
     const absenden = debounce(function() { merkeAktivesFeld(); form.submit(); }, 800);
     inputsVon(form).forEach(function(feld) {

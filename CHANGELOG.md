@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.110.0 - 2026-11-08
+
+- **Klausur-Teile mit Art: Hörverstehen und Inhalt & Sprache.** Jeder Teil einer mehrteiligen Klausur hat jetzt eine Art:
+  - *Standard* wie bisher (Punkte der Aufgaben ergeben prozentual die Teilnote).
+  - *Hörverstehen (Verrechnungstabelle)*: eine Aufgabe mit den Verrechnungspunkten (Vorgabe 15, auch 20/25 über „Max. Punkte“).
+    Die Note folgt der Verrechnungstabelle, also dem Notenschlüssel der Klasse; die Tabelle (ab wie vielen Punkten welche
+    Note, nicht nach dem Komma gerundet) lässt sich unter der Klausur aufklappen und entspricht bei BG der Tabelle für 15/20/25 Punkte.
+  - *Inhalt & Sprache* (Mediation, Textaufgabe): zwei Aufgaben (Inhalt, Sprache) bekommen je eine eigene Note, die Teilnote ist
+    deren Mittel im einstellbaren Verhältnis (Vorgabe 50:50).
+  Die Teilnoten gehen wie bisher gewichtet in die Gesamtnote der Klausur ein (z. B. Hörverstehen 40 %, Textaufgabe 60 %).
+  Die Auswahlfelder der Teile-Tabelle speichern jetzt ebenfalls automatisch.
 ## 0.109.0 - 2026-11-05
 
 - **Eigenes Passwort ändern** (Menü → „Passwort ändern“, `/konto/passwort`) für lokale Konten, vor allem den Admin:

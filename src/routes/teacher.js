@@ -20,7 +20,7 @@ import {
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
-  HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE,
+  HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE, TEIL_ARTEN, TEIL_ART_NAMEN, verrechnungsTabelle,
 } from '../grade-calc.js';
 import { korrekturMoeglich, korrigiereGesamtnote, nimmKorrekturenZurueck, datumText } from '../notenkorrektur.js';
 import { parseFaecherIds, rundenSchluessel, aktuelleRunde, starteRunde, beendeRunde, waehleZufaellig, rundenAnsicht } from '../besprechung.js';
@@ -443,6 +443,7 @@ export default async function teacherRoutes(fastify) {
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct, verrechnung: uebersicht.verrechnung,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       abschlussnoten, sperren, teilnehmer,
+      csvStr: uebersicht.csvStr, verrechnungsTabelle, TEIL_ARTEN, TEIL_ART_NAMEN,
     });
   });
 
@@ -989,10 +990,16 @@ export default async function teacherRoutes(fastify) {
   // eine gemeinsame Liste -- die Teile gruppieren sie nur der Reihe nach.
   // Schreibt die Teile (null = einteilig) und bringt Max-Punkte-Liste sowie die
   // eingetragenen Punkte auf die Gesamt-Aufgabenzahl (vorhandene Werte bleiben).
-  function schreibeTeile(request, k, teileObj, gesamtAufgaben) {
+  function schreibeTeile(request, k, teileObj, gesamtAufgaben, maxVorgaben = {}) {
     const id = request.params.id;
     const alteMax = JSON.parse(k.max_punkte_pro_aufgabe);
     const neueMax = Array.from({ length: gesamtAufgaben }, (_, i) => alteMax[i] ?? 1);
+    // Wechselt ein Teil seine Art, bekommen seine Aufgaben passende Höchstpunkte (Hörverstehen: 15 Verrechnungspunkte).
+    let start = 0;
+    (teileObj?.teile ?? []).forEach((t, ti) => {
+      (maxVorgaben[ti] ?? []).forEach((wert, j) => { if (start + j < neueMax.length) neueMax[start + j] = wert; });
+      start += t.aufgaben;
+    });
     getDb().prepare('UPDATE klausuren SET teile = ?, max_punkte_pro_aufgabe = ? WHERE id = ?')
       .run(teileObj ? JSON.stringify(teileObj) : null, JSON.stringify(neueMax), id);
     for (const e of getDb().prepare('SELECT id, punkte FROM klausur_ergebnisse WHERE klausur_id = ?').all(id)) {
@@ -1004,7 +1011,7 @@ export default async function teacherRoutes(fastify) {
   }
 
   fastify.post('/klausuren/:id/teile', async (request, reply) => {
-    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe FROM klausuren WHERE id = ?').get(request.params.id);
+    const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
     if (!k) return reply.redirect('/teacher');
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const zurueck = `/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}&tab=klausuren&open=klausur-panel-${request.params.id}`;
@@ -1021,6 +1028,10 @@ export default async function teacherRoutes(fastify) {
     const namen = liste(request.body?.teil_name);
     const aufgabenRoh = liste(request.body?.teil_aufgaben);
     const gewichtungen = liste(request.body?.teil_gewichtung);
+    const arten = liste(request.body?.teil_art);
+    const anteile = liste(request.body?.teil_anteil);
+    const alteTeile = parseKlausurTeile(k.teile)?.teile ?? [];
+    const maxVorgaben = {};
     const bestimmendRoh = request.body?.bestimmend;
     const bestimmendZeile = bestimmendRoh === undefined || bestimmendRoh === '' ? null : parseInt(bestimmendRoh, 10);
     const teile = [];
@@ -1030,13 +1041,22 @@ export default async function teacherRoutes(fastify) {
       const leer = (v) => v === undefined || String(v).trim() === '';
       if (leer(namen[i]) && leer(aufgabenRoh[i]) && leer(gewichtungen[i])) continue; // komplett leere Zeile = kein Teil
       // Eine nicht (mehr) lesbare Aufgabenzahl zählt als 1, damit das Löschen einer Ziffer keinen Teil verschwinden lässt.
-      const aufgaben = Math.max(1, parseInt(aufgabenRoh[i], 10) || 1);
+      const art = TEIL_ARTEN.includes(arten[i]) ? arten[i] : 'standard';
+      // Hörverstehen = eine Aufgabe (Verrechnungspunkte), Inhalt & Sprache = zwei Aufgaben.
+      const aufgaben = art === 'hoeren' ? 1 : art === 'inhalt_sprache' ? 2 : Math.max(1, parseInt(aufgabenRoh[i], 10) || 1);
       const gewichtung = Number(String(gewichtungen[i] ?? '').replace(',', '.'));
+      const anteil = Number(String(anteile[i] ?? '').replace(',', '.'));
       if (bestimmendZeile === i) bestimmend = teile.length;
+      if (art !== (alteTeile[i]?.art ?? 'standard')) {
+        if (art === 'hoeren') maxVorgaben[teile.length] = [15];
+        if (art === 'inhalt_sprache') maxVorgaben[teile.length] = [10, 10];
+      }
       teile.push({
         name: String(namen[i] ?? '').trim() || `Teil ${teile.length + 1}`,
         aufgaben: Math.min(aufgaben, 20),
         gewichtung: Number.isFinite(gewichtung) && gewichtung >= 0 ? gewichtung : 0,
+        art,
+        inhaltAnteil: Number.isFinite(anteil) && anteil >= 0 && anteil <= 100 ? anteil : 50,
       });
     }
     const gesamtAufgaben = teile.reduce((a, t) => a + t.aufgaben, 0);
@@ -1045,7 +1065,7 @@ export default async function teacherRoutes(fastify) {
       return reply.redirect(zurueck);
     }
 
-    schreibeTeile(request, k, { teile, bestimmend }, gesamtAufgaben);
+    schreibeTeile(request, k, { teile, bestimmend }, gesamtAufgaben, maxVorgaben);
     request.flash?.('success', 'Teile der Klausur gespeichert.');
     return reply.redirect(zurueck);
   });

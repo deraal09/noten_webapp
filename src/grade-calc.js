@@ -129,22 +129,37 @@ export function kleinerIstBesser(csvStr) {
  * Mehrteilige Klausur: die Aufgaben einer Klausur werden hintereinander auf
  * Teile aufgeteilt. Gespeichert wird das als JSON in klausuren.teile:
  * `{"teile":[{"name":"Teil A","aufgaben":2,"gewichtung":60},...],"bestimmend":0}`.
+ * Jeder Teil hat eine Art (`art`, ohne Angabe 'standard'):
+ *  - 'standard': die Punkte aller Aufgaben des Teils ergeben prozentual die Teilnote.
+ *  - 'hoeren' (Hörverstehen): genau eine Aufgabe = die Verrechnungspunkte (meist 15, auch 20/25); die Teilnote
+ *    folgt der Verrechnungstabelle, also dem Notenschlüssel der Klasse (siehe verrechnungsTabelle).
+ *  - 'inhalt_sprache' (Mediation, Textaufgabe): genau zwei Aufgaben (Inhalt, Sprache), jede bekommt über den
+ *    Notenschlüssel eine eigene Note; die Teilnote ist deren Mittel im Verhältnis `inhaltAnteil` : Rest (meist 50:50).
  * `bestimmend` ist der Index des Teils, dessen Note die BESTE erreichbare
  * Gesamtnote festlegt (oder null). Gibt null zurück, wenn die Klausur
  * einteilig ist (kein/ungültiges JSON, weniger als zwei Teile).
  *
- * @returns {{teile: Array<{name: string, aufgaben: number, gewichtung: number}>, bestimmend: number|null}|null}
+ * @returns {{teile: Array<{name: string, aufgaben: number, gewichtung: number, art: string, inhaltAnteil: number}>, bestimmend: number|null}|null}
  */
+export const TEIL_ARTEN = ['standard', 'hoeren', 'inhalt_sprache'];
+export const TEIL_ART_NAMEN = { standard: 'Standard', hoeren: 'Hörverstehen (Verrechnungstabelle)', inhalt_sprache: 'Inhalt & Sprache' };
+
 export function parseKlausurTeile(roh) {
   if (!roh) return null;
   let obj;
   try { obj = typeof roh === 'string' ? JSON.parse(roh) : roh; } catch { return null; }
   if (!obj || !Array.isArray(obj.teile) || obj.teile.length < 2) return null;
-  const teile = obj.teile.map((t, i) => ({
-    name: String(t?.name || `Teil ${i + 1}`),
-    aufgaben: Math.max(1, Math.floor(Number(t?.aufgaben) || 1)),
-    gewichtung: Number.isFinite(Number(t?.gewichtung)) && Number(t.gewichtung) >= 0 ? Number(t.gewichtung) : 0,
-  }));
+  const teile = obj.teile.map((t, i) => {
+    const art = TEIL_ARTEN.includes(t?.art) ? t.art : 'standard';
+    const anteil = Number(t?.inhaltAnteil);
+    return {
+      name: String(t?.name || `Teil ${i + 1}`),
+      aufgaben: art === 'hoeren' ? 1 : art === 'inhalt_sprache' ? 2 : Math.max(1, Math.floor(Number(t?.aufgaben) || 1)),
+      gewichtung: Number.isFinite(Number(t?.gewichtung)) && Number(t.gewichtung) >= 0 ? Number(t.gewichtung) : 0,
+      art,
+      inhaltAnteil: Number.isFinite(anteil) && anteil >= 0 && anteil <= 100 ? anteil : 50,
+    };
+  });
   const b = obj.bestimmend;
   const bestimmend = Number.isInteger(b) && b >= 0 && b < teile.length ? b : null;
   return { teile, bestimmend };
@@ -237,8 +252,30 @@ export function klausurTeilNoten(punkte, maxPunkte, teileInfo, csvStr) {
     const von = start;
     start += t.aufgaben;
     if (!Array.isArray(punkte)) return null;
+    if (t.art === 'inhalt_sprache') {
+      // Inhalt und Sprache bekommen je eine eigene Note; die Teilnote ist deren Mittel (meist 50:50).
+      const [inhalt, sprache] = [0, 1].map((j) => noteAusPunkten([punkte[von + j]], [maxPunkte[von + j]], csvStr));
+      if (inhalt === null || sprache === null) return null;
+      const a = (t.inhaltAnteil ?? 50) / 100;
+      return Math.round((inhalt * a + sprache * (1 - a)) * 100) / 100;
+    }
     return noteAusPunkten(punkte.slice(von, start), maxPunkte.slice(von, start), csvStr);
   });
+}
+
+/**
+ * Verrechnungstabelle für `maxPunkte` Punkte (z. B. Hörverstehen mit 15 Verrechnungspunkten): ab wie vielen Punkten
+ * (bzw. ab welchem Prozentwert) es welche Note gibt. Nicht gerundet -- Verrechnungspunkte werden nicht nach dem Komma gerundet.
+ * @returns {Array<{note: number, abProzent: number, abPunkte: number}>} absteigend nach Prozent
+ */
+export function verrechnungsTabelle(csvStr, maxPunkte) {
+  const kleinsterProzent = new Map();
+  for (const [prozent, note] of nsCsvParse(csvStr)) {
+    if (!kleinsterProzent.has(note) || prozent < kleinsterProzent.get(note)) kleinsterProzent.set(note, prozent);
+  }
+  return [...kleinsterProzent.entries()]
+    .map(([note, abProzent]) => ({ note, abProzent, abPunkte: Math.round(abProzent * maxPunkte) / 100 }))
+    .sort((a, b) => b.abProzent - a.abProzent);
 }
 
 /**
