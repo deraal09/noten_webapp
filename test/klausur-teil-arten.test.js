@@ -168,3 +168,11 @@ test('Art zurück auf Standard und bei Aufgabenzahl 2 behalten', async () => {
   assert.deepEqual(info.teile.map((t) => [t.art, t.aufgaben]), [['standard', 1], ['standard', 2]]);
   assert.deepEqual(maxPunkte(), [15, 20, 20], 'vorhandene Höchstpunkte bleiben');
 });
+
+test('Hilfetext unter Klausuren: Kurzanleitung als eingeklappter Abschnitt', async () => {
+  const html = await (await lehrer(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /<details class="klausur-hilfe card" id="klausur-hilfe">/);
+  assert.match(html, /Kurzanleitung: Klausur mit mehreren Teilen, Hörverstehen und Inhalt &amp; Sprache/);
+  assert.match(html, /Verrechnungstabelle Hörverstehen/);
+  assert.doesNotMatch(html, /<details class="klausur-hilfe[^>]* open/, 'standardmäßig eingeklappt');
+});

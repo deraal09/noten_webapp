@@ -195,6 +195,7 @@
 </div>
 
 <div id="panel-klausuren" class="reiter-panel">
+  <%- await include('../partials/klausur-hilfe') %>
   <div class="reiter unter-reiter card" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
     <% klausuren.forEach(function(k, i) { %>
       <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%<%= k.datum ? ', ' + k.datum.split('-').reverse().join('.') : '' %>)</small></button>

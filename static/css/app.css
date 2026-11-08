@@ -220,6 +220,9 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 /* Hinweis "Notenschlüssel angepasst": Text links, Knöpfe rechts (umbrechend) */
 .ns-hinweis { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; justify-content: space-between; }
 .ns-hinweis-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }
+.klausur-hilfe > summary { cursor: pointer; }
+.klausur-hilfe ol, .klausur-hilfe ul { margin: 0.5rem 0; padding-left: 1.4rem; }
+.klausur-hilfe li { margin: 0.25rem 0; }
 .ns-karte > summary { cursor: pointer; list-style-position: inside; }
 .ns-karte > summary h2 { display: inline; margin: 0; border: 0; padding: 0; font-size: 1.15rem; }
 .ns-karte h3 { margin: 1rem 0 0.25rem; font-size: 1rem; }

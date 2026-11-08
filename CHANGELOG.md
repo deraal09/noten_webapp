@@ -6,6 +6,12 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.111.0 - 2026-11-08
+
+- **Hilfetext unter Klausuren.** Im Reiter *Klausuren* steht oben ein eingeklappter Abschnitt „Kurzanleitung: Klausur mit
+  mehreren Teilen, Hörverstehen und Inhalt & Sprache“: Schritt für Schritt von der Anzahl der Teile über die Art (Hörverstehen mit
+  Verrechnungspunkten, Inhalt & Sprache, Standard) und die Gewichtung bis zu den Punkten und der Verrechnungstabelle.
+
 ## 0.110.0 - 2026-11-08
 
 - **Klausur-Teile mit Art: Hörverstehen und Inhalt & Sprache.** Jeder Teil einer mehrteiligen Klausur hat jetzt eine Art:
