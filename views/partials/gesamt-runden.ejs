@@ -1,17 +1,19 @@
-<%# Haken "ganze Note" in der Kopfzelle der Gesamtnote-Spalte der Notenübersicht. Erwartet: schluessel (z. B. 'fach-12').
-    Nur die Anzeige ändert sich: Zellen mit data-roh (genauer Wert) in #uebersicht zeigen gerundet an; gespeichert, exportiert und
-    im Zeugnis gelten weiter die genauen Werte. Die Wahl merkt sich der Browser je Fach (localStorage). %>
-<label class="runden-schalter" title="Gesamtnote auf ganze Note runden. Nur die Anzeige in dieser Übersicht: gespeicherte Noten, Zeugnis und Export bleiben unverändert">
-  <input type="checkbox" id="gesamt-runden" data-key="<%= schluessel %>"> ganze Note
+<%# Haken "ganze Note" in der Kopfzelle einer Notenspalte der Notenübersicht (Gesamtnote, Unterrichtsleistung, Klausur/schriftlich).
+    Erwartet: id (Element-Id des Hakens), schluessel (z. B. 'fach-12'), speicher (Präfix für den Browserspeicher), selektor
+    (Zellen der Spalte, jeweils mit data-roh = genauer Wert) und titel.
+    Nur die Anzeige ändert sich; gespeichert, exportiert und im Zeugnis gelten weiter die genauen Werte. Die Wahl merkt sich der
+    Browser je Fach (localStorage). %>
+<label class="runden-schalter" title="<%= titel %> Nur die Anzeige in dieser Übersicht: gespeicherte Noten, Zeugnis und Export bleiben unverändert">
+  <input type="checkbox" id="<%= id %>" data-key="<%= schluessel %>"> ganze Note
 </label>
 <script>
   (function () {
-    var cb = document.getElementById('gesamt-runden');
+    var cb = document.getElementById('<%= id %>');
     if (!cb) return;
-    var KEY = 'gesamt-gerundet-' + cb.dataset.key;
+    var KEY = '<%= speicher %>' + cb.dataset.key;
     try { cb.checked = localStorage.getItem(KEY) === '1'; } catch (e) { /* ohne Speicher: nicht gerundet */ }
     function anwenden() {
-      document.querySelectorAll('#uebersicht [data-roh]').forEach(function (z) {
+      document.querySelectorAll('<%- selektor %>').forEach(function (z) {
         if (z.dataset.orig === undefined) { z.dataset.orig = z.textContent; z.dataset.t0 = z.getAttribute('title') || ''; }
         var n = z.dataset.roh === '' ? NaN : Number(z.dataset.roh);
         if (cb.checked && isFinite(n)) {
@@ -27,8 +29,10 @@
       try { localStorage.setItem(KEY, cb.checked ? '1' : '0'); } catch (e) { /* egal */ }
       anwenden();
     });
-    // Nach dem Live-Update der Tabelle (neuer Wert in data-roh / data-orig) erneut anwenden.
-    window.gesamtRundenAnwenden = anwenden;
+    // Nach dem Live-Update der Tabelle (neuer Wert in data-roh / data-orig) alle Spalten erneut anwenden.
+    var alle = window.rundenAnwender = window.rundenAnwender || [];
+    alle.push(anwenden);
+    window.gesamtRundenAnwenden = function () { alle.forEach(function (f) { f(); }); };
     // Die Tabelle steht erst nach diesem Skript im Dokument: nach dem Laden anwenden.
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', anwenden); else anwenden();
   })();

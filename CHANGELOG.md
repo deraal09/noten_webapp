@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.113.0 - 2026-11-09
+
+- **Haken „ganze Note“ auch bei Unterrichtsleistung und Klausur.** In der Notenübersicht hat jetzt jede der drei Notenspalten
+  -- Unterrichtsleistung, Schriftliche Note (Klausuren) und Gesamtnote -- ihren eigenen Haken in der Kopfzelle. Wie bei der
+  Gesamtnote ändert er nur die Anzeige (der genaue Wert steht beim Darüberfahren), wird je Fach im Browser gemerkt und gilt auch
+  nach Live-Änderungen der Punkte.
+
 ## 0.112.1 - 2026-11-09
 
 - **Haken „ganze Note“ in der Kopfzelle.** Der Haken zum Runden der Gesamtnote sitzt jetzt direkt unter der Überschrift

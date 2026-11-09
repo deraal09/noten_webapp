@@ -55,11 +55,19 @@ test('Notenübersicht hat den Haken; die Zelle trägt den genauen Wert, angezeig
   const html = await (await req(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
   assert.match(html, /<th>Gesamtnote\s*<label class="runden-schalter"[^>]*>\s*<input type="checkbox" id="gesamt-runden" data-key="fach-\d+"> ganze Note\s*<\/label>/);
   assert.match(html, /class="gesamt-cell" data-roh="2\.2">2,2<\/td>/);
-  assert.match(html, /window\.gesamtRundenAnwenden = anwenden/);
+  assert.match(html, /window\.gesamtRundenAnwenden = function/);
   assert.doesNotMatch(html, /id="gesamt-runden"[^>]* checked/, 'standardmäßig nicht gerundet');
 });
 
 test('Das Skript wendet die gemerkte Wahl erst nach dem Laden der Tabelle an (DOMContentLoaded)', async () => {
   const html = await (await req(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
   assert.match(html, /addEventListener\('DOMContentLoaded', anwenden\)/);
+});
+
+test('Auch Unterrichtsleistung und Klausur (schriftliche Note) haben den Haken in der Kopfzelle; Zellen tragen den genauen Wert', async () => {
+  const html = await (await req(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
+  assert.match(html, /<th>Unterrichtsleistung\s*<label class="runden-schalter"[^>]*>\s*<input type="checkbox" id="ul-runden"/);
+  assert.match(html, /<th>Schriftliche Note\s*<label class="runden-schalter"[^>]*>\s*<input type="checkbox" id="schriftlich-runden"/);
+  assert.match(html, /class="note-cell schriftliche-note" data-roh="2\.2">2,2<\/td>/);
+  assert.match(html, /class="note-cell muendliche-note" data-roh="">–<\/td>/, 'ohne Note kein Wert');
 });
