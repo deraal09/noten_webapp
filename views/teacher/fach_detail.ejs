@@ -142,7 +142,6 @@
       </table>
     </div>
   <% } %>
-  <%- await include('../partials/gesamt-runden', { schluessel: 'fach-' + fach.id }) %>
   <table class="data tabelle-fix" id="uebersicht">
     <thead>
       <tr>
@@ -150,7 +149,7 @@
         <th>Unterrichtsleistung</th>
         <th>Schriftliche <%= NL %></th>
         <% if (verrechnung && verrechnung.prozent) { %><th title="Endgültige Note des Vorhalbjahres, die zu <%= verrechnung.prozent %> % einfließt">Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
-        <th>Gesamtnote</th>
+        <th>Gesamtnote <%- await include('../partials/gesamt-runden', { schluessel: 'fach-' + fach.id }) %></th>
         <% if (spaLeistung) { %><th title="Tendenznote aus den Leistungspunkten (SPA-Notenskala)">Tendenz</th><% } %>
         <% if (spaLeistung && !spaLeistung.komponente) { %><th title="Endpunkte laut Endnotentabelle (inkl. Vorwerten, Komponenten und Handeingaben)">Endpunkte <small>(Endnotentabelle)</small></th><% } %>
         <% if (zeigeNaSpalte) { %><th title="Summe der Termine mit n.a. (nicht anwesend) in der Datumstabelle">n.a.</th><% } %>

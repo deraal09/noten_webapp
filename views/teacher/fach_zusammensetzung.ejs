@@ -52,14 +52,13 @@
   <% if (!rows.length) { %>
     <p class="hint">Keine Teilnehmer/innen.</p>
   <% } else { %>
-    <%- await include('../partials/gesamt-runden', { schluessel: 'fach-' + fach.id }) %>
     <table class="data tabelle-fix" id="uebersicht">
       <thead>
         <tr>
           <th>Schüler/in</th>
           <% komposition.unterfaecher.forEach(function(u) { %><th><%= u.kurzname %></th><% }); %>
           <% if (verrechnung && verrechnung.prozent) { %><th>Vorhalbjahr <small>(<%= verrechnung.prozent %> %)</small></th><% } %>
-          <th>Fachnote</th>
+          <th>Fachnote <%- await include('../partials/gesamt-runden', { schluessel: 'fach-' + fach.id }) %></th>
           <% if (darfEndnoteEintragen) { %><th title="Ersetzt die aus den Unterfächern berechnete Fachnote">Direkteingabe</th><% } %>
         </tr>
       </thead>

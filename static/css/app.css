@@ -220,7 +220,7 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 /* Hinweis "Notenschlüssel angepasst": Text links, Knöpfe rechts (umbrechend) */
 .ns-hinweis { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; justify-content: space-between; }
 .ns-hinweis-form { display: flex; gap: 0.5rem; align-items: center; margin: 0; }
-.runden-schalter { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0.25rem 0 0.5rem; cursor: pointer; }
+.runden-schalter { display: flex; align-items: center; gap: 0.3rem; margin: 0.15rem 0 0; font-size: 0.8rem; font-weight: normal; cursor: pointer; }
 .runden-schalter input { width: auto; margin: 0; }
 .klausur-hilfe > summary { cursor: pointer; }
 .klausur-hilfe ol, .klausur-hilfe ul { margin: 0.5rem 0; padding-left: 1.4rem; }

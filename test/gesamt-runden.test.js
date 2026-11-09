@@ -53,7 +53,7 @@ test('Vorbereitung: Klasse, Fach, Person mit Klausur 25/30 (IHK 2,2)', async () 
 
 test('Notenübersicht hat den Haken; die Zelle trägt den genauen Wert, angezeigt wird er ungerundet', async () => {
   const html = await (await req(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
-  assert.match(html, /<input type="checkbox" id="gesamt-runden" data-key="fach-\d+"> Gesamtnote auf ganze Note runden/);
+  assert.match(html, /<th>Gesamtnote\s*<label class="runden-schalter"[^>]*>\s*<input type="checkbox" id="gesamt-runden" data-key="fach-\d+"> ganze Note\s*<\/label>/);
   assert.match(html, /class="gesamt-cell" data-roh="2\.2">2,2<\/td>/);
   assert.match(html, /window\.gesamtRundenAnwenden = anwenden/);
   assert.doesNotMatch(html, /id="gesamt-runden"[^>]* checked/, 'standardmäßig nicht gerundet');

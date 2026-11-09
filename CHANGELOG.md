@@ -6,6 +6,11 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.112.1 - 2026-11-09
+
+- **Haken „ganze Note“ in der Kopfzelle.** Der Haken zum Runden der Gesamtnote sitzt jetzt direkt unter der Überschrift
+  „Gesamtnote“ (bei Fächern aus Unterfächern unter „Fachnote“) statt über der Tabelle. Funktion unverändert.
+
 ## 0.112.0 - 2026-11-09
 
 - **Notenübersicht: Gesamtnote auf ganze Note runden.** Über der Notenübersicht eines Fachs (auch bei Fächern aus Unterfächern)
