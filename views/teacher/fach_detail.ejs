@@ -142,6 +142,7 @@
       </table>
     </div>
   <% } %>
+  <%- await include('../partials/gesamt-runden', { schluessel: 'fach-' + fach.id }) %>
   <table class="data tabelle-fix" id="uebersicht">
     <thead>
       <tr>
@@ -168,7 +169,7 @@
           <td class="note-cell muendliche-note"><%= r.muendlicheNote === null ? '–' : formatNote(r.muendlicheNote) %></td>
           <td class="note-cell schriftliche-note"><%= r.schriftlicheNote === null ? '–' : formatNote(r.schriftlicheNote) %></td>
           <% if (verrechnung && verrechnung.prozent) { %><td class="note-cell vorhalbjahr-zelle"><%= r.vorhalbjahrNote === null ? '–' : formatNote(r.vorhalbjahrNote) %></td><% } %>
-          <td class="gesamt-cell<%= r.endnote ? ' direkt' : '' %>"<% if (r.endnote) { %> title="Direkt eingetragene Endnote"<% } %>><%= r.gesamt === null ? (r.endnote && r.endnote.ntg ? 'ntg' : '–') : formatNote(r.gesamt) %></td>
+          <td class="gesamt-cell<%= r.endnote ? ' direkt' : '' %>" data-roh="<%= r.gesamt === null ? '' : r.gesamt %>"<% if (r.endnote) { %> title="Direkt eingetragene Endnote"<% } %>><%= r.gesamt === null ? (r.endnote && r.endnote.ntg ? 'ntg' : '–') : formatNote(r.gesamt) %></td>
           <% if (spaLeistung) { %><td class="note-cell spa-tendenz-cell"><%= r.gesamt === null ? '–' : (r.endnote ? spaTendenz(r.gesamt) : spaTendenzAusNote(r.gesamt)) %></td><% } %>
           <% if (spaLeistung && !spaLeistung.komponente) { var spaE = spaLeistung.endpunkte.get(r.schueler_id); %><td class="note-cell spa-endpunkte-cell"><%= spaE && spaE.endpunkte !== null && spaE.endpunkte !== undefined ? spaE.endpunkte.toFixed(2) + ' (' + spaE.tendenz + ')' : '–' %></td><% } %>
           <% if (zeigeNaSpalte) { %><td class="note-cell na-summe" data-sid="<%= r.schueler_id %>"><%= r.naAnzahl %></td><% } %>
@@ -761,8 +762,12 @@
           if (sn) sn.textContent = s.schriftlicheNote !== null ? s.schriftlicheNote.toString().replace('.', ',') : '–';
           const gc = tr.querySelector('.gesamt-cell');
           gc.textContent = s.gesamt !== null ? s.gesamt.toString().replace('.', ',') : (s.endnote && s.endnote.ntg ? 'ntg' : '–');
+          gc.dataset.orig = gc.textContent; // Haken "ganze Note": genauen Wert merken und Anzeige neu anwenden
+          gc.dataset.roh = s.gesamt !== null ? String(s.gesamt) : '';
           gc.classList.toggle('direkt', Boolean(s.endnote));
           gc.title = s.endnote ? 'Direkt eingetragene Endnote' : '';
+          gc.dataset.t0 = gc.title;
+          if (window.gesamtRundenAnwenden) window.gesamtRundenAnwenden();
           const spaTendenzZelle = tr.querySelector('.spa-tendenz-cell');
           if (spaTendenzZelle) {
             // Tendenznote zu Punkten 0-15 (SPA-Notenskala, siehe src/spa-grade-calc.js)

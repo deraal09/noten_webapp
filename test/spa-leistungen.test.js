@@ -130,7 +130,7 @@ test('Leistungen-Seite eines SPA-Fachs: Klausuren/UL wie bei IHK, vier Halbjahre
   assert.equal(r.status, 200);
   const html = await r.text();
   assert.match(html, /Gesamtnote/);
-  assert.match(html, /gesamt-cell">1,0</, '100 % = IHK-Note 1,0');
+  assert.match(html, /gesamt-cell" data-roh="1">1,0</, '100 % = IHK-Note 1,0');
   assert.match(html, /spa-tendenz-cell">1</, 'IHK 1 = 14 Punkte = Tendenz 1');
   assert.match(html, /data-target="panel-klausuren"/);
   assert.match(html, /data-target="panel-uls"/);
@@ -147,7 +147,7 @@ test('Leistungen-Seite eines SPA-Fachs: Klausuren/UL wie bei IHK, vier Halbjahre
 test('Halbe Punktzahl: 5/10 = 50 % -> IHK 4,4 -> 3,8 Punkte -> Tendenz 4-', async () => {
   await klausurMitPunkten(lf1Id, '3. Halbjahr', 5);
   const html = await (await admin(`/teacher/fach/${lf1Id}?ansicht=leistungen&hj=${encodeURIComponent('3. Halbjahr')}`)).text();
-  assert.match(html, /gesamt-cell">4,4</);
+  assert.match(html, /gesamt-cell" data-roh="4.4">4,4</);
   assert.match(html, /spa-tendenz-cell">4-</);
 });
 

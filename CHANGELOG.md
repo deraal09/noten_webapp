@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.112.0 - 2026-11-09
+
+- **Notenübersicht: Gesamtnote auf ganze Note runden.** Über der Notenübersicht eines Fachs (auch bei Fächern aus Unterfächern)
+  gibt es den Haken „Gesamtnote auf ganze Note runden“. Er rundet nur die Anzeige in dieser Tabelle (2,36 → 2; 4,5 → 5; bei
+  BG-Punkten 9,9 → 10); gespeicherte Noten, Zeugnis, Export und die Berechnung bleiben genau. Beim Darüberfahren steht der genaue
+  Wert („Genau: 2,36“). Die Wahl merkt sich der Browser je Fach und gilt auch nach Live-Änderungen der Punkte.
+
 ## 0.111.0 - 2026-11-08
 
 - **Hilfetext unter Klausuren.** Im Reiter *Klausuren* steht oben ein eingeklappter Abschnitt „Kurzanleitung: Klausur mit

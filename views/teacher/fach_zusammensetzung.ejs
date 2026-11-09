@@ -52,6 +52,7 @@
   <% if (!rows.length) { %>
     <p class="hint">Keine Teilnehmer/innen.</p>
   <% } else { %>
+    <%- await include('../partials/gesamt-runden', { schluessel: 'fach-' + fach.id }) %>
     <table class="data tabelle-fix" id="uebersicht">
       <thead>
         <tr>
@@ -69,7 +70,7 @@
               <% if (r.herkunftKlasse) { %><small class="hint">(<%= r.herkunftKlasse %>)</small><% } %></td>
             <% r.unterfachNoten.forEach(function(n) { %><td><%= n === null ? '–' : String(n).replace('.', ',') %></td><% }); %>
             <% if (verrechnung && verrechnung.prozent) { %><td><%= r.vorhalbjahrNote === null ? '–' : String(r.vorhalbjahrNote).replace('.', ',') %></td><% } %>
-            <td class="gesamt<%= r.nicht_bestanden ? ' nicht-bestanden' : '' %>"><strong><%= r.endnote && r.endnote.ntg ? 'ntg' : (r.gesamt === null ? '–' : String(r.gesamt).replace('.', ',')) %></strong></td>
+            <td class="gesamt<%= r.nicht_bestanden ? ' nicht-bestanden' : '' %>"><strong data-roh="<%= r.gesamt === null || (r.endnote && r.endnote.ntg) ? '' : r.gesamt %>"><%= r.endnote && r.endnote.ntg ? 'ntg' : (r.gesamt === null ? '–' : String(r.gesamt).replace('.', ',')) %></strong></td>
             <% if (darfEndnoteEintragen) { %>
               <td>
                 <input type="text" inputmode="decimal" autocomplete="off" class="endnote-eingabe" data-sid="<%= r.schueler_id %>" placeholder="–"
