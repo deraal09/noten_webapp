@@ -11,7 +11,7 @@
       <label>Schuljahr
         <select id="schuljahrfilter">
           <option value="">Alle Schuljahre</option>
-          <% alleSchuljahre.forEach(function(sj) { %><option value="<%= sj %>"><%= sj %></option><% }); %>
+          <% alleSchuljahre.forEach(function(sj) { %><option value="<%= sj %>"><%= sj %><%= sj === aktuellesSchuljahr ? ' (aktuell)' : '' %></option><% }); %>
         </select>
       </label>
     <% } %>

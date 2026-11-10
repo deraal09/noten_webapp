@@ -80,7 +80,7 @@
         <label>Schuljahr
           <select name="schuljahr_id">
             <% schuljahre.forEach(function(s) { %>
-              <option value="<%= s.id %>"><%= s.bezeichnung %></option>
+              <option value="<%= s.id %>" <%= s.bezeichnung === aktuellesSchuljahr ? 'selected' : '' %>><%= s.bezeichnung %><%= s.bezeichnung === aktuellesSchuljahr ? ' (aktuell)' : '' %></option>
             <% }); %>
           </select>
         </label>
@@ -164,7 +164,7 @@
       <label>Schuljahr
         <select name="schuljahr_id">
           <% schuljahre.forEach(function(s) { %>
-            <option value="<%= s.id %>"><%= s.bezeichnung %></option>
+            <option value="<%= s.id %>" <%= s.bezeichnung === aktuellesSchuljahr ? 'selected' : '' %>><%= s.bezeichnung %><%= s.bezeichnung === aktuellesSchuljahr ? ' (aktuell)' : '' %></option>
           <% }); %>
         </select>
       </label>

@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.114.0 - 2026-11-10
+
+- **Aktuelles Schuljahr in der Auswahl sichtbar.** In der Noteneingabe steht in der Schuljahr-Auswahl hinter dem laufenden
+  Schuljahr „(aktuell)“. Dasselbe gilt für die Schuljahr-Auswahl beim Anlegen von Klassen und Kursen (dort ist das aktuelle Schuljahr
+  vorausgewählt) und für die Schuljahr-Liste im Adminbereich. Das Schuljahr beginnt jedes Jahr am 1. August, die Kennzeichnung
+  rückt automatisch weiter.
+- **Schuljahre legen sich selbst an.** Das aktuelle Schuljahr (z. B. 2026/27 ab dem 1. August 2026) wird beim Start und danach
+  einmal am Tag geprüft und bei Bedarf angelegt; die Administration muss das nicht mehr von Hand tun. Vorhandene Schuljahre
+  bleiben unverändert, von Hand anlegen geht weiterhin.
+
 ## 0.113.0 - 2026-11-09
 
 - **Haken „ganze Note“ auch bei Unterrichtsleistung und Klausur.** In der Notenübersicht hat jetzt jede der drei Notenspalten

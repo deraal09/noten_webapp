@@ -19,7 +19,7 @@
       <a href="/admin/schuljahre/<%= sj.id %>">
         <div class="kachel-zeile">
           <span class="kachel-icon-klein">📅</span>
-          <span class="kachel-titel-klein"><%= sj.bezeichnung %></span>
+          <span class="kachel-titel-klein"><%= sj.bezeichnung %><%= sj.bezeichnung === aktuellesSchuljahr ? ' (aktuell)' : '' %></span>
         </div>
       </a>
       <% if (sj.istAktuell) { %><div class="kachel-sub">(aktuell)</div><% } %>
