@@ -1,6 +1,6 @@
 /**
  * Klausur-Teile mit Art: Hörverstehen (eine Aufgabe = Verrechnungspunkte, Note nach Verrechnungstabelle) und
- * Inhalt & Sprache (Mediation/Textaufgabe: zwei Aufgaben mit je eigener Note, meist 50:50 zur Teilnote verrechnet).
+ * Inhalt & Sprache (Mediation/Textaufgabe: zwei direkt eingetragene Noten, meist 50:50 zur Teilnote verrechnet).
  */
 
 import { test } from 'node:test';
@@ -31,7 +31,7 @@ const teileInfo = (anteil = 50) => parseKlausurTeile({
   ],
   bestimmend: null,
 });
-const MAX = [15, 20, 20];
+const MAX = [15, 15, 15]; // 15 Verrechnungspunkte; Inhalt und Sprache: beste Note des BG-Schlüssels
 
 test('parseKlausurTeile: Art bestimmt die Aufgabenzahl (Hörverstehen 1, Inhalt & Sprache 2); ohne Art = Standard', () => {
   const info = teileInfo();
@@ -41,19 +41,44 @@ test('parseKlausurTeile: Art bestimmt die Aufgabenzahl (Hörverstehen 1, Inhalt 
   assert.equal(teileInfo(250).teile[1].inhaltAnteil, 50, 'ungültiger Anteil -> 50');
 });
 
-test('BG: Hörverstehen 12/15 = 80 % -> 12; Textaufgabe Inhalt 15/20 -> 11, Sprache 10/20 -> 6, 50:50 = 8,5; Gesamt 0,4*12 + 0,6*8,5 = 9,9', () => {
-  const punkte = [12, 15, 10];
+test('BG: Hörverstehen 12/15 = 80 % -> 12; Textaufgabe Inhalt 11 und Sprache 6 (direkt eingetragen), 50:50 = 8,5; Gesamt 0,4*12 + 0,6*8,5 = 9,9', () => {
+  const punkte = [12, 11, 6];
   assert.deepEqual(klausurTeilNoten(punkte, MAX, teileInfo(), DEFAULT_NS_CSV.BG), [12, 8.5]);
   assert.equal(klausurNote(punkte, MAX, teileInfo(), DEFAULT_NS_CSV.BG), 9.9);
 });
 
 test('Inhalt : Sprache einstellbar (60:40 -> 11*0,6 + 6*0,4 = 9)', () => {
-  assert.deepEqual(klausurTeilNoten([12, 15, 10], MAX, teileInfo(60), DEFAULT_NS_CSV.BG), [12, 9]);
+  assert.deepEqual(klausurTeilNoten([12, 11, 6], MAX, teileInfo(60), DEFAULT_NS_CSV.BG), [12, 9]);
 });
 
-test('IHK: Teilnote aus Inhalt und Sprache ist das Mittel der beiden Noten', () => {
-  // Inhalt 100 % -> 1,0; Sprache 50 % -> 4,4; Mittel 2,7
-  assert.equal(klausurTeilNoten([15, 20, 10], MAX, teileInfo(), DEFAULT_NS_CSV.IHK)[1], 2.7);
+test('IHK: Teilnote aus Inhalt und Sprache ist das Mittel der beiden eingetragenen Noten', () => {
+  // Inhalt 1,0 und Sprache 4,4 -> Mittel 2,7
+  assert.equal(klausurTeilNoten([15, 1, 4.4], MAX, teileInfo(), DEFAULT_NS_CSV.IHK)[1], 2.7);
+});
+
+test('Inhalt 4 und Sprache 3 ergeben 3,5 (Notenpunkte werden direkt gemittelt, nicht nochmal über Prozent umgerechnet)', () => {
+  assert.equal(klausurTeilNoten([15, 4, 3], MAX, teileInfo(), DEFAULT_NS_CSV.BG)[1], 3.5);
+  assert.equal(klausurTeilNoten([15, 4, 3], [15, 15, 15], teileInfo(60), DEFAULT_NS_CSV.BG)[1], 3.6, '60:40');
+});
+
+test('Hörverstehen rundet nicht: 4 von 15 Punkten (26,67 %) sind noch Note 1, ab 4,05 Punkten Note 2 (Tabelle der Verrechnungspunkte)', () => {
+  const hoer = (p) => klausurTeilNoten([p, 10, 10], MAX, teileInfo(), DEFAULT_NS_CSV.BG)[0];
+  assert.equal(hoer(4), 1);
+  assert.equal(hoer(4.04), 1);
+  assert.equal(hoer(4.05), 2);
+  assert.equal(hoer(3), 1);
+  assert.equal(hoer(2.99), 0);
+  assert.equal(hoer(14.25), 15);
+  assert.equal(hoer(14.24), 14);
+  assert.equal(hoer(6), 4);
+  assert.equal(hoer(5.99), 3);
+  assert.equal(hoer(0), 0);
+  // bei 20 Verrechnungspunkten: ab 6,6 die 3, ab 5,4 die 2
+  const hoer20 = (p) => klausurTeilNoten([p, 10, 10], [20, 15, 15], teileInfo(), DEFAULT_NS_CSV.BG)[0];
+  assert.equal(hoer20(6.6), 3);
+  assert.equal(hoer20(6.59), 2);
+  assert.equal(hoer20(5.4), 2);
+  assert.equal(hoer20(5.39), 1);
 });
 
 test('Ohne Inhalt oder Sprache gibt es noch keine Teilnote', () => {
@@ -129,13 +154,11 @@ test('Teile mit Art einrichten: Hörverstehen = 1 Aufgabe mit 15 Verrechnungspun
   assert.deepEqual(info.teile.map((t) => [t.name, t.art, t.aufgaben, t.inhaltAnteil]), [['Hörverstehen', 'hoeren', 1, 50], ['Textaufgabe', 'inhalt_sprache', 2, 50]]);
   assert.equal(maxPunkte()[0], 15, 'Verrechnungspunkte-Vorgabe 15');
   assert.equal(maxPunkte().length, 3);
-  // Max-Punkte für Inhalt und Sprache wie bei jeder Aufgabe einstellbar
-  await form(lehrer, `/teacher/klausuren/${klausurId}/maxpunkte`, { anzahl_aufgaben: '3', mp_0: '15', mp_1: '20', mp_2: '20', halbjahr: HJ });
-  assert.deepEqual(maxPunkte(), [15, 20, 20]);
+  assert.deepEqual(maxPunkte(), [15, 15, 15], 'Inhalt und Sprache: Obergrenze = beste Note des BG-Schlüssels (15)');
 });
 
 test('Noten über die Oberfläche: Teilnoten 12 und 8,5, Gesamtnote 9,9; Seite zeigt Art, Spaltenköpfe und Verrechnungstabelle', async () => {
-  await punkte(0, 12); await punkte(1, 15); await punkte(2, 10);
+  await punkte(0, 12); await punkte(1, 11); await punkte(2, 6);
   const data = await (await lehrer(`/teacher/fach/${fachId}/noten?hj=${encodeURIComponent(HJ)}`)).json();
   const klausur = data.schueler.find((s) => s.schueler_id === annaId).klausuren.find((k) => k.id === klausurId);
   assert.deepEqual(klausur.teilNoten, [12, 8.5]);
@@ -144,8 +167,8 @@ test('Noten über die Oberfläche: Teilnoten 12 und 8,5, Gesamtnote 9,9; Seite z
   const html = await (await lehrer(`/teacher/fach/${fachId}?hj=${encodeURIComponent(HJ)}`)).text();
   assert.match(html, /Hörverstehen <small>\(40%, Hörverstehen\)/);
   assert.match(html, /Textaufgabe <small>\(60%, Inhalt 50 : Sprache 50\)/);
-  assert.match(html, /<th class="aufgabe-head">Inhalt<\/th>/);
-  assert.match(html, /<th class="aufgabe-head">Sprache<\/th>/);
+  assert.match(html, /<th class="aufgabe-head">Inhalt \(Note\)<\/th>/);
+  assert.match(html, /<th class="aufgabe-head">Sprache \(Note\)<\/th>/);
   assert.match(html, /name="teil_art"/);
   assert.match(html, /Verrechnungstabelle Hörverstehen \(Hörverstehen, 15 Verrechnungspunkte\)/);
   assert.match(html, /<tr><td>14,25<\/td><td>95 %<\/td><td>15<\/td><\/tr>/);
@@ -166,7 +189,7 @@ test('Art zurück auf Standard und bei Aufgabenzahl 2 behalten', async () => {
   await formListe(lehrer, `/teacher/klausuren/${klausurId}/teile`, standard);
   const info = parseKlausurTeile(getDb().prepare('SELECT teile FROM klausuren WHERE id = ?').get(klausurId).teile);
   assert.deepEqual(info.teile.map((t) => [t.art, t.aufgaben]), [['standard', 1], ['standard', 2]]);
-  assert.deepEqual(maxPunkte(), [15, 20, 20], 'vorhandene Höchstpunkte bleiben');
+  assert.deepEqual(maxPunkte(), [15, 15, 15], 'vorhandene Höchstpunkte bleiben');
 });
 
 test('Hilfetext unter Klausuren: Kurzanleitung als eingeklappter Abschnitt', async () => {

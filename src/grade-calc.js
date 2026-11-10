@@ -133,14 +133,19 @@ export function kleinerIstBesser(csvStr) {
  *  - 'standard': die Punkte aller Aufgaben des Teils ergeben prozentual die Teilnote.
  *  - 'hoeren' (Hörverstehen): genau eine Aufgabe = die Verrechnungspunkte (meist 15, auch 20/25); die Teilnote
  *    folgt der Verrechnungstabelle, also dem Notenschlüssel der Klasse (siehe verrechnungsTabelle).
- *  - 'inhalt_sprache' (Mediation, Textaufgabe): genau zwei Aufgaben (Inhalt, Sprache), jede bekommt über den
- *    Notenschlüssel eine eigene Note; die Teilnote ist deren Mittel im Verhältnis `inhaltAnteil` : Rest (meist 50:50).
+ *  - 'inhalt_sprache' (Mediation, Textaufgabe): genau zwei Aufgaben (Inhalt, Sprache); dafür werden direkt Noten
+ *    (Notenpunkte) eingetragen, die Teilnote ist deren Mittel im Verhältnis `inhaltAnteil` : Rest (meist 50:50).
  * `bestimmend` ist der Index des Teils, dessen Note die BESTE erreichbare
  * Gesamtnote festlegt (oder null). Gibt null zurück, wenn die Klausur
  * einteilig ist (kein/ungültiges JSON, weniger als zwei Teile).
  *
  * @returns {{teile: Array<{name: string, aufgaben: number, gewichtung: number, art: string, inhaltAnteil: number}>, bestimmend: number|null}|null}
  */
+/** Höchste Note eines Notenschlüssels (BG 15, IHK 6) -- Obergrenze für direkt eingetragene Noten. */
+export function hoechsteNote(csvStr) {
+  return nsCsvParse(csvStr).reduce((m, [, n]) => Math.max(m, n), 0);
+}
+
 export const TEIL_ARTEN = ['standard', 'hoeren', 'inhalt_sprache'];
 export const TEIL_ART_NAMEN = { standard: 'Standard', hoeren: 'Hörverstehen (Verrechnungstabelle)', inhalt_sprache: 'Inhalt & Sprache' };
 
@@ -253,11 +258,19 @@ export function klausurTeilNoten(punkte, maxPunkte, teileInfo, csvStr) {
     start += t.aufgaben;
     if (!Array.isArray(punkte)) return null;
     if (t.art === 'inhalt_sprache') {
-      // Inhalt und Sprache bekommen je eine eigene Note; die Teilnote ist deren Mittel (meist 50:50).
-      const [inhalt, sprache] = [0, 1].map((j) => noteAusPunkten([punkte[von + j]], [maxPunkte[von + j]], csvStr));
-      if (inhalt === null || sprache === null) return null;
+      // Für Inhalt und Sprache werden direkt Noten (Notenpunkte) eingetragen; die Teilnote ist deren Mittel (meist 50:50).
+      const [inhalt, sprache] = [0, 1].map((j) => punkte[von + j]);
+      if (![inhalt, sprache].every((n) => n !== null && n !== undefined && Number.isFinite(Number(n)))) return null;
       const a = (t.inhaltAnteil ?? 50) / 100;
-      return Math.round((inhalt * a + sprache * (1 - a)) * 100) / 100;
+      return Math.round((Number(inhalt) * a + Number(sprache) * (1 - a)) * 100) / 100;
+    }
+    if (t.art === 'hoeren') {
+      // Verrechnungspunkte werden nicht gerundet: erst ab der Punktzahl der Tabelle gibt es die jeweilige Note (z. B. ab 4,05 von 15
+      // Punkten die Note 2 -- 4 Punkte sind 26,67 % und damit erst 1).
+      const p = punkte[von];
+      const m = maxPunkte[von];
+      if (p === null || p === undefined || !(m > 0)) return null;
+      return nsCsvLookup(Math.round((p / m) * 100 * 1e9) / 1e9, csvStr);
     }
     return noteAusPunkten(punkte.slice(von, start), maxPunkte.slice(von, start), csvStr);
   });

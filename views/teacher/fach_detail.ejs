@@ -231,8 +231,8 @@
       </div>
       <p class="hint">Anzahl Teile: 1 = normale Klausur. Bei mehreren Teilen bekommt jeder Teil eine eigene Note, die Gesamtnote wird prozentual aus den Teilnoten berechnet.
         Jeder Teil hat eine Art: <strong>Standard</strong> (Punkte der Aufgaben ergeben die Teilnote), <strong>Hörverstehen</strong> (eine Aufgabe mit den
-        Verrechnungspunkten, meist 15; die Note folgt der Verrechnungstabelle) oder <strong>Inhalt &amp; Sprache</strong> (Mediation, Textaufgabe: je eine Note für
-        Inhalt und Sprache, im einstellbaren Verhältnis, meist 50:50, zur Teilnote verrechnet).</p>
+        Verrechnungspunkten, meist 15; die Note folgt der Verrechnungstabelle) oder <strong>Inhalt &amp; Sprache</strong> (Mediation, Textaufgabe: für Inhalt und Sprache
+        trägst du direkt je eine <em>Note</em> bzw. Notenpunkte ein, die im einstellbaren Verhältnis, meist 50:50, zur Teilnote verrechnet werden).</p>
       <% if (k.teileInfo) { %>
         <form method="post" action="/teacher/klausuren/<%= k.id %>/teile" class="auto-speichern-sofort" autocomplete="off">
           <table class="data">
@@ -298,7 +298,7 @@
             var pos = 0;
             k.teileInfo.teile.forEach(function(t, ti) {
               if (t.art === 'hoeren') aufgabenKopf[pos] = 'Verrech-nungs-punkte';
-              if (t.art === 'inhalt_sprache') { aufgabenKopf[pos] = 'Inhalt'; aufgabenKopf[pos + 1] = 'Sprache'; }
+              if (t.art === 'inhalt_sprache') { aufgabenKopf[pos] = 'Inhalt (Note)'; aufgabenKopf[pos + 1] = 'Sprache (Note)'; }
               pos += t.aufgaben; teilEnde[pos - 1] = ti;
             });
           }

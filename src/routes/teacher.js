@@ -20,7 +20,7 @@ import {
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
-  HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE, TEIL_ARTEN, TEIL_ART_NAMEN, verrechnungsTabelle,
+  HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE, TEIL_ARTEN, TEIL_ART_NAMEN, verrechnungsTabelle, hoechsteNote,
 } from '../grade-calc.js';
 import { korrekturMoeglich, korrigiereGesamtnote, nimmKorrekturenZurueck, datumText } from '../notenkorrektur.js';
 import { parseFaecherIds, rundenSchluessel, aktuelleRunde, starteRunde, beendeRunde, waehleZufaellig, rundenAnsicht } from '../besprechung.js';
@@ -28,7 +28,7 @@ import { starteVerknuepfung, ermittleVerbundenePersonen } from '../klassen-verkn
 import { fremdeNotenImFach, fremdeNotenInKlasse, fremdeNotenDerPerson } from '../loeschschutz.js';
 import { unterfaecherAlsText, speichereFachEinstellungen } from '../fach-einstellungen.js';
 import {
-  ladeFachMitUmfeld, ladeNotenuebersicht, ladeFaecherFuerSchueler, ladeFaecherFuerKlassenleitung, unterfaecherDesHalbjahrs,
+  ladeFachMitUmfeld, getNotenschluesselCsv, ladeNotenuebersicht, ladeFaecherFuerSchueler, ladeFaecherFuerKlassenleitung, unterfaecherDesHalbjahrs,
 } from '../noten-service.js';
 import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta, ladeHalbjahresuebersicht } from '../noten-sync.js';
 import {
@@ -1040,6 +1040,7 @@ export default async function teacherRoutes(fastify) {
     const anteile = liste(request.body?.teil_anteil);
     const alteTeile = parseKlausurTeile(k.teile)?.teile ?? [];
     const maxVorgaben = {};
+    const noteMax = hoechsteNote(getNotenschluesselCsv({ klasse_id: getDb().prepare('SELECT klasse_id FROM faecher WHERE id = ?').get(k.fach_id)?.klasse_id })) || 15;
     const bestimmendRoh = request.body?.bestimmend;
     const bestimmendZeile = bestimmendRoh === undefined || bestimmendRoh === '' ? null : parseInt(bestimmendRoh, 10);
     const teile = [];
@@ -1057,7 +1058,8 @@ export default async function teacherRoutes(fastify) {
       if (bestimmendZeile === i) bestimmend = teile.length;
       if (art !== (alteTeile[i]?.art ?? 'standard')) {
         if (art === 'hoeren') maxVorgaben[teile.length] = [15];
-        if (art === 'inhalt_sprache') maxVorgaben[teile.length] = [10, 10];
+        // Inhalt und Sprache werden direkt als Noten eingetragen: Höchstwert = beste Note des Notenschlüssels (BG 15, IHK 6)
+        if (art === 'inhalt_sprache') maxVorgaben[teile.length] = [noteMax, noteMax];
       }
       teile.push({
         name: String(namen[i] ?? '').trim() || `Teil ${teile.length + 1}`,

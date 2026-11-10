@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.116.2 - 2026-11-10
+
+- **Korrektur Klausur-Teile: Hörverstehen rundet nicht mehr, Inhalt & Sprache werden direkt gemittelt.**
+  - *Hörverstehen:* Die Verrechnungspunkte wurden vor dem Nachschlagen auf ganze Prozent gerundet, 4 von 15 Punkten (26,67 %)
+    ergaben dadurch schon Note 2 statt 1. Jetzt gilt die Verrechnungstabelle exakt: ab 4,05 von 15 Punkten die 2, ab 14,25 die 15 usw.
+    (bei 20 Punkten ab 6,6 die 3).
+  - *Inhalt & Sprache:* Hier trägst du direkt je eine Note bzw. Notenpunkte ein (nicht Rohpunkte); die Teilnote ist deren Mittel
+    (Inhalt 4 und Sprache 3 ergeben 3,5; vorher wurden die Eingaben noch einmal über Prozent umgerechnet). Die Obergrenze der Eingabe ist
+    die beste Note des Schlüssels (BG 15, IHK 6). Bereits mit dieser Art eingetragene Werte werden jetzt als Noten gelesen und müssen
+    gegebenenfalls neu eingetragen werden.
+  - Hilfetext und Spaltenköpfe („Inhalt (Note)“, „Sprache (Note)“) angepasst.
+
 ## 0.116.0 - 2026-11-10
 
 - **Papierkorb für Klassen.** „Klasse löschen“ blendet die Klasse jetzt nur noch für die löschende Lehrkraft aus: Sie verschwindet
