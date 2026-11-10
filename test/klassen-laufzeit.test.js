@@ -108,13 +108,17 @@ test('Hilfsfunktionen: Schuljahr des Halbjahres, aktuelles Halbjahr, Eingabe-Par
   delete process.env.NOTEN_HEUTE;
 });
 
-test('Fachseite akzeptiert alle Halbjahre der Laufzeit und zeigt sie als Reiter', async () => {
+test('Fachseite akzeptiert alle Halbjahre der Laufzeit; Reiter für noch nicht begonnene Schuljahre sind ausgeblendet', async () => {
   const html = await (await admin(`/teacher/fach/${ihkFachId}?hj=${encodeURIComponent('5. Halbjahr')}`)).text();
-  assert.match(html, /class="hj-tab active"[^>]*>5\. Halbjahr</);
-  assert.match(html, />6\. Halbjahr</);
+  assert.match(html, /class="hj-tab active"[^>]*>5\. Halbjahr</, 'das aufgerufene Halbjahr bleibt sichtbar');
+  assert.match(html, />1\. Halbjahr</, 'Halbjahre des aktuellen Schuljahres sind da');
+  assert.doesNotMatch(html, />6\. Halbjahr</, 'Zukunft (2027/28) ausgeblendet');
+  const html6 = await (await admin(`/teacher/fach/${ihkFachId}?hj=${encodeURIComponent('6. Halbjahr')}`)).text();
+  assert.match(html6, /class="hj-tab active"[^>]*>6\. Halbjahr</, 'auch ein Halbjahr der Laufzeit in der Zukunft lässt sich direkt aufrufen');
   const spaFach = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF2'").get(spaId).id;
   const spaHtml = await (await admin(`/teacher/fach/${spaFach}?ansicht=leistungen&hj=3`)).text();
-  assert.match(spaHtml, />4\. Halbjahr</);
+  assert.match(spaHtml, /class="hj-tab active"[^>]*>3\. Halbjahr</, 'aufgerufenes Halbjahr bleibt sichtbar');
+  assert.match(spaHtml, />1\. Halbjahr</);
   assert.doesNotMatch(spaHtml, />5\. Halbjahr</);
 });
 

@@ -64,16 +64,20 @@ test('Noteneingabe: in der Schuljahr-Auswahl steht das aktuelle Schuljahr mit "(
   const inv = getDb().prepare('SELECT token FROM invitations').get();
   await lehrer(`/einladung/${inv.token}`, { username: 'lehrer', display_name: 'Lehrer', password: 'passwort123', password2: 'passwort123' });
   getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrer'").run();
+  await admin('/admin/schuljahre/neu', { bezeichnung: '2024/25' });
   const sj = Object.fromEntries(getDb().prepare('SELECT id, bezeichnung FROM schuljahre').all().map((r) => [r.bezeichnung, r.id]));
-  for (const [name, bez] of [['10A', '2025/26'], ['11B', '2026/27']]) {
+  for (const [name, bez] of [['9Z', '2024/25'], ['10A', '2025/26'], ['11B', '2026/27']]) {
     await lehrer('/teacher/klassen/neu', { schuljahr_id: String(sj[bez]), name, notenschluessel: 'IHK', einschulung_jahr: bez.slice(0, 4) });
     const k = getDb().prepare('SELECT id FROM klassen WHERE name = ?').get(name).id;
     await lehrer(`/teacher/klassen/${k}/faecher/neu`, { name: 'Mathe' });
   }
-  // Aktuell ist (NOTEN_HEUTE) 2025/26
+  // Aktuell ist (NOTEN_HEUTE) 2025/26; 2026/27 liegt in der Zukunft und wird in der Noteneingabe noch nicht angezeigt
   const dashboard = await (await lehrer('/teacher')).text();
+  assert.match(dashboard, /<option value="2024\/25">2024\/25<\/option>/);
   assert.match(dashboard, /<option value="2025\/26">2025\/26 \(aktuell\)<\/option>/);
-  assert.match(dashboard, /<option value="2026\/27">2026\/27<\/option>/);
+  assert.doesNotMatch(dashboard, /<option value="2026\/27"/, 'Zukunft nicht wählbar');
+  assert.match(dashboard, /Mathe/);
+  assert.doesNotMatch(dashboard, /11B/, 'die Klasse im künftigen Schuljahr erscheint noch nicht');
   const liste = await (await lehrer('/teacher/klassen')).text();
   assert.match(liste, new RegExp(`<option value="${sj['2025/26']}" selected>2025/26 \\(aktuell\\)</option>`));
   const adminSeite = await (await admin('/admin')).text();

@@ -395,21 +395,27 @@ test('Noteneingabe: Schuljahr-Filter nach den Halbjahren der Fächer', async () 
     getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(fremdId, f);
     return f;
   };
-  mk('SJA', 2030, [1, 2]); // nur 2030/31
-  mk('SJB', 2030, [3, 4]); // nur 2031/32
-  mk('SJC', 2030, null); // alle drei Schuljahre
+  mk('SJA', 2030, [1, 2]); // liegt ganz in der Zukunft (2030/31): erscheint noch nicht
+  mk('SJB', 2030, [3, 4]);
+  mk('SJC', 2030, null);
+  mk('VJA', 2023, [1, 2]); // nur 2023/24
+  mk('VJB', 2023, [3, 4]); // nur 2024/25
+  mk('VJC', 2023, null); // 2023/24, 2024/25 und das aktuelle 2025/26
   const html = await (await fremd('/teacher')).text();
   assert.match(html, /<select id="schuljahrfilter">\s*<option value="">Alle Schuljahre<\/option>/);
-  assert.match(html, /<option value="2030\/31">2030\/31<\/option>/);
+  assert.match(html, /<option value="2023\/24">2023\/24<\/option>/);
+  assert.match(html, /<option value="2025\/26">2025\/26 \(aktuell\)<\/option>/);
+  assert.doesNotMatch(html, /<option value="2030\/31"/, 'Zukunft nicht wählbar');
+  assert.doesNotMatch(html, /Fach SJ[ABC]</, 'Fächer, die ganz in der Zukunft liegen, erscheinen noch nicht');
   const attr = (name) => {
     const pos = html.indexOf(`Fach ${name}<`);
     const start = html.lastIndexOf('<li class="fach-kachel" data-schuljahre="', pos);
     return html.slice(start).match(/data-schuljahre="([^"]*)"/)[1];
   };
-  assert.equal(attr('SJA'), '2030/31');
-  assert.equal(attr('SJB'), '2031/32');
-  assert.equal(attr('SJC'), '2030/31|2031/32|2032/33');
-  assert.match(html, /data-gruppe="klasse-\d+" data-schuljahre="2030\/31\|2031\/32\|2032\/33"/);
+  assert.equal(attr('VJA'), '2023/24');
+  assert.equal(attr('VJB'), '2024/25');
+  assert.equal(attr('VJC'), '2023/24|2024/25|2025/26');
+  assert.match(html, /data-gruppe="klasse-\d+" data-schuljahre="2023\/24\|2024\/25\|2025\/26"/);
   assert.ok(html.indexOf('id="schuljahrfilter"') < html.indexOf('class="klassen-gruppe"'), 'Filter steht oben');
 });
 

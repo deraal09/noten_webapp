@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.115.0 - 2026-11-10
+
+- **Zukünftige Schuljahre in der Noteneingabe ausgeblendet.** Angezeigt werden nur das aktuelle und die vergangenen Schuljahre:
+  - In der Schuljahr-Auswahl der Noteneingabe fehlen Schuljahre, die erst noch beginnen.
+  - Fächer und Klassen, die ganz in der Zukunft liegen, erscheinen in der Noteneingabe noch nicht; zum 1. August rücken sie von selbst nach.
+    Auf der Klassenseite („Meine Klassen“) bleiben sie sichtbar und bearbeitbar.
+  - Auf der Fachseite fehlen die Halbjahr-Reiter künftiger Schuljahre; das gerade aufgerufene Halbjahr bleibt immer sichtbar.
+
 ## 0.114.0 - 2026-11-10
 
 - **Aktuelles Schuljahr in der Auswahl sichtbar.** In der Noteneingabe steht in der Schuljahr-Auswahl hinter dem laufenden

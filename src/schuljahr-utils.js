@@ -65,3 +65,9 @@ export function sortiereSchuljahreFuerReiter(schuljahre, heute = new Date()) {
   const [aktuelles] = sortiert.splice(idx, 1);
   return [aktuelles, ...sortiert];
 }
+
+/** Beginnt das Schuljahr erst nach dem aktuellen (Start 1. August)? Bezeichnungen außerhalb des Schemas gelten nicht als Zukunft. */
+export function liegtInDerZukunft(bezeichnung, heute = new Date()) {
+  const start = parseSchuljahr(bezeichnung)?.startJahr;
+  return start !== undefined && start > aktuellesStartjahr(heute);
+}

@@ -48,7 +48,7 @@ import {
   seedeTeilnehmerAusKlasse, ladeTeilnehmerMitHerkunft, fuegeTeilnehmerHinzu, entferneTeilnehmer,
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
-import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr } from '../schuljahr-utils.js';
+import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
 import {
   ladeSpaVorlagen, ladeSpaVorlage, speichereSpaVorlage, loescheSpaVorlage, freierVorlagenName, ladeSpaVorlageInKlasse,
@@ -300,7 +300,11 @@ export default async function teacherRoutes(fastify) {
       // Schuljahre, in die sie fallen -- für Schuljahr-Filter und Anzeige.
       const laufzeit = klassenLaufzeit(r.klasse_id);
       const nummern = zuweisungsHalbjahre({ halbjahre: r.zuw_halbjahre }, { halbjahre: r.fach_halbjahre, klasse_id: r.klasse_id }, laufzeit);
-      const fachSchuljahre = [...new Set(nummern.map((n) => laufzeit.schuljahre[Math.floor((n - 1) / 2)]?.bezeichnung).filter(Boolean))];
+      const alleFachSchuljahre = [...new Set(nummern.map((n) => laufzeit.schuljahre[Math.floor((n - 1) / 2)]?.bezeichnung).filter(Boolean))];
+      // Schuljahre, die erst noch beginnen, blenden wir aus: dort gibt es noch nichts einzutragen. Liegt das ganze Fach in
+      // der Zukunft, erscheint es in der Noteneingabe noch nicht (ab dem 1. August von selbst); auf der Klassenseite bleibt es.
+      const fachSchuljahre = alleFachSchuljahre.filter((bez) => !liegtInDerZukunft(bez, jetzt()));
+      if (alleFachSchuljahre.length && !fachSchuljahre.length) continue;
       // Nur bei einer auf einzelne Halbjahre begrenzten Zuordnung anzeigen, in welchen Halbjahren die Lehrkraft das Fach hat.
       let halbjahreText = null;
       if (r.zuw_halbjahre && nummern.length < laufzeit.anzahlHalbjahre) halbjahreText = `${nummern.map((n) => `${n}.`).join(', ')} Halbjahr`;
@@ -435,7 +439,9 @@ export default async function teacherRoutes(fastify) {
       };
     }
     return reply.viewEjs('teacher/fach_detail.ejs', {
-      HALBJAHRE: halbjahreFuerFach(fach).filter((h) => !erlaubteHj || erlaubteHj.includes(halbjahrNr(h))),
+      // Halbjahre in noch nicht begonnenen Schuljahren werden ausgeblendet (das angezeigte Halbjahr bleibt immer sichtbar).
+      HALBJAHRE: halbjahreFuerFach(fach).filter((h) => (!erlaubteHj || erlaubteHj.includes(halbjahrNr(h)))
+        && (h === halbjahr || !liegtInDerZukunft(halbjahrSchuljahrMap(fach.klasse_id)[h], jetzt()))),
       HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id), spaLeistung, spaTendenz, spaTendenzAusNote,
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
