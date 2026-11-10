@@ -184,6 +184,8 @@ test('Klasse löschen: Schüler/innen (nur die Person) wandern in "Ohne Klasse",
 
   const r = await form(lehrerA, `/teacher/klassen/${klasse9C}/loeschen`, {});
   assert.equal(r.status, 302);
+  assert.ok(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasse9C), 'zunächst nur im Papierkorb');
+  (await import('../src/papierkorb.js')).loescheAbgelaufeneKlassen(new Date('2025-11-15T12:00:00')); // 30 Tage später
   assert.equal(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasse9C), undefined, 'Klasse ist weg');
   assert.equal(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(physikId), undefined, 'Fächer sind weg');
 
@@ -211,6 +213,7 @@ test('Sammelklasse ist für jede Lehrkraft einsehbar; übernehmen geht per Reite
   await form(lehrerA, `/teacher/klassen/${klasse9D}/schueler/neu`, { nachname: 'Dietz', vorname: 'Dora' });
   const doraId = getDb().prepare("SELECT id FROM schueler WHERE nachname = 'Dietz'").get().id;
   await form(lehrerA, `/teacher/klassen/${klasse9D}/loeschen`, {});
+  (await import('../src/papierkorb.js')).loescheAbgelaufeneKlassen(new Date('2025-11-15T12:00:00')); // 30 Tage später
   const ablage = getDb().prepare('SELECT * FROM klassen WHERE ist_ablage = 1').get();
   assert.equal(getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(doraId).klasse_id, ablage.id);
 

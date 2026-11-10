@@ -39,6 +39,7 @@ import rechtlichesRoutes from './src/routes/rechtliches.js';
 import notenschluesselRoutes from './src/routes/notenschluessel.js';
 import { hinweiseFuer as notenschluesselHinweiseFuer } from './src/notenschluessel.js';
 import { aktuellesSchuljahrBezeichnung, pruefeSchuljahrEinmalProTag } from './src/schuljahre-auto.js';
+import { pruefePapierkorbEinmalProTag } from './src/papierkorb.js';
 import { starteBackupPlaner } from './src/backup/backup.js';
 import adminRoutes from './src/routes/admin.js';
 import teacherRoutes from './src/routes/teacher.js';
@@ -169,6 +170,7 @@ export async function buildApp(opts = {}) {
   getDb();
 
   pruefeSchuljahrEinmalProTag(); // ein neues Schuljahr (1. August) wird ohne Zutun der Administration angelegt
+  pruefePapierkorbEinmalProTag(); // Klassen, deren 30-Tage-Frist im Papierkorb abgelaufen ist, werden endgültig gelöscht
   app.addHook('preHandler', authPreHandler);
 
   app.addHook('preHandler', (request, reply, done) => {
@@ -176,6 +178,7 @@ export async function buildApp(opts = {}) {
     reply.locals.appName = 'Notenverwaltung';
     reply.locals.now = new Date();
     reply.locals.PUBLIC_URL = PUBLIC_URL;
+    pruefePapierkorbEinmalProTag(); // einmal am Tag: abgelaufene Klassen im Papierkorb endgültig löschen
     pruefeSchuljahrEinmalProTag(); // läuft der Server über den 1. August hinweg, wird das neue Schuljahr beim nächsten Aufruf angelegt
     reply.locals.aktuellesSchuljahr = aktuellesSchuljahrBezeichnung();
     reply.locals.cssVersion = cssVersion;

@@ -103,7 +103,8 @@ test('Eine fachfremde Lehrkraft ohne Klassenleitung darf die Klasse nicht lösch
   assert.ok(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasseId));
 });
 
-test('Co-Klassenleitung (Lehrer B, NICHT Ersteller/in der Klasse) darf die Klasse jetzt löschen', async () => {
+test('Co-Klassenleitung (Lehrer B, NICHT Ersteller/in) darf löschen -- das blendet die Klasse nur für B aus; endgültig weg erst, wenn alle gelöscht haben und 30 Tage um sind', async () => {
+  const { loescheAbgelaufeneKlassen } = await import('../src/papierkorb.js');
   const klasseId = getDb().prepare("SELECT id FROM klassen WHERE name = '9A'").get().id;
   await form(lehrerA, `/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Mathematik' });
   const mathId = getDb().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND name = 'Mathematik'").get(klasseId).id;
@@ -111,6 +112,18 @@ test('Co-Klassenleitung (Lehrer B, NICHT Ersteller/in der Klasse) darf die Klass
 
   const r = await form(lehrerB, `/teacher/klassen/${klasseId}/loeschen`, {});
   assert.equal(r.status, 302);
+  assert.ok(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasseId), 'Klasse bleibt: Lehrer A nutzt sie noch');
+  assert.ok(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(mathId));
+  assert.ok(getDb().prepare('SELECT 1 FROM klassen_geloescht WHERE klasse_id = ?').get(klasseId));
+  assert.equal(getDb().prepare('SELECT papierkorb_ab FROM klassen WHERE id = ?').get(klasseId).papierkorb_ab, null, 'noch keine Frist');
+
+  // Lehrer A löscht als Letzte/r: die Frist läuft
+  assert.equal((await form(lehrerA, `/teacher/klassen/${klasseId}/loeschen`, {})).status, 302);
+  assert.ok(getDb().prepare('SELECT papierkorb_ab FROM klassen WHERE id = ?').get(klasseId).papierkorb_ab);
+  assert.deepEqual(loescheAbgelaufeneKlassen(new Date('2025-10-20T12:00:00')), [], 'nach 19 Tagen noch nicht');
+  assert.ok(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasseId));
+
+  assert.deepEqual(loescheAbgelaufeneKlassen(new Date('2025-11-15T12:00:00')), [klasseId], 'nach über 30 Tagen endgültig gelöscht');
   assert.equal(getDb().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasseId), undefined, 'Klasse wurde gelöscht');
   assert.equal(getDb().prepare('SELECT 1 FROM faecher WHERE id = ?').get(mathId), undefined, 'Fächer der Klasse verschwinden per Cascade mit');
   assert.equal(getDb().prepare("SELECT 1 FROM schueler WHERE klasse_id = ?").get(klasseId), undefined, 'Schüler/innen sind nicht mehr in der gelöschten Klasse');

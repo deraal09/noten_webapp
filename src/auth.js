@@ -364,8 +364,9 @@ export function ladeMeineKlassen(userId) {
     LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
     WHERE k.ist_kurs_huelle = 0
       AND (k.created_by_id = ? OR fz.user_id IS NOT NULL OR kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL)
+      AND NOT EXISTS (SELECT 1 FROM klassen_geloescht g WHERE g.klasse_id = k.id AND g.user_id = ?)
     ORDER BY s.bezeichnung DESC, k.name
-  `).all(userId, userId, userId, userId);
+  `).all(userId, userId, userId, userId, userId);
 }
 
 /**

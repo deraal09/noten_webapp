@@ -722,6 +722,15 @@ CREATE TABLE IF NOT EXISTS notenschluessel_fassungen (
     gueltig_ab TEXT NOT NULL
 );
 
+-- Papierkorb für Klassen: Jede Lehrkraft, die eine Klasse "löscht", blendet sie nur für sich aus (Zeile hier). Sind alle
+-- Lehrkräfte der Klasse durch, läuft klassen.papierkorb_ab; 30 Tage danach wird die Klasse endgültig gelöscht (src/papierkorb.js).
+CREATE TABLE IF NOT EXISTS klassen_geloescht (
+    klasse_id INTEGER NOT NULL REFERENCES klassen(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    geloescht_at TEXT NOT NULL,
+    PRIMARY KEY (klasse_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS notenschluessel_gelesen (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     typ TEXT NOT NULL,
@@ -874,6 +883,8 @@ function migrate(db) {
   ensureColumn(db, 'klassenleitung', 'selbst_eingetragen', 'selbst_eingetragen INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_kurs_huelle', 'ist_kurs_huelle INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
+  // Beginn der 30-Tage-Frist bis zur endgültigen Löschung (ISO-Zeit); NULL = mindestens eine Lehrkraft nutzt die Klasse noch.
+  ensureColumn(db, 'klassen', 'papierkorb_ab', 'papierkorb_ab TEXT');
   // Laufzeit einer Klasse in Schuljahren (Startjahr, z. B. 2025 für 2025/26): siehe src/klassen-jahre.js.
   // NULL = Einschulung ist das Schuljahr der Klasse, Abschluss die Standarddauer (SPA 2, sonst 3 Jahre).
   ensureColumn(db, 'klassen', 'einschulung_jahr', 'einschulung_jahr INTEGER');

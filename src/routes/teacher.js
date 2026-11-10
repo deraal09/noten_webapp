@@ -48,6 +48,7 @@ import {
   seedeTeilnehmerAusKlasse, ladeTeilnehmerMitHerkunft, fuegeTeilnehmerHinzu, entferneTeilnehmer,
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
+import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
 import {
@@ -291,6 +292,7 @@ export default async function teacherRoutes(fastify) {
       JOIN klassen k ON k.id = f.klasse_id
       JOIN schuljahre s ON s.id = k.schuljahr_id
       WHERE fz.user_id = ?
+        AND NOT EXISTS (SELECT 1 FROM klassen_geloescht g WHERE g.klasse_id = k.id AND g.user_id = fz.user_id)
       ORDER BY s.bezeichnung DESC, k.name, f.name
     `).all(request.user.id);
     const byKlasse = new Map();
@@ -1446,7 +1448,7 @@ export default async function teacherRoutes(fastify) {
     `).all().filter((k) => !userHatKlassenZugriff(request.user, k.id));
 
     return reply.viewEjs('teacher/klassen_liste.ejs', {
-      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen: sichtbareKlassen,
+      user: request.user, schuljahre, schuljahreReiter, klassenNachSchuljahr, klassen: sichtbareKlassen, papierkorbAnzahl: anzahlImPapierkorb(request.user.id),
       kurseNachSchuljahr, bildungsgaenge: BILDUNGSGAENGE, spaVorlagen: ladeSpaVorlagen(request.user.id), jahresOptionen: jahresOptionen(),
       kannSelbstKlasseAnlegen: userDarfSelbstKlasseAnlegen(request.user), vorhandeneKlassen,
     });
@@ -2108,20 +2110,40 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(zurueckNach(request, z.klasse_id));
   });
 
+  // "Klasse löschen": Der Admin löscht sofort und endgültig. Lehrkräfte blenden die Klasse nur für sich aus (Papierkorb); erst
+  // wenn die letzte Lehrkraft sie gelöscht hat, läuft die 30-Tage-Frist bis zur endgültigen Löschung (src/papierkorb.js).
+  const datumDe = (d) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   fastify.post('/klassen/:id/loeschen', async (request, reply) => {
-    const klasse = getDb().prepare('SELECT id FROM klassen WHERE id = ?').get(request.params.id);
+    const klasse = getDb().prepare('SELECT id, ist_ablage FROM klassen WHERE id = ?').get(request.params.id);
     if (!klasse) return reply.redirect('/teacher/klassen');
-    if (!userDarfKlasseVerwalten(request.user, klasse.id)) {
-      return reply.code(403).viewEjs('error.ejs', { code: 403, message: KLASSE_VERWALTEN_NUR });
+    if (request.user.isAdmin) {
+      const { gerettet } = loescheKlasseMitSchuelerUebernahme(klasse.id);
+      if (gerettet > 0) {
+        request.flash?.('success', `Klasse gelöscht. ${gerettet} Schüler/innen wurden in die Sammelklasse „Ohne Klasse“ übernommen -- `
+          + 'von dort holst du sie über „Aus Ohne Klasse übernehmen“ in eine deiner Klassen.');
+      }
+      return reply.redirect('/teacher/klassen');
     }
-    const fremd = fremdeNotenInKlasse(request.user, klasse.id);
-    if (fremd.length) return reply.code(403).viewEjs('error.ejs', { code: 403, message: notenAndererMeldung('Diese Klasse', fremd) });
-    const { gerettet } = loescheKlasseMitSchuelerUebernahme(klasse.id);
-    if (gerettet > 0) {
-      request.flash?.('success', `Klasse gelöscht. ${gerettet} Schüler/innen wurden in die Sammelklasse „Ohne Klasse“ übernommen -- `
-        + 'von dort holst du sie über „Aus Ohne Klasse übernehmen“ in eine deiner Klassen.');
+    // Die Sammelklasse "Ohne Klasse" verwaltet nur der Admin; an fremden Klassen hat man nichts zu löschen.
+    if (klasse.ist_ablage || !userHatKlassenZugriff(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Diese Klasse kannst du nicht löschen -- nur Lehrkräfte, die der Klasse angehören (die Sammelklasse „Ohne Klasse“ nur der Admin).' });
     }
+    const ergebnis = loescheFuerMich(request.user.id, klasse.id);
+    request.flash?.('success', ergebnis.letzte
+      ? `Klasse in den Papierkorb gelegt. Alle Lehrkräfte der Klasse haben sie gelöscht -- sie wird am ${datumDe(ergebnis.ablauf)} endgültig gelöscht, bis dahin kannst du sie im Papierkorb wiederherstellen.`
+      : 'Klasse für dich ausgeblendet und in den Papierkorb gelegt. Die anderen Lehrkräfte sehen sie weiter; endgültig gelöscht wird sie erst, wenn alle sie gelöscht haben.');
     return reply.redirect('/teacher/klassen');
+  });
+
+  fastify.get('/papierkorb', async (request, reply) => reply.viewEjs('teacher/papierkorb.ejs', {
+    user: request.user, klassen: ladePapierkorb(request.user.id), fristTage: FRIST_TAGE, datumDe,
+  }));
+
+  fastify.post('/papierkorb/:id/wiederherstellen', async (request, reply) => {
+    if (stelleWiederHer(request.user.id, Number(request.params.id))) {
+      request.flash?.('success', 'Klasse wiederhergestellt -- sie steht wieder unter „Meine Klassen“.');
+    }
+    return reply.redirect('/teacher/papierkorb');
   });
 
   const VERSETZEN_FEHLER = {

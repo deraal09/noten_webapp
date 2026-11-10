@@ -103,9 +103,12 @@ test('Die neue Klassenleitung löscht kein Fach, keine Person und keine Klasse m
   assert.match(await r.text(), /Abgang/);
   assert.ok(db().prepare('SELECT 1 FROM schueler WHERE id = ?').get(erika));
 
+  // Die Klasse löschen blendet sie nur für diese Klassenleitung aus -- die Noten der anderen Lehrkräfte bleiben unangetastet.
   r = await form(angreifer, `/teacher/klassen/${k10b}/loeschen`);
-  assert.equal(r.status, 403);
+  assert.equal(r.status, 302);
   assert.ok(db().prepare('SELECT 1 FROM klassen WHERE id = ?').get(k10b), 'die Klasse bleibt');
+  assert.ok(db().prepare('SELECT 1 FROM faecher WHERE id = ?').get(mathe), 'Fächer und Noten bleiben');
+  assert.equal(db().prepare('SELECT papierkorb_ab FROM klassen WHERE id = ?').get(k10b).papierkorb_ab, null, 'Opfer nutzt die Klasse noch: keine Frist');
 });
 
 test('Auch "Zuordnung entfernen, dann als Fach ohne Lehrkraft löschen" geht nicht', async () => {

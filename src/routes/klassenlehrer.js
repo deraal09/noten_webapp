@@ -44,8 +44,9 @@ export default async function klassenlehrerRoutes(fastify) {
         LEFT JOIN klassen_lehrkraefte kl ON kl.klasse_id = k.id AND kl.user_id = ?
         LEFT JOIN klassenleitung kls ON kls.klasse_id = k.id AND kls.user_id = ?
         WHERE k.ist_kurs_huelle = 0 AND (kl.user_id IS NOT NULL OR kls.user_id IS NOT NULL)
+          AND NOT EXISTS (SELECT 1 FROM klassen_geloescht g WHERE g.klasse_id = k.id AND g.user_id = ?)
         ORDER BY s.bezeichnung DESC, k.name
-      `).all(request.user.id, request.user.id);
+      `).all(request.user.id, request.user.id, request.user.id);
     }
     return reply.viewEjs('klassenlehrer/dashboard.ejs', { user: request.user, klassen });
   });

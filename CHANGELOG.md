@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.116.0 - 2026-11-10
+
+- **Papierkorb für Klassen.** „Klasse löschen“ blendet die Klasse jetzt nur noch für die löschende Lehrkraft aus: Sie verschwindet
+  aus „Meine Klassen“, der Noteneingabe und der Klassenleitungs-Übersicht, die anderen Lehrkräfte der Klasse sehen sie weiter. Jede
+  Lehrkraft der Klasse (Ersteller/in, Fach-Zuweisung, Klassenleitung) darf das; Löschen und der Löschschutz für fremde Noten
+  entfallen, weil dabei nichts mehr entfernt wird.
+- **Papierkorb** (Meine Klassen → „🗑 Papierkorb“): zeigt die eigenen gelöschten Klassen. Jede Lehrkraft kann sie dort für sich
+  wiederherstellen. Solange noch Lehrkräfte die Klasse nutzen, steht dort „noch keine Ablaufzeit“ (mit der Zahl der Lehrkräfte).
+- **Endgültige Löschung nach 30 Tagen.** Haben alle Lehrkräfte der Klasse sie gelöscht, läuft eine Frist von 30 Tagen (das Ablaufdatum
+  steht im Papierkorb). Stellt in der Zeit jemand die Klasse wieder her oder wird eine neue Lehrkraft eingetragen, entfällt die Frist.
+  Danach werden Fächer, Klausuren und Noten unwiderruflich gelöscht; die Personen (nur Name) bleiben wie bisher in der Sammelklasse
+  „Ohne Klasse“. Die Prüfung läuft beim Start und einmal am Tag.
+- **Admin** löscht weiterhin sofort und endgültig.
+
 ## 0.115.0 - 2026-11-10
 
 - **Zukünftige Schuljahre in der Noteneingabe ausgeblendet.** Angezeigt werden nur das aktuelle und die vergangenen Schuljahre:

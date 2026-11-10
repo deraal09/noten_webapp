@@ -1,0 +1,38 @@
+<h1>🗑 Papierkorb</h1>
+<p class="kopf-aktionen"><a class="btn" href="/teacher/klassen">← Meine Klassen</a></p>
+<p class="hint">
+  Hier liegen die Klassen, die du gelöscht hast. Sie sind nur für dich ausgeblendet; du kannst sie jederzeit für dich wiederherstellen.
+  Endgültig gelöscht wird eine Klasse erst, wenn <strong>alle</strong> Lehrkräfte der Klasse sie gelöscht haben -- danach läuft eine Frist von
+  <%= fristTage %> Tagen, in der noch jede Lehrkraft die Klasse zurückholen kann. Mit Ablauf der Frist werden Fächer, Klausuren und Noten der Klasse
+  unwiderruflich gelöscht.
+</p>
+
+<% if (!klassen.length) { %>
+  <div class="card"><p class="hint">Der Papierkorb ist leer.</p></div>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Klasse</th><th>Schuljahr</th><th>Gelöscht am</th><th>Endgültig gelöscht</th><th></th></tr></thead>
+    <tbody>
+      <% klassen.forEach(function(k) { %>
+        <tr>
+          <td><%= k.name %> <small class="hint">(<%= k.notenschluessel %>)</small></td>
+          <td><%= k.schuljahr_bezeichnung %></td>
+          <td><%= datumDe(new Date(k.geloescht_at)) %></td>
+          <td>
+            <% if (k.ablauf) { %>
+              am <strong><%= datumDe(k.ablauf) %></strong> <small class="hint">(noch <%= k.resttage %> Tag<%= k.resttage === 1 ? '' : 'e' %>)</small>
+            <% } else { %>
+              <span title="Es gibt noch Lehrkräfte, die die Klasse nutzen">noch keine Ablaufzeit</span>
+              <small class="hint">(<%= k.nochAktiv %> Lehrkraft<%= k.nochAktiv === 1 ? ' nutzt' : 'e nutzen' %> die Klasse noch)</small>
+            <% } %>
+          </td>
+          <td>
+            <form method="post" action="/teacher/papierkorb/<%= k.id %>/wiederherstellen" class="inline">
+              <button type="submit">↩ Wiederherstellen</button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
