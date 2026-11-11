@@ -29,6 +29,7 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | GET | `/faecher/{id}/statistik?halbjahr=` | lesen | Durchschnitt, Verteilung, nicht bestanden |
 | GET | `/notenschluessel` | lesen | Notenschlüssel IHK, BG, SPA |
 | POST | `/berechnen/klausur` | lesen | Note aus Punkten berechnen (speichert nichts) |
+| POST | `/kurse` | schreiben | Kurs anlegen (Standard BG; wiederholbar) |
 | PUT | `/klassen/{id}/name` | schreiben | Klasse umbenennen (jede Lehrkraft der Klasse; gilt für alle) |
 | PUT | `/faecher/{id}/name` | schreiben | Kurs umbenennen (jede Lehrkraft des Kurses; gilt für alle) |
 | GET | `/faecher/{id}/teilnehmer` | lesen | Teilnehmerliste mit IDs |
@@ -48,7 +49,10 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 * **Alles oder nichts:** Ist bei einem Aufruf mit mehreren Personen ein Eintrag ungültig, wird nichts gespeichert (`422`, Liste unter `details`).
 * **Probelauf:** `?dry_run=true` prüft und zeigt die berechneten Noten, ohne zu speichern -- vor dem Eintragen immer nutzen.
 * **Idempotent:** Wiederholen schadet nicht. **Gelöscht wird über die API nichts** (leeren geht mit `null`).
-* **Nicht über die API beschreibbar:** SPA-Fächer und Fächer, die sich im Halbjahr aus Unterfächern zusammensetzen (`409`); lesen geht.
+* **Lernfelder, Komponenten, Unterfächer:** Ein Fach, das zu einem Lernfeld (SPA) bzw. zu einem übergeordneten Fach gehört, steht mit `art` und `uebergeordnet` in
+  `GET /klassen` und `GET /faecher/{id}`. Eingetragen wird **im Unterfach bzw. in der Komponente selbst** (eigene ID, dort wo die Lehrkraft zugeordnet ist); das
+  Lernfeld bzw. Fach mit Unterfächern lässt sich lesen (auch von Lehrkräften, die nur einem Unterfach zugeordnet sind), aber nicht beschreiben (`409`, `details`
+  nennt die Unterfach-IDs). In SPA-Fächern kommen `leistungspunkte` und `tendenz` dazu; Endnoten sind dort Gesamtpunkte 0–15.
 * **Personen anlegen:** Die Teilnehmerliste eines Fachs oder Kurses füllt `POST /faecher/{id}/teilnehmer` (Nachname, Vorname, Klasse je Person; legt
   fehlende Personen und Klassen an, überspringt Doppelte). Die Schüler:innen einer **Klasse** legt die API nicht an (App: Einzeln/Mehrere auf einmal/CSV-Import).
 * **Grenzen:** 120 Anfragen pro Minute und Schlüssel, 500 Einträge je Aufruf, 40 Aufgaben je Klausur.

@@ -493,3 +493,94 @@ test('Kurs umbenennen über die API: zugeordnete Lehrkraft, gilt für alle; nur 
   assert.equal((await api(schreibKey, 'PUT', '/faecher/99999/name', { name: 'X' })).status, 404);
   await api(schreibKey, 'PUT', `/faecher/${kursId}/name`, { name: 'Philo-AG' });
 });
+
+test('Kurs anlegen über die API: Standard BG, Probelauf, wiederholbar, Schuljahr, Rechte; danach Teilnehmer aufnehmen', async () => {
+  const kurse = () => db().prepare("SELECT COUNT(*) AS c FROM faecher WHERE ist_kurs = 1").get().c;
+  const vorher = kurse();
+  assert.equal((await api(leseKey, 'POST', '/kurse', { name: 'API-Kurs' })).status, 403, 'lesender Schlüssel');
+  const trocken = await api(schreibKey, 'POST', '/kurse?dry_run=true', { name: 'API-Kurs', schuljahr: '2025/26' });
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.kurs.notenschluessel, 'BG');
+  assert.equal(kurse(), vorher, 'Probelauf legt nichts an');
+
+  const r = await api(schreibKey, 'POST', '/kurse', { name: ' API-Kurs ', schuljahr: '2025/26' });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.gespeichert, true);
+  assert.equal(r.json.kurs.name, 'API-Kurs');
+  assert.equal(r.json.kurs.notenschluessel, 'BG', 'Standard-Notenschlüssel BG');
+  assert.equal(r.json.kurs.schuljahr, '2025/26');
+  const kursId = r.json.kurs.id;
+  assert.equal(db().prepare('SELECT 1 FROM fach_zuweisungen WHERE fach_id = ? AND user_id = (SELECT id FROM users WHERE username = ?)').get(kursId, 'anna') !== undefined, true, 'Anna ist dem Kurs zugeordnet');
+  assert.equal(kurse(), vorher + 1);
+  // Wiederholen: kein zweiter Kurs
+  const nochmal = await api(schreibKey, 'POST', '/kurse', { name: 'API-Kurs', schuljahr: '2025/26' });
+  assert.equal(nochmal.json.bereits_vorhanden, true);
+  assert.equal(nochmal.json.kurs.id, kursId);
+  assert.equal(kurse(), vorher + 1);
+  // IHK wählbar, Schuljahr als ID, ohne Schuljahr = aktuelles
+  const ihk = await api(schreibKey, 'POST', '/kurse', { name: 'IHK-Kurs', notenschluessel: 'IHK', schuljahr: db().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id });
+  assert.equal(ihk.json.kurs.notenschluessel, 'IHK');
+  assert.equal((await api(schreibKey, 'POST', '/kurse', { name: 'Aktuell' })).status, 200);
+  // Fehler
+  assert.equal((await api(schreibKey, 'POST', '/kurse', { name: '' })).status, 422);
+  assert.equal((await api(schreibKey, 'POST', '/kurse', { name: 'X', notenschluessel: 'SPA' })).status, 422);
+  assert.equal((await api(schreibKey, 'POST', '/kurse', { name: 'X', schuljahr: '1999/00' })).status, 422);
+  assert.equal((await api(coraKeyGlobal(), 'POST', '/kurse', { name: 'Fremd' })).status, 403, 'ohne Schul-Zugang (LDAP)');
+  // Weiter mit Teilnehmern
+  const t = await api(schreibKey, 'POST', `/faecher/${kursId}/teilnehmer`, { teilnehmer: [{ nachname: 'Kurs', vorname: 'Kai', klasse: '12E' }] });
+  assert.equal(t.status, 200);
+  assert.equal(t.json.hinzugefuegt, 1);
+  assert.ok((await api(leseKey, 'GET', '/klassen')).json.kurse.some((k) => k.id === kursId && k.art === 'kurs'));
+});
+
+test('Lernfelder (SPA): Komponenten und Unterfächer sind sichtbar, beschreibbar, mit Leistungspunkten; das Lernfeld selbst verweist auf sie', async () => {
+  const sj = db().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id;
+  await admin('/teacher/klassen/neu', { schuljahr_id: String(sj), name: '13SPA', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_PIA', einschulung_jahr: '2025' });
+  const spaId = db().prepare("SELECT id FROM klassen WHERE name = '13SPA'").get().id;
+  const lf3 = db().prepare("SELECT id FROM faecher WHERE klasse_id = ? AND spa_fach_key = 'LF3'").get(spaId);
+  await admin(`/teacher/klassen/${spaId}/schueler/neu`, { nachname: 'Spa', vorname: 'Sina' });
+  const sina = db().prepare("SELECT id FROM schueler WHERE nachname = 'Spa'").get().id;
+  const komp = db().prepare('SELECT * FROM faecher WHERE parent_fach_id = ? ORDER BY id').all(lf3.id)[0];
+  assert.ok(komp, 'Komponente vorhanden');
+  const annaId = db().prepare("SELECT id FROM users WHERE username = 'anna'").get().id;
+  db().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(annaId, komp.id); // Anna unterrichtet nur diese Komponente
+  assert.ok(db().prepare('SELECT 1 FROM fach_teilnehmer WHERE fach_id = ? AND schueler_id = ?').get(komp.id, sina), 'Person nimmt an der Komponente teil');
+
+  // Sichtbar mit Bezug zum Lernfeld
+  const kl = (await api(leseKey, 'GET', '/klassen')).json.klassen.find((k) => k.id === spaId);
+  const eintrag = kl.faecher.find((f) => f.id === komp.id);
+  assert.equal(eintrag.art, 'komponente');
+  assert.equal(eintrag.uebergeordnet.id, lf3.id);
+  assert.ok(!kl.faecher.some((f) => f.id === lf3.id), 'das Lernfeld selbst ist Anna nicht zugeordnet');
+  const f = await api(leseKey, 'GET', `/faecher/${komp.id}?halbjahr=1`);
+  assert.equal(f.status, 200);
+  assert.equal(f.json.fach.art, 'komponente');
+  assert.equal(f.json.fach.uebergeordnet.name.length > 0, true);
+
+  // Das Lernfeld ist lesbar (Zusammensetzung), nennt die Unterfächer, kann aber nicht beschrieben werden
+  const lf = await api(leseKey, 'GET', `/faecher/${lf3.id}?halbjahr=1`);
+  assert.equal(lf.status, 200);
+  assert.equal(lf.json.fach.art, 'lernfeld');
+  const kind = lf.json.unterfaecher.find((u) => u.id === komp.id);
+  assert.equal(kind.zugriff, true);
+  const schreibLf = await api(schreibKey, 'POST', `/faecher/${lf3.id}/klausuren`, { halbjahr: 1, name: 'LF-Klausur', max_punkte: [10] });
+  assert.equal(schreibLf.status, 403, 'nicht dem Lernfeld zugeordnet');
+  const adminKey = await neuerSchluessel(admin, 'Admin SPA', 'schreiben');
+  const schreibAdmin = await api(adminKey, 'POST', `/faecher/${lf3.id}/klausuren`, { halbjahr: 1, name: 'LF-Klausur', max_punkte: [10] });
+  assert.equal(schreibAdmin.status, 409);
+  assert.ok(schreibAdmin.json.details.some((u) => u.id === komp.id), 'die Antwort nennt die Komponenten');
+
+  // Eintragen in der Komponente: Klausur, Punkte, Leistungspunkte und Tendenz
+  const k = await api(schreibKey, 'POST', `/faecher/${komp.id}/klausuren`, { halbjahr: 1, name: 'DV-Klausur', max_punkte: [10] });
+  assert.equal(k.status, 200);
+  const e = await api(schreibKey, 'PUT', `/klausuren/${k.json.klausur.id}/ergebnisse`, { ergebnisse: [{ schueler_id: sina, punkte: [10] }] });
+  assert.equal(e.status, 200);
+  const n = await api(leseKey, 'GET', `/faecher/${komp.id}/noten?halbjahr=1`);
+  const sz = n.json.schueler.find((s) => s.id === sina);
+  assert.equal(sz.klausuren[0].note, 1, 'SPA-Schlüssel: 100 % = Note 1');
+  assert.equal(sz.leistungspunkte, 14);
+  assert.equal(sz.tendenz, '1');
+  // Das Lernfeld zeigt die Zusammensetzung
+  const lfNoten = await api(leseKey, 'GET', `/faecher/${lf3.id}/noten?halbjahr=1`);
+  assert.equal(lfNoten.status, 200);
+});

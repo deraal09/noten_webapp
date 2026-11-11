@@ -13,7 +13,7 @@
 
 import { getDb } from '../db.js';
 import {
-  ladeMeineKlassen, ladeMeineKurse, userHatKlassenZugriff, userHatFachZgriff, userIstKlassenlehrer, userDarfTeilnehmerVerwalten,
+  ladeMeineKlassen, ladeMeineKurse, userHatKlassenZugriff, userHatFachZgriff, userIstKlassenlehrer, userDarfTeilnehmerVerwalten, userDarfSelbstKlasseAnlegen,
 } from '../auth.js';
 import { pruefeSchluessel, rateLimitErreicht } from '../api-keys.js';
 import { ladeFachMitUmfeld, ladeNotenuebersicht, getNotenschluesselCsv, unterfaecherDesHalbjahrs } from '../noten-service.js';
@@ -28,6 +28,11 @@ import { setzeEndnote, notenBereich, parseEndnoteEingabe } from '../halbjahr-end
 import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
 import { autoVerteileKlausuren } from './teacher.js';
 import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
+import { legeKursAn, kursNotenschluessel } from '../kurse.js';
+import { aktuellesSchuljahrBezeichnung, sorgeFuerAktuellesSchuljahr } from '../schuljahre-auto.js';
+import { ladeUnterfaecher } from '../unterfaecher.js';
+import { spaTendenz, spaTendenzAusNote } from '../spa-leistung.js';
+import { punkteAusIhkNote } from '../spa-leistung.js';
 import { ENDPOINTS, FEHLERCODES, baueOpenApi, API_BASIS } from '../api-docs.js';
 
 const MAX_EINTRAEGE = 500;
@@ -62,9 +67,25 @@ function halbjahrVon(fach, roh) {
   return liste.includes(text) ? text : null;
 }
 
+/** Art des Fachs: normales Fach, Lernfeld (SPA), Komponente eines Lernfelds (SPA), Unterfach eines Fachs, Kurs. */
+function fachArt(fach) {
+  if (fach.ist_kurs) return 'kurs';
+  if (fach.spa_fach_key) return 'lernfeld';
+  if (fach.spa_komponente) return 'komponente';
+  if (fach.parent_fach_id) return 'unterfach';
+  return 'fach';
+}
+
+function uebergeordnet(fach) {
+  if (!fach.parent_fach_id) return null;
+  const p = getDb().prepare('SELECT id, name FROM faecher WHERE id = ?').get(fach.parent_fach_id);
+  return p ? { id: p.id, name: p.name } : null;
+}
+
 function fachMeta(fach, halbjahr) {
   return {
-    id: fach.id, name: fach.name, klasse: fach.klasse_name, klasse_id: fach.klasse_id, schuljahr: fach.schuljahr_bezeichnung,
+    id: fach.id, name: fach.name, art: fachArt(fach), uebergeordnet: uebergeordnet(fach),
+    klasse: fach.klasse_name, klasse_id: fach.klasse_id, schuljahr: fach.schuljahr_bezeichnung,
     notenschluessel: fach.notenschluessel, halbjahr, halbjahre: halbjahreFuerFach(fach),
   };
 }
@@ -102,15 +123,27 @@ export default async function apiV1Routes(fastify) {
     });
 
     // Fach laden und Rechte prüfen. Bei Fehler wird geantwortet und null zurückgegeben.
+    // Unterfächer (bzw. Komponenten eines Lernfelds) eines Fachs, auf die diese Lehrkraft Zugriff hat.
+    const zugaenglicheUnterfaecher = (user, fach, halbjahr = null) => ladeUnterfaecher(fach.id).filter((u) => userHatFachZgriff(user, u.id, halbjahr));
+    const unterfachListe = (fach) => ladeUnterfaecher(fach.id).map((u) => ({ id: u.id, name: u.kurzname || u.name, gewicht: u.gewicht > 0 ? u.gewicht : null, halbjahre: halbjahreFuerFach(u) }));
+
+    // Lesen: auch wer nur einem Unterfach (z. B. der Komponente „DV-Unterricht“ eines Lernfelds) zugeordnet ist, sieht das übergeordnete Fach
+    // (Zusammensetzung) -- wie die Zusammensetzungs-Seite der App. Eintragen geht immer nur dort, wo die Lehrkraft selbst zugeordnet ist.
     const fachFuer = (request, reply, { halbjahrRoh, schreiben = false } = {}) => {
       const fach = ladeFachMitUmfeld(parseInt(request.params.id, 10));
       if (!fach) { senden(reply, 404, 'not_found', 'Fach nicht gefunden.'); return null; }
-      if (!userHatFachZgriff(request.apiUser, fach.id)) { senden(reply, 403, 'forbidden', 'Kein Zugriff auf dieses Fach.'); return null; }
+      const user = request.apiUser;
+      const eigenes = userHatFachZgriff(user, fach.id);
+      const ueberUnterfach = !eigenes && !schreiben && zugaenglicheUnterfaecher(user, fach).length > 0;
+      if (!eigenes && !ueberUnterfach) { senden(reply, 403, 'forbidden', 'Kein Zugriff auf dieses Fach.'); return null; }
       const halbjahr = halbjahrVon(fach, halbjahrRoh);
       if (!halbjahr) { senden(reply, 400, 'bad_halbjahr', `Ungültiges Halbjahr. Erlaubt: ${halbjahreFuerFach(fach).join(', ')}.`); return null; }
-      if (!userHatFachZgriff(request.apiUser, fach.id, halbjahr)) { senden(reply, 403, 'forbidden', 'Keine Berechtigung für dieses Halbjahr.'); return null; }
+      if (eigenes ? !userHatFachZgriff(user, fach.id, halbjahr) : !zugaenglicheUnterfaecher(user, fach, halbjahr).length) {
+        senden(reply, 403, 'forbidden', 'Keine Berechtigung für dieses Halbjahr.'); return null;
+      }
       if (schreiben && (fach.spa_fach_key || unterfaecherDesHalbjahrs(fach, halbjahr).length)) {
-        senden(reply, 409, 'nicht_unterstuetzt', 'In SPA-Fächern und in Fächern, die sich in diesem Halbjahr aus Unterfächern zusammensetzen, kann die API nicht eintragen -- bitte direkt im jeweiligen Unterfach bzw. in der Oberfläche.');
+        const kinder = unterfachListe(fach);
+        senden(reply, 409, 'nicht_unterstuetzt', `${fach.spa_fach_key ? 'Ein Lernfeld (SPA)' : 'Ein Fach, das sich in diesem Halbjahr aus Unterfächern zusammensetzt,'} wird nicht direkt beschrieben -- bitte in einem seiner Unterfächer bzw. Komponenten eintragen (IDs unter details).`, kinder);
         return null;
       }
       return { fach, halbjahr };
@@ -130,12 +163,13 @@ export default async function apiV1Routes(fastify) {
       const klassen = alle.map((k) => ({
         id: k.id, name: k.name, schuljahr: k.schuljahr_bezeichnung, notenschluessel: k.notenschluessel,
         klassenleitung: userIstKlassenlehrer(user, k.id),
-        faecher: getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? AND ist_kurs = 0 AND parent_fach_id IS NULL ORDER BY name').all(k.id)
+        // Fächer, Lernfelder, Komponenten und Unterfächer, auf die die Lehrkraft Zugriff hat (ein Unterfach nennt sein übergeordnetes Fach)
+        faecher: getDb().prepare('SELECT * FROM faecher WHERE klasse_id = ? AND ist_kurs = 0 ORDER BY name').all(k.id)
           .filter((f) => userHatFachZgriff(user, f.id))
-          .map((f) => ({ id: f.id, name: f.name, halbjahre: halbjahreFuerFach(f) })),
+          .map((f) => ({ id: f.id, name: f.name, art: fachArt(f), uebergeordnet: uebergeordnet(f), halbjahre: halbjahreFuerFach(f) })),
       }));
       const kurse = user.isAdmin ? [] : ladeMeineKurse(user.id).map((f) => ({
-        id: f.id, name: f.name, schuljahr: f.schuljahr_bezeichnung, notenschluessel: f.notenschluessel, halbjahre: halbjahreFuerFach(f),
+        id: f.id, name: f.name, art: 'kurs', schuljahr: f.schuljahr_bezeichnung, notenschluessel: f.notenschluessel, halbjahre: halbjahreFuerFach(f),
       }));
       return { klassen, kurse };
     });
@@ -146,6 +180,39 @@ export default async function apiV1Routes(fastify) {
       if (!userHatKlassenZugriff(request.apiUser, klasse.id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf diese Klasse.');
       const schueler = getDb().prepare('SELECT id, nachname, vorname, status FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
       return { klasse, schueler };
+    });
+
+    // Kurs anlegen: wie „+ Neuen Kurs anlegen“ in der App; die Lehrkraft des Schlüssels wird dem Kurs zugeordnet. Standard-Notenschlüssel BG.
+    route('POST', '/kurse', 'schreiben', async (request, reply) => {
+      const user = request.apiUser;
+      if (!userDarfSelbstKlasseAnlegen(user)) return senden(reply, 403, 'forbidden', 'Eigene Kurse können nur Lehrkräfte mit Schul-Zugang (LDAP) und der Admin anlegen.');
+      const b = request.body || {};
+      if (typeof b.name !== 'string' || !b.name.trim() || b.name.trim().length > 100) return senden(reply, 422, 'invalid', 'name: Text mit 1 bis 100 Zeichen.');
+      if (b.notenschluessel !== undefined && !['IHK', 'BG'].includes(b.notenschluessel)) return senden(reply, 422, 'invalid', 'notenschluessel: IHK oder BG (Standard BG).');
+      // Schuljahr: Bezeichnung („2025/26“) oder ID; ohne Angabe das aktuelle (wird bei Bedarf angelegt).
+      const db = getDb();
+      let sj = null;
+      if (b.schuljahr === undefined || b.schuljahr === null || b.schuljahr === '') {
+        sorgeFuerAktuellesSchuljahr();
+        sj = db.prepare('SELECT * FROM schuljahre WHERE bezeichnung = ?').get(aktuellesSchuljahrBezeichnung());
+      } else {
+        sj = db.prepare(Number.isInteger(b.schuljahr) ? 'SELECT * FROM schuljahre WHERE id = ?' : 'SELECT * FROM schuljahre WHERE bezeichnung = ?').get(b.schuljahr);
+      }
+      if (!sj) return senden(reply, 422, 'invalid', 'schuljahr: unbekannt (Bezeichnung wie „2025/26“ oder ID). Schuljahre legt sonst die Administration an.');
+      const name = b.name.trim();
+      // Wiederholen ist gefahrlos: gibt es den Kurs dieser Lehrkraft schon, wird er zurückgegeben statt doppelt angelegt.
+      const vorhanden = db.prepare(`
+        SELECT f.id, f.name, k.notenschluessel FROM faecher f JOIN klassen k ON k.id = f.klasse_id JOIN fach_zuweisungen fz ON fz.fach_id = f.id
+        WHERE f.ist_kurs = 1 AND f.name = ? AND k.schuljahr_id = ? AND fz.user_id = ?
+      `).get(name, sj.id, user.id);
+      const kursInfo = (id, n, ns) => ({ id, name: n, schuljahr: sj.bezeichnung, notenschluessel: ns });
+      if (vorhanden) return { gespeichert: false, bereits_vorhanden: true, kurs: kursInfo(vorhanden.id, vorhanden.name, vorhanden.notenschluessel) };
+      const ns = kursNotenschluessel(b.notenschluessel);
+      if (!speichern(request)) return { gespeichert: false, dry_run: true, kurs: kursInfo(null, name, ns) };
+      const r = legeKursAn({ userId: user.id, schuljahrId: sj.id, name, notenschluessel: ns });
+      if (!r.ok) return senden(reply, 422, 'invalid', r.fehler);
+      request.log.info({ key: request.apiKey.id, fach: r.fachId }, 'api: Kurs angelegt');
+      return { gespeichert: true, kurs: kursInfo(r.fachId, name, ns), naechster_schritt: `POST /faecher/${r.fachId}/teilnehmer, um die Teilnehmer aufzunehmen` };
     });
 
     // Klasse umbenennen: wie in der App darf das jede Lehrkraft der Klasse; der Name gilt für alle, die eingetragen sind.
@@ -188,6 +255,8 @@ export default async function apiV1Routes(fastify) {
         })),
         termine: db.prepare('SELECT id, datum FROM unterricht_termine WHERE fach_id = ? AND halbjahr = ? ORDER BY datum, id').all(fach.id, halbjahr),
         sync: syncStand(request.apiUser, fach.id, halbjahr),
+        // Lernfeld bzw. Fach mit Unterfächern: deren IDs (Noten werden in den Unterfächern bzw. Komponenten eingetragen)
+        unterfaecher: unterfachListe(fach).map((u) => ({ ...u, zugriff: userHatFachZgriff(request.apiUser, u.id) })),
       };
     });
 
@@ -216,6 +285,7 @@ export default async function apiV1Routes(fastify) {
         fach: fachMeta(fach, halbjahr),
         anteil_schriftlich_prozent: uebersicht.schriftlichPct, anteil_unterrichtsleistung_prozent: uebersicht.ulPct,
         zusammensetzung_aus_unterfaechern: Boolean(uebersicht.komposition),
+        unterfaecher: uebersicht.komposition ? uebersicht.komposition.unterfaecher.map((u) => ({ id: u.id, name: u.kurzname, anteil_prozent: u.anteil })) : undefined,
         schueler: uebersicht.rows.map((r) => ({
           id: r.schueler_id, nachname: r.nachname, vorname: r.vorname, gesperrt: Boolean(sperren.get(r.schueler_id)),
           klausuren: (r.klausuren || []).map((k) => ({ id: k.id, name: k.name, punkte: k.punkte, extrapunkte: k.extrapunkte, note: k.note, teilnoten: k.teilNoten })),
@@ -225,6 +295,11 @@ export default async function apiV1Routes(fastify) {
           note_schriftlich: r.schriftlicheNote, note_unterrichtsleistung: r.muendlicheNote, vorhalbjahr: r.vorhalbjahrNote,
           gesamtnote: r.gesamt, endnote: r.endnote ? { note: r.endnote.note, ntg: Boolean(r.endnote.ntg) } : null,
           nicht_bestanden: Boolean(r.nicht_bestanden),
+          // SPA: Leistungspunkte (0-15) und Tendenznote -- aus der berechneten Note bzw. bei direkt eingetragenen Gesamtpunkten unverändert
+          ...(fach.notenschluessel === 'SPA' && r.gesamt !== null && r.gesamt !== undefined ? {
+            leistungspunkte: r.endnote ? r.gesamt : punkteAusIhkNote(r.gesamt),
+            tendenz: r.endnote ? spaTendenz(r.gesamt) : spaTendenzAusNote(r.gesamt),
+          } : {}),
         })),
       };
     });

@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.124.0 - 2026-11-12
+
+- **API: Kurse anlegen.** `POST /api/v1/kurse` mit `{"name", "schuljahr", "notenschluessel"}` (wie „+ Neuen Kurs anlegen“ in der App; Standard-Notenschlüssel BG,
+  Schuljahr als Bezeichnung oder ID, ohne Angabe das aktuelle). Der Kurs wird der Lehrkraft des Schlüssels zugeordnet; gibt es ihn schon, wird er mit
+  `bereits_vorhanden` zurückgegeben (Wiederholen ist gefahrlos), `?dry_run=true` prüft nur. Danach die Teilnehmer mit `POST /faecher/{id}/teilnehmer` aufnehmen.
+  Anlegen dürfen Lehrkräfte mit Schul-Zugang (LDAP) und der Admin. Die Anlage-Logik liegt gemeinsam für App und API in `src/kurse.js`.
+- **API: Fächer, die zu Lernfeldern gehören (SPA-Komponenten, Unterfächer).** Sie stehen jetzt in `GET /klassen` und `GET /faecher/{id}` mit `art`
+  (`fach`, `lernfeld`, `komponente`, `unterfach`, `kurs`) und `uebergeordnet` (Lernfeld bzw. Fach); `GET /faecher/{id}` des Lernfelds nennt die Unterfächer.
+  Eintragen (Klausuren, Zusatzleistungen, Datumsnoten, Endnoten) geht direkt in der Komponente bzw. im Unterfach; Lernfeld und Fach mit Unterfächern
+  lassen sich lesen (auch von Lehrkräften, die nur einem Unterfach zugeordnet sind), aber nicht beschreiben -- die 409-Antwort nennt die IDs der Unterfächer.
+  In SPA-Fächern liefert die Notenübersicht zusätzlich `leistungspunkte` (0–15) und `tendenz`. Dokumentation ergänzt.
+
 ## 0.123.0 - 2026-11-11
 
 - **API: Kurse umbenennen.** `PUT /api/v1/faecher/{id}/name` (Berechtigung „schreiben“) mit `{"name": "…"}`: jede Lehrkraft, die dem Kurs

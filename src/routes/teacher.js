@@ -49,6 +49,7 @@ import {
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
 import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
+import { legeKursAn } from '../kurse.js';
 import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
@@ -2872,29 +2873,13 @@ export default async function teacherRoutes(fastify) {
       return reply.redirect('/teacher/klassen');
     }
     const schuljahrId = parseInt(request.body?.schuljahr_id, 10);
-    const name = String(request.body?.name || '').trim();
-    // Kurse starten standardmäßig mit dem BG-Schlüssel (Notenpunkte 0-15).
-    let ns = String(request.body?.notenschluessel || 'BG');
-    if (!['IHK', 'BG'].includes(ns)) ns = 'BG';
-    if (!schuljahrId || !name) {
-      request.flash?.('error', 'Schuljahr und Name sind erforderlich.');
+    // Kurse starten standardmäßig mit dem BG-Schlüssel (Notenpunkte 0-15), siehe src/kurse.js.
+    const r = legeKursAn({ userId: request.user.id, schuljahrId, name: request.body?.name, notenschluessel: request.body?.notenschluessel });
+    if (!r.ok) {
+      request.flash?.('error', r.fehler);
       return reply.redirect('/teacher/klassen');
     }
-    const db = getDb();
-    try {
-      const huelle = db.prepare(`
-        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, ist_kurs_huelle)
-        VALUES (?, ?, ?, ?, 1)
-      `).run(schuljahrId, `__kurshuelle_${makeToken()}`, ns, DEFAULT_NS_CSV[ns] || '');
-      const info = db.prepare('INSERT INTO faecher (klasse_id, name, ist_kurs) VALUES (?, ?, 1)')
-        .run(huelle.lastInsertRowid, name);
-      db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)')
-        .run(request.user.id, info.lastInsertRowid);
-      return reply.redirect(`/teacher/fach/${info.lastInsertRowid}/teilnehmer`);
-    } catch (e) {
-      request.flash?.('error', 'Kurs konnte nicht angelegt werden -- bitte Schuljahr prüfen.');
-      return reply.redirect('/teacher/klassen');
-    }
+    return reply.redirect(`/teacher/fach/${r.fachId}/teilnehmer`);
   });
 
   fastify.post('/faecher/:id/loeschen', async (request, reply) => {

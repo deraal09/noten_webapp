@@ -30,7 +30,10 @@ export const ENDPOINTS = [
     antwort: {
       klassen: [{
         id: 12, name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', klassenleitung: true,
-        faecher: [{ id: 41, name: 'Englisch', halbjahre: ['5. Halbjahr', '6. Halbjahr'] }],
+        faecher: [
+          { id: 41, name: 'Englisch', art: 'fach', uebergeordnet: null, halbjahre: ['5. Halbjahr', '6. Halbjahr'] },
+          { id: 52, name: 'LF4 › DV-Unterricht', art: 'komponente', uebergeordnet: { id: 50, name: 'LF4' }, halbjahre: ['1. Halbjahr', '2. Halbjahr'] },
+        ],
       }],
     },
   },
@@ -46,11 +49,12 @@ export const ENDPOINTS = [
     beschreibung: 'Aufbau eines Fachs im gewählten Halbjahr: Klausuren (mit IDs, Höchstpunkten je Aufgabe, Teilen, Gewichtung), Zusatzleistungen der Unterrichtsleistung und die Termine der Datumstabelle.',
     query: [{ name: 'halbjahr', beschreibung: 'z. B. 5 oder „5. Halbjahr“ (ohne Angabe: aktuelles Halbjahr)' }],
     antwort: {
-      fach: { id: 41, name: 'Englisch', klasse: '12BFI1', notenschluessel: 'BG', halbjahr: '5. Halbjahr', halbjahre: ['5. Halbjahr', '6. Halbjahr'] },
+      fach: { id: 41, name: 'Englisch', art: 'fach', uebergeordnet: null, klasse: '12BFI1', notenschluessel: 'BG', halbjahr: '5. Halbjahr', halbjahre: ['5. Halbjahr', '6. Halbjahr'] },
       klausuren: [{ id: 7, name: 'Klausur 1', datum: '2025-10-14', max_punkte: [15, 15, 15], gewichtung: 40, teile: null }],
       unterrichtsleistungen: [{ id: 3, name: 'Referat', datum: null, max_punkte: [10], gewichtung: 20 }],
       termine: [{ id: 90, datum: '2025-09-01' }],
       sync: { automatisch: true, zuletzt_synchronisiert_am: '2025-10-14 09:30:12', zuletzt_synchronisiert_von: 'Max Mustermann' },
+      unterfaecher: [{ id: 52, name: 'DV-Unterricht', gewicht: null, halbjahre: ['1. Halbjahr', '2. Halbjahr'], zugriff: true }],
     },
   },
   {
@@ -169,6 +173,14 @@ export const ENDPOINTS = [
       gespeichert: true, hinzugefuegt: 1, uebersprungen: 1,
       teilnehmer: [{ nachname: 'Adler', vorname: 'Anna', klasse: 'BGG25A', schueler_id: 301, status: 'hinzugefuegt' }, { nachname: 'Berger', vorname: 'Bert', klasse: 'BGG25B', status: 'uebersprungen' }],
     },
+  },
+  {
+    id: 'kurs-neu', method: 'POST', path: '/kurse', scope: 'schreiben',
+    summary: 'Kurs anlegen',
+    beschreibung: 'Legt einen Kurs an (wie „+ Neuen Kurs anlegen“ in der App) und ordnet ihn der Lehrkraft des Schlüssels zu. `schuljahr` als Bezeichnung („2025/26“) oder ID, ohne Angabe das aktuelle Schuljahr. `notenschluessel`: `BG` (Standard) oder `IHK`. Danach die Teilnehmer mit `POST /faecher/{id}/teilnehmer` aufnehmen. Gibt es den Kurs (gleicher Name und Schuljahr) für diese Lehrkraft schon, wird er mit `bereits_vorhanden: true` zurückgegeben statt doppelt angelegt. Anlegen dürfen Lehrkräfte mit Schul-Zugang (LDAP) und der Admin.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts anlegen' }],
+    body: { name: 'Philosophie Q1', schuljahr: '2025/26', notenschluessel: 'BG' },
+    antwort: { gespeichert: true, kurs: { id: 47, name: 'Philosophie Q1', schuljahr: '2025/26', notenschluessel: 'BG' }, naechster_schritt: 'POST /faecher/47/teilnehmer, um die Teilnehmer aufzunehmen' },
   },
   {
     id: 'klasse-name', method: 'PUT', path: '/klassen/{id}/name', scope: 'schreiben',
