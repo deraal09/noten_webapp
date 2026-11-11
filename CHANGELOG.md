@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.121.0 - 2026-11-11
+
+- **Klassen und Kurse umbenennen -- für alle Beteiligten.** Auf der Klassenseite („✏️ Klasse umbenennen“) und auf der Fachseite eines Kurses
+  („✏️ Kurs umbenennen“) kann jede Lehrkraft den Namen ändern, die der Klasse bzw. dem Kurs angehört (nicht nur Klassenleitung oder
+  Ersteller/in). Der Name steht nur einmal und gilt sofort für alle, die in der Klasse bzw. im Kurs eingetragen sind (Meine Klassen,
+  Noteneingabe, Sitzpläne, Klassenleitung ...). Je Schuljahr muss ein Klassenname eindeutig sein (auch ohne Beachtung der
+  Groß-/Kleinschreibung); leere, zu lange (Klasse 60, Kurs 100 Zeichen) und mit „__“ beginnende Klassennamen werden abgelehnt. Die Sammelklasse
+  „Ohne Klasse“ lässt sich nicht umbenennen. Bei Kursen ziehen die Namen eventueller Unterfächer mit.
+
 ## 0.120.0 - 2026-11-11
 
 - **API: Teilnehmerliste.** `POST /api/v1/faecher/{id}/teilnehmer` nimmt Personen mit Nachname, Vorname und Klasse in die Teilnehmerliste eines

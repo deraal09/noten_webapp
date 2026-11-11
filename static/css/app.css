@@ -227,6 +227,9 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 .api-endpunkt pre, .card pre { overflow-x: auto; background: rgba(127,127,127,.12); padding: 0.6rem 0.8rem; border-radius: 6px; font-size: 0.85rem; }
 .api-methode { display: inline-block; min-width: 3.2rem; text-align: center; padding: 0.05rem 0.4rem; border-radius: 4px; color: #fff; font-size: 0.8rem; font-weight: 700; }
 .api-get { background: #2b7de9; } .api-post { background: #2e9b4f; } .api-put { background: #d98a0b; }
+.umbenennen { margin: 0.25rem 0 0.75rem; }
+.umbenennen > summary { cursor: pointer; display: inline-block; }
+.umbenennen form { margin-top: 0.4rem; }
 .klausur-hilfe > summary { cursor: pointer; }
 .klausur-hilfe ol, .klausur-hilfe ul { margin: 0.5rem 0; padding-left: 1.4rem; }
 .klausur-hilfe li { margin: 0.25rem 0; }

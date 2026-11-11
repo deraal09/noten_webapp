@@ -1,5 +1,15 @@
 <h1><%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <% if (!klasse.ist_ablage) { %>
+  <details class="umbenennen">
+    <summary>✏️ Klasse umbenennen</summary>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/umbenennen" class="inline">
+      <input type="text" name="name" value="<%= klasse.name %>" maxlength="60" required aria-label="Neuer Klassenname">
+      <button type="submit">Speichern</button>
+    </form>
+    <p class="hint">Der neue Name gilt sofort für alle Lehrkräfte, die in der Klasse eingetragen sind.</p>
+  </details>
+<% } %>
+<% if (!klasse.ist_ablage) { %>
   <p class="klassenleitung-zeile">
     🎓 <strong>Klassenleitung:</strong>
     <% if (klassenleitungNamen.length) { %><%= klassenleitungNamen.join(', ') %><% } else { %><span class="hint">noch niemand eingetragen</span><% } %>

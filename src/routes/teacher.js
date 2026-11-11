@@ -2137,6 +2137,55 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect('/teacher/klassen');
   });
 
+  // Klasse umbenennen: jede Lehrkraft, die der Klasse angehört (nicht nur die Klassenleitung). Der Name steht nur einmal in der
+  // Klasse und gilt damit sofort für alle, die in der Klasse eingetragen sind. Je Schuljahr muss er eindeutig sein.
+  fastify.post('/klassen/:id/umbenennen', async (request, reply) => {
+    const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(request.params.id);
+    if (!klasse || klasse.ist_kurs_huelle) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Klasse nicht gefunden.' });
+    if (klasse.ist_ablage) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Die Sammelklasse „Ohne Klasse“ lässt sich nicht umbenennen.' });
+    if (!userHatKlassenZugriff(request.user, klasse.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur Lehrkräfte, die der Klasse angehören, können sie umbenennen.' });
+    }
+    const ziel = `/teacher/klassen/${klasse.id}`;
+    const name = String(request.body?.name ?? '').trim();
+    if (!name) { request.flash?.('error', 'Bitte einen Namen angeben.'); return reply.redirect(ziel); }
+    if (name.length > 60) { request.flash?.('error', 'Der Name ist zu lang (höchstens 60 Zeichen).'); return reply.redirect(ziel); }
+    if (name.startsWith('__')) { request.flash?.('error', 'Der Name darf nicht mit „__“ beginnen.'); return reply.redirect(ziel); }
+    if (name === klasse.name) return reply.redirect(ziel);
+    if (getDb().prepare('SELECT 1 FROM klassen WHERE schuljahr_id = ? AND name = ? COLLATE NOCASE AND id != ?').get(klasse.schuljahr_id, name, klasse.id)) {
+      request.flash?.('error', `Im Schuljahr gibt es schon eine Klasse „${name}“.`);
+      return reply.redirect(ziel);
+    }
+    getDb().prepare('UPDATE klassen SET name = ? WHERE id = ?').run(name, klasse.id);
+    request.flash?.('success', `Klasse umbenannt: „${klasse.name}“ → „${name}“. Der neue Name gilt für alle Lehrkräfte der Klasse.`);
+    return reply.redirect(ziel);
+  });
+
+  // Kurs umbenennen: jede Lehrkraft, die dem Kurs zugeordnet ist; gilt für alle Lehrkräfte des Kurses (der Name steht nur einmal).
+  fastify.post('/kurse/:id/umbenennen', async (request, reply) => {
+    const fach = ladeFachMitUmfeld(request.params.id);
+    if (!fach || !fach.ist_kurs) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Kurs nicht gefunden.' });
+    if (!userHatFachZgriff(request.user, fach.id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur Lehrkräfte, die dem Kurs zugeordnet sind, können ihn umbenennen.' });
+    }
+    const ziel = `/teacher/fach/${fach.id}`;
+    const name = String(request.body?.name ?? '').trim();
+    if (!name) { request.flash?.('error', 'Bitte einen Namen angeben.'); return reply.redirect(ziel); }
+    if (name.length > 100) { request.flash?.('error', 'Der Name ist zu lang (höchstens 100 Zeichen).'); return reply.redirect(ziel); }
+    if (name === fach.name) return reply.redirect(ziel);
+    try {
+      const db = getDb();
+      db.transaction(() => {
+        db.prepare('UPDATE faecher SET name = ? WHERE id = ?').run(name, fach.id);
+        for (const u of ladeUnterfaecher(fach.id)) db.prepare('UPDATE faecher SET name = ? WHERE id = ?').run(`${name}${UNTERFACH_TRENNER}${u.kurzname || u.name}`, u.id);
+      })();
+      request.flash?.('success', `Kurs umbenannt: „${fach.name}“ → „${name}“. Der neue Name gilt für alle Lehrkräfte des Kurses.`);
+    } catch {
+      request.flash?.('error', `Einen Kurs „${name}“ gibt es schon.`);
+    }
+    return reply.redirect(ziel);
+  });
+
   fastify.get('/papierkorb', async (request, reply) => reply.viewEjs('teacher/papierkorb.ejs', {
     user: request.user, klassen: ladePapierkorb(request.user.id), fristTage: FRIST_TAGE, datumDe,
   }));

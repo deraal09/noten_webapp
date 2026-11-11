@@ -2,6 +2,16 @@
   <%= fach.name %><% if (!fach.ist_kurs) { %> – <%= fach.klasse_name %><% } %>
   <small>(<%= fach.schuljahr_bezeichnung %>, <%= fach.notenschluessel %><% if (fach.ist_kurs) { %>, Kurs<% } %>)</small>
 </h1>
+<% if (fach.ist_kurs) { %>
+  <details class="umbenennen">
+    <summary>✏️ Kurs umbenennen</summary>
+    <form method="post" action="/teacher/kurse/<%= fach.id %>/umbenennen" class="inline">
+      <input type="text" name="name" value="<%= fach.name %>" maxlength="100" required aria-label="Neuer Kursname">
+      <button type="submit">Speichern</button>
+    </form>
+    <p class="hint">Der neue Name gilt sofort für alle Lehrkräfte, die dem Kurs zugeordnet sind.</p>
+  </details>
+<% } %>
 <p class="kopf-aktionen">
   <a class="btn" href="/teacher">← Meine Noteneingabe</a>
   <% if (!fach.ist_kurs) { %>
