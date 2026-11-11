@@ -3046,7 +3046,7 @@ export default async function teacherRoutes(fastify) {
 // sichtbar falsch verteilte Prozente lassen sich sofort im Formular
 // korrigieren, eine unsichtbar bei 0 hängende Klausur (fehlende Note in der
 // Übersicht) nicht.
-function autoVerteileKlausuren(fachId, halbjahr, { erzwingen = false } = {}) {
+export function autoVerteileKlausuren(fachId, halbjahr, { erzwingen = false } = {}) {
   const klausuren = getDb().prepare(
     'SELECT id, gewichtung FROM klausuren WHERE fach_id = ? AND halbjahr = ? ORDER BY id'
   ).all(fachId, halbjahr);

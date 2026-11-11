@@ -6,6 +6,22 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.117.0 - 2026-11-11
+
+- **API für KI-Agenten (`/api/v1`).** Ein Agent oder Programm kann im Namen einer Lehrkraft Klassen, Fächer und Noten **auslesen,
+  auswerten und eintragen**:
+  - *Auslesen:* Klassen/Fächer/Schüler:innen, Aufbau eines Fachs (Klausuren, Zusatzleistungen, Termine), Notenübersicht, Statistik
+    (Durchschnitt, Verteilung, nicht bestanden), Notenschlüssel; *Berechnen:* Note aus Punkten (auch mehrteilige Klausuren) ohne Speichern.
+  - *Eintragen:* Klausuren und Zusatzleistungen anlegen, Punkte (mehrere Personen auf einmal), Termine der Datumstabelle und deren Noten,
+    Endnoten. Alles oder nichts, Probelauf mit `?dry_run=true`, Wiederholen gefahrlos; gelöscht wird über die API nichts.
+  - *Rechte:* Ein Schlüssel handelt mit den Rechten seiner Lehrkraft (Fach- und Halbjahreszugriff, Teilnahme, Notenkonferenz-Sperre).
+    SPA-Fächer und Fächer aus Unterfächern lassen sich nicht beschreiben (409), lesen geht.
+- **API-Schlüssel:** Menü „🤖 API-Zugang“: Schlüssel `nk_…` anlegen (Klartext nur einmal sichtbar, in der Datenbank nur der Hash), Berechtigung
+  „lesen“ oder „schreiben“, Gültigkeit 30 Tage/90 Tage/1 Jahr/unbegrenzt, Widerruf, „zuletzt benutzt“. Begrenzung 120 Anfragen pro Minute.
+- **Dokumentation:** Seite `/api/v1/docs` (mit Schnellstart, Regeln, Ablauf und Vorschlag für den System-Prompt eines Agenten),
+  maschinenlesbar `/api/v1/openapi.json` (OpenAPI 3) und `docs/API.md`.
+- Neue Tabelle `api_keys` (wird automatisch angelegt).
+
 ## 0.116.2 - 2026-11-10
 
 - **Korrektur Klausur-Teile: Hörverstehen rundet nicht mehr, Inhalt & Sprache werden direkt gemittelt.**

@@ -1,0 +1,91 @@
+<h1>🤖 API für KI-Agenten</h1>
+<p class="hint">
+  Mit dieser Schnittstelle kann ein KI-Agent (oder jedes Programm) Klassen, Fächer und Noten <strong>auslesen, auswerten und eintragen</strong>.
+  Maschinenlesbar: <a href="/api/v1/openapi.json">OpenAPI 3 (JSON)</a> · Basis-URL: <code><%= basis %></code>
+  <% if (user) { %>· <a href="/konto/api">Eigene Schlüssel verwalten</a><% } else { %>· Schlüssel gibt es nach der Anmeldung unter „API-Zugang“<% } %>
+</p>
+
+<div class="card">
+  <h2>Schnellstart</h2>
+  <ol>
+    <li>Unter <a href="/konto/api">🤖 API-Zugang</a> einen Schlüssel anlegen (<code>nk_…</code>), am besten zuerst „nur lesen“. Er wird nur einmal angezeigt.</li>
+    <li>Bei jeder Anfrage mitsenden: <code>Authorization: Bearer nk_…</code></li>
+    <li>Verbindungstest:
+      <pre><code>curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" <%= basis %>/me</code></pre></li>
+    <li>Klassen und Fächer: <code>GET /klassen</code> → Noten eines Fachs: <code>GET /faecher/{id}/noten?halbjahr=5</code></li>
+    <li>Eintragen (Schlüssel mit „schreiben“), erst mit <code>?dry_run=true</code> prüfen:
+      <pre><code>curl -X PUT -H "Authorization: Bearer nk_…" -H "Content-Type: application/json" \
+  -d '{"ergebnisse":[{"schueler_id":301,"punkte":[12,11,6]}]}' \
+  "<%= basis %>/klausuren/7/ergebnisse?dry_run=true"</code></pre></li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>Regeln und Sicherheit</h2>
+  <ul>
+    <li><strong>Eigene Rechte:</strong> Ein Schlüssel handelt als seine Lehrkraft. Es gelten dieselben Prüfungen wie in der Oberfläche: nur eigene Klassen/Fächer und Halbjahre, nur Personen, die am Fach teilnehmen, keine Eingabe bei gesperrten Noten (Notenkonferenz).</li>
+    <li><strong>Berechtigung:</strong> „lesen“ erlaubt Abfragen und Berechnungen, „schreiben“ zusätzlich das Eintragen. <strong>Gelöscht wird über die API nichts</strong>; Einträge lassen sich nur überschreiben oder leeren (<code>null</code>).</li>
+    <li><strong>Alles oder nichts:</strong> Beim Eintragen mehrerer Personen wird nichts gespeichert, wenn ein Eintrag ungültig ist (Status 422, Liste der Fehler unter <code>details</code>). Wiederholen ist gefahrlos.</li>
+    <li><strong>Probelauf:</strong> <code>?dry_run=true</code> prüft nur und zeigt die berechneten Noten, ohne zu speichern. Agenten sollten vor dem Eintragen immer einen Probelauf machen.</li>
+    <li><strong>Grenzen:</strong> höchstens 120 Anfragen pro Minute und Schlüssel, bis zu 500 Einträge je Aufruf, bis zu 40 Aufgaben je Klausur.</li>
+    <li><strong>Nicht über die API:</strong> SPA-Fächer (eigenes Bewertungsmodell) und Fächer, die sich in einem Halbjahr aus Unterfächern zusammensetzen, lassen sich nicht beschreiben (Status 409); lesen geht, Unterfächer lassen sich einzeln beschreiben.</li>
+    <li><strong>Schlüssel schützen:</strong> nur Programmen geben, denen du vertraust; pro Programm ein eigener Schlüssel, möglichst mit Ablaufdatum. Widerrufen wirkt sofort.</li>
+    <li><strong>Datenschutz:</strong> Über die API werden personenbezogene Daten (Namen, Noten) abgerufen. Die Verarbeitung durch einen externen KI-Dienst muss datenschutzrechtlich zulässig sein (Auftragsverarbeitung, Schulvorgaben).</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>Typischer Ablauf für einen Agenten</h2>
+  <ol>
+    <li><code>GET /me</code> – Konto und Berechtigung des Schlüssels prüfen.</li>
+    <li><code>GET /klassen</code> – Klassen und Fach-IDs finden; <code>GET /klassen/{id}/schueler</code> – Schüler-IDs.</li>
+    <li><code>GET /faecher/{id}?halbjahr=5</code> – Klausuren, Zusatzleistungen und Termine mit IDs und Höchstpunkten.</li>
+    <li><code>PUT …/ergebnisse?dry_run=true</code> – Eingaben prüfen, die berechneten Noten ansehen; dann ohne <code>dry_run</code> speichern.</li>
+    <li><code>GET /faecher/{id}/noten</code> bzw. <code>/statistik</code> – Ergebnis kontrollieren und auswerten.</li>
+  </ol>
+  <details>
+    <summary>Vorschlag für eine Anweisung an den Agenten (System-Prompt)</summary>
+<pre><code>Du hilfst einer Lehrkraft bei der Notenverwaltung über die API <%= basis %> (Bearer-Schlüssel nk_…).
+- Frage vor jedem Eintragen nach, wenn Zuordnung (Fach, Halbjahr, Person) nicht eindeutig ist.
+- Prüfe jede Eintragung zuerst mit ?dry_run=true und zeige der Lehrkraft die berechneten Noten.
+- Trage nur ein, was die Lehrkraft ausdrücklich verlangt hat. Lösche nichts, überschreibe nur auf Anweisung.
+- Rechne Noten nicht selbst: Die Notenberechnung macht die API (Notenschlüssel, Teile, Verrechnung).
+- Bei Fehler 422 wurde nichts gespeichert: lies details, korrigiere und wiederhole.
+- Gib Namen und Noten nicht an Dritte weiter.</code></pre>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Begriffe</h2>
+  <ul>
+    <li><strong>Halbjahr:</strong> als Zahl (<code>5</code>) oder Text (<code>"5. Halbjahr"</code>). Ohne Angabe gilt das aktuelle Halbjahr des Fachs.</li>
+    <li><strong>Noten:</strong> IHK 1–6 (kleiner = besser), BG 0–15 Notenpunkte (größer = besser); SPA-Klassen bewerten Klausuren nach dem SPA-Schlüssel (Noten 1–6), daraus entstehen Punkte und Tendenz. Die Schlüssel liefert <code>GET /notenschluessel</code>.</li>
+    <li><strong>Klausur:</strong> <code>max_punkte</code> hat einen Eintrag je Aufgabe. Mehrteilige Klausuren haben Teile; bei <em>Hörverstehen</em> trägt man die Verrechnungspunkte ein (Note nach Verrechnungstabelle, ohne Rundung), bei <em>Inhalt &amp; Sprache</em> direkt je eine Note (Teilnote = gewichtetes Mittel).</li>
+    <li><strong>Unterrichtsleistung:</strong> aus Zusatzleistungen (z. B. Referat) und der Datumstabelle (Note je Unterrichtstermin, <code>"n.a."</code> = nicht anwesend).</li>
+    <li><strong>Endnote:</strong> feste Halbjahresnote, die die berechnete ersetzt; <code>"ntg"</code> = nicht teilgenommen.</li>
+  </ul>
+</div>
+
+<h2>Endpunkte</h2>
+<% endpoints.forEach(function(e) { %>
+  <div class="card api-endpunkt" id="ep-<%= e.id %>">
+    <h3><span class="api-methode api-<%= e.method.toLowerCase() %>"><%= e.method %></span> <code><%= e.path %></code>
+      <small class="hint">· Schlüssel: <%= e.scope %></small></h3>
+    <p><strong><%= e.summary %></strong></p>
+    <p><%- e.beschreibung.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`(.+?)`/g, '<code>$1</code>') %></p>
+    <% if (e.query && e.query.length) { %>
+      <p>Parameter: <% e.query.forEach(function(q, i) { %><code><%= q.name %></code> – <%= q.beschreibung %><%= i < e.query.length - 1 ? '; ' : '' %><% }); %></p>
+    <% } %>
+    <% if (e.body) { %><p>Anfrage (JSON):</p><pre><code><%= JSON.stringify(e.body, null, 2) %></code></pre><% } %>
+    <p>Antwort (Beispiel):</p><pre><code><%= JSON.stringify(e.antwort, null, 2) %></code></pre>
+  </div>
+<% }); %>
+
+<div class="card">
+  <h2>Fehler</h2>
+  <p>Fehler kommen als JSON <code>{ "error": "code", "message": "Text", "details": [...] }</code> mit dem passenden HTTP-Status:</p>
+  <table class="data">
+    <thead><tr><th>Status</th><th>Bedeutung</th></tr></thead>
+    <tbody><% Object.keys(fehlercodes).forEach(function(c) { %><tr><td><%= c %></td><td><%= fehlercodes[c] %></td></tr><% }); %></tbody>
+  </table>
+</div>

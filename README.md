@@ -717,6 +717,15 @@ gebunden) oder als **Notenkonferenz-Entscheidung** (klassenweit, fachübergreife
 sichtbar). Alle Notizen einer Schüler/in erscheinen in der
 Halbjahresübersicht der Klassenleitung.
 
+## API für KI-Agenten
+
+Unter `/api/v1` gibt es eine JSON-API, mit der ein KI-Agent oder ein Programm im Namen einer Lehrkraft Noten **auslesen, auswerten und
+eintragen** kann. Jede Lehrkraft legt ihre API-Schlüssel selbst an (Menü **🤖 API-Zugang**, `/konto/api`; nur der Hash wird gespeichert,
+Berechtigung „lesen“ oder „schreiben“, optional mit Ablaufdatum). Ein Schlüssel hat genau die Rechte seiner Lehrkraft; Eintragen ist
+„alles oder nichts“ und lässt sich mit `?dry_run=true` vorab prüfen. Dokumentation: [docs/API.md](docs/API.md), in der laufenden App
+`/api/v1/docs` und `/api/v1/openapi.json`. Code: `src/routes/api-v1.js`, `src/api-keys.js`, Beschreibung der Endpunkte `src/api-docs.js`.
+(Die ältere Schnittstelle `/api/extern` ist nur für den Lehrerkalender.)
+
 ## Single Sign-on für den Lehrerkalender
 
 Diese App ist der **Anmeldedienst** für den Lehrerkalender

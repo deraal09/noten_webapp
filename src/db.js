@@ -722,6 +722,21 @@ CREATE TABLE IF NOT EXISTS notenschluessel_fassungen (
     gueltig_ab TEXT NOT NULL
 );
 
+-- API-Schlüssel für KI-Agenten und andere Programme (siehe src/api-keys.js, docs/API.md): persönlich je Lehrkraft, mit deren Rechten.
+-- Gespeichert wird nur der SHA-256-Hash; der Schlüssel selbst wird einmalig bei der Anlage angezeigt.
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    key_prefix TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'lesen' CHECK (scope IN ('lesen', 'schreiben')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT,
+    last_used_at TEXT,
+    revoked_at TEXT
+);
+
 -- Papierkorb für Klassen: Jede Lehrkraft, die eine Klasse "löscht", blendet sie nur für sich aus (Zeile hier). Sind alle
 -- Lehrkräfte der Klasse durch, läuft klassen.papierkorb_ab; 30 Tage danach wird die Klasse endgültig gelöscht (src/papierkorb.js).
 CREATE TABLE IF NOT EXISTS klassen_geloescht (

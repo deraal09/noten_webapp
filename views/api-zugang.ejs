@@ -1,0 +1,72 @@
+<h1>🤖 API-Zugang</h1>
+<p class="hint">
+  Mit einem API-Schlüssel kann ein KI-Agent (oder ein anderes Programm) in deinem Namen Noten <strong>auslesen, auswerten und eintragen</strong> –
+  mit genau deinen Rechten: nur deine Klassen und Fächer, nicht in gesperrte Halbjahre. Gelöscht wird über die API nichts.
+  <a href="/api/v1/docs">Dokumentation der API</a> · <a href="/api/v1/openapi.json">OpenAPI-Datei</a>
+</p>
+
+<% if (neu) { %>
+  <div class="card api-neu">
+    <h2>Neuer Schlüssel „<%= neu.name %>“ (<%= neu.scope %>)</h2>
+    <p><strong>Kopiere ihn jetzt</strong> – er wird nur dieses eine Mal angezeigt und ist danach nirgends mehr lesbar.</p>
+    <p><input type="text" readonly value="<%= neu.key %>" id="api-neu-key" class="api-key" onclick="this.select()"></p>
+    <p><button type="button" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('api-neu-key').value)">📋 Kopieren</button></p>
+    <details>
+      <summary>Beispielaufruf</summary>
+      <pre><code>curl -H "Authorization: Bearer <%= neu.key %>" <%= serverUrl %>/api/v1/me</code></pre>
+    </details>
+    <p class="hint">Gib den Schlüssel nur Programmen, denen du vertraust. Wer ihn hat, kann in deinem Namen <%= neu.scope === 'schreiben' ? 'lesen und Noten eintragen' : 'Noten lesen' %>. Bei Verdacht: unten widerrufen.</p>
+  </div>
+<% } %>
+
+<% if (fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
+
+<form method="post" action="/konto/api" class="card">
+  <h2>Neuen Schlüssel anlegen</h2>
+  <label>Name <small>(wofür?)</small>
+    <input type="text" name="name" maxlength="80" required placeholder="z. B. Claude Notenassistent">
+  </label>
+  <label>Berechtigung
+    <select name="scope">
+      <option value="lesen">nur lesen (auslesen und auswerten)</option>
+      <option value="schreiben">lesen und Noten eintragen</option>
+    </select>
+  </label>
+  <label>Gültig für
+    <select name="gueltig_tage">
+      <% gueltig.forEach(function(g) { %><option value="<%= g[0] %>" <%= g[0] === '90' ? 'selected' : '' %>><%= g[1] %></option><% }); %>
+    </select>
+  </label>
+  <button type="submit">🔑 Schlüssel erzeugen</button>
+  <p class="hint">Höchstens <%= maxKeys %> aktive Schlüssel. Empfehlung: für jedes Programm einen eigenen, möglichst nur lesend und mit Ablaufdatum.</p>
+</form>
+
+<h2>Deine Schlüssel</h2>
+<% if (!schluessel.length) { %>
+  <p class="hint">Noch keine Schlüssel.</p>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Name</th><th>Beginnt mit</th><th>Berechtigung</th><th>Angelegt</th><th>Läuft ab</th><th>Zuletzt benutzt</th><th></th></tr></thead>
+    <tbody>
+      <% schluessel.forEach(function(s) { var abgelaufen = s.expires_at && new Date(s.expires_at) <= new Date(); %>
+        <tr <%- s.revoked_at || abgelaufen ? 'class="ausgegraut"' : '' %>>
+          <td><%= s.name %></td>
+          <td><code><%= s.key_prefix %>…</code></td>
+          <td><%= s.scope %></td>
+          <td><%= formatZeit(s.created_at) %></td>
+          <td><%= s.expires_at ? formatZeit(s.expires_at) : 'unbegrenzt' %></td>
+          <td><%= s.last_used_at ? formatZeit(s.last_used_at) : '–' %></td>
+          <td>
+            <% if (s.revoked_at) { %><span class="hint">widerrufen</span>
+            <% } else if (abgelaufen) { %><span class="hint">abgelaufen</span>
+            <% } else { %>
+              <form method="post" action="/konto/api/<%= s.id %>/widerrufen" class="inline" onsubmit="return confirm('Schlüssel „<%= s.name.replace(/'/g, '') %>“ widerrufen? Programme, die ihn nutzen, verlieren sofort den Zugriff.')">
+                <button type="submit" class="danger">Widerrufen</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
