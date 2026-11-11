@@ -6,6 +6,34 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.126.0 - 2026-11-12
+
+### Hilfe für die Klassenleitung
+
+- Neue Kategorie **🎓 Für die Klassenleitung** in der Hilfe (`/hilfe`) mit
+  sieben Artikeln und Bildschirmfotos: Überblick (Klassenleitung werden,
+  Rechte), Halbjahresübersicht und Synchronisation, Notenkonferenz
+  (Konferenzmodus, Konferenznoten, Sperren/Entsperren, Entsperr-Anfragen),
+  Endnoten direkt eintragen, Fehlzeiten und Notizen, Abschluss-/Abgangsübersicht
+  mit Zeugnissen und Export, Klasse verwalten (Lehrkräfte, Rechte, Löschschutz).
+  Der bisherige Artikel `klassenleitung` wurde dabei erweitert und
+  in die neue Kategorie verschoben.
+- Zweiter **geführter Rundgang für die Klassenleitung** (9 Schritte) unter
+  `/hilfe/rundgang-klassenleitung`; Rundgänge sind jetzt in `RUNDGAENGE`
+  (`src/hilfe.js`) beschrieben und haben je einen eigenen gemerkten Fortschritt.
+  Die Hilfe-Startseite zeigt beide Rundgänge, Artikel der Klassenleitung
+  verlinken ihren Rundgang.
+- Bildschirmfotos-Skript (`scripts/hilfe-screenshots.mjs`) erzeugt acht neue
+  `leitung-*`-Bilder aus erfundenen Demodaten (Synchronisation, Sperre,
+  Entsperr-Anfrage, Konferenznote, Fehlzeiten, Fächer ohne Lehrkraft).
+
+### Behoben
+
+- Im **Konferenzmodus** stand bei gesperrten Personen „gesperrt … von
+  unbekannt“ und bei Entsperr-Anfragen „angefragt von —“. Die Namen der sperrenden
+  bzw. anfragenden Lehrkraft werden jetzt angezeigt (`holeSperre` in
+  `src/noten-sperre.js`, Test ergänzt).
+
 ## 0.125.0 - 2026-11-12
 
 - **Hilfe mit Suche und Screenshots (`/hilfe`).** Neuer Menüpunkt „❓ Hilfe“ (und Link in der Fußzeile, auch ohne Anmeldung): 17 Artikel zu allen

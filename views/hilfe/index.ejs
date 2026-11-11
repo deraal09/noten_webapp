@@ -6,13 +6,15 @@
   <ul id="hilfe-suche-ergebnisse" class="hilfe-treffer" hidden></ul>
 </form>
 
+<% Object.values(RUNDGAENGE).forEach(function(r) { %>
 <div class="hilfe-rundgang-karte card">
   <div>
-    <h2>🧭 Geführter Rundgang</h2>
-    <p class="hint">In <%= rundgangAnzahl %> Schritten mit Bildern durch die wichtigsten Funktionen – mit Knöpfen, die die passende Seite öffnen.</p>
+    <h2>🧭 <%= r.titel %></h2>
+    <p class="hint"><%= r.id === 'lehrkraft' ? 'In ' + r.schritte.length + ' Schritten mit Bildern durch die wichtigsten Funktionen – mit Knöpfen, die die passende Seite öffnen.' : 'In ' + r.schritte.length + ' Schritten: Halbjahresübersicht, Notenkonferenz, Sperren, Endnoten, Fehlzeiten und Abschluss.' %></p>
   </div>
-  <a class="btn" href="/hilfe/rundgang/1" id="rundgang-start">Rundgang starten</a>
+  <a class="btn" href="<%= r.basis %>/1" data-rundgang-start="<%= r.merke %>" data-basis="<%= r.basis %>">Rundgang starten</a>
 </div>
+<% }); %>
 
 <% if (treffer) { %>
   <h2>Suchergebnisse für „<%= q %>“</h2>
@@ -88,11 +90,12 @@
     });
     document.addEventListener('click', function (e) { if (!liste.contains(e.target) && e.target !== eingabe) liste.hidden = true; });
     eingabe.addEventListener('keydown', function (e) { if (e.key === 'Escape') liste.hidden = true; });
-    // Gemerkter Rundgang: „Weitermachen“ statt „Rundgang starten“
-    try {
-      var n = parseInt(localStorage.getItem('rundgang-schritt'), 10);
-      var knopf = document.getElementById('rundgang-start');
-      if (knopf && n > 1) { knopf.href = '/hilfe/rundgang/' + n; knopf.textContent = 'Rundgang fortsetzen (Schritt ' + n + ')'; }
-    } catch (e) { /* ohne Speicher: Start bei 1 */ }
+    // Gemerkte Rundgänge: „Weitermachen“ statt „Rundgang starten“
+    document.querySelectorAll('[data-rundgang-start]').forEach(function (knopf) {
+      try {
+        var n = parseInt(localStorage.getItem(knopf.dataset.rundgangStart + '-schritt'), 10);
+        if (n > 1) { knopf.href = knopf.dataset.basis + '/' + n; knopf.textContent = 'Rundgang fortsetzen (Schritt ' + n + ')'; }
+      } catch (e) { /* ohne Speicher: Start bei 1 */ }
+    });
   })();
 </script>

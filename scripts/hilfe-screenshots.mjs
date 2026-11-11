@@ -114,6 +114,19 @@ for (let i = 0; i < schueler.length; i++) for (let t = 0; t < termine.length; t+
 await anna(`/teacher/unterricht/termine/${termine[0].id}/inhalt`, { inhalt: 'Present perfect, Hörverstehen üben' });
 await anna(`/teacher/fach/${eng}/auto-sync`, { aktiv: '1', halbjahr: HJ });
 
+// Klassenleitung: Sync, Sperre mit Entsperr-Anfrage, Konferenznote, Notiz, Fehlzeiten, Fach ohne Lehrkraft, Co-Klassenleitung
+const mathe = fachId('Mathematik');
+await max(`/teacher/fach/${mathe}/sync`, { halbjahr: HJ });
+const sid = (n) => schueler.find((s) => s.nachname === n).id;
+await anna(`/teacher/klassen/${klasse}/konferenz/${sid('Fuchs')}/sperren`, { halbjahr: HJ });
+await max(`/teacher/fach/${mathe}/sperre/${sid('Fuchs')}/anfragen`, { halbjahr: HJ, grund: 'Klausur wurde nachgeschrieben' });
+await anna(`/teacher/klassen/${klasse}/konferenz/${sid('Engel')}/note`, { halbjahr: HJ, fach_id: String(eng), note: '6' });
+await anna(`/teacher/klassen/${klasse}/konferenz/${sid('Engel')}/notiz`, { halbjahr: HJ, text: 'Konferenz: Note angehoben, Leistungssteigerung im Halbjahr.' });
+await anna(`/klassenlehrer/klasse/${klasse}/speichern`, { hj: HJ, ...Object.fromEntries(schueler.flatMap((s, i) => [[`stunden_${s.id}_entschuldigt`, String(i % 3 * 2)], [`stunden_${s.id}_unentschuldigt`, String(i === 3 ? 4 : 0)], [`stunden_${s.id}_betrieblich`, '0']])) });
+await anna(`/teacher/klassen/${klasse}/faecher/neu`, { name: 'Religion' });
+db.prepare('DELETE FROM fach_zuweisungen WHERE fach_id = ?').run(fachId('Religion')); // Fach ohne Lehrkraft
+await anna(`/teacher/klassen/${klasse}/klassenleitung/hinzufuegen`, { user_id: String(uid('mmuster')) });
+
 // Kurs mit Teilnehmerliste (CSV)
 await anna('/teacher/kurse/neu', { schuljahr_id: String(sj), name: 'Philosophie AG', notenschluessel: 'BG' });
 const kurs = db.prepare('SELECT id FROM faecher WHERE ist_kurs = 1').get().id;
@@ -193,6 +206,14 @@ const aufnahmen = [
   { datei: 'notenschluessel', url: '/notenschluessel', klick: ['#ns-SPA summary'], hoehe: 900 },
   { datei: 'besprechung', url: `/teacher/fach/${eng}/besprechung/${schueler[0].id}?hj=${encodeURIComponent(HJ)}`, hoehe: 900 },
   { datei: 'klassenleitung', url: `/klassenlehrer/klasse/${klasse}`, hoehe: 760 },
+  { datei: 'leitung-uebersicht', url: `/klassenlehrer`, hoehe: 520 },
+  { datei: 'leitung-halbjahr', url: `/klassenlehrer/klasse/${klasse}?hj=${encodeURIComponent(HJ)}&tab=halbjahr`, hoehe: 900, markiere: ['.btn:has-text("Konferenzmodus")'] },
+  { datei: 'leitung-konferenz', url: `/teacher/klassen/${klasse}/konferenz/${schueler.find((s) => s.nachname === 'Fuchs').id}?hj=${encodeURIComponent(HJ)}`, hoehe: 900 },
+  { datei: 'leitung-konferenznote', url: `/teacher/klassen/${klasse}/konferenz/${schueler.find((s) => s.nachname === 'Engel').id}?hj=${encodeURIComponent(HJ)}`, hoehe: 900 },
+  { datei: 'leitung-endnoten', url: `/klassenlehrer/klasse/${klasse}?hj=${encodeURIComponent(HJ)}&tab=endnoten`, hoehe: 760 },
+  { datei: 'leitung-fehlzeiten', url: `/klassenlehrer/klasse/${klasse}?hj=${encodeURIComponent(HJ)}&tab=fehlzeiten`, hoehe: 700 },
+  { datei: 'leitung-abschluss', url: `/klassenlehrer/klasse/${klasse}?hj=${encodeURIComponent(HJ)}&tab=abschluss`, hoehe: 700 },
+  { datei: 'leitung-weitere', url: `/klassenlehrer/klasse/${klasse}?hj=${encodeURIComponent(HJ)}&tab=klassenleitung`, hoehe: 620 },
   { datei: 'api-zugang', url: '/konto/api', hoehe: 900 },
   { datei: 'api-docs', url: '/api/v1/docs', hoehe: 820 },
   { datei: 'hilfe', url: '/hilfe', hoehe: 760 },

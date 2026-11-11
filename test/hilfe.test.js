@@ -16,7 +16,7 @@ process.env.NODE_ENV = 'test';
 delete process.env.LDAP_URL;
 
 const { buildApp } = await import('../app.js');
-const { ARTIKEL, RUNDGANG, KATEGORIEN, sucheHilfe, normalisiere, formatiere } = await import('../src/hilfe.js');
+const { ARTIKEL, RUNDGANG, RUNDGANG_KLASSENLEITUNG, KATEGORIEN, sucheHilfe, normalisiere, formatiere } = await import('../src/hilfe.js');
 const fastify = await buildApp({ logger: false });
 const base = await fastify.listen({ port: 0, host: '127.0.0.1' });
 test.after(() => fastify.close());
@@ -32,7 +32,7 @@ test('Inhalte: eindeutige Slugs, gültige Kategorien und Verweise, alle Bilder e
     for (const v of a.verwandt || []) assert.ok(slugs.includes(v), `${a.slug} -> ${v}`);
     for (const b of a.bilder || []) assert.ok(fs.existsSync(path.join(ROOT, 'static', 'hilfe', `${b.datei}.jpg`)), `Bild ${b.datei}.jpg fehlt (node scripts/hilfe-screenshots.mjs)`);
   }
-  for (const s of RUNDGANG) {
+  for (const s of [...RUNDGANG, ...RUNDGANG_KLASSENLEITUNG]) {
     if (s.artikel) assert.ok(slugs.includes(s.artikel), s.titel);
     if (s.bild) assert.ok(fs.existsSync(path.join(ROOT, 'static', 'hilfe', `${s.bild}.jpg`)), `Bild ${s.bild}.jpg fehlt`);
     assert.match(s.href, /^\//);
@@ -47,6 +47,11 @@ test('Suche: Umlaute und Schreibweisen, Rangfolge, mehrere Wörter, Unsinn', () 
   assert.ok(sucheHilfe('csv').length >= 2);
   assert.equal(sucheHilfe('api schlüssel')[0].slug, 'api');
   assert.equal(sucheHilfe('Lernfeld')[0].slug, 'spa');
+  assert.equal(sucheHilfe('Konferenz')[0].slug, 'notenkonferenz');
+  assert.equal(sucheHilfe('Fehlzeiten')[0].slug, 'fehlzeiten-notizen');
+  assert.equal(sucheHilfe('Entsperrung')[0].slug, 'notenkonferenz');
+  assert.equal(sucheHilfe('Abgangszeugnis')[0].slug, 'abschluss-zeugnisse');
+  assert.equal(sucheHilfe('noch nie synchronisiert')[0].slug, 'halbjahresuebersicht');
   assert.deepEqual(sucheHilfe('qwxyzunsinn'), []);
   assert.deepEqual(sucheHilfe('a'), [], 'zu kurz');
   assert.match(sucheHilfe('verrechnungspunkte')[0].snippet, /Verrechnungspunkte/i);
@@ -105,6 +110,24 @@ test('Rundgang: Schritte, Fortschritt, Zurück/Weiter, Ende; ungültiger Schritt
   assert.match(letzter, /Fertig ✓/);
   assert.equal((await get('/hilfe/rundgang/99')).headers.get('location'), '/hilfe/rundgang/1');
   assert.equal((await get('/hilfe/rundgang/abc')).headers.get('location'), '/hilfe/rundgang/1');
+});
+
+test('Rundgang Klassenleitung: eigene Adresse, Schritte, Ende, eigener Speicherschlüssel', async () => {
+  const basis = '/hilfe/rundgang-klassenleitung';
+  assert.equal((await get(basis)).headers.get('location'), `${basis}/1`);
+  const erster = await (await get(`${basis}/1`)).text();
+  assert.match(erster, new RegExp(`Schritt 1 von ${RUNDGANG_KLASSENLEITUNG.length}`));
+  assert.match(erster, new RegExp(`href="${basis}/2"`), 'Weiter bleibt im selben Rundgang');
+  assert.match(erster, /rundgang-klassenleitung-schritt/);
+  const letzter = await (await get(`${basis}/${RUNDGANG_KLASSENLEITUNG.length}`)).text();
+  assert.match(letzter, /Fertig ✓/);
+  assert.equal((await get(`${basis}/99`)).headers.get('location'), `${basis}/1`);
+  const idx = await (await get('/hilfe')).text();
+  assert.match(idx, /Rundgang für die Klassenleitung/);
+  assert.match(idx, /href="\/hilfe\/rundgang-klassenleitung\/1"/);
+  const art = await (await get('/hilfe/notenkonferenz')).text();
+  assert.match(art, /href="\/hilfe\/rundgang-klassenleitung"/, 'Artikel der Klassenleitung verlinken den Rundgang');
+  assert.match(art, /leitung-konferenz\.jpg/);
 });
 
 test('Menü und Fußzeile verlinken die Hilfe; Startseite zeigt den Rundgang-Hinweis', async () => {

@@ -2,10 +2,10 @@
  * Hilfe (/hilfe): Artikel mit Screenshots, Suche und geführter Rundgang. Öffentlich erreichbar (enthält keine Daten, nur Erklärungen).
  */
 
-import { KATEGORIEN, ARTIKEL, RUNDGANG, artikelNachSlug, formatiere, sucheHilfe } from '../hilfe.js';
+import { KATEGORIEN, ARTIKEL, RUNDGAENGE, artikelNachSlug, formatiere, sucheHilfe } from '../hilfe.js';
 
 export default async function hilfeRoutes(fastify) {
-  const gemeinsam = { KATEGORIEN, formatiere, rundgangAnzahl: RUNDGANG.length };
+  const gemeinsam = { KATEGORIEN, formatiere, RUNDGAENGE };
 
   fastify.get('/hilfe', async (request, reply) => {
     const q = String(request.query?.q ?? '').trim().slice(0, 100);
@@ -20,16 +20,18 @@ export default async function hilfeRoutes(fastify) {
     treffer: sucheHilfe(String(request.query?.q ?? '').slice(0, 100), 8).map(({ slug, titel, kategorie, kurz, snippet }) => ({ slug, titel, kategorie, kurz, snippet })),
   }));
 
-  fastify.get('/hilfe/rundgang', async (request, reply) => reply.redirect('/hilfe/rundgang/1'));
-
-  fastify.get('/hilfe/rundgang/:n', async (request, reply) => {
-    const n = parseInt(request.params.n, 10);
-    if (!Number.isInteger(n) || n < 1 || n > RUNDGANG.length) return reply.redirect('/hilfe/rundgang/1');
-    const schritt = RUNDGANG[n - 1];
-    return reply.viewEjs('hilfe/rundgang.ejs', {
-      user: request.user, ...gemeinsam, n, schritt, schritte: RUNDGANG, artikel: schritt.artikel ? artikelNachSlug(schritt.artikel) : null,
+  // Geführte Rundgänge: /hilfe/rundgang[/n] (Lehrkräfte) und /hilfe/rundgang-klassenleitung[/n]
+  for (const rundgang of Object.values(RUNDGAENGE)) {
+    fastify.get(rundgang.basis, async (request, reply) => reply.redirect(`${rundgang.basis}/1`));
+    fastify.get(`${rundgang.basis}/:n`, async (request, reply) => {
+      const n = parseInt(request.params.n, 10);
+      if (!Number.isInteger(n) || n < 1 || n > rundgang.schritte.length) return reply.redirect(`${rundgang.basis}/1`);
+      const schritt = rundgang.schritte[n - 1];
+      return reply.viewEjs('hilfe/rundgang.ejs', {
+        user: request.user, ...gemeinsam, rundgang, n, schritt, schritte: rundgang.schritte, artikel: schritt.artikel ? artikelNachSlug(schritt.artikel) : null,
+      });
     });
-  });
+  }
 
   fastify.get('/hilfe/:slug', async (request, reply) => {
     const artikel = artikelNachSlug(request.params.slug);

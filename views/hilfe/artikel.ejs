@@ -37,4 +37,4 @@
   <h2>Weiterlesen</h2>
   <ul class="hilfe-liste"><% verwandt.forEach(function(v) { %><li><a href="/hilfe/<%= v.slug %>"><%= v.titel %></a> <span class="hint">– <%= v.kurz %></span></li><% }); %></ul>
 <% } %>
-<p><a class="btn" href="/hilfe/rundgang">🧭 Geführter Rundgang</a> <a class="btn" href="/hilfe">← Alle Themen</a></p>
+<p><a class="btn" href="/hilfe/rundgang">🧭 Geführter Rundgang</a> <% if (artikel.kategorie === 'leitung') { %><a class="btn" href="/hilfe/rundgang-klassenleitung">🎓 Rundgang Klassenleitung</a> <% } %> <a class="btn" href="/hilfe">← Alle Themen</a></p>

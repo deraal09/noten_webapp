@@ -1,5 +1,5 @@
-<p class="hilfe-krumel"><a href="/hilfe">❓ Hilfe</a> › 🧭 Geführter Rundgang</p>
-<h1>🧭 Rundgang · Schritt <%= n %> von <%= schritte.length %></h1>
+<p class="hilfe-krumel"><a href="/hilfe">❓ Hilfe</a> › 🧭 <%= rundgang.titel %></p>
+<h1>🧭 <%= rundgang.id === 'lehrkraft' ? 'Rundgang' : 'Klassenleitung' %> · Schritt <%= n %> von <%= schritte.length %></h1>
 
 <div class="rundgang-fortschritt" role="progressbar" aria-valuemin="1" aria-valuemax="<%= schritte.length %>" aria-valuenow="<%= n %>">
   <div style="width: <%= Math.round(n / schritte.length * 100) %>%"></div>
@@ -18,14 +18,14 @@
 </section>
 
 <nav class="rundgang-navigation" aria-label="Rundgang">
-  <% if (n > 1) { %><a class="btn" href="/hilfe/rundgang/<%= n - 1 %>" rel="prev">← Zurück</a><% } else { %><span></span><% } %>
-  <% if (n < schritte.length) { %><a class="btn rundgang-weiter" href="/hilfe/rundgang/<%= n + 1 %>" rel="next">Weiter →</a><% } else { %><a class="btn rundgang-weiter" href="/hilfe">Fertig ✓</a><% } %>
+  <% if (n > 1) { %><a class="btn" href="<%= rundgang.basis %>/<%= n - 1 %>" rel="prev">← Zurück</a><% } else { %><span></span><% } %>
+  <% if (n < schritte.length) { %><a class="btn rundgang-weiter" href="<%= rundgang.basis %>/<%= n + 1 %>" rel="next">Weiter →</a><% } else { %><a class="btn rundgang-weiter" href="/hilfe">Fertig ✓</a><% } %>
 </nav>
 
 <details class="rundgang-inhalt">
   <summary>Alle Schritte</summary>
   <ol>
-    <% schritte.forEach(function(s, i) { %><li <%- i + 1 === n ? 'class="aktuell"' : '' %>><a href="/hilfe/rundgang/<%= i + 1 %>"><%= s.titel %></a></li><% }); %>
+    <% schritte.forEach(function(s, i) { %><li <%- i + 1 === n ? 'class="aktuell"' : '' %>><a href="<%= rundgang.basis %>/<%= i + 1 %>"><%= s.titel %></a></li><% }); %>
   </ol>
 </details>
 
@@ -33,8 +33,8 @@
   // Schritt merken, damit der Rundgang später dort weitergeht (Hilfe-Startseite: „fortsetzen“).
   try {
     var n = <%= n %>;
-    localStorage.setItem('rundgang-schritt', n < <%= schritte.length %> ? String(n) : '1');
-    if (n >= <%= schritte.length %>) localStorage.setItem('rundgang-fertig', '1');
+    localStorage.setItem(<%- jsonFuerSkript(rundgang.merke + '-schritt') %>, n < <%= schritte.length %> ? String(n) : '1');
+    if (n >= <%= schritte.length %>) localStorage.setItem(<%- jsonFuerSkript(rundgang.merke + '-fertig') %>, '1');
   } catch (e) { /* ohne Speicher egal */ }
   // Pfeiltasten blättern
   document.addEventListener('keydown', function (e) {

@@ -186,6 +186,10 @@ test('Entsperrung anfragen (Fachlehrkraft) statt selbst zu entsperren', async ()
   const html = await (await lehrerA(`/teacher/klassen/${klasseId}/konferenz/${s1}?hj=${encodeURIComponent(HJ)}`)).text();
   assert.match(html, /Entsperrung angefragt/);
   assert.match(html, /Tippfehler korrigieren/);
+  // Namen statt „unbekannt“/„—“: Sperrende (Lehrer A) und Anfragende (Lehrer B)
+  assert.doesNotMatch(html, /unbekannt/);
+  assert.match(html, /gesperrt[\s\S]{0,200}Lehrer A/);
+  assert.match(html, /Entsperrung angefragt[\s\S]{0,200}Lehrer B/);
 });
 
 test('Entsperren (Klassenleitung): Fachlehrkraft kann danach wieder eintragen', async () => {

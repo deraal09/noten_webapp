@@ -9,9 +9,15 @@
 import { getDb } from './db.js';
 
 export function holeSperre(klasseId, schuelerId, halbjahr) {
-  return getDb().prepare(
-    'SELECT * FROM notensperren WHERE klasse_id = ? AND schueler_id = ? AND halbjahr = ?'
-  ).get(klasseId, schuelerId, halbjahr) || null;
+  // Mit Namen der sperrenden bzw. anfragenden Lehrkraft (der Konferenzmodus zeigt sie an).
+  return getDb().prepare(`
+    SELECT n.*, u1.display_name AS gesperrt_von_name, u1.username AS gesperrt_von_username,
+           u2.display_name AS angefragt_von_name, u2.username AS angefragt_von_username
+    FROM notensperren n
+    LEFT JOIN users u1 ON u1.id = n.gesperrt_von_id
+    LEFT JOIN users u2 ON u2.id = n.aufhebung_angefragt_von_id
+    WHERE n.klasse_id = ? AND n.schueler_id = ? AND n.halbjahr = ?
+  `).get(klasseId, schuelerId, halbjahr) || null;
 }
 
 export function istGesperrt(klasseId, schuelerId, halbjahr) {

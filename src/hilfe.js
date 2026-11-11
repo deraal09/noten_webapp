@@ -8,6 +8,7 @@ export const KATEGORIEN = [
   { id: 'klassen', titel: 'Klassen und Kurse', icon: '🏫' },
   { id: 'noten', titel: 'Noten eintragen', icon: '📝' },
   { id: 'auswerten', titel: 'Auswerten und Zusammenarbeit', icon: '🤝' },
+  { id: 'leitung', titel: 'Für die Klassenleitung', icon: '🎓' },
   { id: 'mehr', titel: 'Weitere Funktionen', icon: '🧰' },
 ];
 
@@ -289,22 +290,138 @@ export const ARTIKEL = [
     ],
     links: [{ text: 'Zur Noteneingabe', href: '/teacher' }], verwandt: ['klassenleitung', 'api'],
   },
+  // ---------------------------------------------------------------- Für die Klassenleitung
   {
-    slug: 'klassenleitung', kategorie: 'auswerten', titel: 'Klassenleitung: Übersicht, Konferenz und Zeugnisse',
-    kurz: 'Halbjahresübersicht, Endnoten, Fehlzeiten, Notenkonferenz mit Sperre, Abschluss- und Abgangsübersicht.',
-    schlagworte: ['klassenleitung', 'halbjahresübersicht', 'konferenz', 'sperre', 'entsperren', 'fehlzeiten', 'abschluss', 'abgang', 'zeugnis', 'endnoten', 'export', 'csv'],
-    bilder: [{ datei: 'klassenleitung', text: 'Bereich Klassenleitung' }],
+    slug: 'klassenleitung', kategorie: 'leitung', titel: 'Klassenleitung: Überblick',
+    kurz: 'Was die Klassenleitung kann, wie man Klassenleitung wird und wo man was findet.',
+    schlagworte: ['klassenleitung', 'klassenlehrer', 'klassenlehrkraft', 'überblick', 'rechte', 'eintragen', 'co-klassenleitung', 'weitere klassenlehrkräfte', 'reiter', 'verwalten', 'bereich'],
+    bilder: [{ datei: 'leitung-uebersicht', text: 'Klassenleitung: Auswahl der Klasse' }, { datei: 'klassenleitung', text: 'Bereich einer Klasse mit Reitern' }],
     abschnitte: [
-      { titel: 'Reiter', absaetze: [
-        '**Übersicht / Halbjahresübersicht:** die zuletzt synchronisierten Noten aller Fächer. **Endnoten (Direkteingabe):** Endnoten vergangener Halbjahre oder von Fächern ohne Lehrkraft. **Fehlzeiten:** Stunden je Person. **Abschluss-/Abgangsübersicht:** Noten über alle Halbjahre für Zeugnis und Abgang. **Weitere Klassenlehrkräfte:** Co-Klassenleitung eintragen.',
+      { titel: 'Klassenleitung werden', schritte: [
+        'Auf der Klassenseite (**Meine Klassen → Klasse**) auf **Als Klassenleitung eintragen** klicken. Das geht, solange noch niemand eingetragen ist und du in der Klasse mindestens ein **eigenes Fach** hast.',
+        'Weitere Personen trägst du im Reiter **Weitere Klassenlehrkräfte** als **Co-Klassenlehrkraft** ein. Sie haben dieselben Rechte wie du.',
+      ], hinweis: 'Sobald eine Klassenleitung eingetragen ist, verwaltet sie die Klasse (Fächer, Personen, Löschen); die erstellende Lehrkraft behält ihren normalen Zugriff.' },
+      { titel: 'Was die Klassenleitung kann', absaetze: [
+        '**Überblick:** Die Noten aller Fächer im **synchronisierten** Stand (nie die Live-Noten der Fachlehrkräfte).',
+        '**Verwalten:** Fächer anlegen und bearbeiten, Lehrkräfte zuordnen, Personen eintragen, versetzen, Abgang eintragen, Klasse umbenennen und Laufzeit ändern.',
+        '**Konferenz:** Konferenznoten, Notizen, Noten sperren und entsperren. **Auswerten:** Endnoten, Fehlzeiten, Abschluss- und Abgangsübersicht, Zeugnisse, CSV-Export.',
       ] },
-      { titel: 'Notenkonferenz', absaetze: [
-        'In der Notenkonferenz lassen sich Personen **sperren**: Dann kann in diesem Halbjahr niemand mehr Noten für sie ändern. Fachlehrkräfte können eine **Entsperrung anfragen**, die Klassenleitung entsperrt. Der **CSV-Export** der Klasse steht auf der Klassenseite.',
+      { titel: 'Wo finde ich was?', absaetze: [
+        'Über das Menü **Klassenleitung** wählst du die Klasse. Dort gibt es oben die **Halbjahre** und darunter die Reiter **Übersicht**, **Halbjahresübersicht**, **Endnoten (Direkteingabe)**, **Fehlzeiten**, **Abschluss-/Abgangsübersicht** und **Weitere Klassenlehrkräfte**. Fächer und Personen verwaltest du über **Zur Klasse**.',
       ] },
     ],
-    links: [{ text: 'Zur Klassenleitung', href: '/klassenlehrer' }], verwandt: ['sync', 'faecher-lehrkraefte'],
+    links: [{ text: 'Zur Klassenleitung', href: '/klassenlehrer' }, { text: 'Rundgang für die Klassenleitung', href: '/hilfe/rundgang-klassenleitung' }],
+    verwandt: ['halbjahresuebersicht', 'notenkonferenz', 'klassen-verwalten'],
   },
-
+  {
+    slug: 'halbjahresuebersicht', kategorie: 'leitung', titel: 'Halbjahresübersicht und Synchronisation prüfen',
+    kurz: 'Die synchronisierten Noten aller Fächer, Notenschnitt, Status, Notizen – und was „noch nie synchronisiert“ bedeutet.',
+    schlagworte: ['halbjahresübersicht', 'sync', 'synchronisiert', 'noch nie synchronisiert', 'notenschnitt', 'durchschnitt', 'status', 'notizen', 'fächer ohne lehrkraft', 'löschen', 'zusammensetzung'],
+    bilder: [{ datei: 'leitung-halbjahr', text: 'Halbjahresübersicht mit Sync-Stand je Fach' }],
+    abschnitte: [
+      { titel: 'Die Tabelle', absaetze: [
+        'Im Reiter **Halbjahresübersicht** (Halbjahr oben wählen) steht je Fach eine Spalte mit der **Lehrkraft** und dem Zeitpunkt der **letzten Synchronisation**. Daneben siehst du den **Ø Notenschnitt** der Person, den **Status** (🔒 gesperrt, ggf. mit Entsperr-Anfrage), die **Notizen** und den Knopf **Konferenz → Öffnen**.',
+        'Eine Spalte mit **„noch nie synchronisiert“** heißt: Die Fachlehrkraft hat diesen Stand noch nicht freigegeben. Bitte sie, auf **Jetzt synchronisieren** zu klicken oder den Haken **automatisch synchronisieren** zu setzen.',
+        'Ein 🎓 hinter einer Note kennzeichnet eine **Konferenznote** (Entscheidung der Notenkonferenz).',
+      ] },
+      { titel: 'Fächer ohne Lehrkraft', absaetze: [
+        'Fächer, denen niemand zugeordnet ist (z. B. versehentlich angelegt), listet die Übersicht unten auf. Du kannst sie dort **löschen**, solange keine Lehrkraft zugeordnet ist; ihre Noten gehen dabei verloren. Endnoten für solche Fächer trägst du im Reiter **Endnoten** ein.',
+      ] },
+    ],
+    links: [{ text: 'Zur Klassenleitung', href: '/klassenlehrer' }], verwandt: ['sync', 'notenkonferenz', 'endnoten-klassenleitung'],
+  },
+  {
+    slug: 'notenkonferenz', kategorie: 'leitung', titel: 'Notenkonferenz: Konferenzmodus, Konferenznoten, Sperren',
+    kurz: 'Person für Person durchgehen, Konferenznoten festlegen, Notizen, Noten sperren und Entsperr-Anfragen beantworten.',
+    schlagworte: ['konferenz', 'konferenzmodus', 'notenkonferenz', 'konferenznote', 'sperren', 'entsperren', 'entsperrung angefragt', 'sperre', 'notiz', 'entscheidung', 'überschreiben'],
+    bilder: [{ datei: 'leitung-konferenz', text: 'Konferenzmodus: gesperrte Person mit Entsperr-Anfrage' }, { datei: 'leitung-konferenznote', text: 'Konferenznote und Notiz' }],
+    abschnitte: [
+      { titel: 'Konferenzmodus starten', schritte: [
+        'In der **Halbjahresübersicht** auf **🎓 Konferenzmodus starten** klicken (oder bei einer Person auf **Öffnen**).',
+        'Du siehst eine Person nach der anderen; mit **← Zurück** und **Weiter →** blätterst du durch die Klasse. Oben wählst du das Halbjahr.',
+      ] },
+      { titel: 'Konferenznote und Notiz', absaetze: [
+        'In der Tabelle **Noten** steht je Fach der **Sync-Stand**. Trägst du in der Spalte der Konferenznote eine Zahl ein und klickst auf **💾**, überschreibt sie den Stand als **Entscheidung der Notenkonferenz**. Die Fachlehrkraft behält ihre eigene Note, und ein erneuter Sync löscht die Konferenznote nicht. Leer lassen = unverändert.',
+        'Unter **Notizen** hältst du Entscheidungen der Konferenz fest (klassenweit sichtbar für die Klassenleitung).',
+      ] },
+      { titel: 'Noten sperren und entsperren', absaetze: [
+        '**🔒 Noten sperren** verhindert für das Halbjahr jede weitere Änderung der Noten dieser Person durch die Fachlehrkräfte (Punkte und Noten lassen sich nicht mehr eintragen; die Person ist in den Notenübersichten mit 🔒 markiert).',
+        'Fachlehrkräfte können eine **Entsperrung anfragen** (mit Begründung). Die Anfrage erscheint in der Konferenzansicht und als Zahl **Offene Entsperr-Anfragen** in der Übersicht. Mit **🔓 Entsperren** gibst du die Eingabe wieder frei.',
+      ], hinweis: 'Gesperrt wird je Person und Halbjahr. So bleiben Zeugnisnoten nach der Konferenz stabil.' },
+    ],
+    links: [{ text: 'Zur Klassenleitung', href: '/klassenlehrer' }], verwandt: ['halbjahresuebersicht', 'endnoten-klassenleitung', 'abschluss-zeugnisse'],
+  },
+  {
+    slug: 'endnoten-klassenleitung', kategorie: 'leitung', titel: 'Endnoten direkt eintragen (Klassenleitung)',
+    kurz: 'Endnoten vergangener Halbjahre und von Fächern ohne Lehrkraft im Raster eintragen.',
+    schlagworte: ['endnoten', 'direkteingabe', 'raster', 'vergangene halbjahre', 'fach ohne lehrkraft', 'ntg', 'nicht teilgenommen', 'gesperrt', 'halbjahre'],
+    bilder: [{ datei: 'leitung-endnoten', text: 'Reiter „Endnoten (Direkteingabe)“' }],
+    abschnitte: [
+      { titel: 'Wann und wie', absaetze: [
+        'Im Reiter **Endnoten (Direkteingabe)** trägst du je Person und Fach eine **feste Endnote** ein. Sie ersetzt die berechnete Note (leer = berechnete Note, `ntg` = nicht teilgenommen).',
+        'Das geht für **vergangene Halbjahre** und für **Fächer ohne Lehrkraft**. In laufenden Halbjahren tragen die Fachlehrkräfte ihre Endnote selbst ein (**Direkte Endnoteneingabe** auf der Fachseite).',
+        'Gesperrte Personen (🔒) müssen zuerst im Konferenzmodus entsperrt werden. Fächer für ein Halbjahr legst du über **Zur Klasse → Fächer** an (Haken bei den Halbjahren).',
+      ] },
+    ],
+    links: [{ text: 'Zur Klassenleitung', href: '/klassenlehrer' }], verwandt: ['verrechnung-endnoten', 'notenkonferenz'],
+  },
+  {
+    slug: 'fehlzeiten-notizen', kategorie: 'leitung', titel: 'Fehlzeiten und Notizen zu Personen',
+    kurz: 'Fehlstunden je Person erfassen (auch an zwei Schulen) und Notizen zu einzelnen Schüler:innen führen.',
+    schlagworte: ['fehlzeiten', 'fehlstunden', 'entschuldigt', 'unentschuldigt', 'betrieblich', 'zwei schulen', 'notizen', 'notiz', 'schüler notizen'],
+    bilder: [{ datei: 'leitung-fehlzeiten', text: 'Fehlzeiten je Person' }],
+    abschnitte: [
+      { titel: 'Fehlzeiten erfassen', schritte: [
+        'Im Reiter **Fehlzeiten** das Halbjahr oben wählen.',
+        'Je Person die **Stunden** für **entschuldigt**, **unentschuldigt** und **betrieblich** eintragen (halbe Stunden sind möglich).',
+        'Auf **💾 Fehlzeiten speichern** klicken.',
+      ], hinweis: 'Werden die Personen an zwei Schulen unterrichtet, schaltest du oben **„an zwei Schulen unterrichtet“** ein: Dann gibt es je Fehlzeitenart zwei Spalten (Schule 1, Schule 2) und eine Summe.' },
+      { titel: 'Notizen zu einer Person', absaetze: [
+        'Der Knopf **📝 Notizen** hinter dem Namen öffnet ein Fenster mit allen Notizen der Person (mit Datum und Verfasser:in). Dort ergänzt du neue Notizen mit **+ Notiz hinzufügen**. Notizen aus der Notenbesprechung und der Konferenz erscheinen ebenfalls im Verlauf.',
+      ] },
+    ],
+    links: [{ text: 'Zur Klassenleitung', href: '/klassenlehrer' }], verwandt: ['notenkonferenz', 'abschluss-zeugnisse'],
+  },
+  {
+    slug: 'abschluss-zeugnisse', kategorie: 'leitung', titel: 'Abschluss- und Abgangsübersicht, Zeugnisse, Export',
+    kurz: 'Abschlussnoten über die Schullaufbahn, Abgangs- und Abschlusszeugnis, SPA-Zeugnisübersicht, CSV-Export.',
+    schlagworte: ['abschluss', 'abgang', 'abgangszeugnis', 'abschlusszeugnis', 'zeugnis', 'fachabschlussnote', 'schnitt', 'spa zeugnisübersicht', 'export', 'csv', 'abgang eintragen', 'laufzeit', 'abschlussjahr'],
+    bilder: [{ datei: 'leitung-abschluss', text: 'Abschluss-/Abgangsübersicht' }],
+    abschnitte: [
+      { titel: 'Abschluss-/Abgangsübersicht', absaetze: [
+        'Der Reiter zeigt die **Fachabschlussnote** je Fach über die gesamte Laufzeit und den **Ø Abschluss**. Fächer, die noch laufen, zeigen **„läuft“**, weil sie noch keine Abschlussnote haben (ein Fach ist abgeschlossen, wenn sein letztes Halbjahr vorbei ist). Bei Fächern aus Unterfächern lässt sich die Zusammensetzung aufklappen.',
+        'In der Spalte **Aktion** öffnet **🎓 Abgangs-/Abschlusszeugnis** das Zeugnis der Person mit den Noten aller Fächer.',
+      ] },
+      { titel: 'Abgang und Laufzeit', absaetze: [
+        'Verlässt eine Person die Klasse während des Schuljahres, trägst du auf der Klassenseite über **☰ → Abgang** einen Abgang ein (die Noten bleiben erhalten; **Reaktivieren** macht es rückgängig). Die **Laufzeit** der Klasse (Einschulung, Abschlussjahr) stellst du auf der Klassenseite ein; danach richten sich Halbjahre und „abgeschlossen“.',
+      ] },
+      { titel: 'SPA und Export', absaetze: [
+        'Für SPA-Klassen gibt es auf der Klassenseite die **📋 Zeugnisübersicht** mit den Zeugnisnoten nach dem SPA-Bewertungssystem. Den Notenstand der Klasse exportierst du über **📥 CSV-Export** auf der Klassenseite.',
+      ] },
+    ],
+    links: [{ text: 'Zur Klassenleitung', href: '/klassenlehrer' }], verwandt: ['notenkonferenz', 'spa'],
+  },
+  {
+    slug: 'klassen-verwalten', kategorie: 'leitung', titel: 'Klasse verwalten: Lehrkräfte, Rechte und Löschschutz',
+    kurz: 'Fächer und Zuordnungen pflegen, weitere Klassenlehrkräfte, wer was darf, Löschschutz und Einladungen externer Lehrkräfte.',
+    schlagworte: ['klasse verwalten', 'zuordnen', 'zuweisung', 'rechte', 'löschschutz', 'noten anderer lehrkräfte', 'externe lehrkräfte', 'einladung', 'einladungslink', 'co-klassenleitung', 'ohne klasse', 'versetzen', 'beitritt', 'offen für beitritt'],
+    bilder: [{ datei: 'faecher-lehrkraefte', text: 'Fächer und Lehrkräftezuordnung' }, { datei: 'leitung-weitere', text: 'Weitere Klassenlehrkräfte' }],
+    abschnitte: [
+      { titel: 'Lehrkräfte zuordnen', absaetze: [
+        'Auf der Klassenseite ordnest du bei **Fächer** Lehrkräfte den Fächern zu (auch nur für einzelne Halbjahre) und kannst über das **⚙ Zahnrad** Namen, Halbjahre, Unterfächer und Verrechnung eines Fachs ändern. Fächer ohne Lehrkraft siehst du in der Halbjahresübersicht.',
+        '**Externe Lehrkräfte** ohne Schulkonto lädst du über **Einladungen** (Menü) per Link ein; danach ordnest du sie einem Fach zu.',
+      ] },
+      { titel: 'Wer darf was?', absaetze: [
+        '**Fachlehrkraft:** trägt in ihrem Fach Noten ein. **Klassenleitung:** verwaltet Fächer, Personen und die Klasse, sieht die synchronisierten Noten. Wer nur der Klasse beigetreten ist, hat noch keine Verwaltungsrechte.',
+        'Ist eine Klasse **offen für Beitritt**, können Kolleg:innen sich über „Vorhandene Klasse wählen“ anschließen.',
+      ] },
+      { titel: 'Löschschutz für Noten anderer', absaetze: [
+        'Fächer und Personen lassen sich nur löschen, solange daran **keine Noten anderer Lehrkräfte** hängen; sonst bleibt es dem Admin vorbehalten. Personen, die die Klasse verlassen, bekommen einen **Abgang** (Noten bleiben). Wird eine Klasse endgültig gelöscht (durch den Admin), landen ihre Personen (nur Name) in der Sammelklasse **„Ohne Klasse“**; von dort holst du sie über **Aus „Ohne Klasse“ übernehmen** in eine andere Klasse.',
+        '**Klasse löschen** blendet sie nur für dich aus (Papierkorb); endgültig gelöscht wird sie erst, wenn alle Lehrkräfte der Klasse sie gelöscht haben, nach 30 Tagen.',
+      ] },
+    ],
+    links: [{ text: 'Meine Klassen', href: '/teacher/klassen' }], verwandt: ['faecher-lehrkraefte', 'papierkorb', 'klassenleitung'],
+  },
   // ---------------------------------------------------------------- Weitere Funktionen
   {
     slug: 'api', kategorie: 'mehr', titel: 'API-Zugang für KI-Agenten',
@@ -357,6 +474,25 @@ export const RUNDGANG = [
   { titel: 'API für KI-Agenten', bild: 'api-zugang', text: 'Unter **🤖 API-Zugang** erzeugst du persönliche Schlüssel, mit denen ein KI-Agent Noten auslesen, auswerten und eintragen kann – mit deinen Rechten und nur, wenn du es erlaubst.', artikel: 'api', href: '/konto/api', linkText: 'API-Zugang öffnen' },
   { titel: 'Geschafft – und Hilfe', bild: 'hilfe', text: 'Das waren die wichtigsten Funktionen. In der **Hilfe** findest du zu jedem Thema einen Artikel mit Bildern; die **Suche** hilft bei konkreten Fragen. Viel Erfolg!', artikel: null, href: '/hilfe', linkText: 'Zur Hilfe' },
 ];
+
+/** Geführter Rundgang für die Klassenleitung. */
+export const RUNDGANG_KLASSENLEITUNG = [
+  { titel: 'Klassenleitung werden', bild: 'klassenleitung', text: 'Auf der Klassenseite trägst du dich mit **Als Klassenleitung eintragen** ein (solange niemand eingetragen ist und du ein eigenes Fach in der Klasse hast). Weitere Personen trägst du als **Co-Klassenlehrkraft** ein. Im Menü **Klassenleitung** wählst du die Klasse; oben stehen die **Halbjahre**, darunter die Reiter.', artikel: 'klassenleitung', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },
+  { titel: 'Halbjahresübersicht', bild: 'leitung-halbjahr', text: 'Die **Halbjahresübersicht** zeigt den zuletzt **synchronisierten** Stand je Fach, den Notenschnitt, den Status und Notizen. **„Noch nie synchronisiert“** heißt: Die Fachlehrkraft muss ihr Fach freigeben (Knopf oder automatischer Sync).', artikel: 'halbjahresuebersicht', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },
+  { titel: 'Notenkonferenz', bild: 'leitung-konferenznote', text: 'Der **Konferenzmodus** führt dich Person für Person durch die Klasse. Eine **Konferenznote** überschreibt den Sync-Stand als Entscheidung der Konferenz, **Notizen** halten Beschlüsse fest.', artikel: 'notenkonferenz', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },
+  { titel: 'Sperren und Entsperren', bild: 'leitung-konferenz', text: 'Mit **🔒 Noten sperren** friert die Konferenz die Noten einer Person für das Halbjahr ein. Fachlehrkräfte können eine **Entsperrung anfragen**; die Anfragen siehst du in der Übersicht und beim Eintrag der Person. **🔓 Entsperren** gibt wieder frei.', artikel: 'notenkonferenz', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },
+  { titel: 'Endnoten direkt eintragen', bild: 'leitung-endnoten', text: 'Im Reiter **Endnoten (Direkteingabe)** trägst du Endnoten für **vergangene Halbjahre** und **Fächer ohne Lehrkraft** ein. In laufenden Halbjahren machen das die Fachlehrkräfte selbst.', artikel: 'endnoten-klassenleitung', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },
+  { titel: 'Fehlzeiten und Notizen', bild: 'leitung-fehlzeiten', text: 'Im Reiter **Fehlzeiten** erfasst du Stunden je Person (entschuldigt, unentschuldigt, betrieblich; auch für zwei Schulen). **📝 Notizen** hinter dem Namen führen den Verlauf zu einer Person.', artikel: 'fehlzeiten-notizen', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },
+  { titel: 'Abschluss, Abgang und Zeugnisse', bild: 'leitung-abschluss', text: 'Die **Abschluss-/Abgangsübersicht** zeigt die Fachabschlussnoten über die Laufzeit; von dort öffnest du das **Abgangs-/Abschlusszeugnis**. Der **CSV-Export** und (bei SPA) die **Zeugnisübersicht** liegen auf der Klassenseite.', artikel: 'abschluss-zeugnisse', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },
+  { titel: 'Klasse und Lehrkräfte verwalten', bild: 'faecher-lehrkraefte', text: 'Auf der Klassenseite ordnest du **Lehrkräfte** den Fächern zu, bearbeitest Fächer (**⚙**) und trägst Personen ein. **Weitere Klassenlehrkräfte** und **Einladungen** externer Lehrkräfte findest du im Bereich Klassenleitung bzw. im Menü. Fächer und Personen mit Noten anderer Lehrkräfte sind vor dem Löschen geschützt.', artikel: 'klassen-verwalten', href: '/teacher/klassen', linkText: 'Meine Klassen öffnen' },
+  { titel: 'Geschafft', bild: 'hilfe', text: 'Das war der Überblick für die Klassenleitung. Zu jedem Thema gibt es in der **Hilfe** einen ausführlichen Artikel; die **Suche** hilft bei konkreten Fragen.', artikel: null, href: '/hilfe', linkText: 'Zur Hilfe' },
+];
+
+/** Alle Rundgänge: `basis` ist der Pfad der Schritt-Seiten (…/1, …/2). */
+export const RUNDGAENGE = {
+  lehrkraft: { id: 'lehrkraft', titel: 'Geführter Rundgang', basis: '/hilfe/rundgang', schritte: RUNDGANG, merke: 'rundgang' },
+  klassenleitung: { id: 'klassenleitung', titel: 'Rundgang für die Klassenleitung', basis: '/hilfe/rundgang-klassenleitung', schritte: RUNDGANG_KLASSENLEITUNG, merke: 'rundgang-klassenleitung' },
+};
 
 // ---------------------------------------------------------------- Formatierung
 
