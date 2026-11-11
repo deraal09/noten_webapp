@@ -15,6 +15,7 @@
 import { getDb } from './db.js';
 import { DEFAULT_NS_CSV } from './grade-calc.js';
 import { findeLaufendeKlasse } from './klassen-jahre.js';
+import { gibKlassennamenFrei } from './klassennamen.js';
 import { findeOderLegeSchuelerAn } from './schueler-utils.js';
 
 /** Befüllt die Teilnehmerliste eines frisch angelegten Fachs mit allen Schüler/innen seiner Heimat-Klasse. */
@@ -174,6 +175,7 @@ export function legeManuellenTeilnehmerAn(fach, { nachname, vorname, klassenName
     return { ok: false, fehler: 'notenschluessel' };
   }
   if (!klasse) {
+    gibKlassennamenFrei(fach.schuljahr_id, kn); // eine Klasse im Papierkorb mit diesem Namen weicht
     const ns = fach.notenschluessel;
     const info = db.prepare(`
       INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv)

@@ -19,6 +19,7 @@ import {
   getLdapSettingsRow, saveLdapSettings, clearLdapBindPassword, resolveLdapConfig,
 } from '../auth/ldap-settings.js';
 import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
+import { gibKlassennamenFrei } from '../klassennamen.js';
 import { pruefeNotenschluesselWechsel, seedeTeilnehmerAusKlasse } from '../fach-teilnehmer.js';
 import { loescheKlasseMitSchuelerUebernahme } from '../klassenwechsel.js';
 import {
@@ -115,6 +116,7 @@ export default async function adminRoutes(fastify) {
     if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
     if (!name) return reply.redirect(`/admin/schuljahre/${request.params.id}`);
     try {
+      gibKlassennamenFrei(request.params.id, name); // eine Klasse im Papierkorb mit diesem Namen weicht
       getDb().prepare(
         'INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv) VALUES (?, ?, ?, ?)'
       ).run(request.params.id, name, ns, DEFAULT_NS_CSV[ns]);

@@ -13,7 +13,7 @@
 
 import { getDb } from '../db.js';
 import {
-  ladeMeineKlassen, ladeMeineKurse, userHatKlassenZugriff, userHatFachZgriff, userIstKlassenlehrer, userDarfTeilnehmerVerwalten, userDarfSelbstKlasseAnlegen,
+  ladeMeineKlassen, ladeMeineKurse, userHatKlassenZugriff, userHatFachZgriff, userIstKlassenlehrer, userDarfTeilnehmerVerwalten, userDarfSelbstKlasseAnlegen, userDarfKlasseVerwalten,
 } from '../auth.js';
 import { pruefeSchluessel, rateLimitErreicht } from '../api-keys.js';
 import { ladeFachMitUmfeld, ladeNotenuebersicht, getNotenschluesselCsv, unterfaecherDesHalbjahrs } from '../noten-service.js';
@@ -22,17 +22,20 @@ import {
   parseKlausurTeile, klausurNote, klausurTeilNoten, klausurProzent, MAX_KLAUSUR_TEILE, TEIL_ARTEN, noteAusPunkten,
 } from '../grade-calc.js';
 import { globalerSchluessel, tabelle, TYPEN } from '../notenschluessel.js';
-import { ladeTeilnehmerMitHerkunft, legeManuellenTeilnehmerAn } from '../fach-teilnehmer.js';
+import { ladeTeilnehmerMitHerkunft, legeManuellenTeilnehmerAn, seedeTeilnehmerAusKlasse } from '../fach-teilnehmer.js';
 import { istSchuelerGesperrtInFach, ladeSperrenFuerSchueler } from '../noten-sperre.js';
 import { setzeEndnote, notenBereich, parseEndnoteEingabe } from '../halbjahr-endnoten.js';
 import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
 import { autoVerteileKlausuren } from './teacher.js';
 import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { legeKursAn, kursNotenschluessel } from '../kurse.js';
-import { legeKlasseAn, berechneLaufzeit, KLASSEN_NOTENSCHLUESSEL } from '../klasse-anlegen.js';
+import { legeKlasseAn, berechneLaufzeit, aendereLaufzeit, KLASSEN_NOTENSCHLUESSEL } from '../klasse-anlegen.js';
+import { loescheFuerMich, stelleWiederHer, ladePapierkorb, loescheSofort, aktiveLehrkraefte, ablaufDatum } from '../papierkorb.js';
+import { holeSchuelerId, findeOderLegeSchuelerAn } from '../schueler-utils.js';
+import { baueSchuljahrBezeichnung } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE } from '../spa-schema.js';
 import { ladeSpaVorlage } from '../spa-vorlagen.js';
-import { parseJahrEingabe, MAX_SCHULJAHRE, findeLaufendeKlasse } from '../klassen-jahre.js';
+import { parseJahrEingabe, MAX_SCHULJAHRE, findeLaufendeKlasse, klassenLaufzeit, parseHalbjahreEingabe } from '../klassen-jahre.js';
 import { aktuellesSchuljahrBezeichnung, sorgeFuerAktuellesSchuljahr } from '../schuljahre-auto.js';
 import { ladeUnterfaecher } from '../unterfaecher.js';
 import { spaTendenz, spaTendenzAusNote } from '../spa-leistung.js';
@@ -94,6 +97,19 @@ function fachMeta(fach, halbjahr) {
   };
 }
 
+/** Laufzeit als Antwortobjekt; ohne `abschluss` gilt der Standard (SPA zwei, sonst drei Schuljahre). */
+function laufzeitInfo(einschulung, abschluss, notenschluessel) {
+  if (einschulung === null || einschulung === undefined) return { einschulung_jahr: null, abschluss_jahr: null, anzahl_jahre: null, schuljahre: [], halbjahre: null, abschluss_ist_standard: abschluss === null || abschluss === undefined };
+  const standard = einschulung + (notenschluessel === 'SPA' ? 1 : 2);
+  const bis = abschluss ?? standard;
+  const jahre = bis - einschulung + 1;
+  return {
+    einschulung_jahr: einschulung, abschluss_jahr: bis, anzahl_jahre: jahre,
+    schuljahre: Array.from({ length: jahre }, (_, i) => baueSchuljahrBezeichnung(einschulung + i)),
+    halbjahre: jahre * 2, abschluss_ist_standard: abschluss === null || abschluss === undefined,
+  };
+}
+
 export default async function apiV1Routes(fastify) {
   // ---------- Öffentlich: Beschreibung ----------
   // Hinter einem Proxy (Plesk) ist PUBLIC_URL die verlässliche Basis-Adresse; sonst aus der Anfrage.
@@ -105,6 +121,11 @@ export default async function apiV1Routes(fastify) {
 
   // ---------- Mit Schlüssel ----------
   await fastify.register(async (api) => {
+    // Aktions-Endpunkte (z. B. „wiederherstellen“) brauchen keinen Body: ein leerer JSON-Body gilt als {} statt als Fehler.
+    api.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
+      if (!body || !body.trim()) return done(null, {});
+      try { return done(null, JSON.parse(body)); } catch (e) { e.statusCode = 400; return done(e, undefined); }
+    });
     api.addHook('preHandler', async (request, reply) => {
       const p = pruefeSchluessel(request.headers.authorization);
       if (!p.ok) return senden(reply, p.status, 'unauthorized', p.fehler);
@@ -231,9 +252,8 @@ export default async function apiV1Routes(fastify) {
       if ((hatJahr(b.anzahl_jahre) || hatJahr(b.abschluss_jahr)) && laufzeit.abschluss === null) return senden(reply, 422, 'invalid', `Das Abschlussschuljahr muss zwischen dem Einschulungsschuljahr und ${MAX_SCHULJAHRE - 1} Jahren danach liegen.`);
       const name = b.name.trim();
       const info = (id) => ({
-        id, name, schuljahr: sj.bezeichnung, notenschluessel: ns, spa_bildungsgang: spaBildungsgang,
-        // Ohne Angabe gilt der Standard der App: SPA zwei, sonst drei Schuljahre.
-        einschulung_jahr: laufzeit.einschulung, abschluss_jahr: laufzeit.abschluss ?? (laufzeit.einschulung === null ? null : laufzeit.einschulung + (ns === 'SPA' ? 1 : 2)), offen_fuer_beitritt: b.offen_fuer_beitritt === true,
+        id, name, schuljahr: sj.bezeichnung, notenschluessel: ns, spa_bildungsgang: spaBildungsgang, offen_fuer_beitritt: b.offen_fuer_beitritt === true,
+        ...laufzeitInfo(laufzeit.einschulung, laufzeit.abschluss, ns),
       });
       // Wiederholen ist gefahrlos: läuft die Klasse im Schuljahr schon, wird nichts doppelt angelegt.
       const laufende = findeLaufendeKlasse(name, sj.id);
@@ -278,6 +298,169 @@ export default async function apiV1Routes(fastify) {
       if (!r.ok) return senden(reply, 422, 'invalid', r.fehler);
       request.log.info({ key: request.apiKey.id, fach: r.fachId }, 'api: Kurs angelegt');
       return { gespeichert: true, kurs: kursInfo(r.fachId, name, ns), naechster_schritt: `POST /faecher/${r.fachId}/teilnehmer, um die Teilnehmer aufzunehmen` };
+    });
+
+    // Laufzeit einer bestehenden Klasse ändern. Nicht angegebene Felder bleiben unverändert; `abschluss_jahr: null` bzw. `anzahl_jahre: null` = Standard.
+    // Wer darf: Klassenleitung (sobald eine eingetragen ist), sonst die Person, die die Klasse angelegt hat; der Admin immer.
+    route('PUT', '/klassen/:id/laufzeit', 'schreiben', async (request, reply) => {
+      const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(parseInt(request.params.id, 10));
+      if (!klasse || klasse.ist_kurs_huelle) return senden(reply, 404, 'not_found', 'Klasse nicht gefunden.');
+      if (klasse.ist_ablage) return senden(reply, 403, 'forbidden', 'Die Sammelklasse „Ohne Klasse“ hat keine Laufzeit.');
+      if (!userDarfKlasseVerwalten(request.apiUser, klasse.id)) return senden(reply, 403, 'forbidden', 'Die Laufzeit ändert die Klassenleitung (solange keine eingetragen ist: wer die Klasse angelegt hat) oder der Admin.');
+      const b = request.body || {};
+      const hat = (k) => Object.prototype.hasOwnProperty.call(b, k);
+      if (!hat('einschulung_jahr') && !hat('anzahl_jahre') && !hat('abschluss_jahr')) return senden(reply, 422, 'invalid', 'Mindestens eines von einschulung_jahr, anzahl_jahre oder abschluss_jahr angeben.');
+      if (hat('einschulung_jahr') && parseJahrEingabe(b.einschulung_jahr) === null) return senden(reply, 422, 'invalid', 'einschulung_jahr: Startjahr des Einschulungs-Schuljahres als Zahl (z. B. 2025 für 2025/26).');
+      if (hat('anzahl_jahre') && b.anzahl_jahre !== null && !(Number.isInteger(b.anzahl_jahre) && b.anzahl_jahre >= 1 && b.anzahl_jahre <= MAX_SCHULJAHRE)) return senden(reply, 422, 'invalid', `anzahl_jahre: ganze Zahl von 1 bis ${MAX_SCHULJAHRE} (null = Standard).`);
+      if (hat('abschluss_jahr') && b.abschluss_jahr !== null && parseJahrEingabe(b.abschluss_jahr) === null) return senden(reply, 422, 'invalid', 'abschluss_jahr: Startjahr des Abschluss-Schuljahres als Zahl (z. B. 2027 für 2027/28), null = Standard.');
+      const aktuell = klassenLaufzeit(klasse.id);
+      const vorher = laufzeitInfo(aktuell.einschulungJahr, aktuell.abschlussIstStandard ? null : aktuell.abschlussJahr, klasse.notenschluessel);
+      const einschulung = hat('einschulung_jahr') ? b.einschulung_jahr : aktuell.einschulungJahr;
+      let abschluss;
+      if (hat('anzahl_jahre')) abschluss = b.anzahl_jahre === null ? null : einschulung + b.anzahl_jahre - 1;
+      else if (hat('abschluss_jahr')) abschluss = b.abschluss_jahr;
+      else abschluss = aktuell.abschlussIstStandard ? null : aktuell.abschlussJahr;
+      const r = aendereLaufzeit(klasse, { einschulung, abschluss }, { speichern: speichern(request) });
+      if (!r.ok) return senden(reply, r.daten ? 409 : 422, r.daten ? 'conflict' : 'invalid', r.fehler);
+      const info = laufzeitInfo(einschulung, abschluss, klasse.notenschluessel);
+      const geaendert = JSON.stringify(info) !== JSON.stringify(vorher);
+      if (speichern(request) && geaendert) request.log.info({ key: request.apiKey.id, klasse: klasse.id }, 'api: Laufzeit geändert');
+      return { gespeichert: speichern(request) && geaendert, ...(speichern(request) ? {} : { dry_run: true }), klasse: { id: klasse.id, name: klasse.name, ...info }, vorher };
+    });
+
+    // Schüler:innen einer Klasse anlegen: wie „Mehrere auf einmal“ in der App (Doppelte werden übersprungen); alles oder nichts.
+    route('POST', '/klassen/:id/schueler', 'schreiben', async (request, reply) => {
+      const klasse = getDb().prepare('SELECT id, name, ist_ablage, ist_kurs_huelle FROM klassen WHERE id = ?').get(parseInt(request.params.id, 10));
+      if (!klasse || klasse.ist_kurs_huelle) return senden(reply, 404, 'not_found', 'Klasse nicht gefunden.');
+      if (klasse.ist_ablage && !request.apiUser.isAdmin) return senden(reply, 403, 'forbidden', 'Die Sammelklasse „Ohne Klasse“ verwaltet nur der Admin.');
+      if (!userHatKlassenZugriff(request.apiUser, klasse.id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf diese Klasse.');
+      const liste = request.body?.schueler;
+      if (!Array.isArray(liste) || !liste.length) return senden(reply, 422, 'invalid', 'schueler: Liste mit Einträgen { "nachname": "…", "vorname": "…" }.');
+      if (liste.length > MAX_EINTRAEGE) return senden(reply, 422, 'invalid', `Höchstens ${MAX_EINTRAEGE} Personen je Aufruf.`);
+      const fehler = [];
+      const eintraege = liste.map((e, i) => {
+        const n = typeof e?.nachname === 'string' ? e.nachname.trim() : '';
+        const v = typeof e?.vorname === 'string' ? e.vorname.trim() : '';
+        if (!n || !v || n.length > 100 || v.length > 100) fehler.push({ index: i, fehler: 'nachname und vorname: Text mit 1 bis 100 Zeichen.' });
+        return { nachname: n, vorname: v };
+      });
+      if (fehler.length) return senden(reply, 422, 'invalid', 'Ungültige Einträge -- es wurde nichts angelegt.', fehler);
+      const gesehen = new Map(); // gleiche Person mehrfach in einer Anfrage zählt einmal
+      const schueler = [];
+      const arbeite = () => {
+        for (const e of eintraege) {
+          const key = `${e.nachname.toLowerCase()}|${e.vorname.toLowerCase()}`;
+          if (gesehen.has(key)) { schueler.push({ id: gesehen.get(key), ...e, status: 'vorhanden' }); continue; }
+          const vorhanden = holeSchuelerId(klasse.id, e.nachname, e.vorname);
+          if (vorhanden !== null) { gesehen.set(key, vorhanden); schueler.push({ id: vorhanden, ...e, status: 'vorhanden' }); continue; }
+          if (speichern(request)) {
+            const id = Number(findeOderLegeSchuelerAn(klasse.id, e.nachname, e.vorname));
+            gesehen.set(key, id);
+            schueler.push({ id, ...e, status: 'angelegt' });
+          } else {
+            gesehen.set(key, null);
+            schueler.push({ id: null, ...e, status: 'wuerde_angelegt' });
+          }
+        }
+      };
+      getDb().transaction(arbeite)();
+      const neu = schueler.filter((x) => x.status !== 'vorhanden').length;
+      if (speichern(request) && neu) request.log.info({ key: request.apiKey.id, klasse: klasse.id, anzahl: neu }, 'api: Schüler angelegt');
+      return { gespeichert: speichern(request) && neu > 0, ...(speichern(request) ? {} : { dry_run: true }), klasse: { id: klasse.id, name: klasse.name }, neu, vorhanden: schueler.length - neu, schueler };
+    });
+
+    // Fach in einer Klasse anlegen: wie „+ Neues Fach anlegen“ in der App; die Lehrkraft des Schlüssels wird dem Fach zugeordnet, die Teilnehmerliste startet mit der Klasse.
+    route('POST', '/klassen/:id/faecher', 'schreiben', async (request, reply) => {
+      const klasse = getDb().prepare('SELECT id, name, ist_ablage, ist_kurs_huelle FROM klassen WHERE id = ?').get(parseInt(request.params.id, 10));
+      if (!klasse || klasse.ist_kurs_huelle) return senden(reply, 404, 'not_found', 'Klasse nicht gefunden.');
+      if (klasse.ist_ablage) return senden(reply, 403, 'forbidden', 'In der Sammelklasse „Ohne Klasse“ gibt es keine Fächer.');
+      if (!userHatKlassenZugriff(request.apiUser, klasse.id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf diese Klasse.');
+      const b = request.body || {};
+      if (typeof b.name !== 'string' || !b.name.trim() || b.name.trim().length > 100) return senden(reply, 422, 'invalid', 'name: Text mit 1 bis 100 Zeichen.');
+      const name = b.name.trim();
+      const laufzeit = klassenLaufzeit(klasse.id);
+      // Halbjahre: Nummern (3) oder Texte („3. Halbjahr“); nicht angegeben = alle Halbjahre der Klasse.
+      let halbjahreNr = null;
+      if (b.halbjahre !== undefined && b.halbjahre !== null) {
+        const roh = Array.isArray(b.halbjahre) ? b.halbjahre : [];
+        const nummern = roh.map((h) => (typeof h === 'number' ? h : /^\d{1,2}(\. Halbjahr)?$/.test(String(h)) ? parseInt(h, 10) : NaN));
+        if (!roh.length || nummern.some((n) => !Number.isInteger(n) || n < 1 || n > laufzeit.anzahlHalbjahre)) {
+          return senden(reply, 422, 'invalid', `halbjahre: Liste von Halbjahren dieser Klasse (1 bis ${laufzeit.anzahlHalbjahre}, z. B. [3, 4] oder ["3. Halbjahr"]); weglassen = alle.`);
+        }
+        halbjahreNr = parseHalbjahreEingabe(nummern, laufzeit);
+      }
+      const faechInfo = (id) => {
+        const f = id ? ladeFachMitUmfeld(id) : null;
+        return { id, name, klasse_id: klasse.id, halbjahre: f ? halbjahreFuerFach(f) : (halbjahreNr ? halbjahreNr.map((n) => laufzeit.halbjahre[n - 1]) : laufzeit.halbjahre) };
+      };
+      const db = getDb();
+      const vorhanden = db.prepare('SELECT id FROM faecher WHERE klasse_id = ? AND name = ?').get(klasse.id, name);
+      if (vorhanden) {
+        return { gespeichert: false, bereits_vorhanden: true, zugriff: userHatFachZgriff(request.apiUser, vorhanden.id), fach: faechInfo(vorhanden.id) };
+      }
+      if (!speichern(request)) return { gespeichert: false, dry_run: true, fach: faechInfo(null) };
+      const id = db.transaction(() => {
+        const info = db.prepare('INSERT INTO faecher (klasse_id, name, halbjahre, verrechnung) VALUES (?, ?, ?, NULL)')
+          .run(klasse.id, name, halbjahreNr ? JSON.stringify(halbjahreNr) : null);
+        db.prepare('INSERT OR IGNORE INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(request.apiUser.id, info.lastInsertRowid);
+        seedeTeilnehmerAusKlasse(info.lastInsertRowid, klasse.id);
+        return Number(info.lastInsertRowid);
+      })();
+      request.log.info({ key: request.apiKey.id, fach: id }, 'api: Fach angelegt');
+      return { gespeichert: true, fach: faechInfo(id), naechster_schritt: `POST /faecher/${id}/klausuren oder /faecher/${id}/unterrichtsleistungen, um Leistungen anzulegen` };
+    });
+
+    // ---------- Papierkorb (Klassen) ----------
+    const papierkorbEintrag = (k) => ({
+      id: k.id, name: k.name, schuljahr: k.schuljahr_bezeichnung, notenschluessel: k.notenschluessel, geloescht_am: k.geloescht_at,
+      noch_aktiv: k.nochAktiv, // Lehrkräfte, die die Klasse noch nutzen (0 = alle haben sie gelöscht)
+      endgueltig_geloescht_am: k.ablauf ? k.ablauf.toISOString() : null, resttage: k.resttage,
+      sofort_loeschbar: Boolean(k.ablauf),
+    });
+
+    route('GET', '/papierkorb', 'lesen', async (request) => {
+      const eintraege = ladePapierkorb(request.apiUser.id).map(papierkorbEintrag);
+      return { anzahl: eintraege.length, frist_tage: 30, klassen: eintraege };
+    });
+
+    // „Klasse löschen“ = in den eigenen Papierkorb legen (wie in der App für Lehrkräfte); die anderen Lehrkräfte sehen die Klasse weiter.
+    route('DELETE', '/klassen/:id', 'schreiben', async (request, reply) => {
+      const klasse = getDb().prepare('SELECT id, name, ist_ablage, ist_kurs_huelle FROM klassen WHERE id = ?').get(parseInt(request.params.id, 10));
+      if (!klasse || klasse.ist_kurs_huelle) return senden(reply, 404, 'not_found', 'Klasse nicht gefunden.');
+      if (klasse.ist_ablage) return senden(reply, 403, 'forbidden', 'Die Sammelklasse „Ohne Klasse“ verwaltet nur der Admin in der App.');
+      if (!userHatKlassenZugriff(request.apiUser, klasse.id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf diese Klasse.');
+      if (!speichern(request)) return { in_papierkorb: false, dry_run: true, klasse: { id: klasse.id, name: klasse.name } };
+      const r = loescheFuerMich(request.apiUser.id, klasse.id);
+      request.log.info({ key: request.apiKey.id, klasse: klasse.id }, 'api: Klasse in den Papierkorb gelegt');
+      return {
+        in_papierkorb: true, klasse: { id: klasse.id, name: klasse.name }, noch_aktiv: aktiveLehrkraefte(klasse.id).length,
+        endgueltig_geloescht_am: r.ablauf ? r.ablauf.toISOString() : null, sofort_loeschbar: r.letzte,
+        hinweis: r.letzte
+          ? 'Alle Lehrkräfte haben die Klasse gelöscht: Sie wird nach der Frist endgültig gelöscht oder sofort mit DELETE /papierkorb/{id}.'
+          : 'Nur für dich ausgeblendet; die anderen Lehrkräfte sehen sie weiter. Wiederherstellen: POST /papierkorb/{id}/wiederherstellen.',
+      };
+    });
+
+    route('POST', '/papierkorb/:id/wiederherstellen', 'schreiben', async (request, reply) => {
+      const id = parseInt(request.params.id, 10);
+      const imKorb = ladePapierkorb(request.apiUser.id).some((k) => k.id === id);
+      if (!imKorb) return senden(reply, 404, 'not_found', 'Diese Klasse liegt nicht in deinem Papierkorb.');
+      if (!speichern(request)) return { wiederhergestellt: false, dry_run: true };
+      stelleWiederHer(request.apiUser.id, id);
+      const k = getDb().prepare('SELECT id, name FROM klassen WHERE id = ?').get(id);
+      return { wiederhergestellt: true, klasse: { id: k.id, name: k.name } };
+    });
+
+    // Sofort endgültig löschen: nur, wenn die Klasse in MEINEM Papierkorb liegt und niemand sonst sie noch nutzt (alle Lehrkräfte haben sie gelöscht).
+    // Fächer, Klausuren und Noten gehen verloren; die Personen (nur Name) landen in der Sammelklasse „Ohne Klasse“.
+    route('DELETE', '/papierkorb/:id', 'schreiben', async (request, reply) => {
+      const r = loescheSofort(request.apiUser.id, parseInt(request.params.id, 10), { speichern: speichern(request) });
+      if (!r.ok && r.grund === 'nicht-im-papierkorb') return senden(reply, 404, 'not_found', 'Diese Klasse liegt nicht in deinem Papierkorb. Zuerst mit DELETE /klassen/{id} dorthin legen.');
+      if (!r.ok) {
+        return senden(reply, 409, 'noch_verbunden', `Die Klasse wird noch von ${r.nochAktiv} weiteren Lehrkraft${r.nochAktiv === 1 ? '' : 'en'} genutzt -- sofort löschen geht erst, wenn alle sie gelöscht haben.`, { noch_aktiv: r.nochAktiv });
+      }
+      if (speichern(request)) request.log.info({ key: request.apiKey.id, klasse: r.klasse.id }, 'api: Klasse sofort endgültig gelöscht');
+      return { geloescht: speichern(request), ...(speichern(request) ? {} : { dry_run: true, loeschbar: true }), klasse: r.klasse, personen_in_ohne_klasse: r.gerettet };
     });
 
     // Klasse umbenennen: wie in der App darf das jede Lehrkraft der Klasse; der Name gilt für alle, die eingetragen sind.

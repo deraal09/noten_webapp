@@ -30,6 +30,13 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | GET | `/notenschluessel` | lesen | Notenschlüssel IHK, BG, SPA |
 | POST | `/berechnen/klausur` | lesen | Note aus Punkten berechnen (speichert nichts) |
 | POST | `/klassen` | schreiben | Klasse anlegen (IHK/BG/SPA, Laufzeit; wiederholbar) |
+| PUT | `/klassen/{id}/laufzeit` | schreiben | Laufzeit (Einschulung, Dauer) nachträglich ändern |
+| POST | `/klassen/{id}/schueler` | schreiben | Schüler:innen anlegen (Doppelte werden übersprungen) |
+| POST | `/klassen/{id}/faecher` | schreiben | Fach anlegen (Halbjahre wählbar; wiederholbar) |
+| GET | `/papierkorb` | lesen | meine gelöschten Klassen mit Frist und `sofort_loeschbar` |
+| DELETE | `/klassen/{id}` | schreiben | Klasse in den Papierkorb legen (wiederherstellbar) |
+| POST | `/papierkorb/{id}/wiederherstellen` | schreiben | Klasse aus dem Papierkorb holen |
+| DELETE | `/papierkorb/{id}` | schreiben | Klasse sofort endgültig löschen (nur wenn niemand sonst sie nutzt) |
 | POST | `/kurse` | schreiben | Kurs anlegen (Standard BG; wiederholbar) |
 | PUT | `/klassen/{id}/name` | schreiben | Klasse umbenennen (jede Lehrkraft der Klasse; gilt für alle) |
 | PUT | `/faecher/{id}/name` | schreiben | Kurs umbenennen (jede Lehrkraft des Kurses; gilt für alle) |
@@ -49,13 +56,13 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 
 * **Alles oder nichts:** Ist bei einem Aufruf mit mehreren Personen ein Eintrag ungültig, wird nichts gespeichert (`422`, Liste unter `details`).
 * **Probelauf:** `?dry_run=true` prüft und zeigt die berechneten Noten, ohne zu speichern -- vor dem Eintragen immer nutzen.
-* **Idempotent:** Wiederholen schadet nicht. **Gelöscht wird über die API nichts** (leeren geht mit `null`).
+* **Idempotent:** Wiederholen schadet nicht. **Gelöscht wird nur über den Papierkorb für Klassen:** `DELETE /klassen/{id}` legt eine Klasse in den Papierkorb (wiederherstellbar), `DELETE /papierkorb/{id}` löscht sie sofort endgültig – aber nur, wenn keine weitere Lehrkraft mehr mit der Klasse verbunden ist (`409` sonst). Sonst lässt sich nichts löschen (leeren geht mit `null`).
 * **Lernfelder, Komponenten, Unterfächer:** Ein Fach, das zu einem Lernfeld (SPA) bzw. zu einem übergeordneten Fach gehört, steht mit `art` und `uebergeordnet` in
   `GET /klassen` und `GET /faecher/{id}`. Eingetragen wird **im Unterfach bzw. in der Komponente selbst** (eigene ID, dort wo die Lehrkraft zugeordnet ist); das
   Lernfeld bzw. Fach mit Unterfächern lässt sich lesen (auch von Lehrkräften, die nur einem Unterfach zugeordnet sind), aber nicht beschreiben (`409`, `details`
   nennt die Unterfach-IDs). In SPA-Fächern kommen `leistungspunkte` und `tendenz` dazu; Endnoten sind dort Gesamtpunkte 0–15.
 * **Personen anlegen:** Die Teilnehmerliste eines Fachs oder Kurses füllt `POST /faecher/{id}/teilnehmer` (Nachname, Vorname, Klasse je Person; legt
-  fehlende Personen und Klassen an, überspringt Doppelte). Eine **Klasse** legt `POST /klassen` an (leer, bei SPA mit der Fächervorgabe); die Schüler:innen einer Klasse legt die API nicht an (App: Einzeln/Mehrere auf einmal/CSV-Import).
+  fehlende Personen und Klassen an, überspringt Doppelte). Eine **Klasse** legt `POST /klassen` an (leer, bei SPA mit der Fächervorgabe); die Schüler:innen einer Klasse legt `POST /klassen/{id}/schueler` an (Nachname, Vorname je Person; Doppelte werden übersprungen), Fächer einer Klasse `POST /klassen/{id}/faecher`.
 * **Grenzen:** 120 Anfragen pro Minute und Schlüssel, 500 Einträge je Aufruf, 40 Aufgaben je Klausur.
 * **Datenschutz:** Namen und Noten verlassen das System. Der Einsatz eines externen KI-Dienstes muss datenschutzrechtlich zulässig sein.
 * Fehlerformat: `{ "error": "code", "message": "…", "details": [ … ] }`.

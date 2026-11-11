@@ -10,12 +10,12 @@ const FEHLER = {
   401: 'API-Schlüssel fehlt, ist ungültig, abgelaufen oder widerrufen',
   403: 'Keine Berechtigung (Schlüssel nur „lesen“, oder keine Rechte der Lehrkraft am Fach/Halbjahr)',
   404: 'Nicht gefunden',
-  409: 'Wird von der API (noch) nicht unterstützt, z. B. SPA-Fächer oder Fächer aus Unterfächern',
+  409: 'Wird von der API (noch) nicht unterstützt (z. B. SPA-Fächer, Fächer aus Unterfächern) oder steht im Konflikt mit dem Stand (z. B. Klasse wird noch von anderen Lehrkräften genutzt, Laufzeit würde Halbjahre mit Daten abschneiden)',
   422: 'Eingaben ungültig oder gesperrt; es wurde nichts gespeichert (Liste unter details)',
   429: 'Zu viele Anfragen (höchstens 120 pro Minute und Schlüssel)',
 };
 
-/** @type {Array<{id: string, method: 'GET'|'POST'|'PUT', path: string, scope: 'lesen'|'schreiben', summary: string, beschreibung: string, query?: Array<{name: string, beschreibung: string, pflicht?: boolean}>, body?: object, antwort: object}>} */
+/** @type {Array<{id: string, method: 'GET'|'POST'|'PUT'|'DELETE', path: string, scope: 'lesen'|'schreiben', summary: string, beschreibung: string, query?: Array<{name: string, beschreibung: string, pflicht?: boolean}>, body?: object, antwort: object}>} */
 export const ENDPOINTS = [
   {
     id: 'me', method: 'GET', path: '/me', scope: 'lesen',
@@ -181,6 +181,57 @@ export const ENDPOINTS = [
     query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts anlegen' }],
     body: { name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', einschulung_jahr: 2025, anzahl_jahre: 3, offen_fuer_beitritt: false },
     antwort: { gespeichert: true, klasse: { id: 12, name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', spa_bildungsgang: null, einschulung_jahr: 2025, abschluss_jahr: 2027, offen_fuer_beitritt: false }, naechster_schritt: 'Schüler:innen und Fächer legst du in der App an (Meine Klassen → Klasse).' },
+  },
+  {
+    id: 'klasse-laufzeit', method: 'PUT', path: '/klassen/{id}/laufzeit', scope: 'schreiben',
+    summary: 'Laufzeit einer Klasse ändern',
+    beschreibung: 'Ändert nachträglich Einschulung und Dauer einer Klasse (wie „Einschulungsjahr festlegen“ in der App). `einschulung_jahr`: Startjahr des Einschulungs-Schuljahres (2025 für 2025/26). Dauer entweder als `anzahl_jahre` oder als `abschluss_jahr` (Startjahr des Abschluss-Schuljahres); `null` = Standard (SPA 2, sonst 3 Jahre). Nicht angegebene Felder bleiben unverändert. Die Laufzeit lässt sich nicht so kürzen, dass Halbjahre mit eingetragenen Noten, Leistungen oder Fehlzeiten wegfallen (`409`). Wer darf: die Klassenleitung (sobald eine eingetragen ist), sonst die Person, die die Klasse angelegt hat; der Admin immer. Mit `dry_run` nur prüfen.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts ändern' }],
+    body: { einschulung_jahr: 2025, anzahl_jahre: 3 },
+    antwort: { gespeichert: true, klasse: { id: 12, name: '12BFI1', einschulung_jahr: 2025, abschluss_jahr: 2027, anzahl_jahre: 3, schuljahre: ['2025/26', '2026/27', '2027/28'], halbjahre: 6, abschluss_ist_standard: false }, vorher: { einschulung_jahr: 2025, abschluss_jahr: 2027, anzahl_jahre: 3, schuljahre: ['2025/26', '2026/27', '2027/28'], halbjahre: 6, abschluss_ist_standard: true } },
+  },
+  {
+    id: 'schueler-neu', method: 'POST', path: '/klassen/{id}/schueler', scope: 'schreiben',
+    summary: 'Schüler:innen einer Klasse anlegen',
+    beschreibung: 'Legt Personen in der Klasse an (wie „Mehrere auf einmal“ in der App). Wer in der Klasse schon mit gleichem Namen steht (Groß-/Kleinschreibung egal), wird nicht doppelt angelegt (`status: vorhanden`). Neue Personen werden automatisch Teilnehmer:innen aller Fächer der Klasse. Alles oder nichts: ist ein Eintrag ungültig, wird nichts angelegt (`422`, Liste unter `details`). Höchstens 500 Personen je Aufruf; wer Zugriff auf die Klasse hat, darf anlegen. Wiederholen ist gefahrlos.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts anlegen' }],
+    body: { schueler: [{ nachname: 'Adler', vorname: 'Anna' }, { nachname: 'Berger', vorname: 'Ben' }] },
+    antwort: { gespeichert: true, klasse: { id: 12, name: '12BFI1' }, neu: 1, vorhanden: 1, schueler: [{ id: 301, nachname: 'Adler', vorname: 'Anna', status: 'vorhanden' }, { id: 305, nachname: 'Berger', vorname: 'Ben', status: 'angelegt' }] },
+  },
+  {
+    id: 'fach-neu', method: 'POST', path: '/klassen/{id}/faecher', scope: 'schreiben',
+    summary: 'Fach in einer Klasse anlegen',
+    beschreibung: 'Legt ein Fach an (wie „+ Neues Fach anlegen“ in der App) und ordnet es der Lehrkraft des Schlüssels zu; die Teilnehmerliste startet mit allen Personen der Klasse. `halbjahre`: Liste der Halbjahre, in denen das Fach gilt (Nummern `[3, 4]` oder Texte `["3. Halbjahr"]`); weglassen = alle Halbjahre der Klasse. Gibt es das Fach (gleicher Name) in der Klasse schon, wird es mit `bereits_vorhanden: true` zurückgegeben statt doppelt angelegt. Danach mit `POST /faecher/{id}/klausuren` bzw. `/unterrichtsleistungen` weitermachen. Verrechnung der Halbjahre und weitere Lehrkräfte stellt die Klassenleitung in der App ein.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts anlegen' }],
+    body: { name: 'Mathematik', halbjahre: [3, 4] },
+    antwort: { gespeichert: true, fach: { id: 41, name: 'Mathematik', klasse_id: 12, halbjahre: ['3. Halbjahr', '4. Halbjahr'] }, naechster_schritt: 'POST /faecher/41/klausuren oder /faecher/41/unterrichtsleistungen, um Leistungen anzulegen' },
+  },
+  {
+    id: 'papierkorb', method: 'GET', path: '/papierkorb', scope: 'lesen',
+    summary: 'Papierkorb: meine gelöschten Klassen',
+    beschreibung: 'Listet die Klassen, die diese Lehrkraft gelöscht hat (wie die Seite „Papierkorb“ der App). `noch_aktiv` sind die Lehrkräfte, die die Klasse noch nutzen; erst wenn alle sie gelöscht haben (`noch_aktiv: 0`), läuft die Frist von 30 Tagen (`endgueltig_geloescht_am`, `resttage`) und `sofort_loeschbar` ist `true`.',
+    antwort: { anzahl: 1, frist_tage: 30, klassen: [{ id: 12, name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', geloescht_am: '2026-11-11T10:00:00.000Z', noch_aktiv: 0, endgueltig_geloescht_am: '2026-12-11T10:00:00.000Z', resttage: 30, sofort_loeschbar: true }] },
+  },
+  {
+    id: 'klasse-loeschen', method: 'DELETE', path: '/klassen/{id}', scope: 'schreiben',
+    summary: 'Klasse in den Papierkorb legen',
+    beschreibung: 'Wie „Klasse löschen“ in der App für Lehrkräfte: Die Klasse verschwindet nur für diese Lehrkraft und liegt in ihrem Papierkorb; die anderen Lehrkräfte sehen sie weiter. Nichts geht verloren – `POST /papierkorb/{id}/wiederherstellen` holt sie zurück. Erst wenn alle Lehrkräfte der Klasse sie gelöscht haben, läuft die Frist von 30 Tagen; sofort endgültig löschen geht dann mit `DELETE /papierkorb/{id}`. Gilt auch für ein Admin-Konto (über die API wird nie direkt endgültig gelöscht).',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts ändern' }],
+    antwort: { in_papierkorb: true, klasse: { id: 12, name: '12BFI1' }, noch_aktiv: 0, endgueltig_geloescht_am: '2026-12-11T10:00:00.000Z', sofort_loeschbar: true, hinweis: 'Alle Lehrkräfte haben die Klasse gelöscht: Sie wird nach der Frist endgültig gelöscht oder sofort mit DELETE /papierkorb/{id}.' },
+  },
+  {
+    id: 'papierkorb-wiederherstellen', method: 'POST', path: '/papierkorb/{id}/wiederherstellen', scope: 'schreiben',
+    summary: 'Klasse aus dem Papierkorb wiederherstellen',
+    beschreibung: 'Holt eine Klasse aus dem eigenen Papierkorb zurück; eine laufende Frist entfällt. Heißt eine andere Klasse inzwischen genauso, bekommt die wiederhergestellte den Zusatz „ (wiederhergestellt)“.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts ändern' }],
+    antwort: { wiederhergestellt: true, klasse: { id: 12, name: '12BFI1' } },
+  },
+  {
+    id: 'papierkorb-loeschen', method: 'DELETE', path: '/papierkorb/{id}', scope: 'schreiben',
+    summary: 'Klasse im Papierkorb sofort endgültig löschen',
+    beschreibung: 'Löscht eine Klasse aus dem eigenen Papierkorb sofort und endgültig, ohne die 30 Tage abzuwarten – aber nur, wenn **keine weitere Lehrkraft** mehr mit der Klasse verbunden ist (alle haben sie gelöscht, `sofort_loeschbar: true` in `GET /papierkorb`); sonst `409` (`noch_verbunden`). Liegt die Klasse nicht im eigenen Papierkorb, `404` (zuerst `DELETE /klassen/{id}`). **Nicht rückgängig zu machen:** Fächer, Klausuren und Noten gehen verloren; die Personen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“. Mit `dry_run` prüfen.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts löschen' }],
+    antwort: { geloescht: true, klasse: { id: 12, name: '12BFI1' }, personen_in_ohne_klasse: 24 },
   },
   {
     id: 'kurs-neu', method: 'POST', path: '/kurse', scope: 'schreiben',

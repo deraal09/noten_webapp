@@ -97,6 +97,8 @@ test('Dokumentation ist öffentlich (OpenAPI und Seite), Endpunkte und Hinweise 
   assert.equal(spec.openapi, '3.0.3');
   for (const p of ['/me', '/klassen', '/faecher/{id}/noten', '/klausuren/{id}/ergebnisse', '/faecher/{id}/endnoten', '/berechnen/klausur']) assert.ok(spec.paths[p], p);
   assert.ok(spec.paths['/klausuren/{id}/ergebnisse'].put.requestBody);
+  assert.ok(spec.paths['/klassen'].post && spec.paths['/klassen/{id}/laufzeit'].put && spec.paths['/klassen/{id}/schueler'].post && spec.paths['/klassen/{id}/faecher'].post);
+  assert.ok(spec.paths['/papierkorb'].get && spec.paths['/klassen/{id}'].delete && spec.paths['/papierkorb/{id}'].delete && spec.paths['/papierkorb/{id}/wiederherstellen'].post);
   const html = await (await fetch(`${base}/api/v1/docs`)).text();
   assert.match(html, /API für KI-Agenten/);
   assert.match(html, /dry_run=true/);
@@ -593,6 +595,320 @@ test('Klasse anlegen über die API: IHK-Standard, Laufzeit, Probelauf, wiederhol
   ]) assert.equal((await api(schreibKey, 'POST', '/klassen', body)).status, 422, JSON.stringify(body));
   assert.equal(klassen(), vorher + 5, 'Fehlerfälle legen nichts an (Klassen: API-Klasse, Standard, ID, SPA, SPA-leer)');
   assert.equal((await api(coraKeyGlobal(), 'POST', '/klassen', { name: 'Fremd' })).status, 403, 'ohne Schul-Zugang (LDAP)');
+});
+
+const klasseAnlegen = async (name, extra = {}) => {
+  const r = await api(sk, 'POST', '/klassen', { name, schuljahr: '2025/26', notenschluessel: 'BG', einschulung_jahr: 2025, anzahl_jahre: 2, ...extra });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  return r.json.klasse.id;
+};
+const doraFachInKlasse = (kid) => {
+  const doraId = db().prepare("SELECT id FROM users WHERE username = 'dora'").get().id;
+  const f = db().prepare("INSERT INTO faecher (klasse_id, name) VALUES (?, 'Doras Fach')").run(kid).lastInsertRowid;
+  db().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(doraId, f);
+  return doraId;
+};
+// Eigene Schlüssel je Test (die Begrenzung gilt je Schlüssel: 120 Anfragen pro Minute) und eine zweite Lehrkraft ohne Bezug zu Annas Klassen.
+let sk; let lk; let dk;
+const dora = client();
+const frischeSchluessel = async (name) => {
+  sk = await neuerSchluessel(anna, `${name}-s`, 'schreiben');
+  lk = await neuerSchluessel(anna, `${name}-l`, 'lesen');
+  dk = await neuerSchluessel(dora, `${name}-d`, 'schreiben');
+};
+
+test('Vorbereitung: zweite Lehrkraft Dora', async () => {
+  await admin('/admin/einladungen/neu', { display_name: 'dora', ttl_days: '14' });
+  const inv = db().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
+  await dora(`/einladung/${inv.token}`, { username: 'dora', display_name: 'dora', password: 'passwort123', password2: 'passwort123' });
+  assert.ok(db().prepare("SELECT id FROM users WHERE username = 'dora'").get());
+});
+
+test('Schüler:innen und Fächer einer Klasse über die API anlegen: Probelauf, Doppelte, Teilnehmerliste, alles oder nichts, Rechte', async () => {
+  await frischeSchluessel('T' + Math.random().toString(36).slice(2, 7));
+  const kid = await klasseAnlegen('9API');
+  const schuelerZahl = () => db().prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(kid).c;
+  assert.equal((await api(lk, 'POST', `/klassen/${kid}/schueler`, { schueler: [{ nachname: 'A', vorname: 'B' }] })).status, 403, 'lesender Schlüssel');
+  assert.equal((await api(lk, 'POST', `/klassen/${kid}/faecher`, { name: 'X' })).status, 403, 'lesender Schlüssel');
+
+  // Probelauf
+  const trocken = await api(sk, 'POST', `/klassen/${kid}/schueler?dry_run=true`, { schueler: [{ nachname: 'Adler', vorname: 'Anna' }, { nachname: 'Berger', vorname: 'Ben' }] });
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.dry_run, true);
+  assert.deepEqual(trocken.json.schueler.map((x) => x.status), ['wuerde_angelegt', 'wuerde_angelegt']);
+  assert.equal(schuelerZahl(), 0, 'Probelauf legt nichts an');
+
+  // Fach zuerst (halbjahre 3 und 4), danach Personen: sie werden automatisch Teilnehmer:innen
+  const f1 = await api(sk, 'POST', `/klassen/${kid}/faecher`, { name: ' Mathematik ', halbjahre: [3, '4. Halbjahr'] });
+  assert.equal(f1.status, 200);
+  assert.equal(f1.json.gespeichert, true);
+  assert.deepEqual(f1.json.fach.halbjahre, ['3. Halbjahr', '4. Halbjahr']);
+  const matheId = f1.json.fach.id;
+  assert.equal(db().prepare("SELECT 1 FROM fach_zuweisungen WHERE fach_id = ? AND user_id = (SELECT id FROM users WHERE username = 'anna')").get(matheId) !== undefined, true, 'Lehrkraft des Schlüssels ist zugeordnet');
+
+  const r = await api(sk, 'POST', `/klassen/${kid}/schueler`, { schueler: [{ nachname: 'Adler', vorname: 'Anna' }, { nachname: 'Berger', vorname: ' Ben ' }, { nachname: 'ADLER', vorname: 'anna' }] });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.gespeichert, true);
+  assert.equal(r.json.neu, 2);
+  assert.equal(r.json.vorhanden, 1, 'dieselbe Person doppelt in der Anfrage zählt einmal');
+  assert.deepEqual(r.json.schueler.map((x) => x.status), ['angelegt', 'angelegt', 'vorhanden']);
+  assert.equal(r.json.schueler[2].id, r.json.schueler[0].id);
+  assert.equal(schuelerZahl(), 2);
+  assert.equal(db().prepare('SELECT COUNT(*) AS c FROM fach_teilnehmer WHERE fach_id = ?').get(matheId).c, 2, 'neue Personen sind Teilnehmer:innen des vorhandenen Fachs');
+  const nochmal = await api(sk, 'POST', `/klassen/${kid}/schueler`, { schueler: [{ nachname: 'Adler', vorname: 'Anna' }] });
+  assert.equal(nochmal.json.neu, 0);
+  assert.equal(nochmal.json.gespeichert, false);
+  assert.equal((await api(sk, 'GET', `/klassen/${kid}/schueler`)).json.schueler.length, 2);
+
+  // Fach nach den Personen: Teilnehmerliste startet mit der Klasse; ohne halbjahre = alle
+  const f2 = await api(sk, 'POST', `/klassen/${kid}/faecher`, { name: 'Deutsch' });
+  assert.equal(f2.json.fach.halbjahre.length, 4);
+  assert.equal(db().prepare('SELECT COUNT(*) AS c FROM fach_teilnehmer WHERE fach_id = ?').get(f2.json.fach.id).c, 2);
+  assert.equal(db().prepare('SELECT halbjahre FROM faecher WHERE id = ?').get(f2.json.fach.id).halbjahre, null, 'alle Halbjahre = nicht eingeschränkt');
+  const wieder = await api(sk, 'POST', `/klassen/${kid}/faecher`, { name: 'Deutsch' });
+  assert.equal(wieder.json.bereits_vorhanden, true);
+  assert.equal(wieder.json.fach.id, f2.json.fach.id);
+  assert.equal(wieder.json.zugriff, true);
+  assert.equal((await api(sk, 'POST', `/klassen/${kid}/faecher?dry_run=true`, { name: 'Probe' })).json.dry_run, true);
+  assert.equal(db().prepare("SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ? AND name = 'Probe'").get(kid).c, 0);
+
+  // Mit dem neuen Fach geht es weiter: Klausur anlegen
+  const k = await api(sk, 'POST', `/faecher/${matheId}/klausuren`, { name: 'K1', max_punkte: [10], halbjahr: '3. Halbjahr' });
+  assert.equal(k.status, 200, JSON.stringify(k.json));
+
+  // Fehler: alles oder nichts
+  const schlecht = await api(sk, 'POST', `/klassen/${kid}/schueler`, { schueler: [{ nachname: 'Gut', vorname: 'Gabi' }, { nachname: '', vorname: 'x' }, { vorname: 'y' }] });
+  assert.equal(schlecht.status, 422);
+  assert.deepEqual(schlecht.json.details.map((d) => d.index), [1, 2]);
+  assert.equal(schuelerZahl(), 2, 'nichts angelegt');
+  for (const body of [{}, { schueler: [] }, { schueler: 'Anna' }, { schueler: Array.from({ length: 501 }, (_, i) => ({ nachname: `N${i}`, vorname: 'V' })) }]) {
+    assert.equal((await api(sk, 'POST', `/klassen/${kid}/schueler`, body)).status, 422, JSON.stringify(body).slice(0, 40));
+  }
+  for (const body of [{ name: '' }, { name: 'X'.repeat(101) }, { name: 'X', halbjahre: [9] }, { name: 'X', halbjahre: [] }, { name: 'X', halbjahre: 'alle' }, { name: 'X', halbjahre: ['x'] }]) {
+    assert.equal((await api(sk, 'POST', `/klassen/${kid}/faecher`, body)).status, 422, JSON.stringify(body));
+  }
+  // Rechte und unbekannte Klasse
+  assert.equal((await api(dk, 'POST', `/klassen/${kid}/schueler`, { schueler: [{ nachname: 'F', vorname: 'G' }] })).status, 403, 'fremde Lehrkraft');
+  assert.equal((await api(dk, 'POST', `/klassen/${kid}/faecher`, { name: 'Fremd' })).status, 403);
+  assert.equal((await api(sk, 'POST', '/klassen/999999/schueler', { schueler: [{ nachname: 'F', vorname: 'G' }] })).status, 404);
+  assert.equal((await api(sk, 'POST', '/klassen/999999/faecher', { name: 'X' })).status, 404);
+});
+
+test('Laufzeit einer Klasse über die API ändern: Felder einzeln, Standard, Probelauf, Daten schützen, Rechte', async () => {
+  await frischeSchluessel('T' + Math.random().toString(36).slice(2, 7));
+  const kid = await klasseAnlegen('LZ-1', { anzahl_jahre: 3 });
+  const zeile = () => db().prepare('SELECT einschulung_jahr, abschluss_jahr FROM klassen WHERE id = ?').get(kid);
+  assert.deepEqual(zeile(), { einschulung_jahr: 2025, abschluss_jahr: 2027 });
+  assert.equal((await api(lk, 'PUT', `/klassen/${kid}/laufzeit`, { anzahl_jahre: 2 })).status, 403, 'lesender Schlüssel');
+
+  const kurz = await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, { anzahl_jahre: 2 });
+  assert.equal(kurz.status, 200, JSON.stringify(kurz.json));
+  assert.equal(kurz.json.gespeichert, true);
+  assert.equal(kurz.json.klasse.abschluss_jahr, 2026);
+  assert.equal(kurz.json.klasse.halbjahre, 4);
+  assert.deepEqual(kurz.json.klasse.schuljahre, ['2025/26', '2026/27']);
+  assert.equal(kurz.json.vorher.abschluss_jahr, 2027);
+  assert.deepEqual(zeile(), { einschulung_jahr: 2025, abschluss_jahr: 2026 });
+
+  const probe = await api(sk, 'PUT', `/klassen/${kid}/laufzeit?dry_run=true`, { anzahl_jahre: 3 });
+  assert.equal(probe.json.dry_run, true);
+  assert.equal(probe.json.klasse.abschluss_jahr, 2027);
+  assert.equal(zeile().abschluss_jahr, 2026, 'Probelauf ändert nichts');
+
+  const gleich = await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, { abschluss_jahr: 2026 });
+  assert.equal(gleich.json.gespeichert, false, 'keine Änderung');
+
+  const ohneAbschluss = await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, { abschluss_jahr: null });
+  assert.equal(ohneAbschluss.json.klasse.abschluss_ist_standard, true);
+  assert.equal(ohneAbschluss.json.klasse.abschluss_jahr, 2027, 'Standard BG: 3 Jahre');
+  assert.equal(zeile().abschluss_jahr, null);
+
+  const frueher = await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, { einschulung_jahr: 2024 });
+  assert.equal(frueher.json.klasse.einschulung_jahr, 2024);
+  assert.equal(frueher.json.klasse.abschluss_jahr, 2026, 'Standard wandert mit der Einschulung');
+  assert.deepEqual(frueher.json.klasse.schuljahre, ['2024/25', '2025/26', '2026/27']);
+
+  const beides = await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, { einschulung_jahr: 2025, anzahl_jahre: 4 });
+  assert.equal(beides.json.klasse.abschluss_jahr, 2028);
+
+  // Fehler
+  for (const body of [{}, { anzahl_jahre: 0 }, { anzahl_jahre: 7 }, { anzahl_jahre: 2.5 }, { einschulung_jahr: 'bald' }, { abschluss_jahr: 1999 }, { abschluss_jahr: 2020 }, { einschulung_jahr: 2025, abschluss_jahr: 2040 }]) {
+    assert.equal((await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, body)).status, 422, JSON.stringify(body));
+  }
+  assert.equal((await api(sk, 'PUT', '/klassen/999999/laufzeit', { anzahl_jahre: 2 })).status, 404);
+
+  // Halbjahre mit Daten dürfen nicht wegfallen (409): Fach in den Halbjahren 5 und 6 mit Klausur
+  await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, { einschulung_jahr: 2025, anzahl_jahre: 3 });
+  const f = await api(sk, 'POST', `/klassen/${kid}/faecher`, { name: 'Politik', halbjahre: [5, 6] });
+  assert.equal((await api(sk, 'POST', `/faecher/${f.json.fach.id}/klausuren`, { name: 'K1', max_punkte: [10], halbjahr: '6. Halbjahr' })).status, 200);
+  const zuKurz = await api(sk, 'PUT', `/klassen/${kid}/laufzeit`, { anzahl_jahre: 2 });
+  assert.equal(zuKurz.status, 409);
+  assert.match(zuKurz.json.message, /6\./);
+  assert.equal(zeile().abschluss_jahr, 2027, 'unverändert');
+
+  // Rechte: Fachlehrkraft ohne Klassenleitung darf nicht; sobald eine Klassenleitung eingetragen ist, nur noch diese
+  const kid2 = await klasseAnlegen('LZ-2');
+  const doraId = doraFachInKlasse(kid2);
+  assert.equal((await api(dk, 'PUT', `/klassen/${kid2}/laufzeit`, { anzahl_jahre: 3 })).status, 403, 'Fachlehrkraft');
+  assert.equal((await api(sk, 'PUT', `/klassen/${kid2}/laufzeit`, { anzahl_jahre: 3 })).status, 200, 'Ersteller:in, solange keine Klassenleitung eingetragen ist');
+  db().prepare('INSERT INTO klassenleitung (klasse_id, user_id) VALUES (?, ?)').run(kid2, doraId);
+  assert.equal((await api(sk, 'PUT', `/klassen/${kid2}/laufzeit`, { anzahl_jahre: 2 })).status, 403, 'mit Klassenleitung nur noch diese');
+  assert.equal((await api(dk, 'PUT', `/klassen/${kid2}/laufzeit`, { anzahl_jahre: 2 })).status, 200, 'Klassenleitung');
+});
+
+test('Papierkorb über die API: auslesen, Klasse hineinlegen, wiederherstellen, sofort endgültig löschen nur ohne weitere Verbundene', async () => {
+  await frischeSchluessel('T' + Math.random().toString(36).slice(2, 7));
+  const kid = await klasseAnlegen('Korb-1');
+  await api(sk, 'POST', `/klassen/${kid}/schueler`, { schueler: [{ nachname: 'Adler', vorname: 'Anna' }, { nachname: 'Berger', vorname: 'Ben' }] });
+  const doraId = doraFachInKlasse(kid);
+  const imKorb = async (key = lk) => (await api(key, 'GET', '/papierkorb')).json;
+  const existiert = () => db().prepare('SELECT 1 FROM klassen WHERE id = ?').get(kid) !== undefined;
+
+  assert.equal((await imKorb()).klassen.some((k) => k.id === kid), false);
+  assert.equal((await api(sk, 'DELETE', `/papierkorb/${kid}`)).status, 404, 'liegt nicht im Papierkorb');
+  assert.equal((await api(lk, 'DELETE', `/klassen/${kid}`)).status, 403, 'lesender Schlüssel darf nicht löschen');
+  assert.equal((await api(dk, 'DELETE', '/klassen/999999')).status, 404);
+
+  // Probelauf, dann in den Papierkorb (Dora nutzt die Klasse noch)
+  const probe = await api(sk, 'DELETE', `/klassen/${kid}?dry_run=true`);
+  assert.equal(probe.json.in_papierkorb, false);
+  assert.equal((await imKorb()).anzahl, 0);
+  const weg = await api(sk, 'DELETE', `/klassen/${kid}`);
+  assert.equal(weg.status, 200, JSON.stringify(weg.json));
+  assert.equal(weg.json.in_papierkorb, true);
+  assert.equal(weg.json.noch_aktiv, 1);
+  assert.equal(weg.json.sofort_loeschbar, false);
+  assert.equal(weg.json.endgueltig_geloescht_am, null);
+  assert.ok(!(await api(sk, 'GET', '/klassen')).json.klassen.some((k) => k.id === kid), 'für Anna ausgeblendet');
+  assert.ok((await api(dk, 'GET', '/klassen')).json.klassen.some((k) => k.id === kid), 'Dora sieht sie weiter');
+
+  const korb = (await imKorb()).klassen.find((k) => k.id === kid);
+  assert.equal(korb.name, 'Korb-1');
+  assert.equal(korb.noch_aktiv, 1);
+  assert.equal(korb.sofort_loeschbar, false);
+  assert.equal(korb.schuljahr, '2025/26');
+
+  // Sofort löschen geht nicht, solange Dora die Klasse nutzt
+  const verbunden = await api(sk, 'DELETE', `/papierkorb/${kid}`);
+  assert.equal(verbunden.status, 409);
+  assert.equal(verbunden.json.error, 'noch_verbunden');
+  assert.equal(verbunden.json.details.noch_aktiv, 1);
+  assert.equal(existiert(), true);
+
+  // Wiederherstellen und erneut löschen (ein POST ohne Body ist erlaubt)
+  assert.equal((await api(sk, 'POST', `/papierkorb/${kid}/wiederherstellen`)).json.wiederhergestellt, true);
+  assert.equal((await imKorb()).klassen.some((k) => k.id === kid), false);
+  assert.equal((await api(sk, 'POST', `/papierkorb/${kid}/wiederherstellen`)).status, 404, 'nicht mehr im Papierkorb');
+  await api(sk, 'DELETE', `/klassen/${kid}`);
+
+  // Dora löscht auch: jetzt haben alle gelöscht -> Frist läuft, sofort löschen möglich
+  const bens = await api(dk, 'DELETE', `/klassen/${kid}`);
+  assert.equal(bens.json.noch_aktiv, 0);
+  assert.equal(bens.json.sofort_loeschbar, true);
+  assert.ok(bens.json.endgueltig_geloescht_am);
+  const korb2 = (await imKorb()).klassen.find((k) => k.id === kid);
+  assert.equal(korb2.sofort_loeschbar, true);
+  assert.equal(korb2.resttage, 30);
+  assert.equal((await api(lk, 'DELETE', `/papierkorb/${kid}`)).status, 403, 'lesender Schlüssel');
+
+  const trocken = await api(sk, 'DELETE', `/papierkorb/${kid}?dry_run=true`);
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.loeschbar, true);
+  assert.equal(existiert(), true, 'Probelauf löscht nichts');
+
+  const sofort = await api(sk, 'DELETE', `/papierkorb/${kid}`);
+  assert.equal(sofort.status, 200, JSON.stringify(sofort.json));
+  assert.equal(sofort.json.geloescht, true);
+  assert.equal(sofort.json.personen_in_ohne_klasse, 2);
+  assert.equal(existiert(), false);
+  assert.equal(db().prepare("SELECT COUNT(*) AS c FROM schueler s JOIN klassen k ON k.id = s.klasse_id WHERE k.ist_ablage = 1 AND s.nachname IN ('Adler', 'Berger')").get().c, 2, 'Personen in „Ohne Klasse“');
+  assert.equal((await imKorb()).klassen.some((k) => k.id === kid), false);
+  assert.equal(db().prepare('SELECT 1 FROM klassen_geloescht WHERE klasse_id = ?').get(kid), undefined);
+  assert.equal(doraId > 0, true);
+});
+
+test('Gelöschte Klassen blockieren ihren Namen nicht: neu anlegen, Papierkorb zeigt den alten Namen, Wiederherstellen ohne Namenskonflikt', async () => {
+  await frischeSchluessel('T' + Math.random().toString(36).slice(2, 7));
+  const sj = db().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id;
+  const { findeLaufendeKlasse } = await import('../src/klassen-jahre.js');
+  const alt = await klasseAnlegen('Frei-1');
+  assert.equal(findeLaufendeKlasse('Frei-1', sj).id, alt, 'läuft');
+  await api(sk, 'DELETE', `/klassen/${alt}`); // Anna ist die einzige Lehrkraft -> alle haben gelöscht
+  assert.ok(db().prepare('SELECT papierkorb_ab FROM klassen WHERE id = ?').get(alt).papierkorb_ab, 'Frist läuft');
+  assert.equal(findeLaufendeKlasse('Frei-1', sj), null, 'die Klasse im Papierkorb blockiert den Namen nicht');
+
+  const neu = await api(sk, 'POST', '/klassen', { name: 'Frei-1', schuljahr: '2025/26' });
+  assert.equal(neu.status, 200, JSON.stringify(neu.json));
+  assert.equal(neu.json.gespeichert, true, 'neu angelegt, nicht „bereits vorhanden“');
+  assert.notEqual(neu.json.klasse.id, alt);
+  assert.equal(db().prepare('SELECT name FROM klassen WHERE id = ?').get(alt).name, `Frei-1 (gelöscht #${alt})`, 'Papierkorb-Klasse weicht');
+  assert.equal(db().prepare('SELECT name FROM klassen WHERE id = ?').get(neu.json.klasse.id).name, 'Frei-1');
+  assert.equal((await api(lk, 'GET', '/papierkorb')).json.klassen.find((k) => k.id === alt).name, 'Frei-1', 'der Zusatz bleibt unsichtbar');
+
+  // Wiederherstellen, solange der Name vergeben ist
+  const rest = await api(sk, 'POST', `/papierkorb/${alt}/wiederherstellen`);
+  assert.equal(rest.json.klasse.name, 'Frei-1 (wiederhergestellt)');
+  assert.equal(db().prepare('SELECT papierkorb_ab FROM klassen WHERE id = ?').get(alt).papierkorb_ab, null);
+
+  // Wird der Name wieder frei, bekommt die Papierkorb-Klasse ihn beim Wiederherstellen zurück
+  const a2 = await klasseAnlegen('Frei-2');
+  await api(sk, 'DELETE', `/klassen/${a2}`);
+  const n2 = await klasseAnlegen('Frei-2');
+  assert.equal(db().prepare('SELECT name FROM klassen WHERE id = ?').get(a2).name, `Frei-2 (gelöscht #${a2})`);
+  await api(sk, 'DELETE', `/klassen/${n2}`);
+  assert.equal((await api(sk, 'DELETE', `/papierkorb/${n2}`)).json.geloescht, true);
+  assert.equal((await api(sk, 'POST', `/papierkorb/${a2}/wiederherstellen`)).json.klasse.name, 'Frei-2', 'ursprünglicher Name zurück');
+
+  // Umbenennen auf den Namen einer Papierkorb-Klasse
+  const a3 = await klasseAnlegen('Frei-3');
+  await api(sk, 'DELETE', `/klassen/${a3}`);
+  const andere = await klasseAnlegen('Frei-3-neu');
+  assert.equal((await api(sk, 'PUT', `/klassen/${andere}/name`, { name: 'Frei-3' })).status, 200, 'Name der Papierkorb-Klasse ist frei');
+  assert.equal(db().prepare('SELECT name FROM klassen WHERE id = ?').get(andere).name, 'Frei-3');
+
+  // Teilnehmerliste eines Kurses: die Klasse gleichen Namens im Papierkorb blockiert nicht
+  const a4 = await klasseAnlegen('Frei-4');
+  await api(sk, 'DELETE', `/klassen/${a4}`);
+  const kurs = await api(sk, 'POST', '/kurse', { name: 'Frei-Kurs', schuljahr: '2025/26' });
+  const t = await api(sk, 'POST', `/faecher/${kurs.json.kurs.id}/teilnehmer`, { teilnehmer: [{ nachname: 'Neu', vorname: 'Nina', klasse: 'Frei-4' }] });
+  assert.equal(t.status, 200, JSON.stringify(t.json));
+  assert.equal(t.json.hinzugefuegt, 1);
+  const neueKlasse = db().prepare("SELECT id FROM klassen WHERE name = 'Frei-4'").get();
+  assert.ok(neueKlasse && neueKlasse.id !== a4, 'neue Klasse angelegt, die im Papierkorb bleibt unberührt');
+  assert.ok(db().prepare('SELECT 1 FROM klassen WHERE id = ? AND papierkorb_ab IS NOT NULL').get(a4));
+});
+
+test('Oberfläche: gleichnamige Klasse nach dem Löschen neu anlegen; Papierkorb „Sofort löschen“ nur ohne weitere Verbundene', async () => {
+  await frischeSchluessel('T' + Math.random().toString(36).slice(2, 7));
+  const sj = db().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id;
+  const id = (name) => db().prepare('SELECT id FROM klassen WHERE name = ?').get(name)?.id;
+  await anna('/teacher/klassen/neu', { schuljahr_id: String(sj), name: 'UI-Frei', notenschluessel: 'BG', einschulung_jahr: '2025' });
+  const alt = id('UI-Frei');
+  await anna(`/teacher/klassen/${alt}/loeschen`, {});
+  const r = await anna('/teacher/klassen/neu', { schuljahr_id: String(sj), name: 'UI-Frei', notenschluessel: 'BG', einschulung_jahr: '2025' });
+  const neu = id('UI-Frei');
+  assert.ok(neu && neu !== alt, 'neue Klasse angelegt');
+  assert.equal(r.headers.get('location'), `/teacher/klassen/${neu}`, 'führt in die neue Klasse, nicht in einen Beitritt');
+  const korbHtml = await (await anna('/teacher/papierkorb')).text();
+  assert.match(korbHtml, /UI-Frei/);
+  assert.doesNotMatch(korbHtml, /gelöscht #/, 'technischer Zusatz bleibt unsichtbar');
+  assert.match(korbHtml, new RegExp(`/teacher/papierkorb/${alt}/endgueltig`), 'Sofort löschen, weil niemand sonst die Klasse nutzt');
+
+  // Mit einer weiteren Lehrkraft: kein Knopf, und der Aufruf wird abgelehnt
+  const mit = id('UI-Frei') ;
+  doraFachInKlasse(mit);
+  await anna(`/teacher/klassen/${mit}/loeschen`, {});
+  const html2 = await (await anna('/teacher/papierkorb')).text();
+  assert.doesNotMatch(html2, new RegExp(`/teacher/papierkorb/${mit}/endgueltig`), 'Dora nutzt die Klasse noch');
+  await anna(`/teacher/papierkorb/${mit}/endgueltig`, {});
+  assert.ok(db().prepare('SELECT 1 FROM klassen WHERE id = ?').get(mit), 'nicht gelöscht');
+
+  // Endgültig löschen der ersten (allein genutzten) Klasse
+  await anna(`/teacher/papierkorb/${alt}/endgueltig`, {});
+  assert.equal(db().prepare('SELECT 1 FROM klassen WHERE id = ?').get(alt), undefined);
+  // Eine Klasse, die nicht im eigenen Papierkorb liegt, lässt sich so nicht löschen
+  await anna(`/teacher/papierkorb/${klasseId}/endgueltig`, {});
+  assert.ok(db().prepare('SELECT 1 FROM klassen WHERE id = ?').get(klasseId));
 });
 
 test('Lernfelder (SPA): Komponenten und Unterfächer sind sichtbar, beschreibbar, mit Leistungspunkten; das Lernfeld selbst verweist auf sie', async () => {

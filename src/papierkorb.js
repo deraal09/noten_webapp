@@ -15,6 +15,7 @@
 import { getDb } from './db.js';
 import { jetzt } from './klassen-jahre.js';
 import { loescheKlasseMitSchuelerUebernahme } from './klassenwechsel.js';
+import { anzeigeName, stelleKlassennamenWiederHer } from './klassennamen.js';
 
 export const FRIST_TAGE = 30;
 const TAG_MS = 24 * 60 * 60 * 1000;
@@ -54,6 +55,7 @@ export function aktualisiereFrist(klasseId, heute = jetzt()) {
   }
   if (!alleDurch && klasse.papierkorb_ab) {
     db.prepare('UPDATE klassen SET papierkorb_ab = NULL WHERE id = ?').run(klasseId);
+    stelleKlassennamenWiederHer(klasseId); // ein Zusatz „ (gelöscht #…)“ (Name wurde zwischenzeitlich neu vergeben) entfällt
     return null;
   }
   return klasse.papierkorb_ab;
@@ -102,11 +104,29 @@ export function ladePapierkorb(userId, heute = jetzt()) {
     const ablauf = ab ? ablaufDatum(ab) : null;
     return {
       ...r,
+      name: anzeigeName(r.name),
       nochAktiv: ab ? 0 : aktiveLehrkraefte(r.id).length,
       ablauf,
       resttage: ablauf ? Math.max(0, Math.ceil((ablauf.getTime() - heute.getTime()) / TAG_MS)) : null,
     };
   });
+}
+
+/**
+ * Sofort endgültig löschen: Die Klasse muss im Papierkorb dieser Lehrkraft liegen UND darf von niemand sonst mehr genutzt werden
+ * (alle Lehrkräfte der Klasse haben sie gelöscht) -- dann entfällt die Wartefrist. Fächer, Klausuren und Noten gehen verloren; die
+ * Personen (nur Name) landen wie sonst in der Sammelklasse „Ohne Klasse“.
+ * @param {{speichern?: boolean}} [optionen] speichern: false = nur prüfen
+ * @returns {{ok: true, klasse: {id: number, name: string}, gerettet: number} | {ok: false, grund: 'nicht-im-papierkorb'|'noch-verbunden', nochAktiv?: number}}
+ */
+export function loescheSofort(userId, klasseId, { speichern = true, heute = jetzt() } = {}) {
+  const klasse = getDb().prepare('SELECT id, name FROM klassen WHERE id = ? AND ist_kurs_huelle = 0').get(klasseId);
+  if (!klasse || !istFuerMichGeloescht(userId, klasse.id)) return { ok: false, grund: 'nicht-im-papierkorb' };
+  const ab = aktualisiereFrist(klasse.id, heute);
+  if (!ab) return { ok: false, grund: 'noch-verbunden', nochAktiv: aktiveLehrkraefte(klasse.id).length };
+  const info = { id: klasse.id, name: anzeigeName(klasse.name) };
+  if (!speichern) return { ok: true, klasse: info, gerettet: getDb().prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(klasse.id).c };
+  return { ok: true, klasse: info, gerettet: loescheKlasseMitSchuelerUebernahme(klasse.id).gerettet };
 }
 
 export function anzahlImPapierkorb(userId) {

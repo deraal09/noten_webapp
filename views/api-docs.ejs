@@ -24,7 +24,7 @@
   <h2>Regeln und Sicherheit</h2>
   <ul>
     <li><strong>Eigene Rechte:</strong> Ein Schlüssel handelt als seine Lehrkraft. Es gelten dieselben Prüfungen wie in der Oberfläche: nur eigene Klassen/Fächer und Halbjahre, nur Personen, die am Fach teilnehmen, keine Eingabe bei gesperrten Noten (Notenkonferenz).</li>
-    <li><strong>Berechtigung:</strong> „lesen“ erlaubt Abfragen und Berechnungen, „schreiben“ zusätzlich das Eintragen. <strong>Gelöscht wird über die API nichts</strong>; Einträge lassen sich nur überschreiben oder leeren (<code>null</code>).</li>
+    <li><strong>Berechtigung:</strong> „lesen“ erlaubt Abfragen und Berechnungen, „schreiben“ zusätzlich das Eintragen. <strong>Gelöscht wird nur über den Papierkorb für Klassen</strong> (<code>DELETE /klassen/{id}</code> legt eine Klasse in den Papierkorb, <code>DELETE /papierkorb/{id}</code> löscht sie sofort endgültig, aber nur wenn sonst niemand sie nutzt); alles andere lässt sich nur überschreiben oder leeren (<code>null</code>).</li>
     <li><strong>Alles oder nichts:</strong> Beim Eintragen mehrerer Personen wird nichts gespeichert, wenn ein Eintrag ungültig ist (Status 422, Liste der Fehler unter <code>details</code>). Wiederholen ist gefahrlos.</li>
     <li><strong>Probelauf:</strong> <code>?dry_run=true</code> prüft nur und zeigt die berechneten Noten, ohne zu speichern. Agenten sollten vor dem Eintragen immer einen Probelauf machen.</li>
     <li><strong>Personen:</strong> Die Teilnehmerliste eines Fachs oder Kurses füllt <code>POST /faecher/{id}/teilnehmer</code> (Nachname, Vorname, Klasse; legt fehlende Personen und Klassen an, überspringt Doppelte). Die Schüler:innen einer <em>Klasse</em> legt die API nicht an – das geht in der App (Einzeln, Mehrere auf einmal, CSV-Import).</li>

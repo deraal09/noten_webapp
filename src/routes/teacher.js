@@ -50,8 +50,8 @@ import {
 } from '../fach-teilnehmer.js';
 import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { legeKursAn } from '../kurse.js';
-import { legeKlasseAn } from '../klasse-anlegen.js';
-import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, FRIST_TAGE } from '../papierkorb.js';
+import { legeKlasseAn, aendereLaufzeit } from '../klasse-anlegen.js';
+import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, loescheSofort, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
 import {
@@ -1544,24 +1544,11 @@ export default async function teacherRoutes(fastify) {
     const abschluss = Number.isFinite(anzahlJahre) && anzahlJahre >= 1 && einschulung !== null
       ? einschulung + anzahlJahre - 1
       : parseJahrEingabe(request.body?.abschluss_jahr);
-    if (einschulung === null) {
-      request.flash?.('error', 'Einschulungsschuljahr ungültig.');
+    const r = aendereLaufzeit(klasse, { einschulung, abschluss });
+    if (!r.ok) {
+      request.flash?.('error', r.fehler);
       return reply.redirect(zurueck);
     }
-    if (abschluss !== null && (abschluss < einschulung || abschluss >= einschulung + MAX_SCHULJAHRE)) {
-      request.flash?.('error', `Das Abschlussschuljahr muss zwischen dem Einschulungsschuljahr und ${MAX_SCHULJAHRE - 1} Jahren danach liegen.`);
-      return reply.redirect(zurueck);
-    }
-    // Nicht kürzen, wenn in den wegfallenden Halbjahren schon Daten stehen.
-    const standardJahre = klasse.notenschluessel === 'SPA' ? 2 : 3;
-    const neueHalbjahre = ((abschluss ?? (einschulung + standardJahre - 1)) - einschulung + 1) * 2;
-    // Gleiche Prüfung wie beim Ändern der Halbjahre eines Fachs (Leistungen, Endnoten, SPA-Noten) plus Fehlzeiten.
-    const belegt = [...halbjahreMitDatenInKlasse(klasse.id)].filter((n) => n > neueHalbjahre).sort((a, b) => a - b);
-    if (belegt.length) {
-      request.flash?.('error', `Im ${belegt.map((n) => `${n}.`).join(', ')} Halbjahr sind bereits Noten, Leistungen oder Fehlzeiten eingetragen -- diese Halbjahre würden wegfallen. Das Abschlussschuljahr kann nicht davor liegen.`);
-      return reply.redirect(zurueck);
-    }
-    getDb().prepare('UPDATE klassen SET einschulung_jahr = ?, abschluss_jahr = ? WHERE id = ?').run(einschulung, abschluss, klasse.id);
     request.flash?.('success', 'Laufzeit der Klasse gespeichert.');
     return reply.redirect(zurueck);
   });
@@ -2161,6 +2148,19 @@ export default async function teacherRoutes(fastify) {
   fastify.post('/papierkorb/:id/wiederherstellen', async (request, reply) => {
     if (stelleWiederHer(request.user.id, Number(request.params.id))) {
       request.flash?.('success', 'Klasse wiederhergestellt -- sie steht wieder unter „Meine Klassen“.');
+    }
+    return reply.redirect('/teacher/papierkorb');
+  });
+
+  // Sofort endgültig löschen: nur wenn die Klasse in meinem Papierkorb liegt und niemand sonst sie mehr nutzt (keine Wartefrist).
+  fastify.post('/papierkorb/:id/endgueltig', async (request, reply) => {
+    const r = loescheSofort(request.user.id, Number(request.params.id));
+    if (r.ok) {
+      request.flash?.('success', `Klasse „${r.klasse.name}“ endgültig gelöscht.${r.gerettet > 0 ? ` ${r.gerettet} Schüler/innen wurden in die Sammelklasse „Ohne Klasse“ übernommen.` : ''}`);
+    } else if (r.grund === 'noch-verbunden') {
+      request.flash?.('error', `Die Klasse wird noch von ${r.nochAktiv} weiteren Lehrkraft${r.nochAktiv === 1 ? '' : 'en'} genutzt -- sofort löschen geht erst, wenn alle sie gelöscht haben.`);
+    } else {
+      request.flash?.('error', 'Diese Klasse liegt nicht in deinem Papierkorb.');
     }
     return reply.redirect('/teacher/papierkorb');
   });

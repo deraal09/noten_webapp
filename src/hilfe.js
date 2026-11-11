@@ -122,13 +122,15 @@ export const ARTIKEL = [
   {
     slug: 'papierkorb', kategorie: 'klassen', titel: 'Papierkorb: Klassen löschen und wiederherstellen',
     kurz: 'Jede Lehrkraft blendet Klassen für sich aus; endgültig gelöscht wird erst, wenn alle gelöscht haben, nach 30 Tagen.',
-    schlagworte: ['papierkorb', 'löschen', 'wiederherstellen', 'ausblenden', '30 tage', 'ablaufzeit', 'endgültig', 'klasse löschen'],
+    schlagworte: ['papierkorb', 'löschen', 'wiederherstellen', 'ausblenden', '30 tage', 'ablaufzeit', 'endgültig', 'klasse löschen', 'sofort löschen', 'sofort endgültig', 'gleicher name'],
     bilder: [{ datei: 'papierkorb', text: 'Papierkorb mit gelöschter Klasse' }],
     abschnitte: [
       { titel: 'So funktioniert es', absaetze: [
         '**Klasse löschen** blendet die Klasse nur für dich aus (Meine Klassen, Noteneingabe, Klassenleitung). Die anderen Lehrkräfte der Klasse sehen sie weiter.',
         'Im **🗑 Papierkorb** (in „Meine Klassen“) liegen deine gelöschten Klassen. Mit **↩ Wiederherstellen** holst du eine Klasse für dich zurück.',
         'Solange noch Lehrkräfte die Klasse nutzen, steht dort **„noch keine Ablaufzeit“**. Haben **alle** Lehrkräfte der Klasse sie gelöscht, läuft eine Frist von **30 Tagen** (das Datum steht im Papierkorb). Danach werden Fächer, Klausuren und Noten **unwiderruflich** gelöscht. Wer in der Frist wiederherstellt, stoppt sie.',
+        'Nutzt **niemand sonst** die Klasse mehr (steht ein Datum im Papierkorb), kannst du sie mit **🗑 Sofort löschen** ohne Wartezeit **endgültig** löschen. Das geht nicht, solange andere Lehrkräfte die Klasse noch nutzen. Auch ein KI-Agent kann das über die API (`DELETE /papierkorb/{id}`).',
+        'Legst du danach eine neue Klasse mit dem **gleichen Namen** im selben Schuljahr an, blockiert die gelöschte Klasse den Namen nicht: Sie bleibt im Papierkorb und behält ihren Namen zurück, wenn du sie wiederherstellst (ist er dann vergeben, mit dem Zusatz „(wiederhergestellt)“).',
       ], hinweis: 'Die Personen (nur Name) bleiben nach dem endgültigen Löschen in der Sammelklasse „Ohne Klasse“.' },
     ],
     links: [{ text: 'Papierkorb öffnen', href: '/teacher/papierkorb' }], verwandt: ['klasse-anlegen'],
@@ -433,9 +435,9 @@ export const ARTIKEL = [
         'Im Menü **🤖 API-Zugang** einen **Namen** (wofür?), die **Berechtigung** („nur lesen“ oder „lesen und Noten eintragen“) und die **Gültigkeit** wählen.',
         '**Schlüssel erzeugen** und den angezeigten Schlüssel (`nk_…`) **sofort kopieren**: Er wird nur dieses eine Mal gezeigt.',
         'Den Schlüssel dem Programm geben, das ihn als `Authorization: Bearer nk_…` mitsendet. Widerrufen wirkt sofort.',
-      ], hinweis: 'Ein Schlüssel hat genau deine Rechte. Über die API wird nichts gelöscht; Eintragungen lassen sich mit `?dry_run=true` vorab prüfen.' },
+      ], hinweis: 'Ein Schlüssel hat genau deine Rechte. Gelöscht werden über die API nur Klassen, und nur über den Papierkorb (in den Papierkorb legen, wiederherstellen, bei Nichtnutzung durch andere sofort endgültig löschen); Eintragungen lassen sich mit `?dry_run=true` vorab prüfen.' },
       { titel: 'Dokumentation', absaetze: [
-        'Die vollständige Beschreibung mit Beispielen und einem Vorschlag für den System-Prompt eines Agenten steht unter **/api/v1/docs**, maschinenlesbar als **OpenAPI** unter `/api/v1/openapi.json`. Die API kann u. a. Kurse und Klassen umbenennen, Klassen und Kurse anlegen, Teilnehmer aufnehmen, Klausuren und Noten eintragen und mit der Klassenleitung synchronisieren.',
+        'Die vollständige Beschreibung mit Beispielen und einem Vorschlag für den System-Prompt eines Agenten steht unter **/api/v1/docs**, maschinenlesbar als **OpenAPI** unter `/api/v1/openapi.json`. Die API kann u. a. Kurse und Klassen umbenennen, Klassen (samt Laufzeit, Schüler:innen und Fächern) und Kurse anlegen, die Laufzeit einer Klasse ändern, den Papierkorb auslesen, Teilnehmer aufnehmen, Klausuren und Noten eintragen und mit der Klassenleitung synchronisieren.',
       ] },
     ],
     links: [{ text: 'API-Zugang öffnen', href: '/konto/api' }, { text: 'API-Dokumentation', href: '/api/v1/docs' }], verwandt: ['sync', 'kurse'],

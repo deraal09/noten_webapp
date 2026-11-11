@@ -5,6 +5,7 @@
 
 import { getDb } from './db.js';
 import { ladeUnterfaecher, UNTERFACH_TRENNER } from './unterfaecher.js';
+import { gibKlassennamenFrei } from './klassennamen.js';
 
 export const MAX_KLASSENNAME = 60;
 
@@ -20,10 +21,13 @@ export function benenneKlasseUm(klasse, rohName, { speichern = true } = {}) {
   if (name.length > MAX_KLASSENNAME) return { ok: false, fehler: `Der Name ist zu lang (höchstens ${MAX_KLASSENNAME} Zeichen).` };
   if (name.startsWith('__')) return { ok: false, fehler: 'Der Name darf nicht mit „__“ beginnen.' };
   if (name === klasse.name) return { ok: true, alt: klasse.name, neu: name, geaendert: false };
-  if (getDb().prepare('SELECT 1 FROM klassen WHERE schuljahr_id = ? AND name = ? COLLATE NOCASE AND id != ?').get(klasse.schuljahr_id, name, klasse.id)) {
+  if (getDb().prepare('SELECT 1 FROM klassen WHERE schuljahr_id = ? AND name = ? COLLATE NOCASE AND id != ? AND papierkorb_ab IS NULL').get(klasse.schuljahr_id, name, klasse.id)) {
     return { ok: false, fehler: `Im Schuljahr gibt es schon eine Klasse „${name}“.` };
   }
-  if (speichern) getDb().prepare('UPDATE klassen SET name = ? WHERE id = ?').run(name, klasse.id);
+  if (speichern) {
+    gibKlassennamenFrei(klasse.schuljahr_id, name, klasse.id); // eine Klasse im Papierkorb mit diesem Namen weicht
+    getDb().prepare('UPDATE klassen SET name = ? WHERE id = ?').run(name, klasse.id);
+  }
   return { ok: true, alt: klasse.name, neu: name, geaendert: true };
 }
 

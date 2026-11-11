@@ -357,7 +357,8 @@ export function findeLaufendeKlasse(name, schuljahrId) {
   const db = getDb();
   const sj = db.prepare('SELECT bezeichnung FROM schuljahre WHERE id = ?').get(schuljahrId);
   const start = parseSchuljahr(sj?.bezeichnung)?.startJahr;
-  const kandidaten = db.prepare('SELECT * FROM klassen WHERE name = ? AND ist_kurs_huelle = 0 AND ist_ablage = 0').all(name);
+  // Klassen im Papierkorb, die alle Lehrkräfte gelöscht haben (papierkorb_ab gesetzt), blockieren den Namen nicht.
+  const kandidaten = db.prepare('SELECT * FROM klassen WHERE name = ? AND ist_kurs_huelle = 0 AND ist_ablage = 0 AND papierkorb_ab IS NULL').all(name);
   return kandidaten.find((k) => k.schuljahr_id === schuljahrId
     || (start !== undefined && klasseLaeuftImSchuljahr(klassenLaufzeit(k.id), start))) ?? null;
 }

@@ -6,6 +6,56 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.130.0 - 2026-11-12
+
+### API: Schüler:innen, Fächer, Laufzeit und Papierkorb
+
+- **`POST /api/v1/klassen/{id}/schueler`:** Personen einer Klasse anlegen
+  (Nachname, Vorname; Doppelte – auch in der Anfrage selbst – werden
+  übersprungen, neue werden automatisch Teilnehmer:innen aller Fächer der
+  Klasse; alles oder nichts, höchstens 500 je Aufruf, `?dry_run=true`).
+- **`POST /api/v1/klassen/{id}/faecher`:** Fach in einer Klasse anlegen (wie
+  „+ Neues Fach anlegen“): optional `halbjahre` (Nummern oder „3. Halbjahr“),
+  die Lehrkraft des Schlüssels wird zugeordnet, die Teilnehmerliste startet mit
+  der Klasse; ein vorhandenes Fach wird mit `bereits_vorhanden` zurückgegeben.
+- **Laufzeit beim Anlegen** (`POST /klassen`, seit 0.129.0) und jetzt auch
+  **nachträglich: `PUT /api/v1/klassen/{id}/laufzeit`** (`einschulung_jahr`,
+  `anzahl_jahre` oder `abschluss_jahr`, `null` = Standard; nicht angegebene
+  Felder bleiben; Halbjahre mit Daten dürfen nicht wegfallen → `409`).
+  Berechtigt sind die Klassenleitung (sobald eine eingetragen ist), sonst die
+  Person, die die Klasse angelegt hat, und der Admin. Die Antworten nennen jetzt
+  `anzahl_jahre`, `schuljahre`, `halbjahre` und `abschluss_ist_standard`.
+- **Papierkorb:** `GET /api/v1/papierkorb` liest die eigenen gelöschten Klassen
+  aus (mit `noch_aktiv`, Ablaufdatum, `sofort_loeschbar`); `DELETE
+  /api/v1/klassen/{id}` legt eine Klasse in den Papierkorb (wie in der App für
+  Lehrkräfte, wiederherstellbar); `POST /api/v1/papierkorb/{id}/wiederherstellen`
+  holt sie zurück; **`DELETE /api/v1/papierkorb/{id}`** löscht sie **sofort
+  endgültig**, aber nur, wenn keine weitere Lehrkraft mehr mit der Klasse
+  verbunden ist (sonst `409 noch_verbunden`). Die API löscht sonst weiterhin
+  nichts. Ein POST/PUT ohne Body gilt jetzt als `{}` statt als Fehler.
+
+### Papierkorb in der App
+
+- Neu im Papierkorb: **🗑 Sofort löschen** (ohne die 30 Tage abzuwarten), sichtbar
+  nur, wenn niemand sonst die Klasse mehr nutzt.
+
+### Behoben
+
+- `findeLaufendeKlasse()` ignorierte den Papierkorb: Eine Klasse, die alle
+  Lehrkräfte gelöscht hatten (`papierkorb_ab` gesetzt), blockierte weiter ihren
+  Namen – in der App unsichtbar, aber im Weg bei jeder Neuanlage (auch beim
+  Aufnehmen von Teilnehmern in eine Klasse gleichen Namens). Solche Klassen
+  zählen jetzt nicht mehr als „läuft schon“. Weil der Name je Schuljahr in der
+  Datenbank eindeutig sein muss, bekommt die Papierkorb-Klasse bei einer
+  Namensgleichheit den Zusatz „ (gelöscht #<id>)“ (im Papierkorb unsichtbar) und
+  erhält beim Wiederherstellen ihren Namen zurück – ist er inzwischen vergeben,
+  mit dem Zusatz „ (wiederhergestellt)“. Gilt für Klasse anlegen (App, API, Admin),
+  Umbenennen und das Anlegen über Teilnehmerlisten.
+- Intern: Laufzeit ändern liegt jetzt in `src/klasse-anlegen.js`
+  (`aendereLaufzeit`), Namensfreigabe in `src/klassennamen.js`, Sofort-Löschen in
+  `src/papierkorb.js`. Doku (`/api/v1/docs`, OpenAPI, `docs/API.md`) und Hilfe
+  („Papierkorb“, „API“) ergänzt.
+
 ## 0.129.0 - 2026-11-12
 
 ### API: Klassen anlegen

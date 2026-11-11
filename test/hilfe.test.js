@@ -49,6 +49,7 @@ test('Suche: Umlaute und Schreibweisen, Rangfolge, mehrere Wörter, Unsinn', () 
   assert.equal(sucheHilfe('Lernfeld')[0].slug, 'spa');
   assert.equal(sucheHilfe('anonym statistik')[0].slug, 'aktivitaet');
   assert.equal(sucheHilfe('Auslastung')[0].slug, 'aktivitaet');
+  assert.equal(sucheHilfe('sofort endgültig löschen')[0].slug, 'papierkorb');
   assert.equal(sucheHilfe('Konferenz')[0].slug, 'notenkonferenz');
   assert.equal(sucheHilfe('Fehlzeiten')[0].slug, 'fehlzeiten-notizen');
   assert.equal(sucheHilfe('Entsperrung')[0].slug, 'notenkonferenz');
