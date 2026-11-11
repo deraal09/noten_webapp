@@ -154,6 +154,23 @@ export const ENDPOINTS = [
     antwort: { gespeichert: true, halbjahr: '5. Halbjahr', anzahl: 3 },
   },
   {
+    id: 'teilnehmer', method: 'GET', path: '/faecher/{id}/teilnehmer', scope: 'lesen',
+    summary: 'Teilnehmerliste eines Fachs oder Kurses',
+    beschreibung: 'Alle Personen, die am Fach teilnehmen, mit ID und Klasse. Bei Kursen sind es Personen aus verschiedenen Klassen.',
+    antwort: { fach: { id: 47, name: 'Philosophie', kurs: true }, anzahl: 2, teilnehmer: [{ id: 301, nachname: 'Adler', vorname: 'Anna', klasse: 'BGG25A', aus_anderer_klasse: true }] },
+  },
+  {
+    id: 'teilnehmer-neu', method: 'POST', path: '/faecher/{id}/teilnehmer', scope: 'schreiben',
+    summary: 'Personen in die Teilnehmerliste aufnehmen (z. B. 25 Kursteilnehmer auf einmal)',
+    beschreibung: 'Wie „Manuell anlegen“ bzw. CSV-Import in der App, je Eintrag mit Nachname, Vorname und Klasse: Fehlt die Person, wird sie in der Klasse angelegt; fehlt die Klasse im Schuljahr des Fachs, wird sie als leere Klasse mit dem Notenschlüssel des Fachs angelegt; wer schon Teilnehmer:in ist, wird übersprungen (Status `uebersprungen`). Der Notenschlüssel einer vorhandenen Klasse muss zum Fach passen. Erlaubt ist das, wer die Teilnehmer in der App verwalten darf (Klassenleitung, bei Kursen die Lehrkraft des Kurses). Alles oder nichts, auch angelegte Klassen und Personen werden dann zurückgenommen. Die zurückgegebenen `schueler_id` braucht man beim Eintragen von Noten.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen und das Ergebnis zeigen, nichts speichern' }],
+    body: { teilnehmer: [{ nachname: 'Adler', vorname: 'Anna', klasse: 'BGG25A' }, { nachname: 'Berger', vorname: 'Bert', klasse: 'BGG25B' }] },
+    antwort: {
+      gespeichert: true, hinzugefuegt: 1, uebersprungen: 1,
+      teilnehmer: [{ nachname: 'Adler', vorname: 'Anna', klasse: 'BGG25A', schueler_id: 301, status: 'hinzugefuegt' }, { nachname: 'Berger', vorname: 'Bert', klasse: 'BGG25B', status: 'uebersprungen' }],
+    },
+  },
+  {
     id: 'sync', method: 'POST', path: '/faecher/{id}/sync', scope: 'schreiben',
     summary: 'Fach mit der Klassenleitung synchronisieren („Jetzt synchronisieren“)',
     beschreibung: 'Überträgt den aktuellen Notenstand (Gesamtnote je Person) des Fachs und Halbjahres in den Stand, den die Klassenleitung sieht -- wie der Knopf in der App. Die Klassenleitung sieht nie die Live-Noten, nur den zuletzt synchronisierten Stand. Hat die Lehrkraft den automatischen Sync eingeschaltet, geschieht das nach jeder Eintragung von selbst.',

@@ -29,6 +29,8 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | GET | `/faecher/{id}/statistik?halbjahr=` | lesen | Durchschnitt, Verteilung, nicht bestanden |
 | GET | `/notenschluessel` | lesen | Notenschlüssel IHK, BG, SPA |
 | POST | `/berechnen/klausur` | lesen | Note aus Punkten berechnen (speichert nichts) |
+| GET | `/faecher/{id}/teilnehmer` | lesen | Teilnehmerliste mit IDs |
+| POST | `/faecher/{id}/teilnehmer` | schreiben | Personen aufnehmen (Nachname, Vorname, Klasse; wie CSV-Import) |
 | POST | `/faecher/{id}/klausuren` | schreiben | Klausur anlegen |
 | PUT | `/klausuren/{id}/ergebnisse` | schreiben | Klausurpunkte (mehrere Personen) |
 | POST | `/faecher/{id}/unterrichtsleistungen` | schreiben | Zusatzleistung anlegen |
@@ -45,8 +47,8 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 * **Probelauf:** `?dry_run=true` prüft und zeigt die berechneten Noten, ohne zu speichern -- vor dem Eintragen immer nutzen.
 * **Idempotent:** Wiederholen schadet nicht. **Gelöscht wird über die API nichts** (leeren geht mit `null`).
 * **Nicht über die API beschreibbar:** SPA-Fächer und Fächer, die sich im Halbjahr aus Unterfächern zusammensetzen (`409`); lesen geht.
-* **Personen anlegen:** Schüler:innen und Teilnehmerlisten legt die API nicht an (App: Klasse -- Einzeln/Mehrere auf einmal/CSV-Import; Kurs -- Suche,
-  „Manuell anlegen“ oder CSV-Import `Nachname;Vorname;Klasse`). Danach stehen sie mit IDs in der API.
+* **Personen anlegen:** Die Teilnehmerliste eines Fachs oder Kurses füllt `POST /faecher/{id}/teilnehmer` (Nachname, Vorname, Klasse je Person; legt
+  fehlende Personen und Klassen an, überspringt Doppelte). Die Schüler:innen einer **Klasse** legt die API nicht an (App: Einzeln/Mehrere auf einmal/CSV-Import).
 * **Grenzen:** 120 Anfragen pro Minute und Schlüssel, 500 Einträge je Aufruf, 40 Aufgaben je Klausur.
 * **Datenschutz:** Namen und Noten verlassen das System. Der Einsatz eines externen KI-Dienstes muss datenschutzrechtlich zulässig sein.
 * Fehlerformat: `{ "error": "code", "message": "…", "details": [ … ] }`.

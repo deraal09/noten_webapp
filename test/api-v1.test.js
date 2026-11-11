@@ -362,3 +362,80 @@ test('Auto-Sync braucht eine Zuordnung zum Fach; der Admin ohne Zuordnung bekomm
   assert.equal((await api(adminKey, 'POST', `/faecher/${fachId}/sync`, { halbjahr: 1 })).status, 200);
   assert.equal((await api(adminKey, 'GET', `/faecher/${fachId}?halbjahr=1`)).json.sync.automatisch, null);
 });
+
+test('Teilnehmerliste: auslesen und Personen aufnehmen (neu, schon vorhanden, falscher Notenschlüssel); alles oder nichts; Probelauf', async () => {
+  const kurs = async () => {
+    await anna('/teacher/kurse/neu', { schuljahr_id: String(db().prepare('SELECT id FROM schuljahre').get().id), name: 'Philo-AG', notenschluessel: 'BG' });
+    return db().prepare("SELECT id FROM faecher WHERE name = 'Philo-AG'").get().id;
+  };
+  const kursId = await kurs();
+  const stand = () => db().prepare('SELECT COUNT(*) AS c FROM fach_teilnehmer WHERE fach_id = ?').get(kursId).c;
+  assert.equal((await api(leseKey, 'GET', `/faecher/${kursId}/teilnehmer`)).json.anzahl, 0);
+  assert.equal((await api(leseKey, 'POST', `/faecher/${kursId}/teilnehmer`, { teilnehmer: [] })).status, 403, 'lesender Schlüssel');
+
+  const body = { teilnehmer: [{ nachname: 'Neu', vorname: 'Nora', klasse: '13NEU' }, { nachname: 'Berger', vorname: 'Bert', klasse: '12E' }] };
+  const klassenVorher = db().prepare('SELECT COUNT(*) AS c FROM klassen').get().c;
+  const trocken = await api(schreibKey, 'POST', `/faecher/${kursId}/teilnehmer?dry_run=true`, body);
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.gespeichert, false);
+  assert.equal(trocken.json.hinzugefuegt, 2);
+  assert.equal(stand(), 0, 'Probelauf nimmt alles zurück');
+  assert.equal(db().prepare('SELECT COUNT(*) AS c FROM klassen').get().c, klassenVorher, 'auch die neue Klasse');
+
+  const echt = await api(schreibKey, 'POST', `/faecher/${kursId}/teilnehmer`, body);
+  assert.equal(echt.status, 200);
+  assert.equal(echt.json.hinzugefuegt, 2);
+  assert.ok(echt.json.teilnehmer.every((t) => Number.isInteger(t.schueler_id) && t.status === 'hinzugefuegt'));
+  assert.equal(stand(), 2);
+  assert.equal(db().prepare("SELECT notenschluessel FROM klassen WHERE name = '13NEU'").get().notenschluessel, 'BG', 'neue Klasse mit dem Schlüssel des Kurses');
+  // Berger aus 12E ist dieselbe Person wie in der Klasse (keine Dublette)
+  assert.equal(db().prepare("SELECT COUNT(*) AS c FROM schueler WHERE nachname = 'Berger'").get().c, 1);
+
+  const nochmal = await api(schreibKey, 'POST', `/faecher/${kursId}/teilnehmer`, { teilnehmer: [{ nachname: 'Neu', vorname: 'Nora', klasse: '13NEU' }, { nachname: 'Frisch', vorname: 'Finn', klasse: '13NEU' }] });
+  assert.equal(nochmal.json.hinzugefuegt, 1);
+  assert.equal(nochmal.json.uebersprungen, 1);
+  assert.deepEqual(nochmal.json.teilnehmer.map((t) => t.status), ['uebersprungen', 'hinzugefuegt']);
+  assert.equal(stand(), 3);
+
+  // Alles oder nichts: ein fehlerhafter Eintrag verhindert alle (auch neue Personen und Klassen)
+  db().prepare("INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv) SELECT schuljahr_id, '13IHK', 'IHK', '' FROM klassen WHERE name = '13NEU'").run();
+  const klassenAnzahl = db().prepare('SELECT COUNT(*) AS c FROM klassen').get().c;
+  const schlecht = await api(schreibKey, 'POST', `/faecher/${kursId}/teilnehmer`, { teilnehmer: [
+    { nachname: 'Gut', vorname: 'Gerd', klasse: '14GUT' }, { nachname: 'Falsch', vorname: 'Fred', klasse: '13IHK' }, { nachname: 'Ohne', vorname: 'Olga' },
+  ] });
+  assert.equal(schlecht.status, 422);
+  assert.equal(schlecht.json.details.length, 2);
+  assert.match(schlecht.json.details[0].fehler, /Notenschlüssel/);
+  assert.match(schlecht.json.details[1].fehler, /erforderlich/);
+  assert.equal(stand(), 3, 'nichts gespeichert');
+  assert.equal(db().prepare('SELECT COUNT(*) AS c FROM klassen').get().c, klassenAnzahl, 'Klasse 14GUT wurde nicht angelegt');
+  assert.equal(db().prepare("SELECT COUNT(*) AS c FROM schueler WHERE nachname = 'Gut'").get().c, 0);
+
+  const liste = await api(leseKey, 'GET', `/faecher/${kursId}/teilnehmer`);
+  assert.equal(liste.json.anzahl, 3);
+  assert.deepEqual(liste.json.teilnehmer.map((t) => t.nachname).sort(), ['Berger', 'Frisch', 'Neu']);
+  assert.equal(liste.json.fach.kurs, true);
+
+  // Fremde Lehrkraft (Cora hat keinen Zugriff) darf nicht
+  const coraKey = await (async () => {
+    await admin('/admin/einladungen/neu', { display_name: 'cora', ttl_days: '14' });
+    const inv = db().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
+    const cora = client();
+    await cora(`/einladung/${inv.token}`, { username: 'cora', display_name: 'cora', password: 'passwort123', password2: 'passwort123' });
+    return neuerSchluessel(cora, 'Cora', 'schreiben');
+  })();
+  assert.equal((await api(coraKey, 'POST', `/faecher/${kursId}/teilnehmer`, body)).status, 403);
+  assert.equal((await api(coraKey, 'GET', `/faecher/${kursId}/teilnehmer`)).status, 403);
+  assert.equal((await api(schreibKey, 'POST', `/faecher/${kursId}/teilnehmer`, { teilnehmer: 'x' })).status, 400);
+});
+
+test('Mit der Teilnehmerliste können Noten eingetragen werden (Kurs-Workflow für Agenten)', async () => {
+  const kursId = db().prepare("SELECT id FROM faecher WHERE name = 'Philo-AG'").get().id;
+  const liste = (await api(leseKey, 'GET', `/faecher/${kursId}/teilnehmer`)).json.teilnehmer;
+  const nora = liste.find((t) => t.nachname === 'Neu');
+  const k = await api(schreibKey, 'POST', `/faecher/${kursId}/klausuren`, { halbjahr: 1, name: 'K1', max_punkte: [10] });
+  assert.equal(k.status, 200);
+  const r = await api(schreibKey, 'PUT', `/klausuren/${k.json.klausur.id}/ergebnisse`, { ergebnisse: [{ schueler_id: nora.id, punkte: [10] }] });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.ergebnisse[0].note, 15);
+});

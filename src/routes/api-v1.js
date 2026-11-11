@@ -13,7 +13,7 @@
 
 import { getDb } from '../db.js';
 import {
-  ladeMeineKlassen, ladeMeineKurse, userHatKlassenZugriff, userHatFachZgriff, userIstKlassenlehrer,
+  ladeMeineKlassen, ladeMeineKurse, userHatKlassenZugriff, userHatFachZgriff, userIstKlassenlehrer, userDarfTeilnehmerVerwalten,
 } from '../auth.js';
 import { pruefeSchluessel, rateLimitErreicht } from '../api-keys.js';
 import { ladeFachMitUmfeld, ladeNotenuebersicht, getNotenschluesselCsv, unterfaecherDesHalbjahrs } from '../noten-service.js';
@@ -22,7 +22,7 @@ import {
   parseKlausurTeile, klausurNote, klausurTeilNoten, klausurProzent, MAX_KLAUSUR_TEILE, TEIL_ARTEN, noteAusPunkten,
 } from '../grade-calc.js';
 import { globalerSchluessel, tabelle, TYPEN } from '../notenschluessel.js';
-import { ladeTeilnehmerMitHerkunft } from '../fach-teilnehmer.js';
+import { ladeTeilnehmerMitHerkunft, legeManuellenTeilnehmerAn } from '../fach-teilnehmer.js';
 import { istSchuelerGesperrtInFach, ladeSperrenFuerSchueler } from '../noten-sperre.js';
 import { setzeEndnote, notenBereich, parseEndnoteEingabe } from '../halbjahr-endnoten.js';
 import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
@@ -171,6 +171,16 @@ export default async function apiV1Routes(fastify) {
       const sperren = ladeSperrenFuerSchueler(uebersicht.rows.map((r) => r.schueler_id), halbjahr);
       return { uebersicht, sperren };
     };
+
+    route('GET', '/faecher/:id/teilnehmer', 'lesen', async (request, reply) => {
+      const ctx = fachFuer(request, reply, { halbjahrRoh: request.query?.halbjahr });
+      if (!ctx) return undefined;
+      const { fach } = ctx;
+      const teilnehmer = ladeTeilnehmerMitHerkunft(fach).map((t) => ({
+        id: t.id, nachname: t.nachname, vorname: t.vorname, klasse: t.klasse_name, aus_anderer_klasse: Boolean(t.fremd),
+      }));
+      return { fach: { id: fach.id, name: fach.name, kurs: Boolean(fach.ist_kurs) }, anzahl: teilnehmer.length, teilnehmer };
+    });
 
     route('GET', '/faecher/:id/noten', 'lesen', async (request, reply) => {
       const ctx = fachFuer(request, reply, { halbjahrRoh: request.query?.halbjahr });
@@ -431,6 +441,47 @@ export default async function apiV1Routes(fastify) {
       syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.apiUser.id);
       request.log.info({ key: request.apiKey.id, termin: t.id, anzahl: geprueft.length }, 'api: Datumsnoten eingetragen');
       return { gespeichert: true, anzahl: geprueft.length };
+    });
+
+    // Teilnehmerliste: Personen mit Name und Klasse aufnehmen (wie „Manuell anlegen“ bzw. CSV-Import in der App).
+    route('POST', '/faecher/:id/teilnehmer', 'schreiben', async (request, reply) => {
+      const fach = ladeFachMitUmfeld(parseInt(request.params.id, 10));
+      if (!fach || fach.parent_fach_id || fach.spa_fach_key) return senden(reply, 404, 'not_found', 'Fach nicht gefunden (bei SPA-Fächern und Unterfächern gibt es keine eigene Teilnehmerliste).');
+      if (!userDarfTeilnehmerVerwalten(request.apiUser, fach)) return senden(reply, 403, 'forbidden', 'Die Teilnehmer/innen kann nur die Klassenleitung (bzw. bei Kursen die Lehrkraft des Kurses) verwalten.');
+      const liste = request.body?.teilnehmer;
+      if (!Array.isArray(liste) || !liste.length || liste.length > MAX_EINTRAEGE) return senden(reply, 400, 'bad_request', `teilnehmer: Liste mit 1 bis ${MAX_EINTRAEGE} Einträgen { nachname, vorname, klasse }.`);
+      const GRUND = {
+        pflichtfelder: 'nachname, vorname und klasse sind erforderlich.',
+        notenschluessel: 'Der Notenschlüssel der Klasse passt nicht zu diesem Fach (IHK/BG/SPA).',
+      };
+      const ergebnisse = [];
+      const fehler = [];
+      class Zuruecknehmen extends Error {}
+      const probelauf = !speichern(request);
+      try {
+        getDb().transaction(() => {
+          liste.forEach((e, i) => {
+            const wo = `teilnehmer[${i}]`;
+            if (!e || typeof e !== 'object') return fehler.push({ stelle: wo, fehler: 'Objekt { nachname, vorname, klasse } erwartet.' });
+            const r = legeManuellenTeilnehmerAn(fach, { nachname: e.nachname, vorname: e.vorname, klassenName: e.klasse });
+            const eintrag = { nachname: String(e.nachname ?? '').trim(), vorname: String(e.vorname ?? '').trim(), klasse: String(e.klasse ?? '').trim() };
+            if (r.ok) ergebnisse.push({ ...eintrag, schueler_id: r.schuelerId, status: 'hinzugefuegt' });
+            else if (r.fehler === 'bereits-teilnehmer') ergebnisse.push({ ...eintrag, status: 'uebersprungen' });
+            else fehler.push({ stelle: wo, ...eintrag, fehler: GRUND[r.fehler] || 'Nicht übernommen.' });
+          });
+          // Alles oder nichts: bei Fehlern und im Probelauf wird alles zurückgenommen (auch neu angelegte Klassen und Personen).
+          if (fehler.length || probelauf) throw new Zuruecknehmen();
+        })();
+      } catch (err) {
+        if (!(err instanceof Zuruecknehmen)) throw err;
+      }
+      if (fehler.length) return senden(reply, 422, 'invalid', 'Es wurde nichts gespeichert: mindestens ein Eintrag ist ungültig.', fehler);
+      const zaehler = (s) => ergebnisse.filter((x) => x.status === s).length;
+      if (!probelauf) request.log.info({ key: request.apiKey.id, fach: fach.id, anzahl: zaehler('hinzugefuegt') }, 'api: Teilnehmer aufgenommen');
+      return {
+        gespeichert: !probelauf, ...(probelauf ? { dry_run: true } : {}),
+        hinzugefuegt: zaehler('hinzugefuegt'), uebersprungen: zaehler('uebersprungen'), teilnehmer: ergebnisse,
+      };
     });
 
     // ---------- Synchronisation mit der Klassenleitung ----------

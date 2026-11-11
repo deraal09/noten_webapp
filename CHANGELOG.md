@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.120.0 - 2026-11-11
+
+- **API: Teilnehmerliste.** `POST /api/v1/faecher/{id}/teilnehmer` nimmt Personen mit Nachname, Vorname und Klasse in die Teilnehmerliste eines
+  Fachs oder Kurses auf (bis zu 500 je Aufruf) -- dieselbe Logik wie „Manuell anlegen“ bzw. der CSV-Import in der App: fehlende Personen
+  werden in der Klasse angelegt, fehlende Klassen im Schuljahr des Fachs als leere Klasse mit dem Notenschlüssel des Fachs, Doppelte
+  werden übersprungen, der Notenschlüssel einer vorhandenen Klasse muss passen. Alles oder nichts (bei Fehlern wird auch Neu-Angelegtes
+  zurückgenommen), `?dry_run=true` zeigt das Ergebnis ohne Speichern; die Antwort enthält die `schueler_id`s für das Eintragen von Noten.
+  Erlaubt ist, wer die Teilnehmer in der App verwalten darf. `GET /api/v1/faecher/{id}/teilnehmer` liest die Liste aus.
+- Dokumentation (`/api/v1/docs`, OpenAPI, `docs/API.md`) ergänzt.
+
 ## 0.119.0 - 2026-11-11
 
 - **CSV-Import in der Teilnehmerliste eines Kurses.** Auf der Teilnehmer-Seite eines Kurses (und Fachs) gibt es unter „Manuell anlegen“ eine
