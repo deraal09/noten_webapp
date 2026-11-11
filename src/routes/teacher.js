@@ -2975,6 +2975,59 @@ export default async function teacherRoutes(fastify) {
     return reply.redirect(teilnehmerSeite(fach.id));
   });
 
+  // CSV-Import der Teilnehmerliste (Nachname;Vorname;Klasse, Kopfzeile und Trenner werden erkannt): je Zeile wie „Manuell anlegen“
+  // (legeManuellenTeilnehmerAn prüft Schuljahr und Notenschlüssel, legt fehlende Klassen an, überspringt Doppelte).
+  // Eigener, gekapselter Plugin-Scope für multipart/form-data, siehe den Klassen-Import oben.
+  fastify.register(async function (scoped) {
+    scoped.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (request, payload, done) => { done(null, payload); });
+
+    scoped.post('/fach/:id/teilnehmer/csv', { bodyLimit: 1 * 1024 * 1024 }, async (request, reply) => {
+      const fach = ladeTeilnehmerFach(request, reply);
+      if (!fach) return reply;
+      const zurueck = teilnehmerSeite(fach.id);
+      let dateiBuffer;
+      try {
+        dateiBuffer = await leseMultipartDatei(request.body, request.headers['content-type'], 'datei');
+      } catch {
+        dateiBuffer = null;
+      }
+      if (!dateiBuffer) {
+        request.flash?.('error', 'Bitte eine CSV-Datei auswählen.');
+        return reply.redirect(zurueck);
+      }
+      const zeilen = parseSchuelerCsv(dateiBuffer.toString('utf8'));
+      if (!zeilen.length) {
+        request.flash?.('error', 'Aus der Datei konnten keine Zeilen gelesen werden — Format prüfen (Nachname;Vorname;Klasse je Zeile).');
+        return reply.redirect(zurueck);
+      }
+      if (zeilen.length > 1000) {
+        request.flash?.('error', 'Die Datei hat mehr als 1000 Zeilen — bitte aufteilen.');
+        return reply.redirect(zurueck);
+      }
+      const GRUND = {
+        pflichtfelder: 'Nachname, Vorname oder Klasse fehlt',
+        notenschluessel: 'Notenschlüssel der Klasse passt nicht zum Fach',
+      };
+      let hinzugefuegt = 0;
+      let uebersprungen = 0;
+      const probleme = [];
+      getDb().transaction(() => {
+        for (const z of zeilen) {
+          const e = legeManuellenTeilnehmerAn(fach, { nachname: z.nachname, vorname: z.vorname, klassenName: z.klasse });
+          if (e.ok) hinzugefuegt += 1;
+          else if (e.fehler === 'bereits-teilnehmer') uebersprungen += 1;
+          else probleme.push(`${z.nachname}, ${z.vorname}${z.klasse ? ` (${z.klasse})` : ''}: ${GRUND[e.fehler] || 'nicht übernommen'}`);
+        }
+      })();
+      request.flash?.(hinzugefuegt ? 'success' : 'info', `${hinzugefuegt} hinzugefügt, ${uebersprungen} übersprungen (bereits Teilnehmer/in).`);
+      if (probleme.length) {
+        request.flash?.('error', `${probleme.length} Zeile${probleme.length === 1 ? '' : 'n'} nicht übernommen: ${probleme.slice(0, 8).join('; ')}${probleme.length > 8 ? ' …' : ''}`
+          + (probleme.some((p) => p.includes('Klasse fehlt')) ? ' — die Datei braucht je Zeile eine Klasse (Spalte „Klasse“).' : ''));
+      }
+      return reply.redirect(zurueck);
+    });
+  });
+
   fastify.post('/fach/:id/teilnehmer/entfernen', async (request, reply) => {
     const fach = ladeTeilnehmerFach(request, reply);
     if (!fach) return reply;

@@ -6,6 +6,9 @@
  * erkennbare Kopfzeile vorhanden ist — sonst werden die ersten beiden
  * Spalten als Nachname/Vorname angenommen (wie beim bestehenden
  * Sammel-Einfügen per Textfeld).
+ *
+ * Optional eine dritte Spalte "Klasse" (Kopfzeile „Klasse“/„Klassenname“/„Class“ oder ohne Kopfzeile die dritte Spalte): Sie wird als
+ * `klasse` mitgeliefert -- nur, wenn die Spalte vorhanden ist. Der Kurs-Import der Teilnehmerliste braucht sie (Nachname;Vorname;Klasse).
  */
 
 function erkenneTrennzeichen(zeile) {
@@ -49,8 +52,9 @@ function parseZeile(zeile, trenner) {
 
 const NACHNAME_SPALTEN = ['nachname', 'name', 'surname', 'lastname', 'last name', 'familienname'];
 const VORNAME_SPALTEN = ['vorname', 'forename', 'firstname', 'first name'];
+const KLASSE_SPALTEN = ['klasse', 'klassenname', 'class', 'classname'];
 
-/** Liest Nachname/Vorname aus CSV-Text. Gibt [] zurück, wenn nichts lesbar ist. */
+/** Liest Nachname/Vorname (und, falls vorhanden, Klasse) aus CSV-Text. Gibt [] zurück, wenn nichts lesbar ist. */
 export function parseSchuelerCsv(text) {
   const zeilen = String(text || '').split(/\r?\n/).map((z) => z.trim()).filter((z) => z.length > 0);
   if (!zeilen.length) return [];
@@ -59,11 +63,14 @@ export function parseSchuelerCsv(text) {
   const erste = parseZeile(zeilen[0], trenner).map((f) => f.toLowerCase());
   const nachnameIdx = erste.findIndex((f) => NACHNAME_SPALTEN.includes(f));
   const vornameIdx = erste.findIndex((f) => VORNAME_SPALTEN.includes(f));
-  const hatKopfzeile = nachnameIdx !== -1 || vornameIdx !== -1;
+  const klasseKopfIdx = erste.findIndex((f) => KLASSE_SPALTEN.includes(f));
+  const hatKopfzeile = nachnameIdx !== -1 || vornameIdx !== -1 || klasseKopfIdx !== -1;
 
   const datenZeilen = hatKopfzeile ? zeilen.slice(1) : zeilen;
   const nIdx = nachnameIdx !== -1 ? nachnameIdx : 0;
   const vIdx = vornameIdx !== -1 ? vornameIdx : 1;
+  // Mit Kopfzeile nur die benannte Klassen-Spalte; ohne Kopfzeile gilt die dritte Spalte (falls die Zeile eine hat).
+  const kIdx = hatKopfzeile ? klasseKopfIdx : 2;
 
   const ergebnis = [];
   for (const zeile of datenZeilen) {
@@ -71,7 +78,8 @@ export function parseSchuelerCsv(text) {
     const nachname = (felder[nIdx] || '').trim();
     const vorname = (felder[vIdx] || '').trim();
     if (!nachname) continue;
-    ergebnis.push({ nachname, vorname });
+    if (kIdx !== -1 && (hatKopfzeile || felder.length > kIdx)) ergebnis.push({ nachname, vorname, klasse: (felder[kIdx] || '').trim() });
+    else ergebnis.push({ nachname, vorname });
   }
   return ergebnis;
 }

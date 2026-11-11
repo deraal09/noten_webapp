@@ -59,3 +59,17 @@ test('parseSchuelerCsv: fehlender Vorname wird als leerer String übernommen', (
   const text = 'Nachname;Vorname\nMüller;';
   assert.deepEqual(parseSchuelerCsv(text), [{ nachname: 'Müller', vorname: '' }]);
 });
+
+test('parseSchuelerCsv: dritte Spalte "Klasse" (Kopfzeile erkannt, Trenner automatisch)', () => {
+  assert.deepEqual(parseSchuelerCsv('Nachname;Vorname;Klasse\nMüller;Anna;10B\nSchmidt;Bernd;10C'), [
+    { nachname: 'Müller', vorname: 'Anna', klasse: '10B' },
+    { nachname: 'Schmidt', vorname: 'Bernd', klasse: '10C' },
+  ]);
+  assert.deepEqual(parseSchuelerCsv('Klasse,Name,Vorname\n10B,Müller,Anna'), [{ nachname: 'Müller', vorname: 'Anna', klasse: '10B' }], 'Reihenfolge der Spalten egal');
+  assert.deepEqual(parseSchuelerCsv('Müller\tAnna\t10B\nSchmidt\tBernd\t10C'), [
+    { nachname: 'Müller', vorname: 'Anna', klasse: '10B' },
+    { nachname: 'Schmidt', vorname: 'Bernd', klasse: '10C' },
+  ], 'ohne Kopfzeile: dritte Spalte, Tab');
+  assert.deepEqual(parseSchuelerCsv('Nachname;Vorname;Klasse\nMüller;Anna;'), [{ nachname: 'Müller', vorname: 'Anna', klasse: '' }], 'leere Klasse bleibt leer');
+  assert.deepEqual(parseSchuelerCsv('Nachname;Vorname\nMüller;Anna'), [{ nachname: 'Müller', vorname: 'Anna' }], 'ohne Klassen-Spalte kein Feld klasse');
+});

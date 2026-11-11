@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.119.0 - 2026-11-11
+
+- **CSV-Import in der Teilnehmerliste eines Kurses.** Auf der Teilnehmer-Seite eines Kurses (und Fachs) gibt es unter „Manuell anlegen“ eine
+  Upload-Box „Liste per CSV importieren“ für Dateien mit den Spalten **Nachname;Vorname;Klasse**. Kopfzeile und Trennzeichen (Semikolon,
+  Komma, Tab) werden automatisch erkannt; ohne Kopfzeile gelten die ersten drei Spalten. Je Zeile gilt dasselbe wie bei „Manuell anlegen“: fehlende
+  Klassen werden im Schuljahr des Fachs als leere Klasse angelegt, der Notenschlüssel muss passen, wer schon Teilnehmer/in ist, wird
+  übersprungen. Die Meldung nennt die Zähler („x hinzugefügt, y übersprungen“) und listet nicht übernommene Zeilen (falscher Notenschlüssel, fehlender
+  Name oder fehlende Klasse); die übrigen Zeilen werden trotzdem übernommen. Bis zu 1000 Zeilen je Datei.
+- Der CSV-Parser (`parseSchuelerCsv`) liest optional eine dritte Spalte „Klasse“ (Kopfzeile „Klasse“/„Klassenname“/„Class“).
+- API-Dokumentation: Hinweis, dass Schüler:innen und Teilnehmerlisten in der App gepflegt werden.
+
 ## 0.118.0 - 2026-11-11
 
 - **API: Synchronisation mit der Klassenleitung.** Neue Endpunkte `POST /api/v1/faecher/{id}/sync` („Jetzt synchronisieren“) und

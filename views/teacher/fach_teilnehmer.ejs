@@ -81,6 +81,21 @@
   </form>
 </div>
 
+<div class="card" id="teilnehmer-csv">
+  <h2>Liste per CSV importieren</h2>
+  <p class="hint">
+    Für viele Personen auf einmal: eine CSV-Datei mit den Spalten <strong>Nachname;Vorname;Klasse</strong> (je Zeile eine Person). Eine Kopfzeile
+    wird erkannt (z. B. „Nachname“, „Vorname“, „Klasse“); ohne Kopfzeile gelten die ersten drei Spalten. Semikolon, Komma oder Tab als Trennzeichen
+    erkennt die Seite selbst (z. B. aus Excel oder Untis exportiert). Für jede Zeile gilt dasselbe wie bei „Manuell anlegen“: Fehlt die Klasse im
+    Schuljahr dieses Fachs, wird sie als leere Klasse angelegt; der Notenschlüssel der Klasse muss zum Fach passen; wer schon Teilnehmer/in ist,
+    wird übersprungen. Danach steht in der Meldung, wie viele hinzugefügt und übersprungen wurden.
+  </p>
+  <form method="post" action="/teacher/fach/<%= fach.id %>/teilnehmer/csv" enctype="multipart/form-data">
+    <input type="file" name="datei" accept=".csv,text/csv,text/plain" required>
+    <button type="submit">Datei importieren</button>
+  </form>
+</div>
+
 <script>
   // Ergebnisse werden per DOM-API statt innerHTML eingefügt (Namen kommen aus der Datenbank).
   // Hinzufügen läuft per fetch(), damit Suchfeld und Trefferliste stehen bleiben und mehrere
