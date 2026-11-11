@@ -6,6 +6,35 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.127.0 - 2026-11-12
+
+### Aktivität und Auslastung (Admin)
+
+- Neue Admin-Seite **📊 Aktivität** (`/admin/aktivitaet`, Menüpunkt „Aktivität“;
+  Zeitraum 30 Tage, 90 Tage oder 12 Monate): Wie viele Konten waren in den
+  letzten 7/30 Tagen aktiv, wie viele noch nie? Einteilung aller Konten nach
+  aktiven Tagen im Zeitraum – **Keine Aktivität**, **Einmal reingeschaut**,
+  **Wenig aktiv** (2–4 Tage), **Regelmäßig** (5–19), **Intensiv** (ab 20) –
+  dazu der Anteil derer, die **nie etwas eingetragen** haben, die
+  Wiederkehrquote und der Median der aktiven Tage.
+- **Verlauf** der aktiven Personen je Tag (je Woche bei 12 Monaten) und
+  **Auslastung**: Anfragen im Zeitraum, davon Eingaben, Anfragen je Tag mit
+  Nutzung, Spitze (meiste Personen/Anfragen in einer Stunde) sowie eine
+  Wochentag-×-Uhrzeit-Karte in Ortszeit.
+- Tabelle **Alle Konten** mit aktiven Tagen, Anfragen, Eingaben, Anmeldungen,
+  Fächern, letzter Aktivität und Kontoalter.
+- Erfasst wird nur ein **Zähler je Person, Tag und Stunde** (Tabelle
+  `nutzer_aktivitaet`; Aufrufe und Änderungen; Dateien unter `/static` und die
+  Live-Suche der Hilfe zählen nicht, auch API-Anfragen zählen). Gesammelt wird im
+  Speicher und alle 30 Sekunden geschrieben; Daten älter als 400 Tage werden
+  gelöscht. Neu am Konto: `letzter_login` und `anmeldungen`.
+- **Hinweis:** Die Erfassung beginnt mit dieser Version; frühere Nutzung ist
+  nicht rekonstruierbar. Die Seite weist darauf hin, solange der gewählte
+  Zeitraum länger ist als die Erfassung.
+- Standardtext „Protokolle“ unter Admin → Rechtliches nennt die Zähler
+  (nur für noch nicht angepasste Texte wirksam); Hilfe-Artikel
+  „Administration“ ergänzt.
+
 ## 0.126.0 - 2026-11-12
 
 ### Hilfe für die Klassenleitung

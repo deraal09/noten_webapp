@@ -870,3 +870,24 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 /* Datumstabelle: kurze Notiz zum Unterrichtsinhalt unter dem Datum */
 textarea.termin-inhalt { display: block; width: 9rem; height: 3.2rem; min-height: 2.4rem; margin: 0.3rem auto 0; font: inherit; font-size: 0.8rem; white-space: normal; resize: vertical; }
+
+/* ---------- Admin: Aktivität und Auslastung ---------- */
+.akt-zeitraum { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem 0 1rem; }
+.akt-zeitraum a { padding: .35rem .8rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-card); color: var(--text); text-decoration: none; }
+.akt-zeitraum a.aktuell { background: var(--primary); color: var(--on-dark); border-color: var(--primary); }
+.akt-stufen { display: flex; height: 2rem; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); margin: .5rem 0; }
+.akt-stufen span { display: block; min-width: 2px; }
+.akt-legende { list-style: none; padding: 0; margin: .5rem 0 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .5rem; }
+.akt-legende li { display: flex; gap: .5rem; align-items: baseline; }
+.akt-punkt { display: inline-block; width: .8rem; height: .8rem; border-radius: 50%; flex: none; }
+.akt-stufe-keine { background: #9aa0a6; } .akt-stufe-einmalig { background: #e63946; } .akt-stufe-wenig { background: #f4a261; }
+.akt-stufe-regelmaessig { background: #2a9d8f; } .akt-stufe-intensiv { background: #1d3557; }
+.akt-chart { width: 100%; height: auto; display: block; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; }
+.akt-chart .balken { fill: var(--accent); } .akt-chart .linie { fill: none; stroke: var(--text-muted); stroke-width: 1.5; }
+.akt-chart text { fill: var(--text-muted); font-size: 10px; }
+.akt-heat { border-collapse: collapse; font-size: .8rem; width: 100%; max-width: 900px; }
+.akt-heat th { font-weight: 400; color: var(--text-muted); padding: 2px 3px; }
+.akt-heat td { height: 1.6rem; min-width: 1.2rem; text-align: center; border: 1px solid var(--bg-card); background: color-mix(in srgb, var(--accent) calc(var(--w) * 100%), var(--bg-subtle)); }
+.akt-tabelle td.num, .akt-tabelle th.num { text-align: right; }
+.akt-tabelle .tag-stufe { white-space: nowrap; }
+.akt-hinweis { background: var(--bg-tint); border-radius: 6px; padding: .6rem .9rem; margin: .5rem 0 1rem; }

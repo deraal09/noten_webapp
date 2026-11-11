@@ -643,6 +643,17 @@ CREATE TABLE IF NOT EXISTS ldap_settings (
 -- Damit übersteht eine Anmeldung einen App-Neustart (z. B. nach jedem
 -- Deploy auf Plesk) — ohne diese Tabelle wären sonst alle angemeldeten
 -- Personen bei jedem Neustart ohne Vorwarnung ausgeloggt.
+-- Nutzungsstatistik (src/aktivitaet.js): nur Zähler je Person, Tag und Stunde, keine Inhalte.
+CREATE TABLE IF NOT EXISTS nutzer_aktivitaet (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tag TEXT NOT NULL,
+    stunde INTEGER NOT NULL,
+    anfragen INTEGER NOT NULL DEFAULT 0,
+    eingaben INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, tag, stunde)
+);
+CREATE INDEX IF NOT EXISTS idx_nutzer_aktivitaet_tag ON nutzer_aktivitaet(tag);
+
 CREATE TABLE IF NOT EXISTS sessions (
     sid TEXT PRIMARY KEY,
     data TEXT NOT NULL,
@@ -854,6 +865,8 @@ function migrate(db) {
   const alteVersion = versionsZeile ? Number(versionsZeile.value) : null;
   ensureColumn(db, 'users', 'auth_source', "auth_source TEXT NOT NULL DEFAULT 'lokal'");
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
+  ensureColumn(db, 'users', 'letzter_login', 'letzter_login TEXT');
+  ensureColumn(db, 'users', 'anmeldungen', 'anmeldungen INTEGER NOT NULL DEFAULT 0');
   // Partial-Index: login_sub muss nur unter LDAP-Konten eindeutig sein.
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_sub ON users(login_sub) WHERE login_sub IS NOT NULL');
   stelleBenutzernamenEindeutigSicher(db);

@@ -27,9 +27,19 @@ import {
 import { BILDUNGSGAENGE } from '../spa-schema.js';
 import { TYPEN as NS_TYPEN, globalerSchluessel, vorgabeCsv, folgtGlobal, pruefeCsv, speichereGlobal, klassenZahlen, MAX_HINWEIS } from '../notenschluessel.js';
 import { seedeSpaFaecher } from '../spa-noten-service.js';
+import { auswertung as aktivitaetsAuswertung, ZEITRAEUME as AKTIVITAET_ZEITRAEUME, WOCHENTAGE } from '../aktivitaet.js';
 
 export default async function adminRoutes(fastify) {
   fastify.addHook('preHandler', requireAdmin);
+
+  // ---------- Aktivität / Auslastung ----------
+  fastify.get('/aktivitaet', async (request, reply) => {
+    const gewuenscht = parseInt(request.query?.tage, 10);
+    const tage = AKTIVITAET_ZEITRAEUME.includes(gewuenscht) ? gewuenscht : 90;
+    return reply.viewEjs('admin/aktivitaet.ejs', {
+      user: request.user, a: aktivitaetsAuswertung(tage), ZEITRAEUME: AKTIVITAET_ZEITRAEUME, WOCHENTAGE,
+    });
+  });
 
   // ---------- Dashboard ----------
   fastify.get('/', async (request, reply) => {

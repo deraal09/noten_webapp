@@ -52,6 +52,7 @@ import sitzplanRoutes from './src/routes/sitzplan.js';
 import startRoutes from './src/routes/start.js';
 import ssoRoutes from './src/routes/sso.js';
 import apiExternRoutes from './src/routes/api-extern.js';
+import { erfasse as erfasseAktivitaet, starteTimer as starteAktivitaetTimer, stoppeTimer as stoppeAktivitaetTimer } from './src/aktivitaet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';
@@ -175,6 +176,16 @@ export async function buildApp(opts = {}) {
   pruefeSchuljahrEinmalProTag(); // ein neues Schuljahr (1. August) wird ohne Zutun der Administration angelegt
   pruefePapierkorbEinmalProTag(); // Klassen, deren 30-Tage-Frist im Papierkorb abgelaufen ist, werden endgültig gelöscht
   app.addHook('preHandler', authPreHandler);
+
+  // Nutzungsstatistik (Admin → Aktivität): nur ein Zähler je Person/Tag/Stunde, keine Adressen oder Inhalte.
+  starteAktivitaetTimer();
+  app.addHook('onClose', async () => stoppeAktivitaetTimer());
+  app.addHook('onResponse', async (request, reply) => {
+    if (!request.user || reply.statusCode >= 400) return;
+    const pfad = request.url.split('?')[0];
+    if (pfad.startsWith('/static/') || pfad === '/hilfe/suche') return; // Dateien und Live-Suche sind keine „Nutzung“
+    erfasseAktivitaet(request.user.id, { eingabe: !['GET', 'HEAD', 'OPTIONS'].includes(request.method) });
+  });
 
   app.addHook('preHandler', (request, reply, done) => {
     reply.locals = reply.locals || {};

@@ -2,6 +2,7 @@
  * Auth-Routen: Login, Logout, /setup (erster Admin), /einladung/<token>
  */
 
+import { registriereAnmeldung } from '../aktivitaet.js';
 import { getDb } from '../db.js';
 import {
   hashPassword, checkPassword, makeToken, SESSION_COOKIE, requireAuth, destroySession,
@@ -38,6 +39,7 @@ async function meldeAn(request, userId) {
   const alteId = request.session.sessionId;
   await request.session.regenerate();
   request.session.userId = userId;
+  registriereAnmeldung(userId);
   // Die bisherige Sitzung verwerfen (z. B. bei erneuter Anmeldung im selben Browser).
   await new Promise((resolve) => request.sessionStore.destroy(alteId, () => resolve()));
 }

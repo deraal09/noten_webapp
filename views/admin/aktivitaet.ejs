@@ -1,0 +1,109 @@
+<%
+  const proz = (x) => Math.round(x * 100) + ' %';
+  const datum = (t) => t ? t.split('-').reverse().join('.') : '–';
+  const datumKurz = (t) => t ? t.slice(8, 10) + '.' + t.slice(5, 7) + '.' : '';
+  const stundeText = (h) => String(h).padStart(2, '0') + ':00–' + String((h + 1) % 24).padStart(2, '0') + ':00';
+%>
+<h1>📊 Aktivität und Auslastung</h1>
+<p class="hint">Wie intensiv wird die App genutzt – und von wem? Erfasst werden nur Zähler je Person, Tag und Stunde (keine Adressen, keine Noten, keine Inhalte).</p>
+
+<nav class="akt-zeitraum" aria-label="Zeitraum">
+  <% ZEITRAEUME.forEach(function(z) { %>
+    <a href="/admin/aktivitaet?tage=<%= z %>" class="<%= z === a.tage ? 'aktuell' : '' %>">Letzte <%= z === 365 ? '12 Monate' : z + ' Tage' %></a>
+  <% }); %>
+</nav>
+
+<% if (!a.seit) { %>
+  <p class="akt-hinweis">Die Erfassung läuft erst seit Kurzem – es liegen noch keine Nutzungsdaten vor. Sobald sich Personen anmelden und die App benutzen, erscheinen hier Zahlen. Zeitpunkte der letzten Anmeldung werden ab jetzt mitgeführt.</p>
+<% } else if (a.erfassungKuerzer) { %>
+  <p class="akt-hinweis">Die Erfassung läuft erst seit dem <strong><%= datum(a.seit) %></strong>. Für den gewählten Zeitraum (ab <%= datum(a.von) %>) sind daher nur die Tage seit diesem Datum ausgewertet; früher aktive Personen können deshalb noch als „Keine Aktivität“ erscheinen.</p>
+<% } %>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val"><%= a.konten %></div><div class="kpi-lbl">aktive Konten</div></div>
+  <div class="kpi"><div class="kpi-val"><%= a.aktiv7 %></div><div class="kpi-lbl">zuletzt aktiv in 7 Tagen</div></div>
+  <div class="kpi"><div class="kpi-val"><%= a.aktiv30 %></div><div class="kpi-lbl">zuletzt aktiv in 30 Tagen</div></div>
+  <div class="kpi"><div class="kpi-val"><%= a.nieAktiv %></div><div class="kpi-lbl">noch nie aktiv erfasst</div></div>
+  <div class="kpi"><div class="kpi-val"><%= proz(a.wiederkehrQuote) %></div><div class="kpi-lbl">der Aktiven kamen an ≥ 2 Tagen</div></div>
+</div>
+
+<h2>Wer nutzt die App – und wie oft?</h2>
+<p class="hint">Einteilung der <%= a.konten %> Konten nach der Zahl der Tage, an denen sie im Zeitraum aktiv waren.</p>
+<% if (a.konten) { %>
+<div class="akt-stufen" role="img" aria-label="Verteilung der Konten nach Aktivität">
+  <% a.stufen.forEach(function(s) { if (s.anzahl) { %><span class="akt-stufe-<%= s.id %>" style="width: <%= (s.anteil * 100).toFixed(2) %>%" title="<%= s.titel %>: <%= s.anzahl %>"></span><% } }); %>
+</div>
+<ul class="akt-legende">
+  <% a.stufen.forEach(function(s) { %>
+    <li><span class="akt-punkt akt-stufe-<%= s.id %>"></span><span><strong><%= s.titel %></strong>: <%= s.anzahl %> (<%= proz(s.anteil) %>)<br><span class="hint"><%= s.text %></span></span></li>
+  <% }); %>
+</ul>
+<% if (a.aktiveImZeitraum) { %>
+  <p>
+    Von den <strong><%= a.aktiveImZeitraum %></strong> Konten mit Aktivität haben <strong><%= a.ohneEingaben %></strong> (<%= proz(a.ohneEingaben / a.aktiveImZeitraum) %>) im Zeitraum <strong>nie etwas eingetragen</strong>, sich also nur umgesehen.
+    Mittlere Zahl aktiver Tage je Konto (Median): <strong><%= String(a.medianTage).replace('.', ',') %></strong>.
+  </p>
+<% } %>
+<% } %>
+
+<h2>Verlauf: aktive Personen <%= a.woche ? 'je Woche' : 'je Tag' %></h2>
+<%
+  const maxN = Math.max(1, ...a.verlauf.map(function(v) { return v.nutzer; }));
+  const B = 700, H = 160, L = 26, T = 8, Bo = 20;
+  const bw = (B - L) / Math.max(1, a.verlauf.length);
+%>
+<svg class="akt-chart" viewBox="0 0 <%= B %> <%= H + Bo %>" role="img" aria-label="Aktive Personen im Verlauf">
+  <line x1="<%= L %>" y1="<%= H %>" x2="<%= B %>" y2="<%= H %>" stroke="currentColor" opacity=".3"/>
+  <text x="2" y="<%= T + 8 %>"><%= maxN %></text><text x="2" y="<%= H %>">0</text>
+  <% a.verlauf.forEach(function(v, i) { const h = (H - T) * v.nutzer / maxN; %>
+    <rect class="balken" x="<%= (L + i * bw + 0.5).toFixed(1) %>" y="<%= (H - h).toFixed(1) %>" width="<%= Math.max(1, bw - 1).toFixed(1) %>" height="<%= h.toFixed(1) %>"><title><%= datum(v.start) %><%= a.woche ? ' (Woche)' : '' %>: <%= v.nutzer %> Personen, <%= v.anfragen %> Anfragen</title></rect>
+  <% }); %>
+  <text x="<%= L %>" y="<%= H + 14 %>"><%= datumKurz(a.verlauf[0] && a.verlauf[0].start) %></text>
+  <text x="<%= B - 30 %>" y="<%= H + 14 %>"><%= datumKurz(a.bis) %></text>
+</svg>
+
+<h2>Auslastung</h2>
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val"><%= a.summeAnfragen %></div><div class="kpi-lbl">Anfragen im Zeitraum</div></div>
+  <div class="kpi"><div class="kpi-val"><%= a.summeEingaben %></div><div class="kpi-lbl">davon Eingaben/Änderungen</div></div>
+  <div class="kpi"><div class="kpi-val"><%= a.anfragenProAktivemTag %></div><div class="kpi-lbl">Anfragen je Tag mit Nutzung</div></div>
+  <div class="kpi"><div class="kpi-val"><%= a.spitzeNutzer.nutzer %></div><div class="kpi-lbl">Spitze: Personen in einer Stunde<% if (a.spitzeNutzer.tag) { %><br><%= datum(a.spitzeNutzer.tag) %>, <%= stundeText(a.spitzeNutzer.stunde) %><% } %></div></div>
+</div>
+<% if (a.spitzeAnfragen.tag) { %><p class="hint">Meiste Anfragen in einer Stunde: <strong><%= a.spitzeAnfragen.anfragen %></strong> am <%= datum(a.spitzeAnfragen.tag) %>, <%= stundeText(a.spitzeAnfragen.stunde) %> Uhr.</p><% } %>
+
+<p class="hint">Wann ist die App ausgelastet? Je dunkler, desto mehr Anfragen (Summe über den Zeitraum, Ortszeit).</p>
+<div style="overflow-x:auto">
+<table class="akt-heat" aria-label="Auslastung nach Wochentag und Uhrzeit">
+  <thead><tr><th></th><% for (let h = 0; h < 24; h++) { %><th><%= h %></th><% } %></tr></thead>
+  <tbody>
+    <% a.heat.forEach(function(zeile, w) { %>
+      <tr><th><%= WOCHENTAGE[w] %></th>
+        <% zeile.forEach(function(v, h) { %><td style="--w: <%= (v / a.heatMax).toFixed(3) %>" title="<%= WOCHENTAGE[w] %>, <%= stundeText(h) %> Uhr: <%= v %> Anfragen"><%= v ? '' : '' %></td><% }); %>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+</div>
+
+<h2>Alle Konten</h2>
+<p class="hint">Sortiert nach aktiven Tagen. „Eingaben“ sind Änderungen (Noten, Klassen, Einstellungen …), „Anfragen“ jeder Seitenaufruf.</p>
+<div style="overflow-x:auto">
+<table class="data akt-tabelle">
+  <thead><tr>
+    <th>Name</th><th>Einteilung</th><th class="num">Aktive Tage</th><th class="num">Anfragen</th><th class="num">Eingaben</th>
+    <th class="num">Anmeldungen</th><th class="num">Fächer</th><th>Zuletzt aktiv</th><th>Konto seit</th>
+  </tr></thead>
+  <tbody>
+    <% a.personen.forEach(function(p) { const st = a.stufen.find(function(s) { return s.id === p.stufe; }); %>
+      <tr>
+        <td><%= p.name %><br><span class="hint"><%= p.username %><%= p.rolle === 'admin' ? ' · Admin' : '' %><%= p.quelle === 'ldap' ? ' · LDAP' : '' %></span></td>
+        <td class="tag-stufe"><span class="akt-punkt akt-stufe-<%= p.stufe %>"></span> <%= st.titel %></td>
+        <td class="num"><%= p.tage %></td><td class="num"><%= p.anfragen %></td><td class="num"><%= p.eingaben %></td>
+        <td class="num"><%= p.anmeldungen %></td><td class="num"><%= p.faecher %></td>
+        <td><%= p.letzterTag ? datum(p.letzterTag) + (p.tageSeitLetzterAktivitaet > 0 ? ' (vor ' + p.tageSeitLetzterAktivitaet + ' T.)' : ' (heute)') : '–' %></td>
+        <td><%= datum(p.angelegt) %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+</div>

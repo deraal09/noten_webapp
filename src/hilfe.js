@@ -442,16 +442,20 @@ export const ARTIKEL = [
   },
   {
     slug: 'administration', kategorie: 'mehr', titel: 'Administration (für Admins)',
-    kurz: 'Schuljahre, Lehrkräfte, Notenschlüssel, LDAP, Datensicherung, Rechtliches.',
-    schlagworte: ['admin', 'administration', 'schuljahr', 'lehrkräfte', 'ldap', 'datensicherung', 'backup', 'rechtliches', 'impressum', 'datenschutz', 'notenschlüssel', 'einladungen', 'zuweisungen'],
+    kurz: 'Schuljahre, Lehrkräfte, Aktivität und Auslastung, Notenschlüssel, LDAP, Datensicherung, Rechtliches.',
+    schlagworte: ['admin', 'administration', 'schuljahr', 'lehrkräfte', 'ldap', 'datensicherung', 'backup', 'rechtliches', 'impressum', 'datenschutz', 'notenschlüssel', 'einladungen', 'zuweisungen', 'aktivität', 'auslastung', 'statistik', 'nutzung'],
     bilder: [{ datei: 'admin', text: 'Administration: Dashboard' }],
     abschnitte: [
       { titel: 'Was die Administration pflegt', absaetze: [
         '**Schuljahre** legen sich zum 1. August automatisch an (manuell geht auch). **Lehrkräfte** und **Einladungen** (für externe Konten), **Zuweisungen** von Lehrkräften zu Fächern, **LDAP-Einstellungen** (Schulkonto, Gruppe), **LDAP-Import**.',
         '**Notenschlüssel** (IHK, BG, SPA) werden zentral gepflegt; **Datensicherung** (zeitgesteuerte, verschlüsselte Sicherungen, Wiederherstellung) und **Rechtliches** (Angaben für Datenschutzerklärung und Impressum) gibt es als eigene Menüpunkte.',
       ] },
+      { titel: 'Aktivität und Auslastung', absaetze: [
+        'Unter **Aktivität** (Admin-Menü) siehst du, wie die App genutzt wird: wie viele Konten in den letzten 7/30 Tagen aktiv waren, wer **nur einmal reingeschaut** hat und wer **regelmäßig** oder **intensiv** arbeitet, ob jemand je etwas eingetragen hat, den Verlauf der aktiven Personen und eine **Auslastungs-Karte** nach Wochentag und Uhrzeit. Die Tabelle **Alle Konten** nennt je Person aktive Tage, Anfragen, Eingaben und das letzte Mal aktiv.',
+        'Erfasst werden nur Zähler je Person, Tag und Stunde (keine Inhalte, keine Adressen), 400 Tage lang. Die Erfassung beginnt mit der Version 0.127.0; frühere Nutzung ist nicht rekonstruierbar.',
+      ] },
     ],
-    links: [{ text: 'Administration', href: '/admin' }], verwandt: ['notenschluessel', 'anmelden'],
+    links: [{ text: 'Administration', href: '/admin' }, { text: 'Aktivität und Auslastung', href: '/admin/aktivitaet' }], verwandt: ['notenschluessel', 'anmelden'],
   },
 ];
 
