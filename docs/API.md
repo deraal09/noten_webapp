@@ -30,6 +30,7 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | GET | `/notenschluessel` | lesen | Notenschlüssel IHK, BG, SPA |
 | POST | `/berechnen/klausur` | lesen | Note aus Punkten berechnen (speichert nichts) |
 | PUT | `/klassen/{id}/name` | schreiben | Klasse umbenennen (jede Lehrkraft der Klasse; gilt für alle) |
+| PUT | `/faecher/{id}/name` | schreiben | Kurs umbenennen (jede Lehrkraft des Kurses; gilt für alle) |
 | GET | `/faecher/{id}/teilnehmer` | lesen | Teilnehmerliste mit IDs |
 | POST | `/faecher/{id}/teilnehmer` | schreiben | Personen aufnehmen (Nachname, Vorname, Klasse; wie CSV-Import) |
 | POST | `/faecher/{id}/klausuren` | schreiben | Klausur anlegen |

@@ -6,6 +6,13 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.123.0 - 2026-11-11
+
+- **API: Kurse umbenennen.** `PUT /api/v1/faecher/{id}/name` (Berechtigung „schreiben“) mit `{"name": "…"}`: jede Lehrkraft, die dem Kurs
+  zugeordnet ist, darf das; der Name gilt für alle Lehrkräfte des Kurses (Namen von Unterfächern ziehen mit), höchstens 100 Zeichen,
+  `?dry_run=true` prüft nur. Nur für Kurse (Fächer einer Klasse: 409). Die Prüfungen liegen gemeinsam für App und API in `src/umbenennen.js`.
+  Dokumentation ergänzt.
+
 ## 0.122.0 - 2026-11-11
 
 - **Kurse: BG ist der Standard-Notenschlüssel.** Beim Anlegen eines neuen Kurses ist „BG (0–15 Punkte)“ voreingestellt (auch wenn kein

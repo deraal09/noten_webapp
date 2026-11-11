@@ -179,6 +179,14 @@ export const ENDPOINTS = [
     antwort: { gespeichert: true, klasse: { id: 12, name: '12BFI1-neu', vorher: '12BFI1' } },
   },
   {
+    id: 'kurs-name', method: 'PUT', path: '/faecher/{id}/name', scope: 'schreiben',
+    summary: 'Kurs umbenennen',
+    beschreibung: 'Ändert den Namen eines Kurses -- jede Lehrkraft, die dem Kurs zugeordnet ist, darf das; der Name gilt für alle Lehrkräfte des Kurses (Namen von Unterfächern ziehen mit). Höchstens 100 Zeichen. Nur für Kurse; Fächer einer Klasse bearbeitet die Klassenleitung in der App (409).',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts ändern' }],
+    body: { name: 'Philosophie Q1' },
+    antwort: { gespeichert: true, kurs: { id: 47, name: 'Philosophie Q1', vorher: 'Philo-AG' } },
+  },
+  {
     id: 'sync', method: 'POST', path: '/faecher/{id}/sync', scope: 'schreiben',
     summary: 'Fach mit der Klassenleitung synchronisieren („Jetzt synchronisieren“)',
     beschreibung: 'Überträgt den aktuellen Notenstand (Gesamtnote je Person) des Fachs und Halbjahres in den Stand, den die Klassenleitung sieht -- wie der Knopf in der App. Die Klassenleitung sieht nie die Live-Noten, nur den zuletzt synchronisierten Stand. Hat die Lehrkraft den automatischen Sync eingeschaltet, geschieht das nach jeder Eintragung von selbst.',

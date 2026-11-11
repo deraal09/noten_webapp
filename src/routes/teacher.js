@@ -48,7 +48,7 @@ import {
   seedeTeilnehmerAusKlasse, ladeTeilnehmerMitHerkunft, fuegeTeilnehmerHinzu, entferneTeilnehmer,
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
-import { benenneKlasseUm } from '../umbenennen.js';
+import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
@@ -2162,20 +2162,9 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur Lehrkräfte, die dem Kurs zugeordnet sind, können ihn umbenennen.' });
     }
     const ziel = `/teacher/fach/${fach.id}`;
-    const name = String(request.body?.name ?? '').trim();
-    if (!name) { request.flash?.('error', 'Bitte einen Namen angeben.'); return reply.redirect(ziel); }
-    if (name.length > 100) { request.flash?.('error', 'Der Name ist zu lang (höchstens 100 Zeichen).'); return reply.redirect(ziel); }
-    if (name === fach.name) return reply.redirect(ziel);
-    try {
-      const db = getDb();
-      db.transaction(() => {
-        db.prepare('UPDATE faecher SET name = ? WHERE id = ?').run(name, fach.id);
-        for (const u of ladeUnterfaecher(fach.id)) db.prepare('UPDATE faecher SET name = ? WHERE id = ?').run(`${name}${UNTERFACH_TRENNER}${u.kurzname || u.name}`, u.id);
-      })();
-      request.flash?.('success', `Kurs umbenannt: „${fach.name}“ → „${name}“. Der neue Name gilt für alle Lehrkräfte des Kurses.`);
-    } catch {
-      request.flash?.('error', `Einen Kurs „${name}“ gibt es schon.`);
-    }
+    const r = benenneKursUm(fach, request.body?.name);
+    if (!r.ok) request.flash?.('error', r.fehler);
+    else if (r.geaendert) request.flash?.('success', `Kurs umbenannt: „${r.alt}“ → „${r.neu}“. Der neue Name gilt für alle Lehrkräfte des Kurses.`);
     return reply.redirect(ziel);
   });
 

@@ -471,3 +471,25 @@ test('Klasse umbenennen über die API: jede Lehrkraft der Klasse, gilt für alle
   // Zurück für spätere Tests
   await api(schreibKey, 'PUT', `/klassen/${klasseId}/name`, { name: '12E' });
 });
+
+test('Kurs umbenennen über die API: zugeordnete Lehrkraft, gilt für alle; nur Kurse; Probelauf; Rechte', async () => {
+  const kursId = db().prepare("SELECT id FROM faecher WHERE name = 'Philo-AG'").get().id;
+  const name = () => db().prepare('SELECT name FROM faecher WHERE id = ?').get(kursId).name;
+  assert.equal((await api(leseKey, 'PUT', `/faecher/${kursId}/name`, { name: 'X' })).status, 403, 'lesender Schlüssel');
+  const trocken = await api(schreibKey, 'PUT', `/faecher/${kursId}/name?dry_run=true`, { name: 'Philosophie Q1' });
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.gespeichert, false);
+  assert.equal(name(), 'Philo-AG');
+  const r = await api(schreibKey, 'PUT', `/faecher/${kursId}/name`, { name: ' Philosophie Q1 ' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json.kurs, { id: kursId, name: 'Philosophie Q1', vorher: 'Philo-AG' });
+  assert.equal(name(), 'Philosophie Q1');
+  assert.equal((await api(leseKey, 'GET', '/klassen')).json.kurse.some((k) => k.name === 'Philosophie Q1'), true, 'in der Kursliste der API');
+  for (const n of ['', 'x'.repeat(101)]) assert.equal((await api(schreibKey, 'PUT', `/faecher/${kursId}/name`, { name: n })).status, 422);
+  assert.equal(name(), 'Philosophie Q1');
+  assert.equal((await api(coraKeyGlobal(), 'PUT', `/faecher/${kursId}/name`, { name: 'Gekapert' })).status, 403);
+  assert.equal((await api(schreibKey, 'PUT', `/faecher/${fachId}/name`, { name: 'Anders' })).status, 409, 'Englisch ist kein Kurs');
+  assert.equal(db().prepare('SELECT name FROM faecher WHERE id = ?').get(fachId).name, 'Englisch');
+  assert.equal((await api(schreibKey, 'PUT', '/faecher/99999/name', { name: 'X' })).status, 404);
+  await api(schreibKey, 'PUT', `/faecher/${kursId}/name`, { name: 'Philo-AG' });
+});

@@ -27,7 +27,7 @@ import { istSchuelerGesperrtInFach, ladeSperrenFuerSchueler } from '../noten-spe
 import { setzeEndnote, notenBereich, parseEndnoteEingabe } from '../halbjahr-endnoten.js';
 import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
 import { autoVerteileKlausuren } from './teacher.js';
-import { benenneKlasseUm } from '../umbenennen.js';
+import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { ENDPOINTS, FEHLERCODES, baueOpenApi, API_BASIS } from '../api-docs.js';
 
 const MAX_EINTRAEGE = 500;
@@ -158,6 +158,18 @@ export default async function apiV1Routes(fastify) {
       if (!r.ok) return senden(reply, 422, 'invalid', r.fehler);
       if (speichern(request) && r.geaendert) request.log.info({ key: request.apiKey.id, klasse: klasse.id }, 'api: Klasse umbenannt');
       return { gespeichert: speichern(request) && r.geaendert, ...(speichern(request) ? {} : { dry_run: true }), klasse: { id: klasse.id, name: r.neu, vorher: r.alt } };
+    });
+
+    // Kurs umbenennen: jede Lehrkraft, die dem Kurs zugeordnet ist; der Name gilt für alle Lehrkräfte des Kurses.
+    route('PUT', '/faecher/:id/name', 'schreiben', async (request, reply) => {
+      const fach = ladeFachMitUmfeld(parseInt(request.params.id, 10));
+      if (!fach) return senden(reply, 404, 'not_found', 'Fach nicht gefunden.');
+      if (!fach.ist_kurs) return senden(reply, 409, 'nicht_unterstuetzt', 'Über die API lassen sich nur Kurse umbenennen (Fächer einer Klasse bitte in der App bearbeiten).');
+      if (!userHatFachZgriff(request.apiUser, fach.id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf diesen Kurs.');
+      const r = benenneKursUm(fach, request.body?.name, { speichern: speichern(request) });
+      if (!r.ok) return senden(reply, 422, 'invalid', r.fehler);
+      if (speichern(request) && r.geaendert) request.log.info({ key: request.apiKey.id, fach: fach.id }, 'api: Kurs umbenannt');
+      return { gespeichert: speichern(request) && r.geaendert, ...(speichern(request) ? {} : { dry_run: true }), kurs: { id: fach.id, name: r.neu, vorher: r.alt } };
     });
 
     route('GET', '/faecher/:id', 'lesen', async (request, reply) => {
