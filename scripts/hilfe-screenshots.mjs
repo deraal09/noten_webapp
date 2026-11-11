@@ -147,6 +147,26 @@ await admin('/teacher/klassen/neu', { schuljahr_id: String(sj), name: '13SPA1', 
 // API-Schlüssel
 await anna('/konto/api', { name: 'Notenassistent (KI)', scope: 'lesen', gueltig_tage: '90' });
 
+// Erfundene Nutzung für die Seite „Aktivität“ (Admin): 14 Konten mit unterschiedlicher Intensität über 100 Tage
+{
+  const akt = await import(path.join(ROOT, 'src/aktivitaet.js'));
+  const neu = db.prepare("INSERT INTO users (username, display_name, password_hash) VALUES (?, ?, 'x')");
+  let zufall = 7; const rnd = () => (zufall = (zufall * 16807) % 2147483647) / 2147483647;
+  [20, 14, 12, 9, 6, 3, 2, 1, 1, 1, 0, 0, 22, 8].forEach((intensitaet, i) => {
+    const id = neu.run(`demo${i}`, `Demo ${i}`).lastInsertRowid;
+    for (let d = 0; d < 100 && intensitaet; d++) {
+      if (rnd() >= intensitaet / 25) continue;
+      const tag = new Date(Date.now() - d * 86400000);
+      if ([0, 6].includes(tag.getDay()) && rnd() < 0.7) continue;
+      for (let k = 0; k < 1 + Math.floor(rnd() * 3); k++) {
+        const t = new Date(tag); t.setHours(7 + Math.floor(rnd() * 11));
+        for (let q = 0; q < 3 + Math.floor(rnd() * 20); q++) akt.erfasse(id, { jetzt: t, eingabe: i % 3 !== 1 && rnd() < 0.3 });
+      }
+    }
+  });
+  akt.speichere();
+}
+
 // ---------- Aufnahmen ----------
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 const kontexte = new Map();
@@ -218,6 +238,7 @@ const aufnahmen = [
   { datei: 'api-docs', url: '/api/v1/docs', hoehe: 820 },
   { datei: 'hilfe', url: '/hilfe', hoehe: 760 },
   { datei: 'admin', url: '/admin', user: admin, hoehe: 760 },
+  { datei: 'admin-aktivitaet', url: '/admin/aktivitaet?tage=90', user: admin, klick: ['details.akt-hinweis summary'], hoehe: 1000 },
   { datei: 'admin-notenschluessel', url: '/admin/notenschluessel', user: admin, klick: ['#ns-IHK summary'], hoehe: 760 },
 ];
 const nur = process.argv.slice(2);

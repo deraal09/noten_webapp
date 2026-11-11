@@ -891,3 +891,5 @@ textarea.termin-inhalt { display: block; width: 9rem; height: 3.2rem; min-height
 .akt-tabelle td.num, .akt-tabelle th.num { text-align: right; }
 .akt-tabelle .tag-stufe { white-space: nowrap; }
 .akt-hinweis { background: var(--bg-tint); border-radius: 6px; padding: .6rem .9rem; margin: .5rem 0 1rem; }
+.akt-hinweis ul { margin: .5rem 0 0; padding-left: 1.2rem; }
+.akt-hinweis summary { cursor: pointer; }

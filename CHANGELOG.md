@@ -6,6 +6,31 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.128.0 - 2026-11-12
+
+### Aktivitätsstatistik jetzt anonym
+
+- Die in 0.127.0 eingeführte Statistik (Admin → Aktivität) wertet **keine
+  einzelnen Personen** mehr aus: Die Tabelle „Alle Konten“ mit Namen entfällt,
+  angezeigt werden nur noch **Zahlen und Gruppen** (Keine Aktivität, Einmal
+  reingeschaut, Wenig aktiv, Regelmäßig, Intensiv), „Wann waren die Konten
+  zuletzt aktiv?“ (als Gruppen), Verlauf und Auslastung. Bei weniger als 10
+  Konten weist die Seite darauf hin, dass sich Einzelne aus den Zahlen
+  erahnen lassen. Neu: aufklappbarer Kasten „So bleibt die Statistik anonym“.
+- **Datenhaltung:** Es gibt keinen Bezug zum Konto mehr. Je Person wird nur ein
+  nicht umkehrbarer Zählwert (HMAC-SHA-256, Schlüssel aus `SECRET` in der
+  Server-Umgebung, nicht aus der Datenbank) mit dem **Tag** – nie mit der
+  Uhrzeit – gespeichert (`nutzung_tage`). Die Tageszeiten der Auslastung stehen
+  nur als Summe über alle Personen (`nutzung_stunden`). Aufbewahrung weiter
+  400 Tage. Wird `SECRET` geändert, beginnt das Zählen der Tage je Person neu.
+- Migration: Die personenbezogene Tabelle `nutzer_aktivitaet` und die Spalten
+  `users.letzter_login`/`users.anmeldungen` aus 0.127.0 werden beim Start
+  gelöscht; die Erfassung beginnt damit neu.
+- Hilfe: neuer Artikel **„Aktivität und Auslastung (anonym)“** mit Bildschirmfoto
+  (erklärt, was gespeichert wird und was nicht), Artikel „Administration“
+  verweist darauf; Standardtext „Protokolle“ unter Admin → Rechtliches
+  beschreibt die anonymen Zähler.
+
 ## 0.127.0 - 2026-11-12
 
 ### Aktivität und Auslastung (Admin)

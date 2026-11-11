@@ -643,16 +643,25 @@ CREATE TABLE IF NOT EXISTS ldap_settings (
 -- Damit übersteht eine Anmeldung einen App-Neustart (z. B. nach jedem
 -- Deploy auf Plesk) — ohne diese Tabelle wären sonst alle angemeldeten
 -- Personen bei jedem Neustart ohne Vorwarnung ausgeloggt.
--- Nutzungsstatistik (src/aktivitaet.js): nur Zähler je Person, Tag und Stunde, keine Inhalte.
-CREATE TABLE IF NOT EXISTS nutzer_aktivitaet (
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+-- Anonyme Nutzungsstatistik (src/aktivitaet.js): KEINE Verknüpfung mit Konten. profil ist ein nicht umkehrbarer Zufallswert
+-- (HMAC mit Schlüssel aus der Umgebung, nicht aus der Datenbank), nur auf Tagesebene; Tageszeiten stehen nur als Summe aller
+-- Personen in nutzung_stunden.
+CREATE TABLE IF NOT EXISTS nutzung_tage (
+    profil TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    anfragen INTEGER NOT NULL DEFAULT 0,
+    eingaben INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (profil, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_nutzung_tage_tag ON nutzung_tage(tag);
+CREATE TABLE IF NOT EXISTS nutzung_stunden (
     tag TEXT NOT NULL,
     stunde INTEGER NOT NULL,
     anfragen INTEGER NOT NULL DEFAULT 0,
     eingaben INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (user_id, tag, stunde)
+    nutzer INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (tag, stunde)
 );
-CREATE INDEX IF NOT EXISTS idx_nutzer_aktivitaet_tag ON nutzer_aktivitaet(tag);
 
 CREATE TABLE IF NOT EXISTS sessions (
     sid TEXT PRIMARY KEY,
@@ -865,8 +874,13 @@ function migrate(db) {
   const alteVersion = versionsZeile ? Number(versionsZeile.value) : null;
   ensureColumn(db, 'users', 'auth_source', "auth_source TEXT NOT NULL DEFAULT 'lokal'");
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
-  ensureColumn(db, 'users', 'letzter_login', 'letzter_login TEXT');
-  ensureColumn(db, 'users', 'anmeldungen', 'anmeldungen INTEGER NOT NULL DEFAULT 0');
+  // 0.127.0 hatte personenbezogene Nutzungsdaten eingeführt; seit 0.128.0 ist die Statistik anonym -- Altdaten entfernen.
+  db.exec('DROP TABLE IF EXISTS nutzer_aktivitaet');
+  for (const spalte of ['letzter_login', 'anmeldungen']) {
+    if (db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === spalte)) {
+      try { db.exec(`ALTER TABLE users DROP COLUMN ${spalte}`); } catch { db.exec(`UPDATE users SET ${spalte} = ${spalte === 'anmeldungen' ? '0' : 'NULL'}`); }
+    }
+  }
   // Partial-Index: login_sub muss nur unter LDAP-Konten eindeutig sein.
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_login_sub ON users(login_sub) WHERE login_sub IS NOT NULL');
   stelleBenutzernamenEindeutigSicher(db);

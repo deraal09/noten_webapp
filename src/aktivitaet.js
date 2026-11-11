@@ -1,12 +1,17 @@
 /**
- * Nutzungsstatistik für die Administration (Admin → Aktivität).
+ * ANONYME Nutzungsstatistik für die Administration (Admin → Aktivität).
  *
- * Erfasst wird NUR ein Zähler je Person, Tag und Stunde (Ortszeit Europe/Berlin): wie viele Seitenaufrufe/API-Anfragen
- * es waren und wie viele davon etwas geändert haben (POST/PUT/PATCH/DELETE). Keine Adressen, keine Inhalte, keine Noten.
- * Die Zähler werden im Speicher gesammelt und alle 30 Sekunden in einem Schwung in die Datenbank geschrieben
- * (Noteneingabe speichert viele kleine Anfragen); Daten älter als 400 Tage werden gelöscht.
+ * Datenschutz-Grundsätze:
+ *  - Es wird KEIN Konto, kein Name und keine Konto-Nummer gespeichert. Pro Person gibt es nur ein `profil`: einen nicht
+ *    umkehrbaren Wert (HMAC-SHA-256 mit einem Schlüssel aus der Umgebung, nicht aus der Datenbank). Er dient allein dazu,
+ *    „an wie vielen verschiedenen Tagen war dieselbe Person aktiv?“ zu zählen, ohne zu wissen, wer es ist.
+ *  - Je Profil wird nur der TAG festgehalten (nie die Uhrzeit). Tageszeiten stehen nur als Summe über alle Personen.
+ *  - Die Auswertung zeigt ausschließlich Zahlen und Gruppen, keine Listen einzelner Personen.
+ *  - Keine Adressen, keine Inhalte, keine Noten. Alles wird nach 400 Tagen gelöscht.
+ * Gesammelt wird im Speicher, alle 30 Sekunden wird in einem Schwung geschrieben.
  */
 
+import crypto from 'node:crypto';
 import { getDb } from './db.js';
 
 export const AUFBEWAHRUNG_TAGE = 400;
@@ -18,6 +23,13 @@ export const STUFEN = [
   { id: 'wenig', titel: 'Wenig aktiv', min: 2, text: 'an 2–4 Tagen aktiv' },
   { id: 'regelmaessig', titel: 'Regelmäßig', min: 5, text: 'an 5–19 Tagen aktiv' },
   { id: 'intensiv', titel: 'Intensiv', min: 20, text: 'an mindestens 20 Tagen aktiv' },
+];
+/** Zuletzt aktiv vor … (Obergrenze in Tagen, einschließlich). */
+export const ABSTAENDE = [
+  { id: 'a7', titel: 'in den letzten 7 Tagen', bis: 7 },
+  { id: 'a30', titel: 'vor 8–30 Tagen', bis: 30 },
+  { id: 'a90', titel: 'vor 31–90 Tagen', bis: 90 },
+  { id: 'a400', titel: 'vor mehr als 90 Tagen', bis: Infinity },
 ];
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
@@ -43,35 +55,65 @@ export function wochentag(tag) {
   return (new Date(`${tag}T12:00:00Z`).getUTCDay() + 6) % 7;
 }
 
-const puffer = new Map(); // "userId|tag|stunde" -> { userId, tag, stunde, anfragen, eingaben }
+// Schlüssel nur aus der Umgebung (nicht aus der Datenbank): Wer nur die Datenbank (oder eine Sicherung) sieht, kann ein Profil
+// keinem Konto zuordnen. Ohne SECRET (nur Entwicklung) gilt ein Zufallswert je Prozessstart.
+const SCHLUESSEL = crypto.createHash('sha256').update(`nutzung-v1|${process.env.SECRET || crypto.randomBytes(32).toString('hex')}`).digest();
 
-/** Zählt eine Anfrage der Person (im Speicher; `speichere()` schreibt sie in die Datenbank). */
+/** Nicht umkehrbarer Zählwert je Person (kein Bezug zum Konto in der Datenbank). */
+export function profilFuer(userId) {
+  return crypto.createHmac('sha256', SCHLUESSEL).update(`profil:${userId}`).digest('hex').slice(0, 20);
+}
+
+const tageBuffer = new Map(); // "profil|tag" -> { profil, tag, anfragen, eingaben }
+const stundenBuffer = new Map(); // "tag|stunde" -> { tag, stunde, anfragen, eingaben }
+const stundenNutzer = new Map(); // "tag|stunde" -> Set(profil): verschiedene Personen in dieser Stunde (nur im Speicher)
+
+/** Zählt eine Anfrage (im Speicher; `speichere()` schreibt sie in die Datenbank). */
 export function erfasse(userId, { eingabe = false, jetzt = new Date() } = {}) {
   if (!userId) return;
   const { tag, stunde } = ortszeit(jetzt);
-  const key = `${userId}|${tag}|${stunde}`;
-  let e = puffer.get(key);
-  if (!e) { e = { userId, tag, stunde, anfragen: 0, eingaben: 0 }; puffer.set(key, e); }
-  e.anfragen += 1;
-  if (eingabe) e.eingaben += 1;
+  const profil = profilFuer(userId);
+  const e = eingabe ? 1 : 0;
+
+  const tKey = `${profil}|${tag}`;
+  const t = tageBuffer.get(tKey) || { profil, tag, anfragen: 0, eingaben: 0 };
+  t.anfragen += 1; t.eingaben += e;
+  tageBuffer.set(tKey, t);
+
+  const sKey = `${tag}|${stunde}`;
+  const s = stundenBuffer.get(sKey) || { tag, stunde, anfragen: 0, eingaben: 0 };
+  s.anfragen += 1; s.eingaben += e;
+  stundenBuffer.set(sKey, s);
+  if (!stundenNutzer.has(sKey)) stundenNutzer.set(sKey, new Set());
+  stundenNutzer.get(sKey).add(profil);
 }
 
 /** Schreibt die gesammelten Zähler in die Datenbank (addiert zu vorhandenen Zeilen). */
 export function speichere() {
-  if (puffer.size === 0) return;
-  const eintraege = [...puffer.values()];
-  puffer.clear();
+  if (tageBuffer.size === 0 && stundenBuffer.size === 0) return;
+  const tage = [...tageBuffer.values()];
+  const stunden = [...stundenBuffer.values()].map((s) => ({ ...s, nutzer: stundenNutzer.get(`${s.tag}|${s.stunde}`)?.size || 0 }));
+  tageBuffer.clear();
+  stundenBuffer.clear();
+  const jetzt = ortszeit();
+  for (const key of stundenNutzer.keys()) { // Mengen vergangener Stunden werden nicht mehr gebraucht
+    const [tag, stunde] = key.split('|');
+    if (tag < jetzt.tag || (tag === jetzt.tag && Number(stunde) < jetzt.stunde)) stundenNutzer.delete(key);
+  }
   const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO nutzer_aktivitaet (user_id, tag, stunde, anfragen, eingaben) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, tag, stunde) DO UPDATE SET anfragen = anfragen + excluded.anfragen, eingaben = eingaben + excluded.eingaben
+  const tStmt = db.prepare(`
+    INSERT INTO nutzung_tage (profil, tag, anfragen, eingaben) VALUES (?, ?, ?, ?)
+    ON CONFLICT(profil, tag) DO UPDATE SET anfragen = anfragen + excluded.anfragen, eingaben = eingaben + excluded.eingaben
+  `);
+  const sStmt = db.prepare(`
+    INSERT INTO nutzung_stunden (tag, stunde, anfragen, eingaben, nutzer) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(tag, stunde) DO UPDATE SET anfragen = anfragen + excluded.anfragen, eingaben = eingaben + excluded.eingaben,
+      nutzer = MAX(nutzer, excluded.nutzer)
   `);
   try {
     db.transaction(() => {
-      for (const e of eintraege) {
-        // Konto zwischenzeitlich gelöscht? Dann keinen Fremdschlüsselfehler riskieren.
-        if (db.prepare('SELECT 1 FROM users WHERE id = ?').get(e.userId)) stmt.run(e.userId, e.tag, e.stunde, e.anfragen, e.eingaben);
-      }
+      for (const t of tage) tStmt.run(t.profil, t.tag, t.anfragen, t.eingaben);
+      for (const s of stunden) sStmt.run(s.tag, s.stunde, s.anfragen, s.eingaben, s.nutzer);
     })();
   } catch (err) {
     console.warn('[aktivitaet] Speichern fehlgeschlagen:', err.message);
@@ -81,7 +123,9 @@ export function speichere() {
 /** Löscht Zähler, die älter als die Aufbewahrungsfrist sind. */
 export function bereinige(jetzt = new Date()) {
   const grenze = tagPlus(ortszeit(jetzt).tag, -AUFBEWAHRUNG_TAGE);
-  getDb().prepare('DELETE FROM nutzer_aktivitaet WHERE tag < ?').run(grenze);
+  const db = getDb();
+  db.prepare('DELETE FROM nutzung_tage WHERE tag < ?').run(grenze);
+  db.prepare('DELETE FROM nutzung_stunden WHERE tag < ?').run(grenze);
 }
 
 let timer = null;
@@ -102,9 +146,8 @@ export function stoppeTimer() {
   speichere();
 }
 
-/** Trägt eine Anmeldung ein (Zeitpunkt und Zähler am Konto). */
+/** Eine Anmeldung zählt wie ein Seitenaufruf (es wird nichts am Konto vermerkt). */
 export function registriereAnmeldung(userId, jetzt = new Date()) {
-  getDb().prepare('UPDATE users SET letzter_login = ?, anmeldungen = anmeldungen + 1 WHERE id = ?').run(jetzt.toISOString(), userId);
   erfasse(userId, { jetzt });
 }
 
@@ -122,54 +165,44 @@ function median(werte) {
 }
 
 /**
- * Auswertung für die Admin-Seite. `tage` = Zeitraum bis einschließlich heute.
- * Zählt nur aktive Konten (deaktivierte Konten gehören nicht zur Grundgesamtheit).
+ * Auswertung für die Admin-Seite. `tage` = Zeitraum bis einschließlich heute. Das Ergebnis enthält nur Zahlen und Gruppen,
+ * keine Einträge einzelner Personen. Grundgesamtheit: aktive Konten (nur die ANZAHL wird gelesen).
  */
 export function auswertung(tage = 90, jetzt = new Date()) {
   speichere();
   const db = getDb();
   const heute = ortszeit(jetzt).tag;
   const von = tagPlus(heute, -(tage - 1));
-  const seit = db.prepare('SELECT MIN(tag) AS t FROM nutzer_aktivitaet').get().t || null;
+  const seit = db.prepare('SELECT MIN(tag) AS t FROM nutzung_tage').get().t || null;
 
-  const konten = db.prepare(`
-    SELECT id, username, display_name, role, auth_source, created_at, letzter_login, anmeldungen,
-           (SELECT COUNT(DISTINCT fach_id) FROM fach_zuweisungen z WHERE z.user_id = users.id) AS faecher
-    FROM users WHERE active = 1
-  `).all();
-  const proPerson = new Map(db.prepare(`
-    SELECT user_id, COUNT(DISTINCT tag) AS tage, SUM(anfragen) AS anfragen, SUM(eingaben) AS eingaben, MAX(tag) AS letzter_tag
-    FROM nutzer_aktivitaet WHERE tag >= ? GROUP BY user_id
-  `).all(von).map((r) => [r.user_id, r]));
-  const letzterTagGesamt = new Map(db.prepare('SELECT user_id, MAX(tag) AS t FROM nutzer_aktivitaet GROUP BY user_id').all().map((r) => [r.user_id, r.t]));
+  const konten = db.prepare('SELECT COUNT(*) AS c FROM users WHERE active = 1').get().c;
+  const proProfil = db.prepare(`
+    SELECT COUNT(DISTINCT tag) AS tage, SUM(anfragen) AS anfragen, SUM(eingaben) AS eingaben
+    FROM nutzung_tage WHERE tag >= ? GROUP BY profil
+  `).all(von);
+  const aktive = proProfil.length;
+  // Profile ehemaliger Konten bleiben bis zur Löschung nach 400 Tagen stehen -- die Grundgesamtheit darf nie kleiner sein als die Aktiven.
+  const gesamt = Math.max(konten, aktive);
 
-  const personen = konten.map((k) => {
-    const p = proPerson.get(k.id) || { tage: 0, anfragen: 0, eingaben: 0, letzter_tag: null };
-    const letzterTag = letzterTagGesamt.get(k.id) || (k.letzter_login ? ortszeit(new Date(k.letzter_login)).tag : null);
-    return {
-      id: k.id, name: k.display_name || k.username, username: k.username, rolle: k.role, quelle: k.auth_source,
-      angelegt: k.created_at ? k.created_at.slice(0, 10) : null, anmeldungen: k.anmeldungen || 0, faecher: k.faecher,
-      tage: p.tage, anfragen: p.anfragen, eingaben: p.eingaben, letzterTag,
-      tageSeitLetzterAktivitaet: letzterTag ? Math.round((new Date(`${heute}T12:00:00Z`) - new Date(`${letzterTag}T12:00:00Z`)) / 86400000) : null,
-      stufe: stufeFuerTage(p.tage).id,
-    };
-  }).sort((a, b) => (b.tage - a.tage) || (b.anfragen - a.anfragen) || a.name.localeCompare(b.name, 'de'));
+  const stufen = STUFEN.map((s) => ({ ...s, anzahl: 0 }));
+  for (const p of proProfil) stufen.find((s) => s.id === stufeFuerTage(p.tage).id).anzahl += 1;
+  stufen[0].anzahl = gesamt - aktive;
+  for (const s of stufen) s.anteil = gesamt ? s.anzahl / gesamt : 0;
 
-  const stufen = STUFEN.map((s) => {
-    const n = personen.filter((p) => p.stufe === s.id).length;
-    return { ...s, anzahl: n, anteil: personen.length ? n / personen.length : 0 };
-  });
+  // Zuletzt aktiv vor … (über alle gespeicherten Daten)
+  const letzteTage = db.prepare('SELECT MAX(tag) AS t FROM nutzung_tage GROUP BY profil').all().map((r) => r.t);
+  const abstaende = ABSTAENDE.map((x) => ({ ...x, anzahl: 0 }));
+  for (const t of letzteTage) {
+    const alter = Math.round((new Date(`${heute}T12:00:00Z`) - new Date(`${t}T12:00:00Z`)) / 86400000);
+    abstaende.find((x) => alter <= x.bis).anzahl += 1;
+  }
+  const nieAktiv = Math.max(0, gesamt - letzteTage.length);
+  const aktivSeit = (n) => Math.min(gesamt, db.prepare('SELECT COUNT(DISTINCT profil) AS c FROM nutzung_tage WHERE tag >= ?').get(tagPlus(heute, -(n - 1))).c);
 
-  const aktive = personen.filter((p) => p.tage > 0);
-  const ohneEingaben = aktive.filter((p) => p.eingaben === 0).length;
-  const wiederkehrend = aktive.filter((p) => p.tage >= 2).length;
-  const aktivSeit = (n) => {
-    const ab = tagPlus(heute, -(n - 1));
-    return personen.filter((p) => p.letzterTag && p.letzterTag >= ab).length;
-  };
+  const ohneEingaben = proProfil.filter((p) => p.eingaben === 0).length;
+  const wiederkehrend = proProfil.filter((p) => p.tage >= 2).length;
 
   // Verlauf: täglich bis 90 Tage, sonst Kalenderwochen (Montag).
-  const zeilen = db.prepare('SELECT user_id, tag, SUM(anfragen) AS anfragen FROM nutzer_aktivitaet WHERE tag >= ? GROUP BY user_id, tag').all(von);
   const woche = tage > 90;
   const bucketStart = (tag) => (woche ? tagPlus(tag, -wochentag(tag)) : tag);
   const buckets = new Map();
@@ -177,46 +210,37 @@ export function auswertung(tage = 90, jetzt = new Date()) {
     const b = bucketStart(t);
     if (!buckets.has(b)) buckets.set(b, { start: b, nutzer: new Set(), anfragen: 0 });
   }
-  for (const z of zeilen) {
+  for (const z of db.prepare('SELECT profil, tag, anfragen FROM nutzung_tage WHERE tag >= ?').all(von)) {
     const b = buckets.get(bucketStart(z.tag));
-    if (b) { b.nutzer.add(z.user_id); b.anfragen += z.anfragen; }
+    if (b) { b.nutzer.add(z.profil); b.anfragen += z.anfragen; }
   }
   const verlauf = [...buckets.values()].map((b) => ({ start: b.start, nutzer: b.nutzer.size, anfragen: b.anfragen }));
 
-  // Auslastung: Wochentag × Stunde.
+  // Auslastung: Wochentag × Stunde (Summen über alle Personen).
   const heat = Array.from({ length: 7 }, () => Array(24).fill(0));
-  const stundenZeilen = db.prepare(`
-    SELECT tag, stunde, SUM(anfragen) AS anfragen, COUNT(DISTINCT user_id) AS nutzer
-    FROM nutzer_aktivitaet WHERE tag >= ? GROUP BY tag, stunde
-  `).all(von);
   let spitzeNutzer = { nutzer: 0, tag: null, stunde: null };
   let spitzeAnfragen = { anfragen: 0, tag: null, stunde: null };
-  const tageMitAktivitaet = new Set();
+  const tageMitNutzung = new Set();
   let summeAnfragen = 0;
   let summeEingaben = 0;
-  for (const z of stundenZeilen) {
+  for (const z of db.prepare('SELECT tag, stunde, anfragen, eingaben, nutzer FROM nutzung_stunden WHERE tag >= ?').all(von)) {
     heat[wochentag(z.tag)][z.stunde] += z.anfragen;
-    tageMitAktivitaet.add(z.tag);
+    tageMitNutzung.add(z.tag);
     summeAnfragen += z.anfragen;
+    summeEingaben += z.eingaben;
     if (z.nutzer > spitzeNutzer.nutzer) spitzeNutzer = { nutzer: z.nutzer, tag: z.tag, stunde: z.stunde };
     if (z.anfragen > spitzeAnfragen.anfragen) spitzeAnfragen = { anfragen: z.anfragen, tag: z.tag, stunde: z.stunde };
   }
-  summeEingaben = db.prepare('SELECT COALESCE(SUM(eingaben), 0) AS e FROM nutzer_aktivitaet WHERE tag >= ?').get(von).e;
-  const heatMax = Math.max(1, ...heat.flat());
-  const proStunde = Array(24).fill(0);
-  const proWochentag = Array(7).fill(0);
-  heat.forEach((zeile, w) => zeile.forEach((v, h) => { proStunde[h] += v; proWochentag[w] += v; }));
 
   return {
     tage, von, bis: heute, seit, erfassungKuerzer: Boolean(seit && seit > von),
-    konten: personen.length, aktiveImZeitraum: aktive.length,
-    aktiv7: aktivSeit(7), aktiv30: aktivSeit(30),
-    nieAktiv: personen.filter((p) => !p.letzterTag).length,
-    ohneEingaben, wiederkehrend, wiederkehrQuote: aktive.length ? wiederkehrend / aktive.length : 0,
-    medianTage: median(personen.map((p) => p.tage)),
-    summeAnfragen, summeEingaben, aktiveTage: tageMitAktivitaet.size,
-    anfragenProAktivemTag: tageMitAktivitaet.size ? Math.round(summeAnfragen / tageMitAktivitaet.size) : 0,
+    konten: gesamt, aktiveImZeitraum: aktive, kleineGruppe: gesamt < 10,
+    aktiv7: aktivSeit(7), aktiv30: aktivSeit(30), nieAktiv,
+    ohneEingaben, wiederkehrend, wiederkehrQuote: aktive ? wiederkehrend / aktive : 0,
+    medianTage: median([...proProfil.map((p) => p.tage), ...Array(gesamt - aktive).fill(0)]),
+    summeAnfragen, summeEingaben, aktiveTage: tageMitNutzung.size,
+    anfragenProAktivemTag: tageMitNutzung.size ? Math.round(summeAnfragen / tageMitNutzung.size) : 0,
     spitzeNutzer, spitzeAnfragen,
-    stufen, personen, verlauf, woche, heat, heatMax, proStunde, proWochentag,
+    stufen, abstaende, verlauf, woche, heat, heatMax: Math.max(1, ...heat.flat()),
   };
 }

@@ -47,6 +47,8 @@ test('Suche: Umlaute und Schreibweisen, Rangfolge, mehrere Wörter, Unsinn', () 
   assert.ok(sucheHilfe('csv').length >= 2);
   assert.equal(sucheHilfe('api schlüssel')[0].slug, 'api');
   assert.equal(sucheHilfe('Lernfeld')[0].slug, 'spa');
+  assert.equal(sucheHilfe('anonym statistik')[0].slug, 'aktivitaet');
+  assert.equal(sucheHilfe('Auslastung')[0].slug, 'aktivitaet');
   assert.equal(sucheHilfe('Konferenz')[0].slug, 'notenkonferenz');
   assert.equal(sucheHilfe('Fehlzeiten')[0].slug, 'fehlzeiten-notizen');
   assert.equal(sucheHilfe('Entsperrung')[0].slug, 'notenkonferenz');
@@ -128,6 +130,14 @@ test('Rundgang Klassenleitung: eigene Adresse, Schritte, Ende, eigener Speichers
   const art = await (await get('/hilfe/notenkonferenz')).text();
   assert.match(art, /href="\/hilfe\/rundgang-klassenleitung"/, 'Artikel der Klassenleitung verlinken den Rundgang');
   assert.match(art, /leitung-konferenz\.jpg/);
+});
+
+test('Hilfe zur Aktivitätsstatistik betont die Anonymität', async () => {
+  const html = await (await get('/hilfe/aktivitaet')).text();
+  assert.match(html, /anonym/i);
+  assert.match(html, /keine Namen/);
+  assert.match(html, /nicht umkehrbaren Zählwert/);
+  assert.match(html, /admin-aktivitaet\.jpg/);
 });
 
 test('Menü und Fußzeile verlinken die Hilfe; Startseite zeigt den Rundgang-Hinweis', async () => {
