@@ -175,6 +175,14 @@ export const ENDPOINTS = [
     },
   },
   {
+    id: 'klasse-neu', method: 'POST', path: '/klassen', scope: 'schreiben',
+    summary: 'Klasse anlegen',
+    beschreibung: 'Legt eine Klasse an (wie „+ Neue Klasse anlegen“ in der App); die Lehrkraft des Schlüssels ist die anlegende Person. `schuljahr` als Bezeichnung („2025/26“) oder ID, ohne Angabe das aktuelle Schuljahr. `notenschluessel`: `IHK` (Standard), `BG` oder `SPA`; bei `SPA` ist `spa_bildungsgang` Pflicht (`SPA_REGULAR` oder `SPA_PIA`) und `spa_vorlage` wählt die Fächervorgabe (`standard` = Vorgabe des Bildungsgangs, `keine` oder die ID einer eigenen Vorlage). Die Laufzeit stellt man mit `einschulung_jahr` (Startjahr, z. B. 2025 für 2025/26; Standard: das gewählte Schuljahr) und `anzahl_jahre` oder `abschluss_jahr` ein (Standard: SPA 2, sonst 3 Jahre). `offen_fuer_beitritt: true` erlaubt Kolleg:innen den sofortigen Beitritt. Läuft die Klasse im Schuljahr schon, wird sie nicht doppelt angelegt, sondern mit `bereits_vorhanden: true` (und `zugriff`) zurückgegeben – auch ein Wiederholen ist also gefahrlos. Die Klasse startet ohne Personen; Schüler:innen und Fächer (bei SPA mit der Fächervorgabe) legt man in der App an. Anlegen dürfen Lehrkräfte mit Schul-Zugang (LDAP) und der Admin.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts anlegen' }],
+    body: { name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', einschulung_jahr: 2025, anzahl_jahre: 3, offen_fuer_beitritt: false },
+    antwort: { gespeichert: true, klasse: { id: 12, name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', spa_bildungsgang: null, einschulung_jahr: 2025, abschluss_jahr: 2027, offen_fuer_beitritt: false }, naechster_schritt: 'Schüler:innen und Fächer legst du in der App an (Meine Klassen → Klasse).' },
+  },
+  {
     id: 'kurs-neu', method: 'POST', path: '/kurse', scope: 'schreiben',
     summary: 'Kurs anlegen',
     beschreibung: 'Legt einen Kurs an (wie „+ Neuen Kurs anlegen“ in der App) und ordnet ihn der Lehrkraft des Schlüssels zu. `schuljahr` als Bezeichnung („2025/26“) oder ID, ohne Angabe das aktuelle Schuljahr. `notenschluessel`: `BG` (Standard) oder `IHK`. Danach die Teilnehmer mit `POST /faecher/{id}/teilnehmer` aufnehmen. Gibt es den Kurs (gleicher Name und Schuljahr) für diese Lehrkraft schon, wird er mit `bereits_vorhanden: true` zurückgegeben statt doppelt angelegt. Anlegen dürfen Lehrkräfte mit Schul-Zugang (LDAP) und der Admin.',

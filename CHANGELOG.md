@@ -6,6 +6,28 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.129.0 - 2026-11-12
+
+### API: Klassen anlegen
+
+- Neuer Endpunkt **`POST /api/v1/klassen`** (Berechtigung `schreiben`, `?dry_run=true`):
+  legt eine Klasse an wie „+ Neue Klasse anlegen“ in der App. Felder: `name`,
+  `schuljahr` (Bezeichnung oder ID, Standard: aktuelles Schuljahr),
+  `notenschluessel` (`IHK` Standard, `BG`, `SPA`), bei SPA `spa_bildungsgang`
+  (`SPA_REGULAR`/`SPA_PIA`, Pflicht) und `spa_vorlage` (`standard`, `keine` oder
+  ID einer eigenen Vorlage), `einschulung_jahr`, `anzahl_jahre` oder
+  `abschluss_jahr`, `offen_fuer_beitritt`. Die Klasse startet ohne Personen
+  (Schüler:innen und Fächer legt man in der App an; bei SPA kommt die
+  Fächervorgabe automatisch).
+- Wiederholen ist gefahrlos: Läuft die Klasse im Schuljahr schon, wird sie nicht
+  doppelt angelegt (`bereits_vorhanden: true`, `zugriff`). Ungültige Angaben
+  ergeben `422`, statt wie in der App stillschweigend durch Standardwerte ersetzt
+  zu werden. Anlegen dürfen – wie in der App – Lehrkräfte mit Schul-Zugang (LDAP)
+  und der Admin.
+- Intern: Das Anlegen einer Klasse (Laufzeit, SPA-Fächervorgabe) liegt jetzt in
+  `src/klasse-anlegen.js` und wird von App und API gemeinsam genutzt.
+  Dokumentation (`/api/v1/docs`, OpenAPI, `docs/API.md`) und Hilfe ergänzt.
+
 ## 0.128.0 - 2026-11-12
 
 ### Aktivitätsstatistik jetzt anonym

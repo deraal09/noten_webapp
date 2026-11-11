@@ -50,6 +50,7 @@ import {
 } from '../fach-teilnehmer.js';
 import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { legeKursAn } from '../kurse.js';
+import { legeKlasseAn } from '../klasse-anlegen.js';
 import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
@@ -1514,31 +1515,15 @@ export default async function teacherRoutes(fastify) {
         ? `/teacher/klassen/${laufende.id}`
         : `/teacher/klassen/${laufende.id}/verknuepfen`);
     }
-    try {
-      // Laufzeit: Einschulung (Standard: gewähltes Schuljahr) und Abschluss (Standard: SPA 2, sonst 3 Jahre).
-      const heimatJahr = parseSchuljahr(getDb().prepare('SELECT bezeichnung FROM schuljahre WHERE id = ?').get(schuljahrId)?.bezeichnung)?.startJahr ?? null;
-      const einschulungJahr = parseJahrEingabe(request.body?.einschulung_jahr) ?? heimatJahr;
-      const dauer = parseInt(request.body?.anzahl_jahre, 10);
-      let abschlussJahr = Number.isFinite(dauer) && dauer >= 1 && einschulungJahr !== null
-        ? einschulungJahr + dauer - 1
-        : parseJahrEingabe(request.body?.abschluss_jahr);
-      if (abschlussJahr !== null && einschulungJahr !== null && (abschlussJahr < einschulungJahr || abschlussJahr >= einschulungJahr + MAX_SCHULJAHRE)) abschlussJahr = null;
-      const info = getDb().prepare(`
-        INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, created_by_id, offen_fuer_beitritt, spa_bildungsgang, einschulung_jahr, abschluss_jahr)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(schuljahrId, name, ns, DEFAULT_NS_CSV[ns] || '', request.user.id, offenFuerBeitritt, spaBildungsgang, einschulungJahr, abschlussJahr);
-      const klasseId = info.lastInsertRowid;
-      if (ns === 'SPA') ladeSpaVorlageInKlasse({ id: klasseId, notenschluessel: 'SPA', spa_bildungsgang: spaBildungsgang }, spaQuelle, request.user.id);
-      return reply.redirect(`/teacher/klassen/${klasseId}`);
-    } catch (e) {
-      // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zum
-      // Beitritt weiterleiten, damit die Klasse nicht doppelt entsteht.
-      const bestehend = getDb().prepare('SELECT id FROM klassen WHERE schuljahr_id = ? AND name = ?')
-        .get(schuljahrId, name);
-      if (bestehend) return reply.redirect(`/teacher/klassen/${bestehend.id}/verknuepfen`);
-      request.flash?.('error', 'Klasse existiert in diesem Schuljahr bereits.');
-      return reply.redirect('/teacher/klassen');
-    }
+    const angelegt = legeKlasseAn({
+      userId: request.user.id, schuljahrId, name, notenschluessel: ns, spaBildungsgang, spaVorlage: spaQuelle, offenFuerBeitritt: offenFuerBeitritt === 1,
+      einschulungJahr: request.body?.einschulung_jahr, anzahlJahre: request.body?.anzahl_jahre, abschlussJahr: request.body?.abschluss_jahr,
+    });
+    if (angelegt.ok) return reply.redirect(`/teacher/klassen/${angelegt.klasseId}`);
+    // Name in diesem Schuljahr bereits vergeben → statt Fehlermeldung zum Beitritt weiterleiten, damit die Klasse nicht doppelt entsteht.
+    if (angelegt.doppelt) return reply.redirect(`/teacher/klassen/${angelegt.doppelt}/verknuepfen`);
+    request.flash?.('error', 'Klasse existiert in diesem Schuljahr bereits.');
+    return reply.redirect('/teacher/klassen');
   });
 
   // ---------- Laufzeit der Klasse (Einschulungs-/Abschlussschuljahr) ----------

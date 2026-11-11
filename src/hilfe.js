@@ -435,7 +435,7 @@ export const ARTIKEL = [
         'Den Schlüssel dem Programm geben, das ihn als `Authorization: Bearer nk_…` mitsendet. Widerrufen wirkt sofort.',
       ], hinweis: 'Ein Schlüssel hat genau deine Rechte. Über die API wird nichts gelöscht; Eintragungen lassen sich mit `?dry_run=true` vorab prüfen.' },
       { titel: 'Dokumentation', absaetze: [
-        'Die vollständige Beschreibung mit Beispielen und einem Vorschlag für den System-Prompt eines Agenten steht unter **/api/v1/docs**, maschinenlesbar als **OpenAPI** unter `/api/v1/openapi.json`. Die API kann u. a. Kurse und Klassen umbenennen, Kurse anlegen, Teilnehmer aufnehmen, Klausuren und Noten eintragen und mit der Klassenleitung synchronisieren.',
+        'Die vollständige Beschreibung mit Beispielen und einem Vorschlag für den System-Prompt eines Agenten steht unter **/api/v1/docs**, maschinenlesbar als **OpenAPI** unter `/api/v1/openapi.json`. Die API kann u. a. Kurse und Klassen umbenennen, Klassen und Kurse anlegen, Teilnehmer aufnehmen, Klausuren und Noten eintragen und mit der Klassenleitung synchronisieren.',
       ] },
     ],
     links: [{ text: 'API-Zugang öffnen', href: '/konto/api' }, { text: 'API-Dokumentation', href: '/api/v1/docs' }], verwandt: ['sync', 'kurse'],

@@ -29,6 +29,7 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | GET | `/faecher/{id}/statistik?halbjahr=` | lesen | Durchschnitt, Verteilung, nicht bestanden |
 | GET | `/notenschluessel` | lesen | Notenschlüssel IHK, BG, SPA |
 | POST | `/berechnen/klausur` | lesen | Note aus Punkten berechnen (speichert nichts) |
+| POST | `/klassen` | schreiben | Klasse anlegen (IHK/BG/SPA, Laufzeit; wiederholbar) |
 | POST | `/kurse` | schreiben | Kurs anlegen (Standard BG; wiederholbar) |
 | PUT | `/klassen/{id}/name` | schreiben | Klasse umbenennen (jede Lehrkraft der Klasse; gilt für alle) |
 | PUT | `/faecher/{id}/name` | schreiben | Kurs umbenennen (jede Lehrkraft des Kurses; gilt für alle) |
@@ -54,7 +55,7 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
   Lernfeld bzw. Fach mit Unterfächern lässt sich lesen (auch von Lehrkräften, die nur einem Unterfach zugeordnet sind), aber nicht beschreiben (`409`, `details`
   nennt die Unterfach-IDs). In SPA-Fächern kommen `leistungspunkte` und `tendenz` dazu; Endnoten sind dort Gesamtpunkte 0–15.
 * **Personen anlegen:** Die Teilnehmerliste eines Fachs oder Kurses füllt `POST /faecher/{id}/teilnehmer` (Nachname, Vorname, Klasse je Person; legt
-  fehlende Personen und Klassen an, überspringt Doppelte). Die Schüler:innen einer **Klasse** legt die API nicht an (App: Einzeln/Mehrere auf einmal/CSV-Import).
+  fehlende Personen und Klassen an, überspringt Doppelte). Eine **Klasse** legt `POST /klassen` an (leer, bei SPA mit der Fächervorgabe); die Schüler:innen einer Klasse legt die API nicht an (App: Einzeln/Mehrere auf einmal/CSV-Import).
 * **Grenzen:** 120 Anfragen pro Minute und Schlüssel, 500 Einträge je Aufruf, 40 Aufgaben je Klausur.
 * **Datenschutz:** Namen und Noten verlassen das System. Der Einsatz eines externen KI-Dienstes muss datenschutzrechtlich zulässig sein.
 * Fehlerformat: `{ "error": "code", "message": "…", "details": [ … ] }`.

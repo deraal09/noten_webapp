@@ -533,6 +533,68 @@ test('Kurs anlegen über die API: Standard BG, Probelauf, wiederholbar, Schuljah
   assert.ok((await api(leseKey, 'GET', '/klassen')).json.kurse.some((k) => k.id === kursId && k.art === 'kurs'));
 });
 
+test('Klasse anlegen über die API: IHK-Standard, Laufzeit, Probelauf, wiederholbar, SPA mit Fächervorgabe, Fehler, Rechte', async () => {
+  const klassen = () => db().prepare('SELECT COUNT(*) AS c FROM klassen WHERE ist_kurs_huelle = 0 AND ist_ablage = 0').get().c;
+  const vorher = klassen();
+  assert.equal((await api(leseKey, 'POST', '/klassen', { name: 'API-Klasse' })).status, 403, 'lesender Schlüssel');
+  const trocken = await api(schreibKey, 'POST', '/klassen?dry_run=true', { name: 'API-Klasse', schuljahr: '2025/26' });
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.dry_run, true);
+  assert.equal(trocken.json.klasse.id, null);
+  assert.equal(klassen(), vorher, 'Probelauf legt nichts an');
+
+  const r = await api(schreibKey, 'POST', '/klassen', { name: ' API-Klasse ', schuljahr: '2025/26', notenschluessel: 'BG', einschulung_jahr: 2025, anzahl_jahre: 2, offen_fuer_beitritt: true });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.gespeichert, true);
+  assert.equal(r.json.klasse.name, 'API-Klasse');
+  assert.equal(r.json.klasse.notenschluessel, 'BG');
+  assert.equal(r.json.klasse.einschulung_jahr, 2025);
+  assert.equal(r.json.klasse.abschluss_jahr, 2026);
+  const zeile = db().prepare('SELECT k.*, u.username FROM klassen k JOIN users u ON u.id = k.created_by_id WHERE k.id = ?').get(r.json.klasse.id);
+  assert.equal(zeile.username, 'anna', 'angelegt von der Lehrkraft des Schlüssels');
+  assert.equal(zeile.offen_fuer_beitritt, 1);
+  assert.equal(zeile.abschluss_jahr, 2026);
+  assert.equal(klassen(), vorher + 1);
+  assert.ok((await api(leseKey, 'GET', '/klassen')).json.klassen.some((k) => k.id === r.json.klasse.id), 'Klasse erscheint in der Liste der Lehrkraft');
+
+  // Wiederholen: keine zweite Klasse, Hinweis und Zugriff
+  const nochmal = await api(schreibKey, 'POST', '/klassen', { name: 'API-Klasse', schuljahr: '2025/26' });
+  assert.equal(nochmal.json.bereits_vorhanden, true);
+  assert.equal(nochmal.json.klasse.id, r.json.klasse.id);
+  assert.equal(nochmal.json.zugriff, true);
+  assert.equal(klassen(), vorher + 1);
+
+  // Standard: IHK, aktuelles Schuljahr; Schuljahr als ID
+  const std = await api(schreibKey, 'POST', '/klassen', { name: 'Standard-Klasse' });
+  assert.equal(std.status, 200);
+  assert.equal(std.json.klasse.notenschluessel, 'IHK');
+  assert.equal(std.json.klasse.abschluss_jahr, std.json.klasse.einschulung_jahr + 2, 'Standard: 3 Jahre');
+  const sjId = db().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id;
+  assert.equal((await api(schreibKey, 'POST', '/klassen', { name: 'ID-Klasse', schuljahr: sjId })).json.klasse.schuljahr, '2025/26');
+
+  // SPA: Bildungsgang Pflicht, Fächervorgabe wird geladen
+  assert.equal((await api(schreibKey, 'POST', '/klassen', { name: 'SPA-X', notenschluessel: 'SPA' })).status, 422, 'Bildungsgang fehlt');
+  assert.equal((await api(schreibKey, 'POST', '/klassen', { name: 'SPA-X', notenschluessel: 'SPA', spa_bildungsgang: 'GIBTS_NICHT' })).status, 422);
+  const spa = await api(schreibKey, 'POST', '/klassen', { name: 'API-SPA', schuljahr: '2025/26', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_PIA' });
+  assert.equal(spa.status, 200);
+  assert.equal(spa.json.klasse.spa_bildungsgang, 'SPA_PIA');
+  assert.equal(spa.json.klasse.abschluss_jahr, spa.json.klasse.einschulung_jahr + 1, 'SPA: 2 Jahre');
+  assert.ok(db().prepare('SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ?').get(spa.json.klasse.id).c > 0, 'Fächervorgabe des Bildungsgangs geladen');
+  const ohneFaecher = await api(schreibKey, 'POST', '/klassen', { name: 'API-SPA-leer', schuljahr: '2025/26', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_REGULAR', spa_vorlage: 'keine' });
+  assert.equal(ohneFaecher.status, 200);
+  assert.equal(db().prepare('SELECT COUNT(*) AS c FROM faecher WHERE klasse_id = ?').get(ohneFaecher.json.klasse.id).c, 0, 'spa_vorlage keine');
+  assert.equal((await api(schreibKey, 'POST', '/klassen', { name: 'SPA-Y', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_PIA', spa_vorlage: 99999 })).status, 422, 'unbekannte Vorlage');
+
+  // Fehler
+  for (const body of [
+    { name: '' }, { name: 'X'.repeat(101) }, { name: 'X', notenschluessel: 'ABC' }, { name: 'X', schuljahr: '1999/00' },
+    { name: 'X', spa_bildungsgang: 'SPA_PIA' }, { name: 'X', einschulung_jahr: 'bald' }, { name: 'X', anzahl_jahre: 0 }, { name: 'X', anzahl_jahre: 99 },
+    { name: 'X', einschulung_jahr: 2025, abschluss_jahr: 2020 }, { name: 'X', offen_fuer_beitritt: 'ja' },
+  ]) assert.equal((await api(schreibKey, 'POST', '/klassen', body)).status, 422, JSON.stringify(body));
+  assert.equal(klassen(), vorher + 5, 'Fehlerfälle legen nichts an (Klassen: API-Klasse, Standard, ID, SPA, SPA-leer)');
+  assert.equal((await api(coraKeyGlobal(), 'POST', '/klassen', { name: 'Fremd' })).status, 403, 'ohne Schul-Zugang (LDAP)');
+});
+
 test('Lernfelder (SPA): Komponenten und Unterfächer sind sichtbar, beschreibbar, mit Leistungspunkten; das Lernfeld selbst verweist auf sie', async () => {
   const sj = db().prepare("SELECT id FROM schuljahre WHERE bezeichnung = '2025/26'").get().id;
   await admin('/teacher/klassen/neu', { schuljahr_id: String(sj), name: '13SPA', notenschluessel: 'SPA', spa_bildungsgang: 'SPA_PIA', einschulung_jahr: '2025' });

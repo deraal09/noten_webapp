@@ -39,7 +39,7 @@
   <h2>Typischer Ablauf für einen Agenten</h2>
   <ol>
     <li><code>GET /me</code> – Konto und Berechtigung des Schlüssels prüfen.</li>
-    <li>(Neuer Kurs: <code>POST /kurse</code>, dann Teilnehmer aufnehmen.)</li>
+    <li>(Neuer Kurs: <code>POST /kurse</code>, dann Teilnehmer aufnehmen. Neue Klasse: <code>POST /klassen</code>; Personen und Fächer legt man dort in der App an.)</li>
     <li><code>GET /klassen</code> – Klassen und Fach-IDs finden (auch Komponenten/Unterfächer); <code>GET /klassen/{id}/schueler</code> bzw. <code>GET /faecher/{id}/teilnehmer</code> – Schüler-IDs. Bei einem neuen Kurs zuerst <code>POST /faecher/{id}/teilnehmer</code>, um die Teilnehmer aufzunehmen.</li>
     <li><code>GET /faecher/{id}?halbjahr=5</code> – Klausuren, Zusatzleistungen und Termine mit IDs und Höchstpunkten.</li>
     <li><code>PUT …/ergebnisse?dry_run=true</code> – Eingaben prüfen, die berechneten Noten ansehen; dann ohne <code>dry_run</code> speichern.</li>

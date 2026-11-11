@@ -29,6 +29,10 @@ import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta } from '../noten
 import { autoVerteileKlausuren } from './teacher.js';
 import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { legeKursAn, kursNotenschluessel } from '../kurse.js';
+import { legeKlasseAn, berechneLaufzeit, KLASSEN_NOTENSCHLUESSEL } from '../klasse-anlegen.js';
+import { BILDUNGSGAENGE } from '../spa-schema.js';
+import { ladeSpaVorlage } from '../spa-vorlagen.js';
+import { parseJahrEingabe, MAX_SCHULJAHRE, findeLaufendeKlasse } from '../klassen-jahre.js';
 import { aktuellesSchuljahrBezeichnung, sorgeFuerAktuellesSchuljahr } from '../schuljahre-auto.js';
 import { ladeUnterfaecher } from '../unterfaecher.js';
 import { spaTendenz, spaTendenzAusNote } from '../spa-leistung.js';
@@ -182,6 +186,74 @@ export default async function apiV1Routes(fastify) {
       return { klasse, schueler };
     });
 
+    // Schuljahr aus dem Body: Bezeichnung („2025/26“) oder ID; ohne Angabe das aktuelle (wird bei Bedarf angelegt). null = unbekannt.
+    const schuljahrAusBody = (b) => {
+      const db = getDb();
+      if (b.schuljahr === undefined || b.schuljahr === null || b.schuljahr === '') {
+        sorgeFuerAktuellesSchuljahr();
+        return db.prepare('SELECT * FROM schuljahre WHERE bezeichnung = ?').get(aktuellesSchuljahrBezeichnung()) || null;
+      }
+      return db.prepare(Number.isInteger(b.schuljahr) ? 'SELECT * FROM schuljahre WHERE id = ?' : 'SELECT * FROM schuljahre WHERE bezeichnung = ?').get(b.schuljahr) || null;
+    };
+
+    // Klasse anlegen: wie „+ Neue Klasse anlegen“ in der App; die Lehrkraft des Schlüssels ist die anlegende Person. Standard-Notenschlüssel IHK.
+    route('POST', '/klassen', 'schreiben', async (request, reply) => {
+      const user = request.apiUser;
+      if (!userDarfSelbstKlasseAnlegen(user)) return senden(reply, 403, 'forbidden', 'Eigene Klassen können nur Lehrkräfte mit Schul-Zugang (LDAP) und der Admin anlegen.');
+      const b = request.body || {};
+      if (typeof b.name !== 'string' || !b.name.trim() || b.name.trim().length > 100) return senden(reply, 422, 'invalid', 'name: Text mit 1 bis 100 Zeichen.');
+      const ns = b.notenschluessel === undefined || b.notenschluessel === null ? 'IHK' : b.notenschluessel;
+      if (!KLASSEN_NOTENSCHLUESSEL.includes(ns)) return senden(reply, 422, 'invalid', 'notenschluessel: IHK (Standard), BG oder SPA.');
+      let spaBildungsgang = null;
+      let spaVorlage = 'standard';
+      if (ns === 'SPA') {
+        spaBildungsgang = b.spa_bildungsgang;
+        if (!BILDUNGSGAENGE.some((x) => x.schluessel === spaBildungsgang)) return senden(reply, 422, 'invalid', `spa_bildungsgang: ${BILDUNGSGAENGE.map((x) => x.schluessel).join(' oder ')} (bei notenschluessel SPA Pflicht).`);
+        if (b.spa_vorlage !== undefined && b.spa_vorlage !== null) {
+          spaVorlage = b.spa_vorlage;
+          const ok = spaVorlage === 'standard' || spaVorlage === 'keine' || (Number.isInteger(spaVorlage) && ladeSpaVorlage(spaVorlage, user.id));
+          if (!ok) return senden(reply, 422, 'invalid', 'spa_vorlage: "standard" (Vorgabe des Bildungsgangs), "keine" oder die ID einer eigenen Vorlage.');
+          spaVorlage = String(spaVorlage);
+        }
+      } else if (b.spa_bildungsgang !== undefined && b.spa_bildungsgang !== null) {
+        return senden(reply, 422, 'invalid', 'spa_bildungsgang gilt nur bei notenschluessel SPA.');
+      }
+      if (b.offen_fuer_beitritt !== undefined && typeof b.offen_fuer_beitritt !== 'boolean') return senden(reply, 422, 'invalid', 'offen_fuer_beitritt: true oder false.');
+      const db = getDb();
+      const sj = schuljahrAusBody(b);
+      if (!sj) return senden(reply, 422, 'invalid', 'schuljahr: unbekannt (Bezeichnung wie „2025/26“ oder ID). Schuljahre legt sonst die Administration an.');
+      // Laufzeit: Angaben müssen stimmen (die App würde Unsinn stillschweigend durch den Standard ersetzen -- für Programme ist ein Fehler hilfreicher).
+      const hatJahr = (v) => v !== undefined && v !== null;
+      if (hatJahr(b.einschulung_jahr) && parseJahrEingabe(b.einschulung_jahr) === null) return senden(reply, 422, 'invalid', 'einschulung_jahr: Startjahr des Einschulungs-Schuljahres als Zahl (z. B. 2025 für 2025/26).');
+      if (hatJahr(b.anzahl_jahre) && !(Number.isInteger(b.anzahl_jahre) && b.anzahl_jahre >= 1 && b.anzahl_jahre <= MAX_SCHULJAHRE)) return senden(reply, 422, 'invalid', `anzahl_jahre: ganze Zahl von 1 bis ${MAX_SCHULJAHRE}.`);
+      if (hatJahr(b.abschluss_jahr) && parseJahrEingabe(b.abschluss_jahr) === null) return senden(reply, 422, 'invalid', 'abschluss_jahr: Startjahr des Abschluss-Schuljahres als Zahl (z. B. 2027 für 2027/28).');
+      const laufzeit = berechneLaufzeit({ schuljahrBezeichnung: sj.bezeichnung, einschulungJahr: b.einschulung_jahr, anzahlJahre: b.anzahl_jahre, abschlussJahr: b.abschluss_jahr });
+      if ((hatJahr(b.anzahl_jahre) || hatJahr(b.abschluss_jahr)) && laufzeit.abschluss === null) return senden(reply, 422, 'invalid', `Das Abschlussschuljahr muss zwischen dem Einschulungsschuljahr und ${MAX_SCHULJAHRE - 1} Jahren danach liegen.`);
+      const name = b.name.trim();
+      const info = (id) => ({
+        id, name, schuljahr: sj.bezeichnung, notenschluessel: ns, spa_bildungsgang: spaBildungsgang,
+        // Ohne Angabe gilt der Standard der App: SPA zwei, sonst drei Schuljahre.
+        einschulung_jahr: laufzeit.einschulung, abschluss_jahr: laufzeit.abschluss ?? (laufzeit.einschulung === null ? null : laufzeit.einschulung + (ns === 'SPA' ? 1 : 2)), offen_fuer_beitritt: b.offen_fuer_beitritt === true,
+      });
+      // Wiederholen ist gefahrlos: läuft die Klasse im Schuljahr schon, wird nichts doppelt angelegt.
+      const laufende = findeLaufendeKlasse(name, sj.id);
+      if (laufende) {
+        return {
+          gespeichert: false, bereits_vorhanden: true, zugriff: userHatKlassenZugriff(user, laufende.id),
+          klasse: { id: laufende.id, name: laufende.name, notenschluessel: laufende.notenschluessel },
+          hinweis: 'Die Klasse gibt es schon. Gehört sie dir noch nicht, tritt man ihr in der App über „Vorhandene Klasse wählen“ bei.',
+        };
+      }
+      if (!speichern(request)) return { gespeichert: false, dry_run: true, klasse: info(null) };
+      const r = legeKlasseAn({
+        userId: user.id, schuljahrId: sj.id, name, notenschluessel: ns, spaBildungsgang, spaVorlage,
+        offenFuerBeitritt: b.offen_fuer_beitritt === true, einschulungJahr: b.einschulung_jahr, anzahlJahre: b.anzahl_jahre, abschlussJahr: b.abschluss_jahr,
+      });
+      if (!r.ok) return senden(reply, 422, 'invalid', 'Die Klasse existiert in diesem Schuljahr bereits.');
+      request.log.info({ key: request.apiKey.id, klasse: r.klasseId }, 'api: Klasse angelegt');
+      return { gespeichert: true, klasse: info(r.klasseId), naechster_schritt: 'Schüler:innen und Fächer legst du in der App an (Meine Klassen → Klasse).' };
+    });
+
     // Kurs anlegen: wie „+ Neuen Kurs anlegen“ in der App; die Lehrkraft des Schlüssels wird dem Kurs zugeordnet. Standard-Notenschlüssel BG.
     route('POST', '/kurse', 'schreiben', async (request, reply) => {
       const user = request.apiUser;
@@ -189,15 +261,8 @@ export default async function apiV1Routes(fastify) {
       const b = request.body || {};
       if (typeof b.name !== 'string' || !b.name.trim() || b.name.trim().length > 100) return senden(reply, 422, 'invalid', 'name: Text mit 1 bis 100 Zeichen.');
       if (b.notenschluessel !== undefined && !['IHK', 'BG'].includes(b.notenschluessel)) return senden(reply, 422, 'invalid', 'notenschluessel: IHK oder BG (Standard BG).');
-      // Schuljahr: Bezeichnung („2025/26“) oder ID; ohne Angabe das aktuelle (wird bei Bedarf angelegt).
       const db = getDb();
-      let sj = null;
-      if (b.schuljahr === undefined || b.schuljahr === null || b.schuljahr === '') {
-        sorgeFuerAktuellesSchuljahr();
-        sj = db.prepare('SELECT * FROM schuljahre WHERE bezeichnung = ?').get(aktuellesSchuljahrBezeichnung());
-      } else {
-        sj = db.prepare(Number.isInteger(b.schuljahr) ? 'SELECT * FROM schuljahre WHERE id = ?' : 'SELECT * FROM schuljahre WHERE bezeichnung = ?').get(b.schuljahr);
-      }
+      const sj = schuljahrAusBody(b);
       if (!sj) return senden(reply, 422, 'invalid', 'schuljahr: unbekannt (Bezeichnung wie „2025/26“ oder ID). Schuljahre legt sonst die Administration an.');
       const name = b.name.trim();
       // Wiederholen ist gefahrlos: gibt es den Kurs dieser Lehrkraft schon, wird er zurückgegeben statt doppelt angelegt.
