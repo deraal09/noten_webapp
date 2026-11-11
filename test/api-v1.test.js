@@ -307,3 +307,58 @@ test('Oberfläche: Seite API-Zugang listet Schlüssel ohne Klartext; Menüpunkt 
   assert.match(start, /href="\/konto\/api"/);
   assert.ok([302, 401].includes((await fetch(`${base}/konto/api`, { redirect: 'manual' })).status), 'ohne Anmeldung kein Zugang');
 });
+
+test('Sync mit der Klassenleitung: Stand abfragen, auf Knopfdruck synchronisieren, Auto-Sync schalten; API-Eintragungen lösen ihn aus', async () => {
+  const fach = () => api(leseKey, 'GET', `/faecher/${fachId}?halbjahr=1`);
+  const stand = (await fach()).json.sync;
+  assert.equal(stand.automatisch, false, 'Anna hat den Haken nicht gesetzt');
+  const anzahlStand = () => db().prepare('SELECT COUNT(*) AS c FROM fach_sync_stand').get().c;
+  const vorher = anzahlStand();
+
+  assert.equal((await api(leseKey, 'POST', `/faecher/${fachId}/sync`, {})).status, 403, 'lesender Schlüssel darf nicht synchronisieren');
+  const trocken = await api(schreibKey, 'POST', `/faecher/${fachId}/sync?dry_run=true`, { halbjahr: 1 });
+  assert.equal(trocken.json.synchronisiert, false);
+  assert.equal(anzahlStand(), vorher, 'Probelauf ändert nichts');
+
+  const sync = await api(schreibKey, 'POST', `/faecher/${fachId}/sync`, { halbjahr: 1 });
+  assert.equal(sync.status, 200);
+  assert.equal(sync.json.synchronisiert, true);
+  assert.ok(sync.json.sync.zuletzt_synchronisiert_am);
+  assert.equal(sync.json.sync.zuletzt_synchronisiert_von, 'anna');
+  const gesamt = async () => (await api(leseKey, 'GET', `/faecher/${fachId}/noten?halbjahr=1`)).json.schueler.find((x) => x.id === sid1).gesamtnote;
+  const synchronisiert = () => db().prepare('SELECT note FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ? AND schueler_id = ?').get(fachId, HJ, sid1)?.note;
+  const rows = db().prepare('SELECT schueler_id, note FROM fach_sync_stand WHERE fach_id = ? AND halbjahr = ?').all(fachId, HJ);
+  assert.ok(rows.length >= 2, 'Stand für die Klassenleitung geschrieben');
+  const stand1 = await gesamt();
+  assert.equal(synchronisiert(), stand1, 'Klassenleitung sieht die aktuelle Gesamtnote');
+
+  // Auto-Sync einschalten: sofort synchronisiert, danach löst jede API-Eintragung den Sync aus
+  assert.equal((await api(schreibKey, 'PUT', `/faecher/${fachId}/auto-sync`, { aktiv: 'ja' })).status, 422);
+  const an = await api(schreibKey, 'PUT', `/faecher/${fachId}/auto-sync`, { halbjahr: 1, aktiv: true });
+  assert.equal(an.status, 200);
+  assert.equal(an.json.sync.automatisch, true);
+  assert.equal((await fach()).json.sync.automatisch, true);
+  await api(schreibKey, 'PUT', `/klausuren/${klausurId}/ergebnisse`, { ergebnisse: [{ schueler_id: sid1, punkte: [5, 5, 2.5] }] });
+  const schlechter = await gesamt();
+  assert.notEqual(schlechter, stand1);
+  assert.equal(synchronisiert(), schlechter, 'neuer Stand automatisch synchronisiert');
+
+  const aus = await api(schreibKey, 'PUT', `/faecher/${fachId}/auto-sync`, { aktiv: false });
+  assert.equal(aus.json.sync.automatisch, false);
+  await api(schreibKey, 'PUT', `/klausuren/${klausurId}/ergebnisse`, { ergebnisse: [{ schueler_id: sid1, punkte: [10, 10, 5] }] });
+  assert.equal(await gesamt(), stand1);
+  assert.equal(synchronisiert(), schlechter, 'ohne Auto-Sync bleibt der alte Stand bis zum nächsten Sync');
+  await api(schreibKey, 'POST', `/faecher/${fachId}/sync`, { halbjahr: 1 });
+  assert.equal(synchronisiert(), stand1);
+
+  // Fremde Lehrkraft und Admin ohne Zuordnung
+  assert.equal((await api(benKey, 'POST', `/faecher/${fachId}/sync`, {})).status, 401, 'Ben ist deaktiviert (vorheriger Test)');
+});
+
+test('Auto-Sync braucht eine Zuordnung zum Fach; der Admin ohne Zuordnung bekommt 409, kann aber synchronisieren', async () => {
+  await admin('/admin/einladungen/neu', { display_name: 'x', ttl_days: '14' });
+  const adminKey = await neuerSchluessel(admin, 'Admin-Agent', 'schreiben');
+  assert.equal((await api(adminKey, 'PUT', `/faecher/${fachId}/auto-sync`, { aktiv: true })).status, 409);
+  assert.equal((await api(adminKey, 'POST', `/faecher/${fachId}/sync`, { halbjahr: 1 })).status, 200);
+  assert.equal((await api(adminKey, 'GET', `/faecher/${fachId}?halbjahr=1`)).json.sync.automatisch, null);
+});

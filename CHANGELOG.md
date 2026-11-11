@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.118.0 - 2026-11-11
+
+- **API: Synchronisation mit der Klassenleitung.** Neue Endpunkte `POST /api/v1/faecher/{id}/sync` („Jetzt synchronisieren“) und
+  `PUT /api/v1/faecher/{id}/auto-sync` (Haken „automatisch synchronisieren“ ein-/ausschalten; beim Einschalten sofort ein Sync, Konto muss
+  dem Fach zugeordnet sein). `GET /api/v1/faecher/{id}` zeigt unter `sync`, ob der Auto-Sync an ist und wann zuletzt (und von wem)
+  synchronisiert wurde. Eintragungen über die API lösen den Sync bei eingeschaltetem Auto-Sync wie in der App von selbst aus.
+  Dokumentation (`/api/v1/docs`, OpenAPI, `docs/API.md`) ergänzt.
+
 ## 0.117.0 - 2026-11-11
 
 - **API für KI-Agenten (`/api/v1`).** Ein Agent oder Programm kann im Namen einer Lehrkraft Klassen, Fächer und Noten **auslesen,

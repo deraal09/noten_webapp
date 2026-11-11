@@ -25,12 +25,23 @@ import { globalerSchluessel, tabelle, TYPEN } from '../notenschluessel.js';
 import { ladeTeilnehmerMitHerkunft } from '../fach-teilnehmer.js';
 import { istSchuelerGesperrtInFach, ladeSperrenFuerSchueler } from '../noten-sperre.js';
 import { setzeEndnote, notenBereich, parseEndnoteEingabe } from '../halbjahr-endnoten.js';
-import { syncPerson, syncFallsAutoAktiv } from '../noten-sync.js';
+import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
 import { autoVerteileKlausuren } from './teacher.js';
 import { ENDPOINTS, FEHLERCODES, baueOpenApi, API_BASIS } from '../api-docs.js';
 
 const MAX_EINTRAEGE = 500;
 const MAX_AUFGABEN = 40;
+
+/** Stand der Synchronisation mit der Klassenleitung für Fach, Halbjahr und diese Lehrkraft. */
+function syncStand(user, fachId, halbjahr) {
+  const meta = holeSyncMeta(fachId, halbjahr);
+  const z = getDb().prepare('SELECT auto_sync FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?').get(fachId, user.id);
+  return {
+    automatisch: z ? Boolean(z.auto_sync) : null, // null: dieser Schlüssel/Konto hat keine eigene Zuordnung zum Fach
+    zuletzt_synchronisiert_am: meta ? meta.synced_at : null,
+    zuletzt_synchronisiert_von: meta ? (meta.display_name || meta.username) : null,
+  };
+}
 
 const NOTENEINHEIT = { IHK: 'Note (1–6)', BG: 'Notenpunkte (0–15)', SPA: 'Note (1–6), daraus Punkte und Tendenz' };
 
@@ -151,6 +162,7 @@ export default async function apiV1Routes(fastify) {
           id: u.id, name: u.name, datum: u.datum, max_punkte: JSON.parse(u.max_punkte_pro_aufgabe), gewichtung: u.gewichtung,
         })),
         termine: db.prepare('SELECT id, datum FROM unterricht_termine WHERE fach_id = ? AND halbjahr = ? ORDER BY datum, id').all(fach.id, halbjahr),
+        sync: syncStand(request.apiUser, fach.id, halbjahr),
       };
     });
 
@@ -419,6 +431,32 @@ export default async function apiV1Routes(fastify) {
       syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.apiUser.id);
       request.log.info({ key: request.apiKey.id, termin: t.id, anzahl: geprueft.length }, 'api: Datumsnoten eingetragen');
       return { gespeichert: true, anzahl: geprueft.length };
+    });
+
+    // ---------- Synchronisation mit der Klassenleitung ----------
+    // Wie in der Oberfläche: Die Klassenleitung sieht nur den zuletzt synchronisierten Stand eines Fachs, nie die Live-Noten.
+    route('POST', '/faecher/:id/sync', 'schreiben', async (request, reply) => {
+      const ctx = fachFuer(request, reply, { halbjahrRoh: request.body?.halbjahr });
+      if (!ctx) return undefined;
+      const { fach, halbjahr } = ctx;
+      if (!speichern(request)) return { synchronisiert: false, dry_run: true, halbjahr };
+      syncFach(fach.id, halbjahr, request.apiUser.id);
+      request.log.info({ key: request.apiKey.id, fach: fach.id }, 'api: mit Klassenleitung synchronisiert');
+      return { synchronisiert: true, halbjahr, sync: syncStand(request.apiUser, fach.id, halbjahr) };
+    });
+
+    route('PUT', '/faecher/:id/auto-sync', 'schreiben', async (request, reply) => {
+      const ctx = fachFuer(request, reply, { halbjahrRoh: request.body?.halbjahr });
+      if (!ctx) return undefined;
+      const { fach, halbjahr } = ctx;
+      if (typeof request.body?.aktiv !== 'boolean') return senden(reply, 422, 'invalid', 'aktiv: true oder false.');
+      const zuordnung = getDb().prepare('SELECT 1 FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?').get(fach.id, request.apiUser.id);
+      if (!zuordnung) return senden(reply, 409, 'keine_zuordnung', 'Der automatische Sync gilt je Lehrkraft und Fach -- dieses Konto ist dem Fach nicht zugeordnet.');
+      if (!speichern(request)) return { gespeichert: false, dry_run: true, aktiv: request.body.aktiv };
+      getDb().prepare('UPDATE fach_zuweisungen SET auto_sync = ? WHERE fach_id = ? AND user_id = ?').run(request.body.aktiv ? 1 : 0, fach.id, request.apiUser.id);
+      if (request.body.aktiv) syncFach(fach.id, halbjahr, request.apiUser.id); // sofort auf den aktuellen Stand bringen
+      request.log.info({ key: request.apiKey.id, fach: fach.id, aktiv: request.body.aktiv }, 'api: Auto-Sync geändert');
+      return { gespeichert: true, sync: syncStand(request.apiUser, fach.id, halbjahr) };
     });
 
     route('PUT', '/faecher/:id/endnoten', 'schreiben', async (request, reply) => {

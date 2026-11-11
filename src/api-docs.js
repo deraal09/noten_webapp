@@ -50,6 +50,7 @@ export const ENDPOINTS = [
       klausuren: [{ id: 7, name: 'Klausur 1', datum: '2025-10-14', max_punkte: [15, 15, 15], gewichtung: 40, teile: null }],
       unterrichtsleistungen: [{ id: 3, name: 'Referat', datum: null, max_punkte: [10], gewichtung: 20 }],
       termine: [{ id: 90, datum: '2025-09-01' }],
+      sync: { automatisch: true, zuletzt_synchronisiert_am: '2025-10-14 09:30:12', zuletzt_synchronisiert_von: 'Max Mustermann' },
     },
   },
   {
@@ -151,6 +152,22 @@ export const ENDPOINTS = [
     query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts speichern' }],
     body: { halbjahr: '5. Halbjahr', endnoten: [{ schueler_id: 301, note: 10 }, { schueler_id: 302, note: 'ntg' }, { schueler_id: 303, note: null }] },
     antwort: { gespeichert: true, halbjahr: '5. Halbjahr', anzahl: 3 },
+  },
+  {
+    id: 'sync', method: 'POST', path: '/faecher/{id}/sync', scope: 'schreiben',
+    summary: 'Fach mit der Klassenleitung synchronisieren („Jetzt synchronisieren“)',
+    beschreibung: 'Überträgt den aktuellen Notenstand (Gesamtnote je Person) des Fachs und Halbjahres in den Stand, den die Klassenleitung sieht -- wie der Knopf in der App. Die Klassenleitung sieht nie die Live-Noten, nur den zuletzt synchronisierten Stand. Hat die Lehrkraft den automatischen Sync eingeschaltet, geschieht das nach jeder Eintragung von selbst.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nicht synchronisieren' }],
+    body: { halbjahr: '5. Halbjahr' },
+    antwort: { synchronisiert: true, halbjahr: '5. Halbjahr', sync: { automatisch: false, zuletzt_synchronisiert_am: '2025-10-14 09:30:12', zuletzt_synchronisiert_von: 'Max Mustermann' } },
+  },
+  {
+    id: 'auto-sync', method: 'PUT', path: '/faecher/{id}/auto-sync', scope: 'schreiben',
+    summary: 'Automatischen Sync mit der Klassenleitung ein- oder ausschalten',
+    beschreibung: 'Der Haken „automatisch mit Klassenleitung synchronisieren“ gilt je Lehrkraft und Fach. Eingeschaltet wird sofort einmal synchronisiert, danach nach jeder Eintragung (auch über die API). Das Konto des Schlüssels muss dem Fach zugeordnet sein (sonst 409).',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts ändern' }],
+    body: { aktiv: true, halbjahr: '5. Halbjahr' },
+    antwort: { gespeichert: true, sync: { automatisch: true, zuletzt_synchronisiert_am: '2025-10-14 09:31:40', zuletzt_synchronisiert_von: 'Max Mustermann' } },
   },
 ];
 

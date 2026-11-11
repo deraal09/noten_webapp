@@ -36,6 +36,8 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | POST | `/faecher/{id}/termine` | schreiben | Termin der Datumstabelle anlegen |
 | PUT | `/termine/{id}/noten` | schreiben | Noten je Termin (auch `"n.a."`) |
 | PUT | `/faecher/{id}/endnoten` | schreiben | Endnoten / `"ntg"` |
+| POST | `/faecher/{id}/sync` | schreiben | mit der Klassenleitung synchronisieren („Jetzt synchronisieren“) |
+| PUT | `/faecher/{id}/auto-sync` | schreiben | automatischen Sync ein-/ausschalten |
 
 ## Verhalten für Agenten
 
@@ -46,6 +48,15 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 * **Grenzen:** 120 Anfragen pro Minute und Schlüssel, 500 Einträge je Aufruf, 40 Aufgaben je Klausur.
 * **Datenschutz:** Namen und Noten verlassen das System. Der Einsatz eines externen KI-Dienstes muss datenschutzrechtlich zulässig sein.
 * Fehlerformat: `{ "error": "code", "message": "…", "details": [ … ] }`.
+
+## Synchronisation mit der Klassenleitung
+
+Die Klassenleitung sieht nie die Live-Noten eines Fachs, nur den zuletzt **synchronisierten** Stand. Über die API geht beides wie in der App:
+
+* `PUT /faecher/{id}/auto-sync` mit `{"aktiv": true}` schaltet den Haken „automatisch synchronisieren“ ein (je Lehrkraft und Fach). Danach löst **jede
+  Eintragung über die API** den Sync von selbst aus; beim Einschalten wird sofort einmal synchronisiert.
+* `POST /faecher/{id}/sync` synchronisiert auf Knopfdruck (z. B. am Ende einer Eintragung ohne Auto-Sync).
+* `GET /faecher/{id}` zeigt unter `sync`, ob der Auto-Sync an ist und wann zuletzt (und von wem) synchronisiert wurde.
 
 ## Beispiel: Klausurpunkte eintragen
 

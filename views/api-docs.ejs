@@ -42,6 +42,7 @@
     <li><code>GET /faecher/{id}?halbjahr=5</code> – Klausuren, Zusatzleistungen und Termine mit IDs und Höchstpunkten.</li>
     <li><code>PUT …/ergebnisse?dry_run=true</code> – Eingaben prüfen, die berechneten Noten ansehen; dann ohne <code>dry_run</code> speichern.</li>
     <li><code>GET /faecher/{id}/noten</code> bzw. <code>/statistik</code> – Ergebnis kontrollieren und auswerten.</li>
+    <li>Die Klassenleitung sieht nur den <em>synchronisierten</em> Stand: <code>PUT /faecher/{id}/auto-sync</code> (einmal einschalten, danach synchronisiert jede Eintragung automatisch) oder <code>POST /faecher/{id}/sync</code>; Stand unter <code>sync</code> in <code>GET /faecher/{id}</code>.</li>
   </ol>
   <details>
     <summary>Vorschlag für eine Anweisung an den Agenten (System-Prompt)</summary>
