@@ -53,6 +53,11 @@ const db = () => getDb();
 let klasseId; let fachId; let sid1; let sid2; let sid3; let leseKey; let schreibKey; let benKey; let coraKeyCache;
 const coraKeyGlobal = () => coraKeyCache;
 const HJ = '1. Halbjahr';
+/** Führt `fn` aus, während das Konto `username` vorübergehend ein lokales Konto ist (kein Schulkonto). */
+async function alsLokal(username, fn) {
+  db().prepare("UPDATE users SET auth_source = 'lokal' WHERE username = ?").run(username);
+  try { return await fn(); } finally { db().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = ?").run(username); }
+}
 
 async function neuerSchluessel(c, name, scope, tage = '') {
   const html = await (await c('/konto/api', { name, scope, gueltig_tage: tage })).text();
@@ -70,7 +75,7 @@ test('Vorbereitung: Anna (Klasse, Fach, drei Schüler:innen), Ben (fremde Lehrkr
     const inv = db().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
     await c(`/einladung/${inv.token}`, { username: n, display_name: n, password: 'passwort123', password2: 'passwort123' });
   }
-  db().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'anna'").run();
+  db().prepare("UPDATE users SET auth_source = 'ldap' WHERE username IN ('anna', 'ben')").run();
   await anna('/teacher/klassen/neu', { schuljahr_id: String(sj), name: '12E', notenschluessel: 'BG', einschulung_jahr: '2025' });
   klasseId = db().prepare("SELECT id FROM klassen WHERE name = '12E'").get().id;
   await anna(`/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Englisch' });
@@ -117,7 +122,7 @@ test('Ohne, mit falschem, widerrufenem oder abgelaufenem Schlüssel: 401', async
   assert.equal((await api(wegwerf, 'GET', '/me')).status, 401, 'widerrufen');
   db().prepare("UPDATE api_keys SET expires_at = '2020-01-01T00:00:00.000Z' WHERE name = 'Lesen'").run();
   assert.equal((await api(leseKey, 'GET', '/me')).status, 401, 'abgelaufen');
-  db().prepare("UPDATE api_keys SET expires_at = NULL WHERE name = 'Lesen'").run();
+  db().prepare("UPDATE api_keys SET expires_at = '2999-01-01T00:00:00.000Z' WHERE name = 'Lesen'").run();
   assert.equal((await api(leseKey, 'GET', '/me')).status, 200);
   // Fremde Lehrkraft kann Annas Schlüssel nicht widerrufen
   const annaKeyId = db().prepare("SELECT id FROM api_keys WHERE name = 'Schreiben'").get().id;
@@ -358,12 +363,18 @@ test('Sync mit der Klassenleitung: Stand abfragen, auf Knopfdruck synchronisiere
   assert.equal((await api(benKey, 'POST', `/faecher/${fachId}/sync`, {})).status, 401, 'Ben ist deaktiviert (vorheriger Test)');
 });
 
-test('Auto-Sync braucht eine Zuordnung zum Fach; der Admin ohne Zuordnung bekommt 409, kann aber synchronisieren', async () => {
-  await admin('/admin/einladungen/neu', { display_name: 'x', ttl_days: '14' });
-  const adminKey = await neuerSchluessel(admin, 'Admin-Agent', 'schreiben');
-  assert.equal((await api(adminKey, 'PUT', `/faecher/${fachId}/auto-sync`, { aktiv: true })).status, 409);
-  assert.equal((await api(adminKey, 'POST', `/faecher/${fachId}/sync`, { halbjahr: 1 })).status, 200);
-  assert.equal((await api(adminKey, 'GET', `/faecher/${fachId}?halbjahr=1`)).json.sync.automatisch, null);
+test('Der Admin (lokales Konto) hat keinen API-Zugang: kein Schlüssel über die Oberfläche, ein vorhandener wird abgelehnt', async () => {
+  const seite = await (await admin('/konto/api')).text();
+  assert.match(seite, /nur <strong>Schulkonten \(LDAP\)<\/strong>/);
+  assert.doesNotMatch(seite, /name="gueltig_tage"/);
+  assert.equal((await admin('/konto/api', { name: 'Admin-Agent', scope: 'schreiben', gueltig_tage: '30' })).status, 403);
+  assert.equal(db().prepare("SELECT COUNT(*) AS c FROM api_keys WHERE name = 'Admin-Agent'").get().c, 0);
+  const alt = 'nk_alter-admin-schluessel-aus-der-zeit-davor';
+  db().prepare("INSERT INTO api_keys (user_id, name, key_hash, key_prefix, scope, expires_at) VALUES (1, 'Alt', ?, 'nk_alter-ad', 'schreiben', '2999-01-01T00:00:00.000Z')")
+    .run(crypto.createHash('sha256').update(alt).digest('hex'));
+  const r = await api(alt, 'GET', '/me');
+  assert.equal(r.status, 403);
+  assert.equal(r.json.error, 'nur_ldap');
 });
 
 test('Teilnehmerliste: auslesen und Personen aufnehmen (neu, schon vorhanden, falscher Notenschlüssel); alles oder nichts; Probelauf', async () => {
@@ -425,6 +436,7 @@ test('Teilnehmerliste: auslesen und Personen aufnehmen (neu, schon vorhanden, fa
     const inv = db().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
     const cora = client();
     await cora(`/einladung/${inv.token}`, { username: 'cora', display_name: 'cora', password: 'passwort123', password2: 'passwort123' });
+    db().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'cora'").run();
     const k = await neuerSchluessel(cora, 'Cora', 'schreiben');
     coraKeyCache = k;
     return k;
@@ -527,7 +539,7 @@ test('Kurs anlegen über die API: Standard BG, Probelauf, wiederholbar, Schuljah
   assert.equal((await api(schreibKey, 'POST', '/kurse', { name: '' })).status, 422);
   assert.equal((await api(schreibKey, 'POST', '/kurse', { name: 'X', notenschluessel: 'SPA' })).status, 422);
   assert.equal((await api(schreibKey, 'POST', '/kurse', { name: 'X', schuljahr: '1999/00' })).status, 422);
-  assert.equal((await api(coraKeyGlobal(), 'POST', '/kurse', { name: 'Fremd' })).status, 403, 'ohne Schul-Zugang (LDAP)');
+  assert.equal((await alsLokal('cora', () => api(coraKeyGlobal(), 'POST', '/kurse', { name: 'Fremd' }))).status, 403, 'ohne Schul-Zugang (LDAP)');
   // Weiter mit Teilnehmern
   const t = await api(schreibKey, 'POST', `/faecher/${kursId}/teilnehmer`, { teilnehmer: [{ nachname: 'Kurs', vorname: 'Kai', klasse: '12E' }] });
   assert.equal(t.status, 200);
@@ -594,7 +606,7 @@ test('Klasse anlegen über die API: IHK-Standard, Laufzeit, Probelauf, wiederhol
     { name: 'X', einschulung_jahr: 2025, abschluss_jahr: 2020 }, { name: 'X', offen_fuer_beitritt: 'ja' },
   ]) assert.equal((await api(schreibKey, 'POST', '/klassen', body)).status, 422, JSON.stringify(body));
   assert.equal(klassen(), vorher + 5, 'Fehlerfälle legen nichts an (Klassen: API-Klasse, Standard, ID, SPA, SPA-leer)');
-  assert.equal((await api(coraKeyGlobal(), 'POST', '/klassen', { name: 'Fremd' })).status, 403, 'ohne Schul-Zugang (LDAP)');
+  assert.equal((await alsLokal('cora', () => api(coraKeyGlobal(), 'POST', '/klassen', { name: 'Fremd' }))).status, 403, 'ohne Schul-Zugang (LDAP)');
 });
 
 const klasseAnlegen = async (name, extra = {}) => {
@@ -622,6 +634,7 @@ test('Vorbereitung: zweite Lehrkraft Dora', async () => {
   const inv = db().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
   await dora(`/einladung/${inv.token}`, { username: 'dora', display_name: 'dora', password: 'passwort123', password2: 'passwort123' });
   assert.ok(db().prepare("SELECT id FROM users WHERE username = 'dora'").get());
+  db().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'dora'").run();
 });
 
 test('Schüler:innen und Fächer einer Klasse über die API anlegen: Probelauf, Doppelte, Teilnehmerliste, alles oder nichts, Rechte', async () => {
@@ -943,10 +956,12 @@ test('Lernfelder (SPA): Komponenten und Unterfächer sind sichtbar, beschreibbar
   assert.equal(kind.zugriff, true);
   const schreibLf = await api(schreibKey, 'POST', `/faecher/${lf3.id}/klausuren`, { halbjahr: 1, name: 'LF-Klausur', max_punkte: [10] });
   assert.equal(schreibLf.status, 403, 'nicht dem Lernfeld zugeordnet');
-  const adminKey = await neuerSchluessel(admin, 'Admin SPA', 'schreiben');
-  const schreibAdmin = await api(adminKey, 'POST', `/faecher/${lf3.id}/klausuren`, { halbjahr: 1, name: 'LF-Klausur', max_punkte: [10] });
-  assert.equal(schreibAdmin.status, 409);
-  assert.ok(schreibAdmin.json.details.some((u) => u.id === komp.id), 'die Antwort nennt die Komponenten');
+  // Auch wer dem Lernfeld selbst zugeordnet ist, schreibt nicht ins Lernfeld (409), sondern in die Komponenten.
+  const zLf = db().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES (?, ?)').run(annaId, lf3.id).lastInsertRowid;
+  const schreibLfZugeordnet = await api(schreibKey, 'POST', `/faecher/${lf3.id}/klausuren`, { halbjahr: 1, name: 'LF-Klausur', max_punkte: [10] });
+  db().prepare('DELETE FROM fach_zuweisungen WHERE id = ?').run(zLf);
+  assert.equal(schreibLfZugeordnet.status, 409);
+  assert.ok(schreibLfZugeordnet.json.details.some((u) => u.id === komp.id), 'die Antwort nennt die Komponenten');
 
   // Eintragen in der Komponente: Klausur, Punkte, Leistungspunkte und Tendenz
   const k = await api(schreibKey, 'POST', `/faecher/${komp.id}/klausuren`, { halbjahr: 1, name: 'DV-Klausur', max_punkte: [10] });

@@ -5,6 +5,7 @@
   Endgültig gelöscht wird eine Klasse erst, wenn <strong>alle</strong> Lehrkräfte der Klasse sie gelöscht haben -- danach läuft eine Frist von
   <%= fristTage %> Tagen, in der noch jede Lehrkraft die Klasse zurückholen kann. Mit Ablauf der Frist werden Fächer, Klausuren und Noten der Klasse
   unwiderruflich gelöscht. Nutzt niemand sonst die Klasse mehr, kannst du sie hier auch <strong>sofort endgültig löschen</strong>, ohne die Frist abzuwarten.
+  Stehen in einem Fach Noten, dem keine Lehrkraft (mehr) zugeordnet ist, wird die Klasse nicht endgültig gelöscht -- das entscheidet dann der Admin.
 </p>
 
 <% if (!klassen.length) { %>
@@ -30,7 +31,9 @@
             <form method="post" action="/teacher/papierkorb/<%= k.id %>/wiederherstellen" class="inline">
               <button type="submit">↩ Wiederherstellen</button>
             </form>
-            <% if (k.ablauf) { %>
+            <% if (k.blockiert && k.blockiert.length) { %>
+              <p class="hint">Enthält Noten in Fächern ohne zugeordnete Lehrkraft (<%= k.blockiert.join(', ') %>) — wird nicht endgültig gelöscht; das kann nur der Admin.</p>
+            <% } else if (k.ablauf) { %>
               <form method="post" action="/teacher/papierkorb/<%= k.id %>/endgueltig" class="inline"
                     onsubmit="return confirm(<%= jsonFuerSkript('Klasse „' + k.name + '“ jetzt endgültig löschen? Fächer, Klausuren und Noten gehen unwiderruflich verloren. Die Schüler/innen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“.') %>)">
                 <button type="submit" class="danger" title="Niemand sonst nutzt die Klasse -- die Wartefrist entfällt">🗑 Sofort löschen</button>

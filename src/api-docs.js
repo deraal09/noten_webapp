@@ -7,12 +7,13 @@ export const API_BASIS = '/api/v1';
 
 const FEHLER = {
   400: 'Ungültige Anfrage (z. B. falsches Halbjahr, fehlende Felder)',
-  401: 'API-Schlüssel fehlt, ist ungültig, abgelaufen oder widerrufen',
-  403: 'Keine Berechtigung (Schlüssel nur „lesen“, oder keine Rechte der Lehrkraft am Fach/Halbjahr)',
+  401: 'API-Schlüssel fehlt, ist ungültig, abgelaufen, widerrufen oder vom Admin deaktiviert',
+  403: 'Keine Berechtigung (Schlüssel nur „lesen“, keine Rechte der Lehrkraft am Fach/Halbjahr, oder `nur_ldap`: das Konto ist kein Schulkonto (LDAP))',
   404: 'Nicht gefunden',
-  409: 'Wird von der API (noch) nicht unterstützt (z. B. SPA-Fächer, Fächer aus Unterfächern) oder steht im Konflikt mit dem Stand (z. B. Klasse wird noch von anderen Lehrkräften genutzt, Laufzeit würde Halbjahre mit Daten abschneiden)',
+  409: 'Wird von der API (noch) nicht unterstützt (z. B. SPA-Fächer, Fächer aus Unterfächern) oder steht im Konflikt mit dem Stand (z. B. Klasse wird noch von anderen Lehrkräften genutzt oder enthält Noten ohne zugeordnete Lehrkraft, Laufzeit würde Halbjahre mit Daten abschneiden)',
   422: 'Eingaben ungültig oder gesperrt; es wurde nichts gespeichert (Liste unter details)',
   429: 'Zu viele Anfragen (höchstens 120 pro Minute und Schlüssel)',
+  503: 'Die API ist vom Admin abgeschaltet (`api_deaktiviert`)',
 };
 
 /** @type {Array<{id: string, method: 'GET'|'POST'|'PUT'|'DELETE', path: string, scope: 'lesen'|'schreiben', summary: string, beschreibung: string, query?: Array<{name: string, beschreibung: string, pflicht?: boolean}>, body?: object, antwort: object}>} */
@@ -21,7 +22,7 @@ export const ENDPOINTS = [
     id: 'me', method: 'GET', path: '/me', scope: 'lesen',
     summary: 'Wer bin ich? Konto, Schlüssel und Berechtigung',
     beschreibung: 'Gibt die Lehrkraft zurück, als die der Schlüssel handelt, sowie dessen Berechtigung und Ablaufdatum. Gut als erster Aufruf („Verbindungstest“).',
-    antwort: { nutzer: { id: 3, benutzername: 'mmustermann', name: 'Max Mustermann', admin: false }, schluessel: { name: 'Claude', berechtigung: 'schreiben', laeuft_ab: null } },
+    antwort: { nutzer: { id: 3, benutzername: 'mmustermann', name: 'Max Mustermann', admin: false }, schluessel: { name: 'Claude', berechtigung: 'schreiben', laeuft_ab: '2026-12-31T08:00:00.000Z' } },
   },
   {
     id: 'klassen', method: 'GET', path: '/klassen', scope: 'lesen',
@@ -209,8 +210,8 @@ export const ENDPOINTS = [
   {
     id: 'papierkorb', method: 'GET', path: '/papierkorb', scope: 'lesen',
     summary: 'Papierkorb: meine gelöschten Klassen',
-    beschreibung: 'Listet die Klassen, die diese Lehrkraft gelöscht hat (wie die Seite „Papierkorb“ der App). `noch_aktiv` sind die Lehrkräfte, die die Klasse noch nutzen; erst wenn alle sie gelöscht haben (`noch_aktiv: 0`), läuft die Frist von 30 Tagen (`endgueltig_geloescht_am`, `resttage`) und `sofort_loeschbar` ist `true`.',
-    antwort: { anzahl: 1, frist_tage: 30, klassen: [{ id: 12, name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', geloescht_am: '2026-11-11T10:00:00.000Z', noch_aktiv: 0, endgueltig_geloescht_am: '2026-12-11T10:00:00.000Z', resttage: 30, sofort_loeschbar: true }] },
+    beschreibung: 'Listet die Klassen, die diese Lehrkraft gelöscht hat (wie die Seite „Papierkorb“ der App). `noch_aktiv` sind die Lehrkräfte, die die Klasse noch nutzen; erst wenn alle sie gelöscht haben (`noch_aktiv: 0`), läuft die Frist von 30 Tagen (`endgueltig_geloescht_am`, `resttage`) und `sofort_loeschbar` ist `true`. Stehen in einem Fach Noten, dem keine Lehrkraft (mehr) zugeordnet ist (`blockiert_durch_faecher`), wird die Klasse nicht endgültig gelöscht -- weder sofort noch nach der Frist; das entscheidet der Admin in der App.',
+    antwort: { anzahl: 1, frist_tage: 30, klassen: [{ id: 12, name: '12BFI1', schuljahr: '2025/26', notenschluessel: 'BG', geloescht_am: '2026-11-11T10:00:00.000Z', noch_aktiv: 0, endgueltig_geloescht_am: '2026-12-11T10:00:00.000Z', resttage: 30, sofort_loeschbar: true, blockiert_durch_faecher: [] }] },
   },
   {
     id: 'klasse-loeschen', method: 'DELETE', path: '/klassen/{id}', scope: 'schreiben',
@@ -229,7 +230,7 @@ export const ENDPOINTS = [
   {
     id: 'papierkorb-loeschen', method: 'DELETE', path: '/papierkorb/{id}', scope: 'schreiben',
     summary: 'Klasse im Papierkorb sofort endgültig löschen',
-    beschreibung: 'Löscht eine Klasse aus dem eigenen Papierkorb sofort und endgültig, ohne die 30 Tage abzuwarten – aber nur, wenn **keine weitere Lehrkraft** mehr mit der Klasse verbunden ist (alle haben sie gelöscht, `sofort_loeschbar: true` in `GET /papierkorb`); sonst `409` (`noch_verbunden`). Liegt die Klasse nicht im eigenen Papierkorb, `404` (zuerst `DELETE /klassen/{id}`). **Nicht rückgängig zu machen:** Fächer, Klausuren und Noten gehen verloren; die Personen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“. Mit `dry_run` prüfen.',
+    beschreibung: 'Löscht eine Klasse aus dem eigenen Papierkorb sofort und endgültig, ohne die 30 Tage abzuwarten – aber nur, wenn **keine weitere Lehrkraft** mehr mit der Klasse verbunden ist (alle haben sie gelöscht, `sofort_loeschbar: true` in `GET /papierkorb`); sonst `409` (`noch_verbunden`). Enthält die Klasse Noten in Fächern ohne zugeordnete Lehrkraft, ebenfalls `409` (`fremde_noten`, Fächer unter `details`) -- das entscheidet der Admin. Liegt die Klasse nicht im eigenen Papierkorb, `404` (zuerst `DELETE /klassen/{id}`). **Nicht rückgängig zu machen:** Fächer, Klausuren und Noten gehen verloren; die Personen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“. Mit `dry_run` prüfen.',
     query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts löschen' }],
     antwort: { geloescht: true, klasse: { id: 12, name: '12BFI1' }, personen_in_ohne_klasse: 24 },
   },
@@ -296,7 +297,7 @@ export function baueOpenApi({ version, serverUrl }) {
       parameters: parameter,
       responses: {
         200: { description: 'Erfolg', content: { 'application/json': { example: e.antwort } } },
-        ...Object.fromEntries(Object.entries(FEHLER).filter(([c]) => ['401', '403', '404', '422', '429'].includes(c) || (c === '400') || (c === '409' && e.scope === 'schreiben'))
+        ...Object.fromEntries(Object.entries(FEHLER).filter(([c]) => ['401', '403', '404', '422', '429', '503'].includes(c) || (c === '400') || (c === '409' && e.scope === 'schreiben'))
           .map(([c, t]) => [c, { description: t, content: { 'application/json': { example: { error: 'fehlercode', message: t } } } }])),
       },
     };
@@ -309,7 +310,8 @@ export function baueOpenApi({ version, serverUrl }) {
       title: 'Notenverwaltung API',
       version,
       description: 'API für KI-Agenten und Programme: Klassen, Fächer und Noten auslesen und verarbeiten, Noten eintragen. '
-        + 'Jeder Schlüssel handelt mit den Rechten seiner Lehrkraft. Ausführliche Anleitung: /api/v1/docs.',
+        + 'Jeder Schlüssel handelt mit den Rechten seiner Lehrkraft. Schlüssel gibt es nur für Schulkonten (LDAP), gültig höchstens ein Jahr. '
+        + 'Ausführliche Anleitung: /api/v1/docs.',
     },
     servers: [{ url: serverUrl + API_BASIS }],
     components: { securitySchemes: { apiKey: { type: 'http', scheme: 'bearer', description: 'API-Schlüssel (nk_…) aus dem Menü „API-Zugang“' } } },

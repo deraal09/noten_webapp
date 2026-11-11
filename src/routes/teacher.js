@@ -2157,6 +2157,8 @@ export default async function teacherRoutes(fastify) {
     const r = loescheSofort(request.user.id, Number(request.params.id));
     if (r.ok) {
       request.flash?.('success', `Klasse „${r.klasse.name}“ endgültig gelöscht.${r.gerettet > 0 ? ` ${r.gerettet} Schüler/innen wurden in die Sammelklasse „Ohne Klasse“ übernommen.` : ''}`);
+    } else if (r.grund === 'fremde-noten') {
+      request.flash?.('error', `Die Klasse enthält Noten in Fächern ohne zugeordnete Lehrkraft (${r.faecher.join(', ')}) -- sie gehören jemandem, der nicht zugestimmt hat. Endgültig löschen kann sie nur der Admin.`);
     } else if (r.grund === 'noch-verbunden') {
       request.flash?.('error', `Die Klasse wird noch von ${r.nochAktiv} weiteren Lehrkraft${r.nochAktiv === 1 ? '' : 'en'} genutzt -- sofort löschen geht erst, wenn alle sie gelöscht haben.`);
     } else {

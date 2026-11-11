@@ -57,6 +57,7 @@
             <a href="/admin/ldap">LDAP-Import</a>
             <a href="/admin/einladungen">Einladungen</a>
             <a href="/admin/zuweisungen">Zuweisungen</a>
+            <a href="/admin/api">API-Zugänge</a>
           <% } else { %>
             <a href="/teacher/klassen">Meine Klassen</a>
             <% if (typeof kannEinladen !== 'undefined' && kannEinladen) { %>
@@ -74,7 +75,7 @@
         </nav>
         <div class="userbox">
           <a href="/hilfe">❓ Hilfe</a>
-          <a href="/konto/api" title="API-Schlüssel für KI-Agenten">🤖 API-Zugang</a>
+          <% if (user.authSource === 'ldap') { %><a href="/konto/api" title="API-Schlüssel für KI-Agenten">🤖 API-Zugang</a><% } %>
           <% if (user.authSource !== 'ldap') { %><a href="/konto/passwort">🔑 Passwort ändern</a><% } %>
           <a class="logout" href="/logout">Abmelden</a>
         </div>

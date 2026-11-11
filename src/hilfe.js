@@ -435,7 +435,10 @@ export const ARTIKEL = [
         'Im Menü **🤖 API-Zugang** einen **Namen** (wofür?), die **Berechtigung** („nur lesen“ oder „lesen und Noten eintragen“) und die **Gültigkeit** wählen.',
         '**Schlüssel erzeugen** und den angezeigten Schlüssel (`nk_…`) **sofort kopieren**: Er wird nur dieses eine Mal gezeigt.',
         'Den Schlüssel dem Programm geben, das ihn als `Authorization: Bearer nk_…` mitsendet. Widerrufen wirkt sofort.',
-      ], hinweis: 'Ein Schlüssel hat genau deine Rechte. Gelöscht werden über die API nur Klassen, und nur über den Papierkorb (in den Papierkorb legen, wiederherstellen, bei Nichtnutzung durch andere sofort endgültig löschen); Eintragungen lassen sich mit `?dry_run=true` vorab prüfen.' },
+      ], hinweis: 'Ein Schlüssel hat genau deine Rechte. API-Schlüssel gibt es nur für Schulkonten (LDAP), jeweils höchstens ein Jahr gültig. Gelöscht werden über die API nur Klassen, und nur über den Papierkorb (in den Papierkorb legen, wiederherstellen, bei Nichtnutzung durch andere sofort endgültig löschen); Eintragungen lassen sich mit `?dry_run=true` vorab prüfen.' },
+      { titel: 'Verwaltung durch den Admin', absaetze: [
+        'Unter **API-Zugänge** sieht der Admin alle Schlüssel mit Lehrkraft, Ablauf und letzter Nutzung. Er kann einzelne Schlüssel **deaktivieren** (und wieder aktivieren) oder **löschen** und die API insgesamt **abschalten** (Vorgabe: eingeschaltet). Ein deaktivierter Schlüssel steht in deiner Liste als „vom Admin deaktiviert“.',
+      ] },
       { titel: 'Dokumentation', absaetze: [
         'Die vollständige Beschreibung mit Beispielen und einem Vorschlag für den System-Prompt eines Agenten steht unter **/api/v1/docs**, maschinenlesbar als **OpenAPI** unter `/api/v1/openapi.json`. Die API kann u. a. Kurse und Klassen umbenennen, Klassen (samt Laufzeit, Schüler:innen und Fächern) und Kurse anlegen, die Laufzeit einer Klasse ändern, den Papierkorb auslesen, Teilnehmer aufnehmen, Klausuren und Noten eintragen und mit der Klassenleitung synchronisieren.',
       ] },

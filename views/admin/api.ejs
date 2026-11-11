@@ -1,0 +1,58 @@
+<h1>🤖 API-Zugänge</h1>
+<p class="hint">
+  Über die API (<a href="/api/v1/docs">Dokumentation</a>) können KI-Agenten und andere Programme im Namen einer Lehrkraft Noten auslesen und eintragen.
+  Schlüssel legen die Lehrkräfte selbst unter „API-Zugang“ an -- nur Schulkonten (LDAP), jeweils höchstens ein Jahr gültig.
+  Lokale Konten (auch der Admin) haben keinen API-Zugang.
+</p>
+
+<form method="post" action="/admin/api/schalter" class="card">
+  <h2>API insgesamt</h2>
+  <% if (apiAktiv) { %>
+    <p>Status: <strong>eingeschaltet</strong>.</p>
+    <input type="hidden" name="aktiv" value="0">
+    <button type="submit" class="danger" onclick="return confirm('API abschalten? Alle Programme verlieren sofort den Zugriff; neue Schlüssel lassen sich nicht anlegen.')">API abschalten</button>
+  <% } else { %>
+    <p>Status: <strong>abgeschaltet</strong> -- Anfragen an <code>/api/v1</code> werden mit 503 abgelehnt, neue Schlüssel lassen sich nicht anlegen.</p>
+    <input type="hidden" name="aktiv" value="1">
+    <button type="submit">API einschalten</button>
+  <% } %>
+  <p class="hint">Alle Schlüssel der LDAP-Konten auf einmal widerrufen: unter LDAP-Einstellungen „alle laufenden Anmeldungen von LDAP-Konten beenden“.</p>
+</form>
+
+<h2>Alle Schlüssel</h2>
+<% if (!schluessel.length) { %>
+  <p class="hint">Noch keine Schlüssel.</p>
+<% } else { %>
+  <table class="data">
+    <thead><tr><th>Lehrkraft</th><th>Name</th><th>Beginnt mit</th><th>Berechtigung</th><th>Angelegt</th><th>Läuft ab</th><th>Zuletzt benutzt</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      <% schluessel.forEach(function(s) {
+           var abgelaufen = !s.expires_at || new Date(s.expires_at) <= new Date();
+           var status = s.revoked_at ? 'widerrufen' : s.gesperrt_at ? 'deaktiviert' : abgelaufen ? 'abgelaufen'
+             : s.auth_source !== 'ldap' ? 'kein LDAP-Konto' : !s.active ? 'Konto inaktiv' : 'aktiv'; %>
+        <tr <%- status !== 'aktiv' ? 'class="ausgegraut"' : '' %>>
+          <td><%= s.display_name %> <small class="hint">(<%= s.username %>)</small></td>
+          <td><%= s.name %></td>
+          <td><code><%= s.key_prefix %>…</code></td>
+          <td><%= s.scope %></td>
+          <td><%= formatZeit(s.created_at) %></td>
+          <td><%= s.expires_at ? formatZeit(s.expires_at) : '–' %></td>
+          <td><%= s.last_used_at ? formatZeit(s.last_used_at) : '–' %></td>
+          <td><%= status %></td>
+          <td>
+            <% if (!s.revoked_at) { %>
+              <% if (s.gesperrt_at) { %>
+                <form method="post" action="/admin/api/<%= s.id %>/aktivieren" class="inline"><button type="submit">Aktivieren</button></form>
+              <% } else { %>
+                <form method="post" action="/admin/api/<%= s.id %>/deaktivieren" class="inline"><button type="submit">Deaktivieren</button></form>
+              <% } %>
+            <% } %>
+            <form method="post" action="/admin/api/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schlüssel endgültig löschen? Programme, die ihn nutzen, verlieren sofort den Zugriff.')">
+              <button type="submit" class="danger">Löschen</button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>

@@ -6,6 +6,25 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.131.0 - 2026-11-12
+
+### Sicherheit: Papierkorb schützt fremde Noten, API nur für Schulkonten mit Admin-Kontrolle
+
+- **Papierkorb -- Löschschutz:** Wer die Zuweisung einer anderen Lehrkraft entfernt und dann die Klasse löscht, konnte deren Noten bisher
+  über „Sofort löschen“ (oder `DELETE /api/v1/papierkorb/{id}`, oder nach Ablauf der 30 Tage automatisch) vernichten. Jetzt bleibt eine
+  Klasse im Papierkorb, solange ein Fach Noten enthält, dem keine Lehrkraft zugeordnet ist: kein „Sofort löschen“ (stattdessen ein Hinweis),
+  die API antwortet `409 fremde_noten` (`details.faecher`), der automatische Ablauf überspringt sie. Endgültig löschen kann sie dann nur der
+  Admin. `GET /api/v1/papierkorb` liefert dazu `blockiert_durch_faecher`.
+- **API nur für Schulkonten (LDAP):** Schlüssel anlegen und benutzen können nur LDAP-Konten; lokale Konten (auch der Admin) nicht -- der
+  Menüeintrag „🤖 API-Zugang“ erscheint nur für sie, ein Schlüssel eines lokalen Kontos wird mit `403 nur_ldap` abgelehnt.
+- **Gültigkeit höchstens ein Jahr:** Auswahl 30 Tage, 90 Tage, 6 Monate, 1 Jahr (kein „unbegrenzt“ mehr). Bisher unbegrenzte Schlüssel
+  laufen ein Jahr nach dem Update ab.
+- **Admin: API-Zugänge** (`/admin/api`, neuer Menüpunkt): alle Schlüssel mit Lehrkraft, Ablauf, letzter Nutzung und Status;
+  Schlüssel **deaktivieren** (wieder aktivierbar) oder **löschen**; die API insgesamt **abschalten** (Vorgabe: an) -- dann antwortet
+  `/api/v1` mit `503 api_deaktiviert` und es lassen sich keine Schlüssel anlegen; die Dokumentation bleibt öffentlich.
+- **„Alle laufenden Anmeldungen von LDAP-Konten beenden“** (LDAP-Einstellungen) widerruft jetzt auch alle API-Schlüssel der LDAP-Konten.
+- Datenbank: Schema 24 (Spalte `api_keys.gesperrt_at`, Tabelle `app_einstellungen`), wird beim Start automatisch ergänzt.
+
 ## 0.130.0 - 2026-11-12
 
 ### API: Schüler:innen, Fächer, Laufzeit und Papierkorb

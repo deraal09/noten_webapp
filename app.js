@@ -45,6 +45,7 @@ import { aktuellesSchuljahrBezeichnung, pruefeSchuljahrEinmalProTag } from './sr
 import { pruefePapierkorbEinmalProTag } from './src/papierkorb.js';
 import { starteBackupPlaner } from './src/backup/backup.js';
 import adminRoutes from './src/routes/admin.js';
+import adminApiRoutes from './src/routes/admin-api.js';
 import teacherRoutes from './src/routes/teacher.js';
 import klassenlehrerRoutes from './src/routes/klassenlehrer.js';
 import exportRoutes from './src/routes/export.js';
@@ -278,6 +279,7 @@ export async function buildApp(opts = {}) {
   await app.register(apiSchluesselRoutes, { prefix: '' });
   await app.register(apiV1Routes, { prefix: '/api/v1' });
   await app.register(adminRoutes, { prefix: '/admin' });
+  await app.register(adminApiRoutes, { prefix: '/admin' });
   await app.register(startRoutes, { prefix: '/start' });
   await app.register(teacherRoutes, { prefix: '/teacher' });
   await app.register(sitzplanRoutes, { prefix: '/teacher' });

@@ -10,12 +10,17 @@
  *
  * Lehrkräfte einer Klasse: Ersteller/in, Lehrkräfte mit Fach-Zuweisung, Klassenleitung (beide Tabellen). Admins zählen nicht
  * mit (sie löschen direkt).
+ *
+ * Löschschutz: Stehen in einem Fach Noten, aber ist ihm keine Lehrkraft (mehr) zugeordnet, wird die Klasse NICHT endgültig
+ * gelöscht -- weder sofort noch nach Ablauf der Frist. Diese Noten gehören jemandem, der der Löschung nicht zugestimmt hat
+ * (z. B. nachdem die Klassenleitung die Zuordnung entfernt hat). Sie bleibt im Papierkorb; löschen kann sie dann nur der Admin.
  */
 
 import { getDb } from './db.js';
 import { jetzt } from './klassen-jahre.js';
 import { loescheKlasseMitSchuelerUebernahme } from './klassenwechsel.js';
 import { anzeigeName, stelleKlassennamenWiederHer } from './klassennamen.js';
+import { faecherMitNotenOhneLehrkraft } from './loeschschutz.js';
 
 export const FRIST_TAGE = 30;
 const TAG_MS = 24 * 60 * 60 * 1000;
@@ -108,6 +113,8 @@ export function ladePapierkorb(userId, heute = jetzt()) {
       nochAktiv: ab ? 0 : aktiveLehrkraefte(r.id).length,
       ablauf,
       resttage: ablauf ? Math.max(0, Math.ceil((ablauf.getTime() - heute.getTime()) / TAG_MS)) : null,
+      // Fächer mit Noten ohne zugeordnete Lehrkraft: verhindern das endgültige Löschen (siehe oben).
+      blockiert: faecherMitNotenOhneLehrkraft(r.id),
     };
   });
 }
@@ -117,13 +124,17 @@ export function ladePapierkorb(userId, heute = jetzt()) {
  * (alle Lehrkräfte der Klasse haben sie gelöscht) -- dann entfällt die Wartefrist. Fächer, Klausuren und Noten gehen verloren; die
  * Personen (nur Name) landen wie sonst in der Sammelklasse „Ohne Klasse“.
  * @param {{speichern?: boolean}} [optionen] speichern: false = nur prüfen
- * @returns {{ok: true, klasse: {id: number, name: string}, gerettet: number} | {ok: false, grund: 'nicht-im-papierkorb'|'noch-verbunden', nochAktiv?: number}}
+ * Stehen in einem Fach Noten ohne zugeordnete Lehrkraft, wird nicht gelöscht (grund 'fremde-noten', faecher = deren Namen).
+ * @returns {{ok: true, klasse: {id: number, name: string}, gerettet: number}
+ *   | {ok: false, grund: 'nicht-im-papierkorb'|'noch-verbunden'|'fremde-noten', nochAktiv?: number, faecher?: string[]}}
  */
 export function loescheSofort(userId, klasseId, { speichern = true, heute = jetzt() } = {}) {
   const klasse = getDb().prepare('SELECT id, name FROM klassen WHERE id = ? AND ist_kurs_huelle = 0').get(klasseId);
   if (!klasse || !istFuerMichGeloescht(userId, klasse.id)) return { ok: false, grund: 'nicht-im-papierkorb' };
   const ab = aktualisiereFrist(klasse.id, heute);
   if (!ab) return { ok: false, grund: 'noch-verbunden', nochAktiv: aktiveLehrkraefte(klasse.id).length };
+  const blockiert = faecherMitNotenOhneLehrkraft(klasse.id);
+  if (blockiert.length) return { ok: false, grund: 'fremde-noten', faecher: blockiert };
   const info = { id: klasse.id, name: anzeigeName(klasse.name) };
   if (!speichern) return { ok: true, klasse: info, gerettet: getDb().prepare('SELECT COUNT(*) AS c FROM schueler WHERE klasse_id = ?').get(klasse.id).c };
   return { ok: true, klasse: info, gerettet: loescheKlasseMitSchuelerUebernahme(klasse.id).gerettet };
@@ -146,6 +157,8 @@ export function loescheAbgelaufeneKlassen(heute = jetzt()) {
   for (const { id } of kandidaten) {
     const ab = aktualisiereFrist(id, heute);
     if (!ab) continue;
+    // Noten ohne zugeordnete Lehrkraft: nicht automatisch löschen -- die Klasse bleibt im Papierkorb (Admin entscheidet).
+    if (faecherMitNotenOhneLehrkraft(id).length) continue;
     if (ablaufDatum(ab).getTime() <= heute.getTime()) {
       loescheKlasseMitSchuelerUebernahme(id);
       geloescht.push(id);

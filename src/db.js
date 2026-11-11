@@ -54,7 +54,7 @@ if (!DB_ENCRYPTION_KEY) {
 }
 
 // Schema-Version für Migrationen
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 // Spalten der beiden Sitzplan-Tabellen — einmal definiert, damit SCHEMA
 // (neue Datenbanken) und der Neuaufbau in migriereSitzplanRaeume()
@@ -754,7 +754,15 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     expires_at TEXT,
     last_used_at TEXT,
-    revoked_at TEXT
+    revoked_at TEXT,
+    -- vom Admin vorübergehend deaktiviert (wieder aktivierbar); widerrufen (revoked_at) ist endgültig
+    gesperrt_at TEXT
+);
+
+-- Einfache Schalter der Anwendung (Schlüssel/Wert), z. B. api_aktiv = '0'|'1' (fehlt = Vorgabe, siehe src/api-keys.js).
+CREATE TABLE IF NOT EXISTS app_einstellungen (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 
 -- Papierkorb für Klassen: Jede Lehrkraft, die eine Klasse "löscht", blendet sie nur für sich aus (Zeile hier). Sind alle
@@ -927,6 +935,9 @@ function migrate(db) {
   ensureColumn(db, 'klassen', 'ist_ablage', 'ist_ablage INTEGER NOT NULL DEFAULT 0');
   // Beginn der 30-Tage-Frist bis zur endgültigen Löschung (ISO-Zeit); NULL = mindestens eine Lehrkraft nutzt die Klasse noch.
   ensureColumn(db, 'klassen', 'papierkorb_ab', 'papierkorb_ab TEXT');
+  // API-Schlüssel: vom Admin deaktivierbar; Gültigkeit höchstens ein Jahr -- bisher unbegrenzte Schlüssel laufen ein Jahr nach der Umstellung ab.
+  ensureColumn(db, 'api_keys', 'gesperrt_at', 'gesperrt_at TEXT');
+  db.exec("UPDATE api_keys SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+365 days') WHERE expires_at IS NULL AND revoked_at IS NULL");
   // Laufzeit einer Klasse in Schuljahren (Startjahr, z. B. 2025 für 2025/26): siehe src/klassen-jahre.js.
   // NULL = Einschulung ist das Schuljahr der Klasse, Abschluss die Standarddauer (SPA 2, sonst 3 Jahre).
   ensureColumn(db, 'klassen', 'einschulung_jahr', 'einschulung_jahr INTEGER');

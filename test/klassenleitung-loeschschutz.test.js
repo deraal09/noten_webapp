@@ -24,7 +24,7 @@ process.env.NODE_ENV = 'test';
 delete process.env.LDAP_URL;
 
 const { buildApp } = await import('../app.js');
-const { getDb, closeDb } = await import('../src/db.js');
+const { getDb, closeDb, SCHEMA_VERSION } = await import('../src/db.js');
 const { hashPassword, makeToken, setLdapAuthenticatorForTests } = await import('../src/auth.js');
 const { FakeAuthenticator } = await import('../src/auth/authenticator.js');
 
@@ -209,7 +209,7 @@ test('Migration (Schema 23): bestehende Klassenleitungen der Sammelklasse werden
   closeDb();
   assert.equal(db().prepare('SELECT COUNT(*) AS c FROM klassenleitung WHERE klasse_id = ?').get(ablage).c, 0);
   assert.equal(db().prepare('SELECT COUNT(*) AS c FROM klassenleitung WHERE klasse_id = ?').get(k10a).c, 1, 'echte Klassen bleiben unberührt');
-  assert.equal(db().prepare("SELECT value FROM schema_meta WHERE key = 'version'").get().value, '23');
+  assert.equal(db().prepare("SELECT value FROM schema_meta WHERE key = 'version'").get().value, String(SCHEMA_VERSION), 'auf den aktuellen Stand gehoben');
 });
 
 test.after(async () => {

@@ -6,12 +6,17 @@ Die ausführliche, immer aktuelle Beschreibung steht in der laufenden App: **`/a
 
 ## API-Schlüssel
 
-* Jede angemeldete Person legt ihre Schlüssel selbst an: Menü **🤖 API-Zugang** (`/konto/api`).
+* Jede Lehrkraft mit **Schulkonto (LDAP)** legt ihre Schlüssel selbst an: Menü **🤖 API-Zugang** (`/konto/api`). Lokale Konten
+  (auch der Admin) haben keinen API-Zugang; ein Schlüssel eines Kontos, das kein Schulkonto (mehr) ist, wird mit `403 nur_ldap` abgelehnt.
 * Format `nk_…`. Der Klartext wird **nur einmal** angezeigt; in der Datenbank steht nur der SHA-256-Hash (Tabelle `api_keys`).
 * Berechtigung je Schlüssel: **lesen** (Abfragen und Berechnungen) oder **schreiben** (zusätzlich Noten eintragen).
-* Gültigkeit: 30 Tage, 90 Tage, 1 Jahr oder unbegrenzt; Widerruf wirkt sofort. Höchstens 20 aktive Schlüssel je Person.
+* Gültigkeit: 30 Tage, 90 Tage, 6 Monate oder 1 Jahr (höchstens ein Jahr); Widerruf wirkt sofort. Höchstens 20 aktive Schlüssel je Person.
+  Früher unbegrenzte Schlüssel laufen ein Jahr nach dem Update auf 0.131.0 ab.
+* Admin (`/admin/api`): sieht alle Schlüssel, kann sie **deaktivieren** (`401`, wieder aktivierbar) oder **löschen** und die API
+  insgesamt **abschalten** (Vorgabe: an) -- dann antwortet jeder Aufruf mit `503 api_deaktiviert`; die Dokumentation bleibt erreichbar.
+  „Alle laufenden Anmeldungen von LDAP-Konten beenden“ (LDAP-Einstellungen) widerruft auch alle Schlüssel der LDAP-Konten.
 * Ein Schlüssel handelt als seine Besitzerin/sein Besitzer: dieselben Rechte und Prüfungen wie in der Oberfläche (nur eigene Klassen/Fächer
-  und Halbjahre, nur Teilnehmende des Fachs, keine Eingabe bei Notenkonferenz-Sperre). Ein Admin-Schlüssel hat die Rechte des Admins.
+  und Halbjahre, nur Teilnehmende des Fachs, keine Eingabe bei Notenkonferenz-Sperre).
 
 ```bash
 curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
@@ -33,10 +38,10 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | PUT | `/klassen/{id}/laufzeit` | schreiben | Laufzeit (Einschulung, Dauer) nachträglich ändern |
 | POST | `/klassen/{id}/schueler` | schreiben | Schüler:innen anlegen (Doppelte werden übersprungen) |
 | POST | `/klassen/{id}/faecher` | schreiben | Fach anlegen (Halbjahre wählbar; wiederholbar) |
-| GET | `/papierkorb` | lesen | meine gelöschten Klassen mit Frist und `sofort_loeschbar` |
+| GET | `/papierkorb` | lesen | meine gelöschten Klassen mit Frist, `sofort_loeschbar` und `blockiert_durch_faecher` |
 | DELETE | `/klassen/{id}` | schreiben | Klasse in den Papierkorb legen (wiederherstellbar) |
 | POST | `/papierkorb/{id}/wiederherstellen` | schreiben | Klasse aus dem Papierkorb holen |
-| DELETE | `/papierkorb/{id}` | schreiben | Klasse sofort endgültig löschen (nur wenn niemand sonst sie nutzt) |
+| DELETE | `/papierkorb/{id}` | schreiben | Klasse sofort endgültig löschen (nur wenn niemand sonst sie nutzt und keine fremden Noten enthält) |
 | POST | `/kurse` | schreiben | Kurs anlegen (Standard BG; wiederholbar) |
 | PUT | `/klassen/{id}/name` | schreiben | Klasse umbenennen (jede Lehrkraft der Klasse; gilt für alle) |
 | PUT | `/faecher/{id}/name` | schreiben | Kurs umbenennen (jede Lehrkraft des Kurses; gilt für alle) |
@@ -56,7 +61,7 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 
 * **Alles oder nichts:** Ist bei einem Aufruf mit mehreren Personen ein Eintrag ungültig, wird nichts gespeichert (`422`, Liste unter `details`).
 * **Probelauf:** `?dry_run=true` prüft und zeigt die berechneten Noten, ohne zu speichern -- vor dem Eintragen immer nutzen.
-* **Idempotent:** Wiederholen schadet nicht. **Gelöscht wird nur über den Papierkorb für Klassen:** `DELETE /klassen/{id}` legt eine Klasse in den Papierkorb (wiederherstellbar), `DELETE /papierkorb/{id}` löscht sie sofort endgültig – aber nur, wenn keine weitere Lehrkraft mehr mit der Klasse verbunden ist (`409` sonst). Sonst lässt sich nichts löschen (leeren geht mit `null`).
+* **Idempotent:** Wiederholen schadet nicht. **Gelöscht wird nur über den Papierkorb für Klassen:** `DELETE /klassen/{id}` legt eine Klasse in den Papierkorb (wiederherstellbar), `DELETE /papierkorb/{id}` löscht sie sofort endgültig – aber nur, wenn keine weitere Lehrkraft mehr mit der Klasse verbunden ist (`409 noch_verbunden` sonst) und kein Fach Noten enthält, dem keine Lehrkraft (mehr) zugeordnet ist (`409 fremde_noten`, `details.faecher`; solche Klassen löscht nur der Admin in der App, auch der automatische Ablauf der Frist überspringt sie). Sonst lässt sich nichts löschen (leeren geht mit `null`).
 * **Lernfelder, Komponenten, Unterfächer:** Ein Fach, das zu einem Lernfeld (SPA) bzw. zu einem übergeordneten Fach gehört, steht mit `art` und `uebergeordnet` in
   `GET /klassen` und `GET /faecher/{id}`. Eingetragen wird **im Unterfach bzw. in der Komponente selbst** (eigene ID, dort wo die Lehrkraft zugeordnet ist); das
   Lernfeld bzw. Fach mit Unterfächern lässt sich lesen (auch von Lehrkräften, die nur einem Unterfach zugeordnet sind), aber nicht beschreiben (`409`, `details`

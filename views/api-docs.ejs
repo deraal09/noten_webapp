@@ -8,7 +8,8 @@
 <div class="card">
   <h2>Schnellstart</h2>
   <ol>
-    <li>Unter <a href="/konto/api">🤖 API-Zugang</a> einen Schlüssel anlegen (<code>nk_…</code>), am besten zuerst „nur lesen“. Er wird nur einmal angezeigt.</li>
+    <li>Unter <a href="/konto/api">🤖 API-Zugang</a> einen Schlüssel anlegen (<code>nk_…</code>), am besten zuerst „nur lesen“. Er wird nur einmal angezeigt.
+      Schlüssel gibt es nur für <strong>Schulkonten (LDAP)</strong>; lokale Konten (auch der Admin) haben keinen API-Zugang.</li>
     <li>Bei jeder Anfrage mitsenden: <code>Authorization: Bearer nk_…</code></li>
     <li>Verbindungstest:
       <pre><code>curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" <%= basis %>/me</code></pre></li>
@@ -24,13 +25,14 @@
   <h2>Regeln und Sicherheit</h2>
   <ul>
     <li><strong>Eigene Rechte:</strong> Ein Schlüssel handelt als seine Lehrkraft. Es gelten dieselben Prüfungen wie in der Oberfläche: nur eigene Klassen/Fächer und Halbjahre, nur Personen, die am Fach teilnehmen, keine Eingabe bei gesperrten Noten (Notenkonferenz).</li>
-    <li><strong>Berechtigung:</strong> „lesen“ erlaubt Abfragen und Berechnungen, „schreiben“ zusätzlich das Eintragen. <strong>Gelöscht wird nur über den Papierkorb für Klassen</strong> (<code>DELETE /klassen/{id}</code> legt eine Klasse in den Papierkorb, <code>DELETE /papierkorb/{id}</code> löscht sie sofort endgültig, aber nur wenn sonst niemand sie nutzt); alles andere lässt sich nur überschreiben oder leeren (<code>null</code>).</li>
+    <li><strong>Berechtigung:</strong> „lesen“ erlaubt Abfragen und Berechnungen, „schreiben“ zusätzlich das Eintragen. <strong>Gelöscht wird nur über den Papierkorb für Klassen</strong> (<code>DELETE /klassen/{id}</code> legt eine Klasse in den Papierkorb, <code>DELETE /papierkorb/{id}</code> löscht sie sofort endgültig, aber nur wenn sonst niemand sie nutzt und keine Noten in Fächern ohne zugeordnete Lehrkraft stehen); alles andere lässt sich nur überschreiben oder leeren (<code>null</code>).</li>
     <li><strong>Alles oder nichts:</strong> Beim Eintragen mehrerer Personen wird nichts gespeichert, wenn ein Eintrag ungültig ist (Status 422, Liste der Fehler unter <code>details</code>). Wiederholen ist gefahrlos.</li>
     <li><strong>Probelauf:</strong> <code>?dry_run=true</code> prüft nur und zeigt die berechneten Noten, ohne zu speichern. Agenten sollten vor dem Eintragen immer einen Probelauf machen.</li>
     <li><strong>Personen:</strong> Die Teilnehmerliste eines Fachs oder Kurses füllt <code>POST /faecher/{id}/teilnehmer</code> (Nachname, Vorname, Klasse; legt fehlende Personen und Klassen an, überspringt Doppelte). Die Schüler:innen einer <em>Klasse</em> legt die API nicht an – das geht in der App (Einzeln, Mehrere auf einmal, CSV-Import).</li>
     <li><strong>Grenzen:</strong> höchstens 120 Anfragen pro Minute und Schlüssel, bis zu 500 Einträge je Aufruf, bis zu 40 Aufgaben je Klausur.</li>
     <li><strong>Lernfelder, Komponenten und Unterfächer:</strong> Gehört ein Fach zu einem Lernfeld (SPA, z. B. „DV-Unterricht“ als Komponente von LF4) oder ist es ein Unterfach eines Fachs, steht es in <code>GET /klassen</code> und <code>GET /faecher/{id}</code> mit <code>art</code> (<code>komponente</code>, <code>unterfach</code>) und <code>uebergeordnet</code> (das Lernfeld/Fach). Klausuren, Zusatzleistungen, Datumsnoten und Endnoten trägt man <strong>direkt im Unterfach bzw. in der Komponente</strong> ein (dessen eigene ID), dort, wo die Lehrkraft zugeordnet ist. Das Lernfeld bzw. das Fach selbst setzt sich daraus zusammen: lesen geht (auch für Lehrkräfte, die nur einem Unterfach zugeordnet sind), beschreiben nicht (Status 409; <code>details</code> nennt die IDs der Unterfächer). In SPA-Fächern liefert <code>/noten</code> zusätzlich <code>leistungspunkte</code> (0–15) und <code>tendenz</code>; Endnoten sind dort Gesamtpunkte von 0 bis 15.</li>
-    <li><strong>Schlüssel schützen:</strong> nur Programmen geben, denen du vertraust; pro Programm ein eigener Schlüssel, möglichst mit Ablaufdatum. Widerrufen wirkt sofort.</li>
+    <li><strong>Schlüssel schützen:</strong> nur Programmen geben, denen du vertraust; pro Programm ein eigener Schlüssel. Ein Schlüssel gilt höchstens ein Jahr; Widerrufen wirkt sofort.</li>
+    <li><strong>Verwaltung durch den Admin:</strong> Der Admin sieht alle Schlüssel, kann einzelne deaktivieren (Status 401, wieder aktivierbar) oder löschen und die API insgesamt abschalten (Status 503 <code>api_deaktiviert</code>).</li>
     <li><strong>Datenschutz:</strong> Über die API werden personenbezogene Daten (Namen, Noten) abgerufen. Die Verarbeitung durch einen externen KI-Dienst muss datenschutzrechtlich zulässig sein (Auftragsverarbeitung, Schulvorgaben).</li>
   </ul>
 </div>

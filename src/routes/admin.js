@@ -13,6 +13,7 @@ import {
 } from '../backup/einstellungen.js';
 import { ladeAngaben, speichereAngaben, fehlendePflichtfelder, FELDER as RECHT_FELDER, STANDARD_RECHTSGRUNDLAGE, STANDARD_SPEICHERDAUER, STANDARD_PROTOKOLLE } from '../rechtliches.js';
 import { requireAdmin, makeToken, hashPassword, isLdapConfigured } from '../auth.js';
+import { widerrufeLdapSchluessel } from '../api-keys.js';
 import { DEFAULT_NS_CSV, DEFAULT_GEWICHTUNG } from '../grade-calc.js';
 import { searchLehrkraefte } from '../auth/ldap.js';
 import {
@@ -470,7 +471,9 @@ export default async function adminRoutes(fastify) {
         const beendet = getDb().prepare(`
           DELETE FROM sessions WHERE json_extract(data, '$.userId') IN (SELECT id FROM users WHERE auth_source = 'ldap')
         `).run().changes;
-        request.flash?.('success', `LDAP-Einstellungen gespeichert. ${beendet} laufende Anmeldung(en) von LDAP-Konten beendet.`);
+        // Auch die API-Schlüssel der LDAP-Konten -- sonst behielte ein Programm den Zugriff, den die Gruppenprüfung entziehen soll.
+        const widerrufen = widerrufeLdapSchluessel();
+        request.flash?.('success', `LDAP-Einstellungen gespeichert. ${beendet} laufende Anmeldung(en) von LDAP-Konten beendet, ${widerrufen} API-Schlüssel widerrufen.`);
         return reply.redirect('/admin/ldap/einstellungen');
       }
       request.flash?.('success', 'LDAP-Einstellungen gespeichert.');

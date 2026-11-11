@@ -81,3 +81,18 @@ export function fremdeNotenDerPerson(user, schuelerId) {
   const ids = getDb().prepare(`SELECT DISTINCT fach_id FROM (${NOTEN_EINTRAEGE}) WHERE schueler_id = ?`).all(schuelerId).map((r) => r.fach_id);
   return fachNamen(faecherMitFremdenNoten(user, ids, schuelerId));
 }
+
+/**
+ * Fächer der Klasse (Namen), in denen Noten stehen, aber keine Lehrkraft (mehr) zugeordnet ist. Für den Papierkorb: Eine
+ * Klasse darf endgültig erst verschwinden, wenn alle Lehrkräfte sie gelöscht haben -- als Lehrkraft zählt aber nur, wer gerade
+ * zugeordnet ist. Ohne diese Prüfung ginge "Zuordnungen der anderen entfernen, Klasse löschen, Papierkorb leeren".
+ */
+export function faecherMitNotenOhneLehrkraft(klasseId) {
+  const ids = getDb().prepare(`
+    SELECT f.id FROM faecher f WHERE f.klasse_id = ? AND NOT EXISTS (SELECT 1 FROM fach_zuweisungen fz WHERE fz.fach_id = f.id)
+  `).all(klasseId).map((r) => r.id);
+  if (!ids.length) return [];
+  const mitNoten = getDb().prepare(`SELECT DISTINCT fach_id FROM (${NOTEN_EINTRAEGE}) WHERE fach_id IN (${ids.map(() => '?').join(', ')})`)
+    .all(...ids).map((r) => r.fach_id);
+  return fachNamen(mitNoten);
+}

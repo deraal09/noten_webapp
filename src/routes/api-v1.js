@@ -128,7 +128,7 @@ export default async function apiV1Routes(fastify) {
     });
     api.addHook('preHandler', async (request, reply) => {
       const p = pruefeSchluessel(request.headers.authorization);
-      if (!p.ok) return senden(reply, p.status, 'unauthorized', p.fehler);
+      if (!p.ok) return senden(reply, p.status, p.code, p.fehler);
       if (rateLimitErreicht(p.key.id)) return senden(reply, 429, 'rate_limit', FEHLERCODES[429]);
       request.apiUser = p.user;
       request.apiKey = p.key;
@@ -415,7 +415,9 @@ export default async function apiV1Routes(fastify) {
       id: k.id, name: k.name, schuljahr: k.schuljahr_bezeichnung, notenschluessel: k.notenschluessel, geloescht_am: k.geloescht_at,
       noch_aktiv: k.nochAktiv, // Lehrkräfte, die die Klasse noch nutzen (0 = alle haben sie gelöscht)
       endgueltig_geloescht_am: k.ablauf ? k.ablauf.toISOString() : null, resttage: k.resttage,
-      sofort_loeschbar: Boolean(k.ablauf),
+      sofort_loeschbar: Boolean(k.ablauf) && !k.blockiert.length,
+      // Fächer mit Noten ohne zugeordnete Lehrkraft: die Klasse wird nicht endgültig gelöscht (das entscheidet der Admin in der App).
+      blockiert_durch_faecher: k.blockiert,
     });
 
     route('GET', '/papierkorb', 'lesen', async (request) => {
@@ -456,6 +458,9 @@ export default async function apiV1Routes(fastify) {
     route('DELETE', '/papierkorb/:id', 'schreiben', async (request, reply) => {
       const r = loescheSofort(request.apiUser.id, parseInt(request.params.id, 10), { speichern: speichern(request) });
       if (!r.ok && r.grund === 'nicht-im-papierkorb') return senden(reply, 404, 'not_found', 'Diese Klasse liegt nicht in deinem Papierkorb. Zuerst mit DELETE /klassen/{id} dorthin legen.');
+      if (!r.ok && r.grund === 'fremde-noten') {
+        return senden(reply, 409, 'fremde_noten', `Die Klasse enthält Noten in Fächern ohne zugeordnete Lehrkraft (${r.faecher.join(', ')}) -- endgültig löschen kann sie nur der Admin in der App.`, { faecher: r.faecher });
+      }
       if (!r.ok) {
         return senden(reply, 409, 'noch_verbunden', `Die Klasse wird noch von ${r.nochAktiv} weiteren Lehrkraft${r.nochAktiv === 1 ? '' : 'en'} genutzt -- sofort löschen geht erst, wenn alle sie gelöscht haben.`, { noch_aktiv: r.nochAktiv });
       }

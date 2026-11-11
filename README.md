@@ -734,8 +734,11 @@ Das Skript baut eine Demo-Datenbank mit erfundenen Namen (festes Datum 1. Oktobe
 ## API für KI-Agenten
 
 Unter `/api/v1` gibt es eine JSON-API, mit der ein KI-Agent oder ein Programm im Namen einer Lehrkraft Noten **auslesen, auswerten und
-eintragen** kann. Jede Lehrkraft legt ihre API-Schlüssel selbst an (Menü **🤖 API-Zugang**, `/konto/api`; nur der Hash wird gespeichert,
-Berechtigung „lesen“ oder „schreiben“, optional mit Ablaufdatum). Ein Schlüssel hat genau die Rechte seiner Lehrkraft; Eintragen ist
+eintragen** kann. Jede Lehrkraft mit **Schulkonto (LDAP)** legt ihre API-Schlüssel selbst an (Menü **🤖 API-Zugang**, `/konto/api`; nur der
+Hash wird gespeichert, Berechtigung „lesen“ oder „schreiben“, gültig höchstens ein Jahr); lokale Konten, auch der Admin, haben keinen
+API-Zugang. Der Admin sieht unter **API-Zugänge** (`/admin/api`) alle Schlüssel, deaktiviert (wieder aktivierbar) oder löscht sie und
+schaltet die API insgesamt ab (Vorgabe: an; abgeschaltet antwortet `/api/v1` mit 503). „Alle laufenden Anmeldungen von LDAP-Konten
+beenden“ (LDAP-Einstellungen) widerruft auch deren Schlüssel. Ein Schlüssel hat genau die Rechte seiner Lehrkraft; Eintragen ist
 „alles oder nichts“ und lässt sich mit `?dry_run=true` vorab prüfen. Dokumentation: [docs/API.md](docs/API.md), in der laufenden App
 `/api/v1/docs` und `/api/v1/openapi.json`. Code: `src/routes/api-v1.js`, `src/api-keys.js`, Beschreibung der Endpunkte `src/api-docs.js`.
 (Die ältere Schnittstelle `/api/extern` ist nur für den Lehrerkalender.)

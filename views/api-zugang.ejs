@@ -1,7 +1,7 @@
 <h1>🤖 API-Zugang</h1>
 <p class="hint">
   Mit einem API-Schlüssel kann ein KI-Agent (oder ein anderes Programm) in deinem Namen Noten <strong>auslesen, auswerten und eintragen</strong> –
-  mit genau deinen Rechten: nur deine Klassen und Fächer, nicht in gesperrte Halbjahre. Gelöscht wird über die API nichts.
+  mit genau deinen Rechten: nur deine Klassen und Fächer, nicht in gesperrte Halbjahre. Endgültig löschen lassen sich über die API nur Klassen aus dem eigenen Papierkorb.
   <a href="/api/v1/docs">Dokumentation der API</a> · <a href="/api/v1/openapi.json">OpenAPI-Datei</a>
 </p>
 
@@ -21,6 +21,11 @@
 
 <% if (fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
 
+<% if (!darf) { %>
+  <div class="flash flash-info">Die API steht nur <strong>Schulkonten (LDAP)</strong> zur Verfügung. Dieses Konto kann keine Schlüssel anlegen oder benutzen.</div>
+<% } else if (!apiAktiv) { %>
+  <div class="flash flash-info">Die API ist derzeit vom Admin <strong>abgeschaltet</strong>. Bestehende Schlüssel funktionieren nicht; neue lassen sich nicht anlegen.</div>
+<% } else { %>
 <form method="post" action="/konto/api" class="card">
   <h2>Neuen Schlüssel anlegen</h2>
   <label>Name <small>(wofür?)</small>
@@ -38,8 +43,9 @@
     </select>
   </label>
   <button type="submit">🔑 Schlüssel erzeugen</button>
-  <p class="hint">Höchstens <%= maxKeys %> aktive Schlüssel. Empfehlung: für jedes Programm einen eigenen, möglichst nur lesend und mit Ablaufdatum.</p>
+  <p class="hint">Höchstens <%= maxKeys %> aktive Schlüssel, jeweils höchstens ein Jahr gültig. Empfehlung: für jedes Programm einen eigenen, möglichst nur lesend.</p>
 </form>
+<% } %>
 
 <h2>Deine Schlüssel</h2>
 <% if (!schluessel.length) { %>
@@ -49,17 +55,18 @@
     <thead><tr><th>Name</th><th>Beginnt mit</th><th>Berechtigung</th><th>Angelegt</th><th>Läuft ab</th><th>Zuletzt benutzt</th><th></th></tr></thead>
     <tbody>
       <% schluessel.forEach(function(s) { var abgelaufen = s.expires_at && new Date(s.expires_at) <= new Date(); %>
-        <tr <%- s.revoked_at || abgelaufen ? 'class="ausgegraut"' : '' %>>
+        <tr <%- s.revoked_at || s.gesperrt_at || abgelaufen ? 'class="ausgegraut"' : '' %>>
           <td><%= s.name %></td>
           <td><code><%= s.key_prefix %>…</code></td>
           <td><%= s.scope %></td>
           <td><%= formatZeit(s.created_at) %></td>
-          <td><%= s.expires_at ? formatZeit(s.expires_at) : 'unbegrenzt' %></td>
+          <td><%= s.expires_at ? formatZeit(s.expires_at) : '–' %></td>
           <td><%= s.last_used_at ? formatZeit(s.last_used_at) : '–' %></td>
           <td>
             <% if (s.revoked_at) { %><span class="hint">widerrufen</span>
             <% } else if (abgelaufen) { %><span class="hint">abgelaufen</span>
             <% } else { %>
+              <% if (s.gesperrt_at) { %><span class="hint">vom Admin deaktiviert</span><% } %>
               <form method="post" action="/konto/api/<%= s.id %>/widerrufen" class="inline" onsubmit="return confirm('Schlüssel „<%= s.name.replace(/'/g, '') %>“ widerrufen? Programme, die ihn nutzen, verlieren sofort den Zugriff.')">
                 <button type="submit" class="danger">Widerrufen</button>
               </form>
