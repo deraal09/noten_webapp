@@ -6,6 +6,15 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.122.0 - 2026-11-11
+
+- **Kurse: BG ist der Standard-Notenschlüssel.** Beim Anlegen eines neuen Kurses ist „BG (0–15 Punkte)“ voreingestellt (auch wenn kein
+  Schlüssel mitgeschickt wird); IHK bleibt wählbar.
+- **API: Klassen umbenennen.** `PUT /api/v1/klassen/{id}/name` (Berechtigung „schreiben“) mit `{"name": "…"}`: wie in der App darf das jede
+  Lehrkraft der Klasse, der Name gilt sofort für alle, die in der Klasse eingetragen sind; gleiche Regeln (eindeutig je Schuljahr, höchstens
+  60 Zeichen, nicht mit „__“ beginnen, Sammelklasse ausgenommen), `?dry_run=true` prüft nur. Die Prüfungen liegen jetzt gemeinsam für App und API in
+  `src/umbenennen.js`. Dokumentation (`/api/v1/docs`, OpenAPI, `docs/API.md`) ergänzt.
+
 ## 0.121.0 - 2026-11-11
 
 - **Klassen und Kurse umbenennen -- für alle Beteiligten.** Auf der Klassenseite („✏️ Klasse umbenennen“) und auf der Fachseite eines Kurses

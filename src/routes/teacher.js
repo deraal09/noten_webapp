@@ -48,6 +48,7 @@ import {
   seedeTeilnehmerAusKlasse, ladeTeilnehmerMitHerkunft, fuegeTeilnehmerHinzu, entferneTeilnehmer,
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
 } from '../fach-teilnehmer.js';
+import { benenneKlasseUm } from '../umbenennen.js';
 import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
@@ -2147,17 +2148,9 @@ export default async function teacherRoutes(fastify) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur Lehrkräfte, die der Klasse angehören, können sie umbenennen.' });
     }
     const ziel = `/teacher/klassen/${klasse.id}`;
-    const name = String(request.body?.name ?? '').trim();
-    if (!name) { request.flash?.('error', 'Bitte einen Namen angeben.'); return reply.redirect(ziel); }
-    if (name.length > 60) { request.flash?.('error', 'Der Name ist zu lang (höchstens 60 Zeichen).'); return reply.redirect(ziel); }
-    if (name.startsWith('__')) { request.flash?.('error', 'Der Name darf nicht mit „__“ beginnen.'); return reply.redirect(ziel); }
-    if (name === klasse.name) return reply.redirect(ziel);
-    if (getDb().prepare('SELECT 1 FROM klassen WHERE schuljahr_id = ? AND name = ? COLLATE NOCASE AND id != ?').get(klasse.schuljahr_id, name, klasse.id)) {
-      request.flash?.('error', `Im Schuljahr gibt es schon eine Klasse „${name}“.`);
-      return reply.redirect(ziel);
-    }
-    getDb().prepare('UPDATE klassen SET name = ? WHERE id = ?').run(name, klasse.id);
-    request.flash?.('success', `Klasse umbenannt: „${klasse.name}“ → „${name}“. Der neue Name gilt für alle Lehrkräfte der Klasse.`);
+    const r = benenneKlasseUm(klasse, request.body?.name);
+    if (!r.ok) request.flash?.('error', r.fehler);
+    else if (r.geaendert) request.flash?.('success', `Klasse umbenannt: „${r.alt}“ → „${r.neu}“. Der neue Name gilt für alle Lehrkräfte der Klasse.`);
     return reply.redirect(ziel);
   });
 
@@ -2891,8 +2884,9 @@ export default async function teacherRoutes(fastify) {
     }
     const schuljahrId = parseInt(request.body?.schuljahr_id, 10);
     const name = String(request.body?.name || '').trim();
-    let ns = String(request.body?.notenschluessel || 'IHK');
-    if (!['IHK', 'BG'].includes(ns)) ns = 'IHK';
+    // Kurse starten standardmäßig mit dem BG-Schlüssel (Notenpunkte 0-15).
+    let ns = String(request.body?.notenschluessel || 'BG');
+    if (!['IHK', 'BG'].includes(ns)) ns = 'BG';
     if (!schuljahrId || !name) {
       request.flash?.('error', 'Schuljahr und Name sind erforderlich.');
       return reply.redirect('/teacher/klassen');

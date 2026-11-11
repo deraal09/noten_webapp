@@ -121,3 +121,17 @@ test('Kurs: jede zugeordnete Lehrkraft darf umbenennen, der Name gilt für alle;
   const mathe = db().prepare("SELECT id FROM faecher WHERE name = 'Mathe'").get().id;
   assert.equal((await anna(`/teacher/kurse/${mathe}/umbenennen`, { name: 'Anders' })).status, 404);
 });
+
+test('Neuer Kurs: BG ist der voreingestellte Notenschlüssel (Formular und ohne Angabe), IHK bleibt wählbar', async () => {
+  const html = await (await anna('/teacher/klassen')).text();
+  const form = html.slice(html.indexOf('action="/teacher/kurse/neu"'));
+  assert.match(form.slice(0, form.indexOf('+ Kurs anlegen')), /<option value="BG" selected>BG/);
+  assert.doesNotMatch(form.slice(0, form.indexOf('+ Kurs anlegen')), /<option value="IHK" selected>/);
+  await anna('/teacher/kurse/neu', { schuljahr_id: String(sjId), name: 'Ohne Angabe' });
+  await anna('/teacher/kurse/neu', { schuljahr_id: String(sjId), name: 'Mit IHK', notenschluessel: 'IHK' });
+  await anna('/teacher/kurse/neu', { schuljahr_id: String(sjId), name: 'Quatsch', notenschluessel: 'SPA' });
+  const ns = (n) => db().prepare('SELECT k.notenschluessel AS ns FROM faecher f JOIN klassen k ON k.id = f.klasse_id WHERE f.name = ?').get(n).ns;
+  assert.equal(ns('Ohne Angabe'), 'BG');
+  assert.equal(ns('Mit IHK'), 'IHK');
+  assert.equal(ns('Quatsch'), 'BG', 'ungültige Angabe fällt auf BG zurück');
+});

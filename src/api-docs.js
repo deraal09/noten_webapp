@@ -171,6 +171,14 @@ export const ENDPOINTS = [
     },
   },
   {
+    id: 'klasse-name', method: 'PUT', path: '/klassen/{id}/name', scope: 'schreiben',
+    summary: 'Klasse umbenennen',
+    beschreibung: 'Ändert den Namen einer Klasse -- wie in der App darf das jede Lehrkraft, die der Klasse angehört. Der neue Name gilt sofort für alle, die in der Klasse eingetragen sind. Je Schuljahr muss der Name eindeutig sein (auch ohne Beachtung der Groß-/Kleinschreibung), höchstens 60 Zeichen, nicht mit „__“ beginnen. Die Sammelklasse „Ohne Klasse“ lässt sich nicht umbenennen.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts ändern' }],
+    body: { name: '12BFI1-neu' },
+    antwort: { gespeichert: true, klasse: { id: 12, name: '12BFI1-neu', vorher: '12BFI1' } },
+  },
+  {
     id: 'sync', method: 'POST', path: '/faecher/{id}/sync', scope: 'schreiben',
     summary: 'Fach mit der Klassenleitung synchronisieren („Jetzt synchronisieren“)',
     beschreibung: 'Überträgt den aktuellen Notenstand (Gesamtnote je Person) des Fachs und Halbjahres in den Stand, den die Klassenleitung sieht -- wie der Knopf in der App. Die Klassenleitung sieht nie die Live-Noten, nur den zuletzt synchronisierten Stand. Hat die Lehrkraft den automatischen Sync eingeschaltet, geschieht das nach jeder Eintragung von selbst.',

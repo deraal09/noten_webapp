@@ -50,7 +50,8 @@ async function api(key, method, url, body) {
 }
 
 const db = () => getDb();
-let klasseId; let fachId; let sid1; let sid2; let sid3; let leseKey; let schreibKey; let benKey;
+let klasseId; let fachId; let sid1; let sid2; let sid3; let leseKey; let schreibKey; let benKey; let coraKeyCache;
+const coraKeyGlobal = () => coraKeyCache;
 const HJ = '1. Halbjahr';
 
 async function neuerSchluessel(c, name, scope, tage = '') {
@@ -422,7 +423,9 @@ test('Teilnehmerliste: auslesen und Personen aufnehmen (neu, schon vorhanden, fa
     const inv = db().prepare('SELECT token FROM invitations ORDER BY id DESC').get();
     const cora = client();
     await cora(`/einladung/${inv.token}`, { username: 'cora', display_name: 'cora', password: 'passwort123', password2: 'passwort123' });
-    return neuerSchluessel(cora, 'Cora', 'schreiben');
+    const k = await neuerSchluessel(cora, 'Cora', 'schreiben');
+    coraKeyCache = k;
+    return k;
   })();
   assert.equal((await api(coraKey, 'POST', `/faecher/${kursId}/teilnehmer`, body)).status, 403);
   assert.equal((await api(coraKey, 'GET', `/faecher/${kursId}/teilnehmer`)).status, 403);
@@ -438,4 +441,33 @@ test('Mit der Teilnehmerliste können Noten eingetragen werden (Kurs-Workflow f�
   const r = await api(schreibKey, 'PUT', `/klausuren/${k.json.klausur.id}/ergebnisse`, { ergebnisse: [{ schueler_id: nora.id, punkte: [10] }] });
   assert.equal(r.status, 200);
   assert.equal(r.json.ergebnisse[0].note, 15);
+});
+
+test('Klasse umbenennen über die API: jede Lehrkraft der Klasse, gilt für alle; Regeln wie in der App; Probelauf', async () => {
+  const name = () => db().prepare('SELECT name FROM klassen WHERE id = ?').get(klasseId).name;
+  assert.equal((await api(leseKey, 'PUT', `/klassen/${klasseId}/name`, { name: 'Neu' })).status, 403, 'lesender Schlüssel');
+  const trocken = await api(schreibKey, 'PUT', `/klassen/${klasseId}/name?dry_run=true`, { name: '12E-Neu' });
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.gespeichert, false);
+  assert.equal(name(), '12E', 'Probelauf ändert nichts');
+  const r = await api(schreibKey, 'PUT', `/klassen/${klasseId}/name`, { name: '  12E-Neu ' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json.klasse, { id: klasseId, name: '12E-Neu', vorher: '12E' });
+  assert.equal(name(), '12E-Neu');
+  assert.equal((await api(leseKey, 'GET', '/klassen')).json.klassen[0].name, '12E-Neu');
+  assert.match(await (await anna('/teacher/klassen')).text(), /12E-Neu/, 'auch in der App');
+  // Regeln
+  for (const n of ['', 'x'.repeat(61), '__x']) assert.equal((await api(schreibKey, 'PUT', `/klassen/${klasseId}/name`, { name: n })).status, 422);
+  db().prepare("INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv) SELECT schuljahr_id, 'Doppelt', 'BG', '' FROM klassen WHERE id = ?").run(klasseId);
+  const doppelt = await api(schreibKey, 'PUT', `/klassen/${klasseId}/name`, { name: 'doppelt' });
+  assert.equal(doppelt.status, 422);
+  assert.match(doppelt.json.message, /gibt es schon/);
+  assert.equal(name(), '12E-Neu');
+  // Nicht Zugehörige, unbekannte Klasse, Sammelklasse
+  assert.equal((await api(coraKeyGlobal(), 'PUT', `/klassen/${klasseId}/name`, { name: 'Gekapert' })).status, 403);
+  assert.equal((await api(schreibKey, 'PUT', '/klassen/99999/name', { name: 'X' })).status, 404);
+  const ablage = db().prepare("INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, ist_ablage) SELECT schuljahr_id, 'Ohne Klasse', 'IHK', '', 1 FROM klassen WHERE id = ?").run(klasseId).lastInsertRowid;
+  assert.equal((await api(schreibKey, 'PUT', `/klassen/${ablage}/name`, { name: 'Anders' })).status, 403);
+  // Zurück für spätere Tests
+  await api(schreibKey, 'PUT', `/klassen/${klasseId}/name`, { name: '12E' });
 });

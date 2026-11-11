@@ -27,6 +27,7 @@ import { istSchuelerGesperrtInFach, ladeSperrenFuerSchueler } from '../noten-spe
 import { setzeEndnote, notenBereich, parseEndnoteEingabe } from '../halbjahr-endnoten.js';
 import { syncFach, syncPerson, syncFallsAutoAktiv, holeSyncMeta } from '../noten-sync.js';
 import { autoVerteileKlausuren } from './teacher.js';
+import { benenneKlasseUm } from '../umbenennen.js';
 import { ENDPOINTS, FEHLERCODES, baueOpenApi, API_BASIS } from '../api-docs.js';
 
 const MAX_EINTRAEGE = 500;
@@ -145,6 +146,18 @@ export default async function apiV1Routes(fastify) {
       if (!userHatKlassenZugriff(request.apiUser, klasse.id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf diese Klasse.');
       const schueler = getDb().prepare('SELECT id, nachname, vorname, status FROM schueler WHERE klasse_id = ? ORDER BY nachname, vorname').all(klasse.id);
       return { klasse, schueler };
+    });
+
+    // Klasse umbenennen: wie in der App darf das jede Lehrkraft der Klasse; der Name gilt für alle, die eingetragen sind.
+    route('PUT', '/klassen/:id/name', 'schreiben', async (request, reply) => {
+      const klasse = getDb().prepare('SELECT * FROM klassen WHERE id = ?').get(parseInt(request.params.id, 10));
+      if (!klasse || klasse.ist_kurs_huelle) return senden(reply, 404, 'not_found', 'Klasse nicht gefunden.');
+      if (klasse.ist_ablage) return senden(reply, 403, 'forbidden', 'Die Sammelklasse „Ohne Klasse“ lässt sich nicht umbenennen.');
+      if (!userHatKlassenZugriff(request.apiUser, klasse.id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf diese Klasse.');
+      const r = benenneKlasseUm(klasse, request.body?.name, { speichern: speichern(request) });
+      if (!r.ok) return senden(reply, 422, 'invalid', r.fehler);
+      if (speichern(request) && r.geaendert) request.log.info({ key: request.apiKey.id, klasse: klasse.id }, 'api: Klasse umbenannt');
+      return { gespeichert: speichern(request) && r.geaendert, ...(speichern(request) ? {} : { dry_run: true }), klasse: { id: klasse.id, name: r.neu, vorher: r.alt } };
     });
 
     route('GET', '/faecher/:id', 'lesen', async (request, reply) => {
