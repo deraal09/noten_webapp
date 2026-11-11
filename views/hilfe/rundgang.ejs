@@ -1,0 +1,45 @@
+<p class="hilfe-krumel"><a href="/hilfe">❓ Hilfe</a> › 🧭 Geführter Rundgang</p>
+<h1>🧭 Rundgang · Schritt <%= n %> von <%= schritte.length %></h1>
+
+<div class="rundgang-fortschritt" role="progressbar" aria-valuemin="1" aria-valuemax="<%= schritte.length %>" aria-valuenow="<%= n %>">
+  <div style="width: <%= Math.round(n / schritte.length * 100) %>%"></div>
+</div>
+
+<section class="card rundgang-schritt">
+  <h2><%= schritt.titel %></h2>
+  <% if (schritt.bild) { %>
+    <figure class="rundgang-bild"><img src="/static/hilfe/<%= schritt.bild %>.jpg?v=<%= appVersion %>" alt="Bildschirmfoto: <%= schritt.titel %>"></figure>
+  <% } %>
+  <p><%- formatiere(schritt.text) %></p>
+  <p class="kopf-aktionen">
+    <a class="btn" href="<%= schritt.href %>"><%= schritt.linkText %> →</a>
+    <% if (artikel) { %><a class="btn" href="/hilfe/<%= artikel.slug %>">📖 Mehr dazu: <%= artikel.titel %></a><% } %>
+  </p>
+</section>
+
+<nav class="rundgang-navigation" aria-label="Rundgang">
+  <% if (n > 1) { %><a class="btn" href="/hilfe/rundgang/<%= n - 1 %>" rel="prev">← Zurück</a><% } else { %><span></span><% } %>
+  <% if (n < schritte.length) { %><a class="btn rundgang-weiter" href="/hilfe/rundgang/<%= n + 1 %>" rel="next">Weiter →</a><% } else { %><a class="btn rundgang-weiter" href="/hilfe">Fertig ✓</a><% } %>
+</nav>
+
+<details class="rundgang-inhalt">
+  <summary>Alle Schritte</summary>
+  <ol>
+    <% schritte.forEach(function(s, i) { %><li <%- i + 1 === n ? 'class="aktuell"' : '' %>><a href="/hilfe/rundgang/<%= i + 1 %>"><%= s.titel %></a></li><% }); %>
+  </ol>
+</details>
+
+<script>
+  // Schritt merken, damit der Rundgang später dort weitergeht (Hilfe-Startseite: „fortsetzen“).
+  try {
+    var n = <%= n %>;
+    localStorage.setItem('rundgang-schritt', n < <%= schritte.length %> ? String(n) : '1');
+    if (n >= <%= schritte.length %>) localStorage.setItem('rundgang-fertig', '1');
+  } catch (e) { /* ohne Speicher egal */ }
+  // Pfeiltasten blättern
+  document.addEventListener('keydown', function (e) {
+    if (/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) return;
+    var ziel = e.key === 'ArrowRight' ? document.querySelector('a[rel=next], .rundgang-weiter') : (e.key === 'ArrowLeft' ? document.querySelector('a[rel=prev]') : null);
+    if (ziel) location.href = ziel.href;
+  });
+</script>

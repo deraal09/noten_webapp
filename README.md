@@ -717,6 +717,20 @@ gebunden) oder als **Notenkonferenz-Entscheidung** (klassenweit, fachübergreife
 sichtbar). Alle Notizen einer Schüler/in erscheinen in der
 Halbjahresübersicht der Klassenleitung.
 
+## Hilfe, Rundgang und Screenshots
+
+Unter `/hilfe` (Menü „❓ Hilfe“, öffentlich erreichbar) gibt es Artikel mit Bildschirmfotos, eine Suche (`/hilfe/suche?q=` liefert die Live-Treffer als JSON) und
+einen geführten Rundgang (`/hilfe/rundgang`). Die Inhalte stehen als Daten in `src/hilfe.js` (Artikel, Rundgang-Schritte, Suchindex), die Seiten in
+`src/routes/hilfe.js` und `views/hilfe/`. Die Bilder liegen in `static/hilfe/*.jpg` und lassen sich neu erzeugen, wenn sich die Oberfläche ändert:
+
+```bash
+PLAYWRIGHT_PATH=/pfad/zu/playwright/index.mjs CHROMIUM_PATH=/pfad/zu/chromium node scripts/hilfe-screenshots.mjs        # alle Bilder
+node scripts/hilfe-screenshots.mjs klausur-teile notenschluessel                                                       # nur einzelne
+```
+
+Das Skript baut eine Demo-Datenbank mit erfundenen Namen (festes Datum 1. Oktober 2025, nichts wird gespeichert) und fotografiert die Seiten mit Playwright. Ein Test
+(`test/hilfe.test.js`) prüft, dass alle verwendeten Bilder vorhanden sind. Neue Artikel: in `ARTIKEL` ergänzen (mit Schlagworten für die Suche).
+
 ## API für KI-Agenten
 
 Unter `/api/v1` gibt es eine JSON-API, mit der ein KI-Agent oder ein Programm im Namen einer Lehrkraft Noten **auslesen, auswerten und

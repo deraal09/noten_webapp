@@ -1,6 +1,22 @@
 <div class="start-mitte">
   <h1>Willkommen<% if (user.displayName) { %>, <%= user.displayName %><% } %></h1>
 
+  <p class="hilfe-banner" id="hilfe-banner" hidden>
+    👋 Neu hier? <a href="/hilfe/rundgang">Geführter Rundgang</a> · <a href="/hilfe">Hilfe mit Suche</a>
+    <button type="button" id="hilfe-banner-zu" class="hilfe-banner-zu" aria-label="Hinweis ausblenden">✕</button>
+  </p>
+  <script>
+    (function () {
+      var b = document.getElementById('hilfe-banner');
+      try { if (localStorage.getItem('hilfe-banner-zu') === '1' || localStorage.getItem('rundgang-fertig') === '1') return; } catch (e) { /* ohne Speicher: anzeigen */ }
+      b.hidden = false;
+      document.getElementById('hilfe-banner-zu').addEventListener('click', function () {
+        b.hidden = true;
+        try { localStorage.setItem('hilfe-banner-zu', '1'); } catch (e) { /* egal */ }
+      });
+    })();
+  </script>
+
   <div class="kacheln">
     <a class="kachel" href="/teacher">
       <span class="kachel-icon">📝</span>

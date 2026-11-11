@@ -37,6 +37,7 @@ import { klassenSchuljahrText } from './src/klassen-jahre.js';
 import authRoutes from './src/routes/auth.js';
 import rechtlichesRoutes from './src/routes/rechtliches.js';
 import notenschluesselRoutes from './src/routes/notenschluessel.js';
+import hilfeRoutes from './src/routes/hilfe.js';
 import apiV1Routes from './src/routes/api-v1.js';
 import apiSchluesselRoutes from './src/routes/api-schluessel.js';
 import { hinweiseFuer as notenschluesselHinweiseFuer } from './src/notenschluessel.js';
@@ -262,6 +263,7 @@ export async function buildApp(opts = {}) {
   await app.register(authRoutes, { prefix: '' });
   await app.register(rechtlichesRoutes, { prefix: '' });
   await app.register(notenschluesselRoutes, { prefix: '' });
+  await app.register(hilfeRoutes, { prefix: '' });
   await app.register(apiSchluesselRoutes, { prefix: '' });
   await app.register(apiV1Routes, { prefix: '/api/v1' });
   await app.register(adminRoutes, { prefix: '/admin' });

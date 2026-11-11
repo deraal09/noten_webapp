@@ -1,0 +1,40 @@
+<p class="hilfe-krumel"><a href="/hilfe">❓ Hilfe</a> › <%= kategorie.icon %> <%= kategorie.titel %></p>
+<h1><%= artikel.titel %></h1>
+<p class="hint"><%= artikel.kurz %></p>
+
+<form method="get" action="/hilfe" class="hilfe-suche hilfe-suche-klein" role="search">
+  <input type="search" name="q" placeholder="Hilfe durchsuchen …" aria-label="Hilfe durchsuchen">
+  <button type="submit">🔍</button>
+</form>
+
+<% if (artikel.bilder && artikel.bilder.length) { %>
+  <div class="hilfe-bilder">
+    <% artikel.bilder.forEach(function(b) { %>
+      <figure>
+        <a href="/static/hilfe/<%= b.datei %>.jpg?v=<%= appVersion %>" target="_blank" rel="noopener"><img src="/static/hilfe/<%= b.datei %>.jpg?v=<%= appVersion %>" alt="<%= b.text %>" loading="lazy"></a>
+        <figcaption><%= b.text %></figcaption>
+      </figure>
+    <% }); %>
+  </div>
+<% } %>
+
+<% artikel.abschnitte.forEach(function(ab) { %>
+  <section class="card hilfe-abschnitt">
+    <% if (ab.titel) { %><h2><%= ab.titel %></h2><% } %>
+    <% (ab.absaetze || []).forEach(function(p) { %><p><%- formatiere(p) %></p><% }); %>
+    <% if (ab.schritte && ab.schritte.length) { %>
+      <ol><% ab.schritte.forEach(function(s) { %><li><%- formatiere(s) %></li><% }); %></ol>
+    <% } %>
+    <% if (ab.hinweis) { %><p class="hilfe-hinweis">💡 <%- formatiere(ab.hinweis) %></p><% } %>
+  </section>
+<% }); %>
+
+<% if (artikel.links && artikel.links.length) { %>
+  <p class="kopf-aktionen"><% artikel.links.forEach(function(l) { %><a class="btn" href="<%= l.href %>"><%= l.text %> →</a> <% }); %></p>
+<% } %>
+
+<% if (verwandt.length) { %>
+  <h2>Weiterlesen</h2>
+  <ul class="hilfe-liste"><% verwandt.forEach(function(v) { %><li><a href="/hilfe/<%= v.slug %>"><%= v.titel %></a> <span class="hint">– <%= v.kurz %></span></li><% }); %></ul>
+<% } %>
+<p><a class="btn" href="/hilfe/rundgang">🧭 Geführter Rundgang</a> <a class="btn" href="/hilfe">← Alle Themen</a></p>

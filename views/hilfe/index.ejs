@@ -1,0 +1,98 @@
+<h1>❓ Hilfe</h1>
+
+<form method="get" action="/hilfe" class="hilfe-suche" role="search">
+  <input type="search" name="q" id="hilfe-suche-eingabe" value="<%= q %>" placeholder="Wobei brauchst du Hilfe? z. B. „Klausur“, „CSV“, „Papierkorb“, „Hörverstehen“" autocomplete="off" aria-label="Hilfe durchsuchen" autofocus>
+  <button type="submit">🔍 Suchen</button>
+  <ul id="hilfe-suche-ergebnisse" class="hilfe-treffer" hidden></ul>
+</form>
+
+<div class="hilfe-rundgang-karte card">
+  <div>
+    <h2>🧭 Geführter Rundgang</h2>
+    <p class="hint">In <%= rundgangAnzahl %> Schritten mit Bildern durch die wichtigsten Funktionen – mit Knöpfen, die die passende Seite öffnen.</p>
+  </div>
+  <a class="btn" href="/hilfe/rundgang/1" id="rundgang-start">Rundgang starten</a>
+</div>
+
+<% if (treffer) { %>
+  <h2>Suchergebnisse für „<%= q %>“</h2>
+  <% if (!treffer.length) { %>
+    <p class="hint">Nichts gefunden. Versuche ein anderes Wort (z. B. „Klausur“, „Schüler“, „Notenschlüssel“) oder stöbere unten in den Themen.</p>
+  <% } else { %>
+    <ul class="hilfe-liste">
+      <% treffer.forEach(function(t) { %>
+        <li><a href="/hilfe/<%= t.slug %>"><strong><%= t.titel %></strong></a><br><span class="hint"><%= t.snippet %></span></li>
+      <% }); %>
+    </ul>
+  <% } %>
+<% } %>
+
+<h2>Alle Themen</h2>
+<div class="hilfe-themen">
+  <% nachKategorie.forEach(function(k) { %>
+    <section class="card hilfe-kategorie">
+      <h3><%= k.icon %> <%= k.titel %></h3>
+      <ul>
+        <% k.artikel.forEach(function(a) { %>
+          <li><a href="/hilfe/<%= a.slug %>"><%= a.titel %></a><br><span class="hint"><%= a.kurz %></span></li>
+        <% }); %>
+      </ul>
+    </section>
+  <% }); %>
+</div>
+
+<script>
+  // Live-Suche: Treffer erscheinen beim Tippen unter dem Suchfeld (ohne Skript bleibt die normale Suche über „Suchen“).
+  (function () {
+    var eingabe = document.getElementById('hilfe-suche-eingabe');
+    var liste = document.getElementById('hilfe-suche-ergebnisse');
+    if (!eingabe || !liste || !window.fetch) return;
+    var timer = null;
+    var letzte = '';
+    function zeige(treffer, q) {
+      liste.textContent = '';
+      if (!treffer.length) {
+        var leer = document.createElement('li');
+        leer.className = 'hilfe-treffer-leer';
+        leer.textContent = 'Nichts gefunden für „' + q + '“.';
+        liste.appendChild(leer);
+      }
+      treffer.forEach(function (t) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = '/hilfe/' + encodeURIComponent(t.slug);
+        var titel = document.createElement('strong');
+        titel.textContent = t.titel;
+        var snip = document.createElement('span');
+        snip.className = 'hint';
+        snip.textContent = t.snippet;
+        a.appendChild(titel);
+        a.appendChild(document.createElement('br'));
+        a.appendChild(snip);
+        li.appendChild(a);
+        liste.appendChild(li);
+      });
+      liste.hidden = false;
+    }
+    eingabe.addEventListener('input', function () {
+      clearTimeout(timer);
+      var q = eingabe.value.trim();
+      if (q.length < 2) { liste.hidden = true; return; }
+      timer = setTimeout(function () {
+        if (q === letzte) return;
+        letzte = q;
+        fetch('/hilfe/suche?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); })
+          .then(function (d) { if (eingabe.value.trim() === q) zeige(d.treffer || [], q); })
+          .catch(function () { /* ohne Live-Suche bleibt „Suchen“ */ });
+      }, 150);
+    });
+    document.addEventListener('click', function (e) { if (!liste.contains(e.target) && e.target !== eingabe) liste.hidden = true; });
+    eingabe.addEventListener('keydown', function (e) { if (e.key === 'Escape') liste.hidden = true; });
+    // Gemerkter Rundgang: „Weitermachen“ statt „Rundgang starten“
+    try {
+      var n = parseInt(localStorage.getItem('rundgang-schritt'), 10);
+      var knopf = document.getElementById('rundgang-start');
+      if (knopf && n > 1) { knopf.href = '/hilfe/rundgang/' + n; knopf.textContent = 'Rundgang fortsetzen (Schritt ' + n + ')'; }
+    } catch (e) { /* ohne Speicher: Start bei 1 */ }
+  })();
+</script>

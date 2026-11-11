@@ -72,6 +72,7 @@
           <% } %>
         </nav>
         <div class="userbox">
+          <a href="/hilfe">❓ Hilfe</a>
           <a href="/konto/api" title="API-Schlüssel für KI-Agenten">🤖 API-Zugang</a>
           <% if (user.authSource !== 'ldap') { %><a href="/konto/passwort">🔑 Passwort ändern</a><% } %>
           <a class="logout" href="/logout">Abmelden</a>
@@ -144,7 +145,7 @@
 <% } %>
 <% if (!(typeof embed !== 'undefined' && embed)) { %>
 <footer class="footer">
-  <small class="footer-links"><a href="/datenschutz">Datenschutz</a> · <a href="/impressum">Impressum</a></small><br>
+  <small class="footer-links"><a href="/hilfe">Hilfe</a> · <a href="/datenschutz">Datenschutz</a> · <a href="/impressum">Impressum</a></small><br>
   <small>Notenverwaltung · <%= now.getFullYear() %><% if (typeof appVersion !== 'undefined' && appVersion) { %> · v<%= appVersion %><%
     if (typeof appReleaseDate !== 'undefined' && appReleaseDate) { %> (<%= appReleaseDate.split('-').reverse().join('.') %>)<% } %><% } %></small>
 </footer>

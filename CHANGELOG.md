@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.125.0 - 2026-11-12
+
+- **Hilfe mit Suche und Screenshots (`/hilfe`).** Neuer Menüpunkt „❓ Hilfe“ (und Link in der Fußzeile, auch ohne Anmeldung): 17 Artikel zu allen
+  Funktionen -- Anmelden, Klassen und Kurse (Schüler:innen einzeln/als Liste/per CSV, Fächer und Lehrkräfte, Kurs-Teilnehmerliste, Papierkorb,
+  Umbenennen), Noteneingabe (Klausuren, mehrteilige Klausuren mit Hörverstehen und Inhalt & Sprache, Unterrichtsleistung, Notenschlüssel, Verrechnung und
+  Endnoten, Notenbesprechung, SPA-Lernfelder), Sync und Klassenleitung, API-Zugang, Administration -- mit 22 Bildschirmfotos (`static/hilfe/`).
+  Die **Suche** findet Artikel beim Tippen (Live-Vorschläge) oder über „Suchen“; sie versteht Umlaute und Ersatzschreibung („Hoerverstehen“ = „Hörverstehen“)
+  und verlangt alle eingegebenen Wörter.
+- **Geführter Rundgang (`/hilfe/rundgang`).** 16 Schritte mit Bild, Erklärung, Knopf zur passenden Seite zum Ausprobieren und Link zum Artikel; Zurück/Weiter
+  (auch mit den Pfeiltasten), Fortschrittsbalken, Merken des Schritts („Rundgang fortsetzen“). Die Startseite weist neue Nutzer:innen mit einem ausblendbaren
+  Hinweis darauf hin.
+- Die Screenshots entstehen reproduzierbar aus einer Demo-Datenbank mit erfundenen Namen: `node scripts/hilfe-screenshots.mjs` (siehe README).
+
 ## 0.124.0 - 2026-11-12
 
 - **API: Kurse anlegen.** `POST /api/v1/kurse` mit `{"name", "schuljahr", "notenschluessel"}` (wie „+ Neuen Kurs anlegen“ in der App; Standard-Notenschlüssel BG,

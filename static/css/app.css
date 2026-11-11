@@ -230,6 +230,34 @@ h3 { font-size: 1.1rem; margin: 0.5rem 0; }
 .umbenennen { margin: 0.25rem 0 0.75rem; }
 .umbenennen > summary { cursor: pointer; display: inline-block; }
 .umbenennen form { margin-top: 0.4rem; }
+/* Hilfe */
+.hilfe-suche { position: relative; display: flex; gap: 0.5rem; margin: 0.5rem 0 1rem; flex-wrap: wrap; }
+.hilfe-suche input[type=search] { flex: 1 1 18rem; min-width: 0; }
+.hilfe-suche-klein { max-width: 28rem; }
+.hilfe-treffer { position: absolute; z-index: 20; top: 100%; left: 0; right: 0; margin: 0.25rem 0 0; padding: 0; list-style: none; background: var(--card-bg, #fff); border: 1px solid rgba(127,127,127,.35); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); max-height: 26rem; overflow-y: auto; }
+.hilfe-treffer li a { display: block; padding: 0.55rem 0.8rem; text-decoration: none; color: inherit; border-bottom: 1px solid rgba(127,127,127,.18); }
+.hilfe-treffer li a:hover, .hilfe-treffer li a:focus { background: rgba(127,127,127,.14); }
+.hilfe-treffer-leer { padding: 0.6rem 0.8rem; }
+.hilfe-rundgang-karte { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.hilfe-rundgang-karte h2 { margin: 0 0 0.25rem; }
+.hilfe-themen { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 0.75rem; }
+.hilfe-kategorie ul, .hilfe-liste { list-style: none; padding: 0; margin: 0; }
+.hilfe-kategorie li, .hilfe-liste li { margin: 0 0 0.65rem; }
+.hilfe-krumel { margin: 0 0 0.25rem; font-size: 0.9rem; }
+.hilfe-bilder { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem; margin: 0.75rem 0 1rem; }
+.hilfe-bilder figure, .rundgang-bild { margin: 0; }
+.hilfe-bilder img, .rundgang-bild img { display: block; width: 100%; height: auto; border: 1px solid rgba(127,127,127,.35); border-radius: 8px; }
+.hilfe-bilder figcaption { font-size: 0.85rem; opacity: .8; margin-top: 0.25rem; }
+.hilfe-abschnitt h2 { margin-top: 0; }
+.hilfe-hinweis { background: rgba(255, 193, 7, .16); border-left: 4px solid #ffc107; padding: 0.5rem 0.75rem; border-radius: 4px; }
+.rundgang-fortschritt { height: 8px; background: rgba(127,127,127,.25); border-radius: 4px; overflow: hidden; margin: 0.25rem 0 1rem; }
+.rundgang-fortschritt > div { height: 100%; background: #2b7de9; border-radius: 4px; }
+.rundgang-schritt h2 { margin-top: 0; }
+.rundgang-navigation { display: flex; justify-content: space-between; gap: 0.5rem; margin: 1rem 0; }
+.rundgang-inhalt ol { columns: 2 16rem; }
+.rundgang-inhalt li.aktuell a { font-weight: 700; }
+.hilfe-banner { background: rgba(43, 125, 233, .12); border: 1px solid rgba(43, 125, 233, .4); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; }
+.hilfe-banner-zu { background: none; border: 0; color: inherit; cursor: pointer; font-size: 1rem; padding: 0 0.25rem; }
 .klausur-hilfe > summary { cursor: pointer; }
 .klausur-hilfe ol, .klausur-hilfe ul { margin: 0.5rem 0; padding-left: 1.4rem; }
 .klausur-hilfe li { margin: 0.25rem 0; }
