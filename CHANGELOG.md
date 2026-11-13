@@ -6,6 +6,24 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.133.0 - 2026-11-13
+
+### Testphase: Personenansicht bei „Aktivität“, Admin-Artikel aus der Hilfe
+
+- **Admin → Aktivität zeigt vorübergehend wieder die Konten mit Namen:** Tabelle
+  „Alle Konten“ mit Einteilung, aktiven Tagen, Anfragen, Eingaben, Fächern,
+  letzter Aktivität und Kontoalter; statt des Anonymitätskastens steht ein Hinweis
+  „🧪 Testphase“. Gespeichert wird dafür **nichts Neues**: Es bleibt bei einem
+  Zähler je Person und Tag (`nutzung_tage`); die Zuordnung zum Namen entsteht erst
+  beim Anzeigen, indem der Zählwert jedes aktiven Kontos mit dem Server-Schlüssel
+  neu berechnet wird (keine Uhrzeiten je Person, keine Inhalte). **Beenden der
+  Testphase:** Umgebungsvariable `AKTIVITAET_PERSONEN=0` – dann zeigt die Seite
+  wieder nur Zahlen und Gruppen samt Anonymitätskasten. Nutzung vor Beginn der
+  Erfassung (0.128.0) ist nicht enthalten; „Anmeldungen“ je Konto gibt es nicht mehr.
+- **Hilfe:** Die Artikel „Administration (für Admins)“ und „Aktivität und
+  Auslastung (anonym)“ sind entfernt (samt Bildschirmfotos und Eintrag im
+  Screenshot-Skript); die Anonymitäts-Aussage träfe in der Testphase nicht zu.
+
 ## 0.132.0 - 2026-11-13
 
 ### Aufräumen: Suchfeld über Auswahllisten, Knopf bei „Klasse wählen“

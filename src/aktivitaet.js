@@ -9,6 +9,11 @@
  *  - Die Auswertung zeigt ausschließlich Zahlen und Gruppen, keine Listen einzelner Personen.
  *  - Keine Adressen, keine Inhalte, keine Noten. Alles wird nach 400 Tagen gelöscht.
  * Gesammelt wird im Speicher, alle 30 Sekunden wird in einem Schwung geschrieben.
+ *
+ * TESTPHASE: Die Admin-Seite kann zusätzlich eine Liste der Konten mit Namen zeigen (`personenAnsichtAktiv()`, an solange die
+ * Umgebungsvariable AKTIVITAET_PERSONEN nicht auf 0 steht). Gespeichert wird dafür NICHTS Neues: Die Zuordnung entsteht erst beim
+ * Anzeigen, indem der Zählwert jedes aktiven Kontos mit dem Server-Schlüssel neu berechnet wird (nur Tage, nie Uhrzeiten je Person).
+ * Zum Beenden der Testphase AKTIVITAET_PERSONEN=0 setzen (oder die Konstante unten ändern).
  */
 
 import crypto from 'node:crypto';
@@ -32,6 +37,11 @@ export const ABSTAENDE = [
   { id: 'a400', titel: 'vor mehr als 90 Tagen', bis: Infinity },
 ];
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+/** Testphase: Personenansicht (Konten mit Namen) auf der Admin-Seite. Aus mit AKTIVITAET_PERSONEN=0. */
+export function personenAnsichtAktiv() {
+  return process.env.AKTIVITAET_PERSONEN !== '0';
+}
 
 const FORMAT = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23',
@@ -168,7 +178,7 @@ function median(werte) {
  * Auswertung für die Admin-Seite. `tage` = Zeitraum bis einschließlich heute. Das Ergebnis enthält nur Zahlen und Gruppen,
  * keine Einträge einzelner Personen. Grundgesamtheit: aktive Konten (nur die ANZAHL wird gelesen).
  */
-export function auswertung(tage = 90, jetzt = new Date()) {
+export function auswertung(tage = 90, jetzt = new Date(), { personen: mitPersonen = personenAnsichtAktiv() } = {}) {
   speichere();
   const db = getDb();
   const heute = ortszeit(jetzt).tag;
@@ -177,7 +187,7 @@ export function auswertung(tage = 90, jetzt = new Date()) {
 
   const konten = db.prepare('SELECT COUNT(*) AS c FROM users WHERE active = 1').get().c;
   const proProfil = db.prepare(`
-    SELECT COUNT(DISTINCT tag) AS tage, SUM(anfragen) AS anfragen, SUM(eingaben) AS eingaben
+    SELECT profil, COUNT(DISTINCT tag) AS tage, SUM(anfragen) AS anfragen, SUM(eingaben) AS eingaben, MAX(tag) AS letzter_tag
     FROM nutzung_tage WHERE tag >= ? GROUP BY profil
   `).all(von);
   const aktive = proProfil.length;
@@ -232,8 +242,31 @@ export function auswertung(tage = 90, jetzt = new Date()) {
     if (z.anfragen > spitzeAnfragen.anfragen) spitzeAnfragen = { anfragen: z.anfragen, tag: z.tag, stunde: z.stunde };
   }
 
+  // Testphase: Konten mit Namen. Die Zuordnung entsteht nur hier, durch Neuberechnen des Zählwerts je aktivem Konto.
+  let personen = null;
+  if (mitPersonen) {
+    const nachProfil = new Map(proProfil.map((p) => [p.profil, p]));
+    const letzterTagGesamt = new Map(db.prepare('SELECT profil, MAX(tag) AS t FROM nutzung_tage GROUP BY profil').all().map((r) => [r.profil, r.t]));
+    personen = db.prepare(`
+      SELECT id, username, display_name, role, auth_source, created_at,
+             (SELECT COUNT(DISTINCT fach_id) FROM fach_zuweisungen z WHERE z.user_id = users.id) AS faecher
+      FROM users WHERE active = 1
+    `).all().map((k) => {
+      const profil = profilFuer(k.id);
+      const p = nachProfil.get(profil) || { tage: 0, anfragen: 0, eingaben: 0 };
+      const letzterTag = letzterTagGesamt.get(profil) || null;
+      return {
+        id: k.id, name: k.display_name || k.username, username: k.username, rolle: k.role, quelle: k.auth_source,
+        angelegt: k.created_at ? k.created_at.slice(0, 10) : null, faecher: k.faecher,
+        tage: p.tage, anfragen: p.anfragen, eingaben: p.eingaben, letzterTag,
+        tageSeitLetzterAktivitaet: letzterTag ? Math.round((new Date(`${heute}T12:00:00Z`) - new Date(`${letzterTag}T12:00:00Z`)) / 86400000) : null,
+        stufe: stufeFuerTage(p.tage).id,
+      };
+    }).sort((a, b) => (b.tage - a.tage) || (b.anfragen - a.anfragen) || a.name.localeCompare(b.name, 'de'));
+  }
+
   return {
-    tage, von, bis: heute, seit, erfassungKuerzer: Boolean(seit && seit > von),
+    personen, tage, von, bis: heute, seit, erfassungKuerzer: Boolean(seit && seit > von),
     konten: gesamt, aktiveImZeitraum: aktive, kleineGruppe: gesamt < 10,
     aktiv7: aktivSeit(7), aktiv30: aktivSeit(30), nieAktiv,
     ohneEingaben, wiederkehrend, wiederkehrQuote: aktive ? wiederkehrend / aktive : 0,

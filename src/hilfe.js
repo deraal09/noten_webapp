@@ -445,44 +445,6 @@ export const ARTIKEL = [
     ],
     links: [{ text: 'API-Zugang öffnen', href: '/konto/api' }, { text: 'API-Dokumentation', href: '/api/v1/docs' }], verwandt: ['sync', 'kurse'],
   },
-  {
-    slug: 'administration', kategorie: 'mehr', titel: 'Administration (für Admins)',
-    kurz: 'Schuljahre, Lehrkräfte, Aktivität und Auslastung, Notenschlüssel, LDAP, Datensicherung, Rechtliches.',
-    schlagworte: ['admin', 'administration', 'schuljahr', 'lehrkräfte', 'ldap', 'datensicherung', 'backup', 'rechtliches', 'impressum', 'datenschutz', 'notenschlüssel', 'einladungen', 'zuweisungen', 'aktivität', 'auslastung', 'statistik', 'nutzung'],
-    bilder: [{ datei: 'admin', text: 'Administration: Dashboard' }],
-    abschnitte: [
-      { titel: 'Was die Administration pflegt', absaetze: [
-        '**Schuljahre** legen sich zum 1. August automatisch an (manuell geht auch). **Lehrkräfte** und **Einladungen** (für externe Konten), **Zuweisungen** von Lehrkräften zu Fächern, **LDAP-Einstellungen** (Schulkonto, Gruppe), **LDAP-Import**.',
-        '**Notenschlüssel** (IHK, BG, SPA) werden zentral gepflegt; **Datensicherung** (zeitgesteuerte, verschlüsselte Sicherungen, Wiederherstellung) und **Rechtliches** (Angaben für Datenschutzerklärung und Impressum) gibt es als eigene Menüpunkte.',
-      ] },
-      { titel: 'Aktivität und Auslastung', absaetze: [
-        'Unter **Aktivität** (Admin-Menü) siehst du **anonym**, wie die App genutzt wird – ohne Namen und ohne Liste einzelner Personen. Mehr dazu im Artikel „Aktivität und Auslastung (anonym)“.',
-      ] },
-    ],
-    links: [{ text: 'Administration', href: '/admin' }, { text: 'Aktivität und Auslastung', href: '/admin/aktivitaet' }], verwandt: ['aktivitaet', 'notenschluessel', 'anmelden'],
-  },
-  {
-    slug: 'aktivitaet', kategorie: 'mehr', titel: 'Aktivität und Auslastung (anonym)',
-    kurz: 'Wie intensiv die App genutzt wird – als anonyme Statistik ohne Namen, ohne Personenlisten und ohne Uhrzeiten je Person.',
-    schlagworte: ['aktivität', 'auslastung', 'statistik', 'nutzung', 'anonym', 'datenschutz', 'admin', 'aktiv', 'reingeschaut', 'regelmäßig', 'intensiv', 'wochentag', 'uhrzeit', 'abspringen', 'wiederkehrquote', 'zähler'],
-    bilder: [{ datei: 'admin-aktivitaet', text: 'Admin → Aktivität: anonyme Gruppen und Auslastung' }],
-    abschnitte: [
-      { titel: 'Wofür die Statistik da ist', absaetze: [
-        'Die Seite **Admin → Aktivität** beantwortet die Frage: Nutzen die Kolleg:innen die App wirklich – oder haben sich viele nur einmal angemeldet und nie wieder? Dazu werden alle Konten in **Gruppen** eingeteilt: **Keine Aktivität**, **Einmal reingeschaut**, **Wenig aktiv** (2–4 Tage), **Regelmäßig** (5–19 Tage) und **Intensiv** (ab 20 Tage). Ergänzt wird das um den Anteil, der **nie etwas eingetragen** hat, die **Wiederkehrquote**, den Verlauf der aktiven Personen und eine **Auslastungs-Karte** (Wochentag × Uhrzeit) mit der Spitzenstunde.',
-      ] },
-      { titel: 'So bleibt sie anonym', absaetze: [
-        '**Keine Personen:** Die Auswertung zeigt nur Zahlen und Gruppen, **keine Namen und keine Liste einzelner Konten**. Es gibt keine Ansicht, in der man sieht, wie aktiv eine bestimmte Person ist.',
-        '**Nichts am Konto:** Es wird weder Name noch Benutzername noch Konto-Nummer gespeichert, auch kein Anmeldezeitpunkt am Konto. Je Person gibt es nur einen **nicht umkehrbaren Zählwert**, mit dem gezählt wird, an wie vielen verschiedenen Tagen dieselbe Person aktiv war – ohne zu wissen, wer es ist. Der Schlüssel dafür liegt in der Server-Umgebung, nicht in der Datenbank; wer nur die Datenbank oder eine Sicherung sieht, kann einen Zählwert keinem Konto zuordnen.',
-        '**Keine Uhrzeiten je Person:** Je Zählwert wird nur der **Tag** festgehalten. Die Tageszeiten der Auslastung stehen nur als **Summe über alle Personen**.',
-        '**Keine Inhalte:** Gezählt werden nur Aufrufe und Änderungen – nicht, welche Seite, welche Klasse oder welche Note. Alle Zähler werden nach **400 Tagen** gelöscht.',
-      ], hinweis: 'An sehr kleinen Schulen (unter 10 Konten) kann man aus einzelnen Zahlen dennoch auf Einzelne schließen; die Seite weist darauf hin. Lies die Zahlen dann nur als Gesamtbild.' },
-      { titel: 'So liest du die Seite', absaetze: [
-        '**Zeitraum** oben wählen (30 Tage, 90 Tage, 12 Monate). **„Wann waren die Konten zuletzt aktiv?“** zeigt, wie viele Konten schon länger nicht mehr aktiv waren („Abspringer“) – wieder nur als Gruppen.',
-        'Die Erfassung läuft erst seit der Version 0.128.0; frühere Nutzung ist nicht rekonstruierbar. Solange der gewählte Zeitraum länger ist als die Erfassung, weist die Seite darauf hin.',
-      ] },
-    ],
-    links: [{ text: 'Aktivität und Auslastung öffnen', href: '/admin/aktivitaet' }], verwandt: ['administration'],
-  },
 ];
 
 /** Geführter Rundgang: Schritt für Schritt durch die wichtigsten Funktionen. `artikel` verweist auf die Hilfe, `href` auf die Seite zum Ausprobieren. */

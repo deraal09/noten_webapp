@@ -47,8 +47,7 @@ test('Suche: Umlaute und Schreibweisen, Rangfolge, mehrere Wörter, Unsinn', () 
   assert.ok(sucheHilfe('csv').length >= 2);
   assert.equal(sucheHilfe('api schlüssel')[0].slug, 'api');
   assert.equal(sucheHilfe('Lernfeld')[0].slug, 'spa');
-  assert.equal(sucheHilfe('anonym statistik')[0].slug, 'aktivitaet');
-  assert.equal(sucheHilfe('Auslastung')[0].slug, 'aktivitaet');
+  assert.ok(!sucheHilfe('Administration').some((t) => t.slug === 'administration'), 'kein Admin-Artikel in der Hilfe');
   assert.equal(sucheHilfe('sofort endgültig löschen')[0].slug, 'papierkorb');
   assert.equal(sucheHilfe('Konferenz')[0].slug, 'notenkonferenz');
   assert.equal(sucheHilfe('Fehlzeiten')[0].slug, 'fehlzeiten-notizen');
@@ -133,12 +132,12 @@ test('Rundgang Klassenleitung: eigene Adresse, Schritte, Ende, eigener Speichers
   assert.match(art, /leitung-konferenz\.jpg/);
 });
 
-test('Hilfe zur Aktivitätsstatistik betont die Anonymität', async () => {
-  const html = await (await get('/hilfe/aktivitaet')).text();
-  assert.match(html, /anonym/i);
-  assert.match(html, /keine Namen/);
-  assert.match(html, /nicht umkehrbaren Zählwert/);
-  assert.match(html, /admin-aktivitaet\.jpg/);
+test('Die Hilfe enthält keine Admin-Artikel (Administration, Aktivität)', async () => {
+  assert.ok(!ARTIKEL.some((a) => ['administration', 'aktivitaet'].includes(a.slug)));
+  assert.equal((await get('/hilfe/administration')).status, 404);
+  assert.equal((await get('/hilfe/aktivitaet')).status, 404);
+  const index = await (await get('/hilfe')).text();
+  assert.doesNotMatch(index, /\/hilfe\/(administration|aktivitaet)/);
 });
 
 test('Menü und Fußzeile verlinken die Hilfe; Startseite zeigt den Rundgang-Hinweis', async () => {

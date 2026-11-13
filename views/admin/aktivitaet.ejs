@@ -5,6 +5,14 @@
   const stundeText = (h) => String(h).padStart(2, '0') + ':00–' + String((h + 1) % 24).padStart(2, '0') + ':00';
 %>
 <h1>📊 Aktivität und Auslastung</h1>
+<% if (a.personen) { %>
+  <p class="hint">Wie intensiv wird die App genutzt – und von wem?</p>
+  <div class="akt-hinweis akt-testphase">
+    <strong>🧪 Testphase: Die Personenansicht ist vorübergehend eingeschaltet.</strong>
+    Unten zeigt die Tabelle „Alle Konten“ die Nutzung mit Namen. Gespeichert wird weiterhin nur ein Zähler je Person und <em>Tag</em> (nie Uhrzeit, keine Inhalte, keine Adressen);
+    die Zuordnung zum Namen entsteht erst beim Anzeigen. Nach der Testphase wird die Ansicht ausgeschaltet (Umgebungsvariable <code>AKTIVITAET_PERSONEN=0</code>); dann zeigt die Seite nur noch Zahlen und Gruppen.
+  </div>
+<% } else { %>
 <p class="hint">Wie intensiv wird die App genutzt? Die Auswertung ist <strong>anonym</strong>: Sie zeigt nur Zahlen und Gruppen, keine Namen und keine Liste einzelner Personen.</p>
 <details class="akt-hinweis">
   <summary><strong>🔒 So bleibt die Statistik anonym</strong></summary>
@@ -15,6 +23,8 @@
     <li>Alle Zähler werden nach <strong>400 Tagen</strong> gelöscht.</li>
   </ul>
 </details>
+
+<% } %>
 
 <nav class="akt-zeitraum" aria-label="Zeitraum">
   <% ZEITRAEUME.forEach(function(z) { %>
@@ -27,7 +37,7 @@
 <% } else if (a.erfassungKuerzer) { %>
   <p class="akt-hinweis">Die Erfassung läuft erst seit dem <strong><%= datum(a.seit) %></strong>. Für den gewählten Zeitraum (ab <%= datum(a.von) %>) sind daher nur die Tage seit diesem Datum ausgewertet; früher aktive Personen können deshalb noch als „Keine Aktivität“ erscheinen.</p>
 <% } %>
-<% if (a.kleineGruppe) { %>
+<% if (a.kleineGruppe && !a.personen) { %>
   <p class="akt-hinweis">Bei so wenigen Konten (<%= a.konten %>) lassen sich aus Einzelzahlen leicht Rückschlüsse auf Einzelne ziehen. Lies die Zahlen deshalb nur als Gesamtbild.</p>
 <% } %>
 
@@ -103,3 +113,28 @@
   </tbody>
 </table>
 </div>
+
+<% if (a.personen) { %>
+<h2>Alle Konten <small class="hint">(Testphase)</small></h2>
+<p class="hint">Sortiert nach aktiven Tagen im gewählten Zeitraum. „Eingaben“ sind Änderungen (Noten, Klassen, Einstellungen …), „Anfragen“ jeder Seitenaufruf. Nutzung vor Beginn der Erfassung ist nicht enthalten.</p>
+<div style="overflow-x:auto">
+<table class="data akt-tabelle">
+  <thead><tr>
+    <th>Name</th><th>Einteilung</th><th class="num">Aktive Tage</th><th class="num">Anfragen</th><th class="num">Eingaben</th>
+    <th class="num">Fächer</th><th>Zuletzt aktiv</th><th>Konto seit</th>
+  </tr></thead>
+  <tbody>
+    <% a.personen.forEach(function(p) { const st = a.stufen.find(function(x) { return x.id === p.stufe; }); %>
+      <tr>
+        <td><%= p.name %><br><span class="hint"><%= p.username %><%= p.rolle === 'admin' ? ' · Admin' : '' %><%= p.quelle === 'ldap' ? ' · LDAP' : '' %></span></td>
+        <td class="tag-stufe"><span class="akt-punkt akt-stufe-<%= p.stufe %>"></span> <%= st.titel %></td>
+        <td class="num"><%= p.tage %></td><td class="num"><%= p.anfragen %></td><td class="num"><%= p.eingaben %></td>
+        <td class="num"><%= p.faecher %></td>
+        <td><%= p.letzterTag ? datum(p.letzterTag) + (p.tageSeitLetzterAktivitaet > 0 ? ' (vor ' + p.tageSeitLetzterAktivitaet + ' T.)' : ' (heute)') : '–' %></td>
+        <td><%= datum(p.angelegt) %></td>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+</div>
+<% } %>

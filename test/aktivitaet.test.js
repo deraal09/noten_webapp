@@ -89,8 +89,8 @@ test('Anonymität: Tabellen enthalten keine Konto-Spalte, keine Namen, keine Uhr
   assert.equal(db.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE name = 'nutzer_aktivitaet'").get().c, 0, 'alte personenbezogene Tabelle entfernt');
 });
 
-test('Auswertung: Gruppen, Quoten, Aktiv-Zahlen, Ohne-Eingaben – und keine Einträge einzelner Personen', () => {
-  const a = akt.auswertung(30, JETZT);
+test('Auswertung (anonym): Gruppen, Quoten, Aktiv-Zahlen, Ohne-Eingaben – und keine Einträge einzelner Personen', () => {
+  const a = akt.auswertung(30, JETZT, { personen: false });
   const anzahl = (id) => a.stufen.find((s) => s.id === id).anzahl;
   assert.equal(a.konten, 5, 'Admin + 4 Konten');
   assert.equal(anzahl('einmalig'), 1);
@@ -109,7 +109,7 @@ test('Auswertung: Gruppen, Quoten, Aktiv-Zahlen, Ohne-Eingaben – und keine Ein
   assert.equal(a.heat.flat().reduce((s, x) => s + x, 0), a.summeAnfragen, 'Heatmap summiert alle Anfragen');
   assert.equal(a.kleineGruppe, true, 'unter 10 Konten: Hinweis');
   // Ergebnis enthält keine Personenliste
-  assert.equal(a.personen, undefined);
+  assert.equal(a.personen, null);
   assert.ok(!/konto_|Geheime|admin/i.test(JSON.stringify(a)), 'keine Namen im Ergebnis');
 });
 
@@ -132,7 +132,7 @@ test('Profile ehemaliger Konten lassen die Grundgesamtheit nicht unter die Zahl 
   db.prepare("UPDATE users SET active = 1 WHERE username LIKE 'konto_%'").run();
 });
 
-test('Zugriff: nur Admin; die Seite zeigt Gruppen und Anonymitätshinweis, aber keine Namen oder Tabelle', async () => {
+test('Zugriff: nur Admin; Testphase zeigt Gruppen und die Konten mit Namen', async () => {
   assert.ok([302, 401, 403].includes((await client()('/admin/aktivitaet')).status));
   getDb().prepare("UPDATE users SET password_hash = ? WHERE username = 'konto_nie'").run((await import('../src/auth.js')).hashPassword('lehrerpass123'));
   const lehrer = client();
@@ -143,14 +143,46 @@ test('Zugriff: nur Admin; die Seite zeigt Gruppen und Anonymitätshinweis, aber 
   assert.equal(r.status, 200);
   const html = await r.text();
   assert.match(html, /Aktivität und Auslastung/);
-  assert.match(html, /anonym/);
-  assert.match(html, /So bleibt die Statistik anonym/);
+  assert.match(html, /Testphase/);
   assert.match(html, /Einmal reingeschaut/);
   assert.match(html, /Letzte 90 Tage/);
   assert.match(html, /href="\/admin\/aktivitaet"/, 'Menüpunkt');
-  assert.doesNotMatch(html, /Geheime Person|konto_(nie|einmal|wenig|intensiv)/, 'keine Namen der Konten');
-  assert.doesNotMatch(html, /Alle Konten|<table class="data/, 'keine Personentabelle');
-  assert.match(html, /Bei so wenigen Konten/);
+  assert.match(html, /Alle Konten/);
+  assert.match(html, /Geheime Person intensiv/);
+  assert.match(html, /konto_wenig/);
+  assert.doesNotMatch(html, /So bleibt die Statistik anonym/, 'in der Testphase wird nicht Anonymität versprochen');
+});
+
+test('Testphase: Personenliste mit Zahlen je Konto (aus dem Zählwert errechnet, nichts am Konto gespeichert)', () => {
+  const a = akt.auswertung(30, JETZT);
+  assert.ok(Array.isArray(a.personen));
+  const von = (n) => a.personen.find((p) => p.username === n);
+  assert.equal(von('konto_intensiv').tage, 25);
+  assert.equal(von('konto_intensiv').stufe, 'intensiv');
+  assert.equal(von('konto_wenig').tage, 2);
+  assert.equal(von('konto_wenig').eingaben, 1);
+  assert.equal(von('konto_einmal').tage, 1);
+  assert.equal(von('konto_nie').tage >= 0, true);
+  assert.equal(von('konto_intensiv').name, 'Geheime Person intensiv');
+  assert.equal(von('konto_einmal').letzterTag, '2026-11-08');
+  assert.equal(a.personen[0].username, 'konto_intensiv', 'sortiert nach aktiven Tagen');
+  // die Speicherung bleibt anonym
+  const db = getDb();
+  assert.deepEqual(db.prepare('PRAGMA table_info(nutzung_tage)').all().map((c) => c.name), ['profil', 'tag', 'anfragen', 'eingaben']);
+});
+
+test('Testphase beenden: AKTIVITAET_PERSONEN=0 schaltet die Personenansicht wieder aus', async () => {
+  process.env.AKTIVITAET_PERSONEN = '0';
+  try {
+    assert.equal(akt.personenAnsichtAktiv(), false);
+    assert.equal(akt.auswertung(30, JETZT).personen, null);
+    const html = await (await admin('/admin/aktivitaet')).text();
+    assert.match(html, /So bleibt die Statistik anonym/);
+    assert.doesNotMatch(html, /Geheime Person|konto_(nie|einmal|wenig|intensiv)|Alle Konten|Testphase/);
+  } finally {
+    delete process.env.AKTIVITAET_PERSONEN;
+  }
+  assert.equal(akt.personenAnsichtAktiv(), true);
 });
 
 test('Anfragen eingeloggter Personen werden gezählt (Seitenaufruf vs. Eingabe), Statisches und Anonymes nicht', async () => {
