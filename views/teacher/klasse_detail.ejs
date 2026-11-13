@@ -267,7 +267,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
     <h2>Versetzen: <span id="versetzen-name"></span></h2>
     <p class="hint">Alle bisherigen Noten bleiben der Person erhalten.</p>
     <label>Zielklasse
-      <select name="ziel_klasse_id" required>
+      <select name="ziel_klasse_id" required data-filter aria-label="Zielklasse">
         <option value="">— Klasse wählen —</option>
         <% if (!klasse.ist_ablage) { %><option value="ohne-klasse">Ohne Klasse</option><% } %>
         <% versetzZiele.filter(function(z) { return !z.ist_ablage; }).forEach(function(z) { %>

@@ -78,10 +78,13 @@ try {
   const cssInhalt = readFileSync(path.join(__dirname, 'static', 'css', 'app.css'));
   cssVersion = crypto.createHash('sha1').update(cssInhalt).digest('hex').slice(0, 10);
 } catch { /* static/css/app.css sollte immer vorhanden sein — Fallback bleibt 'dev' */ }
-// Ebenso fürs Skript der Touch-Notenauswahl (static/js/noten-picker.js).
+// Ebenso fürs Skript der Touch-Notenauswahl (static/js/noten-picker.js) und das Suchfeld über Auswahllisten (static/js/select-filter.js).
 let jsVersion = 'dev';
 try {
-  jsVersion = crypto.createHash('sha1').update(readFileSync(path.join(__dirname, 'static', 'js', 'noten-picker.js'))).digest('hex').slice(0, 10);
+  jsVersion = crypto.createHash('sha1')
+    .update(readFileSync(path.join(__dirname, 'static', 'js', 'noten-picker.js')))
+    .update(readFileSync(path.join(__dirname, 'static', 'js', 'select-filter.js')))
+    .digest('hex').slice(0, 10);
 } catch { /* Fallback bleibt 'dev' */ }
 
 // Versionsnummer + Release-Datum für die Fußzeile (siehe

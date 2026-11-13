@@ -893,3 +893,11 @@ textarea.termin-inhalt { display: block; width: 9rem; height: 3.2rem; min-height
 .akt-hinweis { background: var(--bg-tint); border-radius: 6px; padding: .6rem .9rem; margin: .5rem 0 1rem; }
 .akt-hinweis ul { margin: .5rem 0 0; padding-left: 1.2rem; }
 .akt-hinweis summary { cursor: pointer; }
+
+/* ---------- Suchfeld über Auswahllisten (static/js/select-filter.js) ---------- */
+.select-filter { display: block; width: 100%; max-width: 28rem; box-sizing: border-box; margin: 0 0 .25rem; padding: .3rem .5rem; font-size: .9rem; }
+.select-filter.ohne-treffer { border-color: var(--danger); }
+.select-filter-info { display: block; margin: 0 0 .25rem; }
+form.inline .select-filter { display: inline-block; width: 12rem; margin: 0 .25rem 0 0; }
+form.inline .select-filter-info { display: inline-block; margin: 0 .5rem 0 0; }
+.select-filter-info[hidden] { display: none; }

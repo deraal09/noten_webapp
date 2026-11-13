@@ -63,14 +63,17 @@
         </p>
         <form method="post" action="/teacher/klassen/neu">
           <label>Klasse
-            <select name="vorhandene_klasse_id" required>
+            <select name="vorhandene_klasse_id" required data-filter aria-label="Klasse">
               <option value="">— wählen —</option>
               <% vorhandeneKlassen.forEach(function(k) { %>
                 <option value="<%= k.id %>"><%= k.name %> (<%= klassenSchuljahrText(k.id) %>, <%= k.notenschluessel %>)</option>
               <% }); %>
             </select>
           </label>
-          <button type="submit">Klasse wählen</button>
+          <div class="knopf-leiste">
+            <button type="submit">Klasse wählen</button>
+            <button type="button" id="neue-klasse-statt-wahl" data-zu-reiter="klasse-anlegen-neu" title="Die Klasse gibt es noch nicht? Dann hier neu anlegen.">+ Neue Klasse anlegen</button>
+          </div>
         </form>
       </div>
     <% } %>
@@ -300,4 +303,19 @@
     block.addEventListener('change', filtern);
     filtern();
   });
+</script>
+
+<script>
+  // „+ Neue Klasse anlegen“ neben „Klasse wählen“: wechselt zum Reiter mit dem Formular (und setzt den Cursor ins Namensfeld).
+  (function () {
+    document.querySelectorAll('[data-zu-reiter]').forEach(function (knopf) {
+      knopf.addEventListener('click', function () {
+        var ziel = knopf.getAttribute('data-zu-reiter');
+        var reiter = document.querySelector('.unter-reiter [data-target="' + ziel + '"]');
+        if (reiter) reiter.click();
+        var feld = document.querySelector('#' + ziel + ' input[name="name"]');
+        if (feld) feld.focus();
+      });
+    });
+  })();
 </script>

@@ -3,13 +3,13 @@
 <h2>Lehrkraft → Fach</h2>
 <form method="post" action="/admin/zuweisungen/neu" class="card">
   <label>Lehrkraft
-    <select name="user_id" required>
+    <select name="user_id" required data-filter aria-label="Lehrkraft">
       <option value="">— wählen —</option>
       <% users.forEach(function(u) { %><option value="<%= u.id %>"><%= u.display_name || u.username %></option><% }); %>
     </select>
   </label>
   <label>Fach
-    <select name="fach_id" required>
+    <select name="fach_id" required data-filter aria-label="Fach">
       <option value="">— wählen —</option>
       <% faecher.forEach(function(f) { %><option value="<%= f.id %>"><%= f.schuljahr_bezeichnung %> · <%= f.klasse_name %> · <%= f.name %></option><% }); %>
     </select>
@@ -38,7 +38,7 @@
 <h2>Klassenleitung</h2>
 <form method="post" action="/admin/klassenlehrer/neu" class="card">
   <label>Lehrkraft
-    <select name="user_id" required>
+    <select name="user_id" required data-filter aria-label="Lehrkraft">
       <option value="">— wählen —</option>
       <% users.forEach(function(u) { %><option value="<%= u.id %>"><%= u.display_name || u.username %></option><% }); %>
     </select>

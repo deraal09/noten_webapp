@@ -36,7 +36,7 @@
     <input type="hidden" name="fach_id" value="<%= ziel.id %>">
     <input type="hidden" name="zurueck" value="<%= zurueck %>">
     <label>Lehrkraft hinzufügen
-      <select name="user_id" required>
+      <select name="user_id" required data-filter aria-label="Lehrkraft">
         <option value="">— wählen —</option>
         <% zuweisbare.forEach(function(u) { %><option value="<%= u.id %>"><%= u.display_name || u.username %></option><% }); %>
       </select>

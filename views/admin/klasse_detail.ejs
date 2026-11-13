@@ -27,7 +27,7 @@
 <% } %>
 <% if (zuweisbareLehrkraefte.length) { %>
   <form method="post" action="/admin/klassen/<%= klasse.id %>/klassenleitung/hinzufuegen" class="inline">
-    <select name="user_id" required>
+    <select name="user_id" required data-filter aria-label="Lehrkraft">
       <option value="">— Lehrkraft wählen —</option>
       <% zuweisbareLehrkraefte.forEach(function(u) { %>
         <option value="<%= u.id %>"><%= u.display_name || u.username %></option>

@@ -6,6 +6,28 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.132.0 - 2026-11-13
+
+### Aufräumen: Suchfeld über Auswahllisten, Knopf bei „Klasse wählen“
+
+- **„+ Neue Klasse anlegen“ steht jetzt direkt neben „Klasse wählen“** (Meine
+  Klassen → Neue Klasse anlegen → Vorhandene Klasse wählen): ein Klick wechselt
+  zum Formular für eine neue Klasse und setzt den Cursor ins Namensfeld.
+- **Suchfeld über langen Auswahllisten** (`static/js/select-filter.js`, an
+  `<select data-filter>`): Es filtert beim Tippen **unscharf** – Groß-/Kleinschreibung,
+  Umlaute (ä/ae, ö/oe, ü/ue, ß/ss) und Akzente sind egal, mehrere Wörter müssen
+  alle passen (Reihenfolge egal), verstreute Buchstaben („mstr“ für „Muster“) und
+  ein Tippfehler bei längeren Wörtern werden verziehen; die besten Treffer stehen
+  oben. Genau ein Treffer wird gleich ausgewählt, **Enter** wählt den besten Treffer
+  (und schickt das Formular nicht ab), **Esc** leert das Feld, darunter steht die
+  Trefferzahl. Ohne JavaScript bleibt die normale Liste.
+- Eingebaut bei der **Klassenauswahl** („Vorhandene Klasse wählen“), bei **allen
+  Lehrkräfte-Auswahlen** (Lehrkraft einem Fach zuordnen, Co-Klassenlehrkraft,
+  Admin: Klassenleitung eintragen, Zuweisungen Lehrkraft → Fach und Klassenleitung)
+  sowie bei der **Fach-Auswahl** der Zuweisungen und der **Zielklasse** beim
+  Versetzen.
+- Hilfe („Klasse anlegen“, „Fächer anlegen und Lehrkräfte zuordnen“) ergänzt.
+
 ## 0.131.0 - 2026-11-12
 
 ### Sicherheit: Papierkorb schützt fremde Noten, API nur für Schulkonten mit Admin-Kontrolle

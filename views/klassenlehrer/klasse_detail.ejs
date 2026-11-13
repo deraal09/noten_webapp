@@ -377,7 +377,7 @@
      }); %>
   <% if (moeglicheCoLehrkraefte.length) { %>
     <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenleitung/hinzufuegen" class="inline">
-      <select name="user_id" required>
+      <select name="user_id" required data-filter aria-label="Lehrkraft">
         <option value="">— Co-Klassenlehrkraft wählen —</option>
         <% moeglicheCoLehrkraefte.forEach(function(u) { %>
           <option value="<%= u.id %>"><%= u.display_name || u.username %></option>
