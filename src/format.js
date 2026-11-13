@@ -68,7 +68,8 @@ export function formatZeitLokal(sqliteUtcText) {
  * fertigem Text öffnen.
  */
 export function baueEinladungsMailtoLink(einladung, link) {
-  const anrede = einladung.display_name ? `Hallo ${einladung.display_name},` : 'Hallo,';
+  // Ein zufällig erzeugtes Etikett (name_generiert) ist keine Anrede.
+  const anrede = einladung.display_name && !einladung.name_generiert ? `Hallo ${einladung.display_name},` : 'Hallo,';
   const gueltigBis = einladung.expires_at
     ? `\n\nDer Link ist bis zum ${formatZeitLokal(einladung.expires_at)} gültig.`
     : '';

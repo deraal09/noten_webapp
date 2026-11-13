@@ -270,7 +270,7 @@ export default async function authRoutes(fastify) {
   // ---------- /einladung/<token> ----------
   fastify.get('/einladung/:token', async (request, reply) => {
     const inv = getDb()
-      .prepare(`SELECT id, token, email, display_name, role, expires_at, used_at
+      .prepare(`SELECT id, token, email, display_name, name_generiert, role, created_by_id, expires_at, used_at
                 FROM invitations WHERE token = ?`)
       .get(request.params.token);
     if (!inv) {
@@ -278,6 +278,7 @@ export default async function authRoutes(fastify) {
         user: request.user, invitation: null, error: 'Einladung nicht gefunden.',
       });
     }
+    if (inv.name_generiert) inv.display_name = null; // zufälliges Etikett der Einladung: weder anzeigen noch vorbelegen
     const valid =
       !inv.used_at && (!inv.expires_at || new Date(inv.expires_at) > new Date());
     if (!valid) {
@@ -293,10 +294,11 @@ export default async function authRoutes(fastify) {
 
   fastify.post('/einladung/:token', async (request, reply) => {
     const inv = getDb()
-      .prepare(`SELECT id, token, email, display_name, role, expires_at, used_at
+      .prepare(`SELECT id, token, email, display_name, name_generiert, role, created_by_id, expires_at, used_at
                 FROM invitations WHERE token = ?`)
       .get(request.params.token);
     if (!inv) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Einladung nicht gefunden.' });
+    if (inv.name_generiert) inv.display_name = null; // zufälliges Etikett: nicht als Kontoname übernehmen
     const valid = !inv.used_at && (!inv.expires_at || new Date(inv.expires_at) > new Date());
     if (!valid) return reply.redirect('/login?msg=invite_expired');
 

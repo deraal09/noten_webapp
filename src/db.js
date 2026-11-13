@@ -882,6 +882,8 @@ function migrate(db) {
   const alteVersion = versionsZeile ? Number(versionsZeile.value) : null;
   ensureColumn(db, 'users', 'auth_source', "auth_source TEXT NOT NULL DEFAULT 'lokal'");
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
+  // 1 = der Anzeigename der Einladung wurde zufällig erzeugt (Etikett zum Wiederfinden), nicht eingegeben: nie als Anrede/Kontoname verwenden.
+  ensureColumn(db, 'invitations', 'name_generiert', 'name_generiert INTEGER NOT NULL DEFAULT 0');
   // 0.127.0 hatte personenbezogene Nutzungsdaten eingeführt; seit 0.128.0 ist die Statistik anonym -- Altdaten entfernen.
   db.exec('DROP TABLE IF EXISTS nutzer_aktivitaet');
   for (const spalte of ['letzter_login', 'anmeldungen']) {

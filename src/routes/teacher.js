@@ -51,6 +51,7 @@ import {
 import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { legeKursAn } from '../kurse.js';
 import { legeKlasseAn, aendereLaufzeit } from '../klasse-anlegen.js';
+import { legeEinladungAn } from '../einladungen.js';
 import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, loescheSofort, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
@@ -3064,14 +3065,10 @@ export default async function teacherRoutes(fastify) {
     if (!istIrgendeineKlassenleitung(request.user)) {
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Nur die Klassenleitung kann externe Lehrkräfte einladen.' });
     }
-    const email = String(request.body?.email || '').trim() || null;
-    const displayName = String(request.body?.display_name || '').trim() || null;
-    const ttl = parseInt(request.body?.ttl_days, 10) || 14;
-    const expires = new Date(Date.now() + ttl * 86400 * 1000).toISOString();
-    getDb().prepare(`INSERT INTO invitations
-      (token, email, display_name, role, created_by_id, expires_at)
-      VALUES (?, ?, ?, 'teacher', ?, ?)`)
-      .run(makeToken(), email, displayName, request.user.id, expires);
+    const e = legeEinladungAn({ userId: request.user.id, email: request.body?.email, displayName: request.body?.display_name, ttlDays: request.body?.ttl_days });
+    request.flash?.('success', e.generiert
+      ? `Einladung für „${e.displayName}“ erstellt (zufälliger Name – du hast keinen eingegeben).`
+      : `Einladung für „${e.displayName}“ erstellt.`);
     return reply.redirect('/teacher/einladungen');
   });
 

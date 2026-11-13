@@ -30,7 +30,7 @@ export const ARTIKEL = [
         'Mit dem Haken **Angemeldet bleiben** bleibst du auf diesem Gerät länger angemeldet. Auf fremden Geräten besser nicht setzen.',
       ] },
       { titel: 'Externe Lehrkräfte', absaetze: [
-        'Wer kein Schulkonto hat, bekommt von der Klassenleitung oder der Administration einen **Einladungslink** und legt damit ein eigenes Konto mit Passwort an. Das Passwort lässt sich unter **🔑 Passwort ändern** (oben rechts im Menü) ändern.',
+        'Wer kein Schulkonto hat, bekommt von der Klassenleitung oder der Administration einen **Einladungslink** und legt damit ein eigenes Konto mit Passwort an. Wer Einladungen verschickt, gibt dazu einen **Anzeigenamen** ein, damit er in der Liste erkennt, für wen der Link gedacht ist; ohne Eingabe vergibt die App einen zufälligen Namen aus dem Star-Trek-Universum (nur als Etikett, er erscheint nicht in der Mail und nicht im neuen Konto). Das Passwort lässt sich unter **🔑 Passwort ändern** (oben rechts im Menü) ändern.',
       ] },
       { titel: 'Die Startseite', absaetze: [
         'Nach der Anmeldung siehst du vier Kacheln: **Noteneingabe** (hier trägst du Noten ein), **Meine Klassen** (Klassen und Kurse verwalten), **Sitzpläne** und **Klassenleitung** (Übersicht, Konferenz, Zeugnisse).',

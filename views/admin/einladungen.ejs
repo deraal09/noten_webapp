@@ -3,7 +3,8 @@
 <h2>Neue Einladung erstellen</h2>
 <form method="post" action="/admin/einladungen/neu" class="card">
   <label>Anzeigename (optional)
-    <input type="text" name="display_name" placeholder="z. B. Frau Müller">
+    <input type="text" name="display_name" placeholder="z. B. Frau Müller" maxlength="100">
+    <small class="hint">Damit erkennst du in der Liste, für wen der Link gedacht ist. Leer lassen: Es wird ein zufälliger Name aus dem Star-Trek-Universum vergeben (Personen, Raumschiffe, Stationen, Waffen …) – er dient nur als Etikett und erscheint nicht in der Mail und nicht im neuen Konto.</small>
   </label>
   <label>E-Mail (optional)
     <input type="email" name="email">
@@ -23,13 +24,14 @@
 <% if (!einladungen.length) { %><p>Noch keine Einladungen.</p><% } else { %>
   <table class="data">
     <thead>
-      <tr><th>Token / Link</th><th>Rolle</th><th>Erstellt</th><th>Gültig bis</th><th>Status</th><th>Aktion</th></tr>
+      <tr><th>Name</th><th>Token / Link</th><th>Rolle</th><th>Erstellt</th><th>Gültig bis</th><th>Status</th><th>Aktion</th></tr>
     </thead>
     <tbody>
       <% einladungen.forEach(function(e) { %>
         <% var base = PUBLIC_URL || ''; var link = base + '/einladung/' + e.token; %>
         <% var status = e.used_at ? '✅ eingelöst' : ((e.expires_at && new Date(e.expires_at) < now) ? '⏱ abgelaufen' : '🟢 offen'); %>
         <tr>
+          <td class="einladung-name"><strong><%= e.display_name || '–' %></strong><% if (e.name_generiert) { %> <span class="hint" title="Zufällig vergeben, weil kein Anzeigename eingegeben wurde. Erscheint nicht in der Mail und nicht im neuen Konto.">🖖 zufällig</span><% } %><% if (e.email) { %><br><small class="hint"><%= e.email %></small><% } %></td>
           <td>
             <code class="token" data-link="<%= link %>"><%= e.token.slice(0, 12) %>…</code>
             <button type="button" class="copy-btn" data-target="<%= link %>" title="Link kopieren">📋</button>
@@ -38,7 +40,7 @@
           <td><%= e.role %></td>
           <td><%= e.created_at %></td>
           <td><%= e.expires_at || '∞' %></td>
-          <td><%= status %></td>
+          <td><%= status %><% if (e.used_at && e.verwendet_von) { %><br><small class="hint">von <%= e.verwendet_von %></small><% } %></td>
           <td>
             <% if (!e.used_at) { %>
               <form method="post" action="/admin/einladungen/<%= e.id %>/loeschen" class="inline" onsubmit="return confirm('Einladung löschen?')">

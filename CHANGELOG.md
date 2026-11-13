@@ -6,6 +6,29 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.134.0 - 2026-11-13
+
+### Einladungen: Anzeigename in der Liste, zufälliger Star-Trek-Name
+
+- **Anzeigename sichtbar:** Die Einladungslisten (Admin → Einladungen und
+  Klassenleitung → Einladungen) haben eine neue Spalte **Name** (mit E-Mail, falls
+  angegeben); bei eingelösten Einladungen steht zusätzlich, von wem. So lässt sich
+  jeder Link beim Verschicken der richtigen Person zuordnen.
+- **Ohne Anzeigename ein zufälliger Name aus dem Star-Trek-Universum** (rund 290
+  Einträge: Personen, Raumschiffe, Stationen, Orte, Waffen, Technik, Völker …
+  `src/startrek-namen.js`). Die Namen offener Einladungen sind eindeutig (sind alle
+  vergeben, kommt eine römische Zahl dazu); die Liste kennzeichnet sie mit
+  „🖖 zufällig“, und nach dem Anlegen erscheint eine Rückmeldung.
+- Das zufällige Etikett ist **nur zum Wiederfinden**: Es steht **nicht** in der
+  Anrede der Mail („Hallo,“ statt „Hallo Worf,“), nicht auf der Einladungsseite,
+  nicht im vorbelegten Namensfeld und wird nicht Name des neuen Kontos (dann gilt
+  der Benutzername). Dafür neue Spalte `invitations.name_generiert`.
+- Behoben nebenbei: Beim Einlösen einer Einladung wurde „eingeladen von“ am neuen
+  Konto nicht gesetzt (die Abfrage lud `created_by_id` nicht mit).
+- Anlegen der Einladung liegt jetzt gemeinsam für Admin und Klassenleitung in
+  `src/einladungen.js` (Anzeigename auf 100 Zeichen begrenzt). Hilfe („Anmelden“)
+  ergänzt.
+
 ## 0.133.0 - 2026-11-13
 
 ### Testphase: Personenansicht bei „Aktivität“, Admin-Artikel aus der Hilfe
