@@ -69,9 +69,19 @@ test('Seiten verlinken Manifest, iOS-Symbol und bieten den Installieren-Knopf sa
   assert.match(html, /beforeinstallprompt/);
 });
 
+test('„App neu laden“: Knopf im Menü und Skript für den harten Reload (Stylesheets/Skripte frisch holen, Service Worker aktualisieren)', async () => {
+  const html = await (await get('/setup')).text();
+  assert.match(html, /id="app-neu-laden"/);
+  assert.match(html, /App neu laden/);
+  assert.match(html, /cache: 'reload'/, 'Dateien werden am Cache vorbei geholt');
+  assert.match(html, /getRegistrations/, 'Service Worker wird aktualisiert');
+  assert.match(html, /location\.reload\(\)/);
+});
+
 test('Eingebettet (iframe) wird kein Installieren-Knopf ausgeliefert', async () => {
   const html = await (await get('/setup', { headers: { 'sec-fetch-dest': 'iframe' } })).text();
   assert.equal(html.includes('id="app-install-knopf"'), false);
+  assert.equal(html.includes('id="app-neu-laden"'), false, 'auch kein Knopf zum Neuladen');
 });
 
 test.after(async () => {

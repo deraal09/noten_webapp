@@ -81,6 +81,9 @@
         </div>
       <% } %>
       <div class="menue-extras">
+        <button type="button" class="app-install" id="app-neu-laden" title="Lädt die Seite neu und holt Stylesheets und Skripte frisch vom Server (harter Reload) – hilft, wenn die Darstellung nach einer Aktualisierung noch veraltet aussieht">
+          <span aria-hidden="true">🔄</span><span class="app-install-text"> App neu laden</span>
+        </button>
         <button type="button" class="app-install" id="app-install-knopf" hidden title="Notenverwaltung als App installieren">
           <span aria-hidden="true">📲</span><span class="app-install-text"> App installieren</span>
         </button>
@@ -170,6 +173,30 @@
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menue.hidden) { setze(false); toggle.focus(); } });
       menue.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { setze(false); }); });
     }
+  })();
+  // App neu laden („harter“ Reload): Stylesheets, Skripte und den Service Worker frisch vom Server holen und die Seite neu laden --
+  // besonders für die installierte App ohne Adressleiste und Neu-laden-Taste. Farbschema und Anmeldung bleiben erhalten.
+  (function () {
+    var knopf = document.getElementById('app-neu-laden');
+    if (!knopf) return;
+    knopf.addEventListener('click', function () {
+      if (knopf.disabled) return;
+      knopf.disabled = true;
+      var text = knopf.querySelector('.app-install-text');
+      if (text) text.textContent = ' Lädt neu …';
+      var urls = {};
+      document.querySelectorAll('link[rel="stylesheet"][href], link[rel="manifest"][href], script[src]').forEach(function (el) { urls[el.href || el.src] = true; });
+      var aufgaben = Object.keys(urls).map(function (u) { return fetch(u, { cache: 'reload', credentials: 'same-origin' }).catch(function () { /* offline o. Ä.: egal */ }); });
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        aufgaben.push(navigator.serviceWorker.getRegistrations()
+          .then(function (rs) { return Promise.all(rs.map(function (r) { return r.update().catch(function () { /* egal */ }); })); })
+          .catch(function () { /* egal */ }));
+      }
+      var fertig = false;
+      function neuLaden() { if (fertig) return; fertig = true; location.reload(); }
+      Promise.all(aufgaben).then(neuLaden, neuLaden);
+      setTimeout(neuLaden, 5000); // hängt etwas, wird trotzdem neu geladen
+    });
   })();
   // App installieren: Chrome/Edge (Android, Windows, Linux) bieten per "beforeinstallprompt" die Installation direkt
   // an; auf iOS (und überall, wo der Browser das nicht anbietet) öffnet der Knopf eine Anleitung.

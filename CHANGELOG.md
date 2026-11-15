@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.135.0 - 2026-11-15
+
+### „App neu laden“ im Menü
+
+- Neuer Knopf **🔄 App neu laden** im Menü (☰, neben „App installieren“ und dem
+  Farbschema): ein **harter Reload**. Er holt Stylesheets, Skripte und das
+  Manifest am Browser-Cache vorbei frisch vom Server, aktualisiert den Service
+  Worker und lädt die Seite danach neu (spätestens nach 5 Sekunden, auch wenn
+  etwas hängt). Praktisch, wenn die Darstellung nach einer Aktualisierung noch
+  veraltet aussieht – vor allem in der installierten App, die keine Adressleiste
+  und keine Neu-laden-Taste hat. Anmeldung und gewähltes Farbschema bleiben
+  erhalten. In eingebetteter Ansicht (iframe) gibt es den Knopf wie die
+  Installieren-Schaltfläche nicht.
+
 ## 0.134.0 - 2026-11-13
 
 ### Einladungen: Anzeigename in der Liste, zufälliger Star-Trek-Name
