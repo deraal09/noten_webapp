@@ -1,5 +1,5 @@
 /**
- * Such-/Filterfeld über langen Auswahllisten: <select data-filter> bekommt ein kleines Suchfeld, das die Einträge beim Tippen
+ * Such-/Auswahlfeld für lange Listen: <select data-filter> wird zur Combobox (Eingabefeld mit Trefferliste), die beim Tippen
  * unscharf filtert (Groß-/Kleinschreibung, Umlaute und ä/ae, ö/oe, ü/ue, ß/ss sind egal; mehrere Wörter müssen alle passen;
  * auch verstreute Buchstaben und ein Tippfehler bei längeren Wörtern werden verziehen) und die besten Treffer nach oben sortiert.
  * Passt genau ein Eintrag, wird er gleich ausgewählt. Ohne JavaScript bleibt die normale Auswahlliste.
@@ -69,56 +69,145 @@
     return summe;
   }
 
+  var zaehler = 0;
+
+  /**
+   * Aus <select data-filter> wird eine Combobox: ein Eingabefeld mit Trefferliste darunter (die Auswahlliste selbst bleibt unsichtbar im
+   * Formular und liefert den Wert). Tippen filtert unscharf, Pfeiltasten wählen, Enter übernimmt, Escape schließt.
+   */
   function verbessere(select) {
     if (select.dataset.filterBereit) return;
     select.dataset.filterBereit = '1';
-    var alle = Array.prototype.map.call(select.options, function (o, i) {
-      return { option: o, index: i, platzhalter: o.value === '', text: normalisiere(o.textContent + ' ' + (o.dataset.suche || '')) };
-    });
+    var eintraege = Array.prototype.map.call(select.options, function (o, i) {
+      return { option: o, index: i, wert: o.value, text: o.textContent.replace(/\s+/g, ' ').trim(), norm: normalisiere(o.textContent + ' ' + (o.dataset.suche || '')) };
+    }).filter(function (e) { return e.wert !== ''; });
+    var id = 'sf-' + (++zaehler);
+
+    var huelle = document.createElement('div');
+    huelle.className = 'sf-combobox';
     var eingabe = document.createElement('input');
-    eingabe.type = 'search';
+    eingabe.type = 'text';
     eingabe.className = 'select-filter';
-    eingabe.placeholder = '🔍 Suchen …';
+    eingabe.placeholder = '🔍 Suchen oder auswählen …';
     eingabe.autocomplete = 'off';
-    eingabe.setAttribute('aria-label', (select.getAttribute('aria-label') || 'Auswahl') + ' durchsuchen');
+    eingabe.setAttribute('role', 'combobox');
+    eingabe.setAttribute('aria-autocomplete', 'list');
+    eingabe.setAttribute('aria-expanded', 'false');
+    eingabe.setAttribute('aria-controls', id + '-liste');
+    eingabe.setAttribute('aria-label', select.getAttribute('aria-label') || 'Auswahl');
+    var liste = document.createElement('ul');
+    liste.className = 'sf-liste';
+    liste.id = id + '-liste';
+    liste.setAttribute('role', 'listbox');
+    liste.hidden = true;
     var info = document.createElement('small');
     info.className = 'select-filter-info hint';
-    info.hidden = true;
     info.setAttribute('aria-live', 'polite');
-    select.parentNode.insertBefore(eingabe, select);
-    select.parentNode.insertBefore(info, select);
+    info.hidden = true;
+    huelle.appendChild(eingabe);
+    huelle.appendChild(liste);
+    huelle.appendChild(info);
+    select.parentNode.insertBefore(huelle, select);
+    select.classList.add('sf-versteckt'); // bleibt im Formular (Wert, Pflichtfeld), ist aber nicht mehr zu sehen
 
-    function zeige(query) {
+    var treffer = [];
+    var aktiv = -1;
+
+    function beschriftung(wert) {
+      var e = eintraege.filter(function (x) { return x.wert === wert; })[0];
+      return e ? e.text : '';
+    }
+    function setzeAuswahl(wert) {
+      select.value = wert;
+      eingabe.value = wert ? beschriftung(wert) : eingabe.value;
+      eingabe.classList.remove('ohne-treffer');
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    function berechne(query) {
       var tokens = normalisiere(query).split(' ').filter(Boolean);
-      var gewaehlt = select.value;
-      var treffer = alle.filter(function (e) { return !e.platzhalter; }).map(function (e) {
-        return { e: e, punkte: tokens.length ? bewerteText(tokens, e.text) : 1 };
-      }).filter(function (t) { return t.punkte > 0; });
-      if (tokens.length) treffer.sort(function (a, b) { return (b.punkte - a.punkte) || (a.e.index - b.e.index); });
-      else treffer.sort(function (a, b) { return a.e.index - b.e.index; });
-      while (select.options.length) select.remove(0);
-      alle.filter(function (e) { return e.platzhalter; }).forEach(function (e) { select.add(e.option); });
-      treffer.forEach(function (t) { select.add(t.e.option); });
-      if (tokens.length && treffer.length === 1) select.value = treffer[0].e.option.value; // genau ein Treffer: gleich gewählt
-      else if (gewaehlt && Array.prototype.some.call(select.options, function (o) { return o.value === gewaehlt; })) select.value = gewaehlt;
-      else if (!tokens.length) select.selectedIndex = 0;
-      else select.value = '';
-      info.hidden = !tokens.length;
-      info.textContent = treffer.length === 0 ? 'Kein Treffer' : (treffer.length === 1 ? '1 Treffer' : treffer.length + ' Treffer');
-      eingabe.classList.toggle('ohne-treffer', Boolean(tokens.length) && treffer.length === 0);
+      var r = eintraege.map(function (e) { return { e: e, punkte: tokens.length ? bewerteText(tokens, e.norm) : 1 }; }).filter(function (t) { return t.punkte > 0; });
+      r.sort(function (a, b) { return tokens.length ? ((b.punkte - a.punkte) || (a.e.index - b.e.index)) : (a.e.index - b.e.index); });
+      return r.map(function (t) { return t.e; });
+    }
+    function markiere(neu) {
+      var knoten = liste.children;
+      if (!knoten.length) { aktiv = -1; eingabe.removeAttribute('aria-activedescendant'); return; }
+      aktiv = (neu + knoten.length) % knoten.length;
+      for (var i = 0; i < knoten.length; i++) knoten[i].setAttribute('aria-selected', i === aktiv ? 'true' : 'false');
+      eingabe.setAttribute('aria-activedescendant', knoten[aktiv].id);
+      knoten[aktiv].scrollIntoView({ block: 'nearest' });
+    }
+    function oeffne() {
+      var query = eingabe.dataset.gewaehlt && eingabe.value === beschriftung(select.value) ? '' : eingabe.value;
+      treffer = berechne(query);
+      liste.textContent = '';
+      treffer.slice(0, 60).forEach(function (e, i) {
+        var li = document.createElement('li');
+        li.id = id + '-opt-' + i;
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', 'false');
+        li.textContent = e.text;
+        li.addEventListener('mousedown', function (ev) { ev.preventDefault(); waehle(e); });
+        liste.appendChild(li);
+      });
+      info.hidden = !query.trim();
+      info.textContent = treffer.length === 0 ? 'Kein Treffer' : (treffer.length === 1 ? '1 Treffer' : treffer.length + ' Treffer' + (treffer.length > 60 ? ' (die ersten 60 – bitte weiter eingrenzen)' : ''));
+      eingabe.classList.toggle('ohne-treffer', Boolean(query.trim()) && treffer.length === 0);
+      liste.hidden = treffer.length === 0;
+      eingabe.setAttribute('aria-expanded', String(!liste.hidden));
+      markiere(0);
+    }
+    function schliesse() {
+      liste.hidden = true;
+      eingabe.setAttribute('aria-expanded', 'false');
+      eingabe.removeAttribute('aria-activedescendant');
+    }
+    function waehle(e) {
+      eingabe.dataset.gewaehlt = '1';
+      setzeAuswahl(e.wert);
+      info.hidden = true;
+      schliesse();
     }
 
-    eingabe.addEventListener('input', function () { zeige(eingabe.value); });
+    // Vorbelegung (selected-Attribut): gewählten Eintrag anzeigen
+    if (select.value) { eingabe.value = beschriftung(select.value); eingabe.dataset.gewaehlt = '1'; }
+
+    eingabe.addEventListener('input', function () {
+      // Wer tippt, hat die bisherige Auswahl verworfen, bis aus der Liste neu gewählt wird.
+      if (select.value) { select.value = ''; delete eingabe.dataset.gewaehlt; }
+      oeffne();
+    });
+    eingabe.addEventListener('focus', function () { eingabe.select(); oeffne(); });
+    eingabe.addEventListener('click', function () { if (liste.hidden) oeffne(); });
     eingabe.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { // Enter wählt den besten Treffer, schickt das Formular aber nicht ab
-        e.preventDefault();
-        if (select.options.length > 1 && !select.value) select.selectedIndex = 1;
-        select.focus();
-      } else if (e.key === 'ArrowDown') { e.preventDefault(); select.focus(); }
-      else if (e.key === 'Escape') { eingabe.value = ''; zeige(''); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (liste.hidden) oeffne(); else markiere(aktiv + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (!liste.hidden) markiere(aktiv - 1); }
+      else if (e.key === 'Enter') {
+        e.preventDefault(); // Enter schickt das Formular nicht ab, sondern übernimmt den markierten Treffer
+        if (!liste.hidden && treffer[aktiv]) waehle(treffer[aktiv]);
+      } else if (e.key === 'Escape') {
+        if (!liste.hidden) { e.preventDefault(); schliesse(); }
+      } else if (e.key === 'Tab') schliesse();
+    });
+    eingabe.addEventListener('blur', function () {
+      // Genau ein Treffer und nichts gewählt: übernehmen (so reicht „schmid“ und Weiter).
+      if (!select.value && eingabe.value.trim()) {
+        var t = berechne(eingabe.value);
+        if (t.length === 1) { eingabe.dataset.gewaehlt = '1'; setzeAuswahl(t[0].wert); }
+      }
+      schliesse();
+      info.hidden = true;
+    });
+    // Pflichtfeld ohne Auswahl: Hinweis am sichtbaren Feld statt an der unsichtbaren Liste
+    select.addEventListener('invalid', function (e) {
+      e.preventDefault();
+      eingabe.classList.add('ohne-treffer');
+      info.hidden = false;
+      info.textContent = 'Bitte einen Eintrag aus der Liste wählen.';
+      eingabe.focus();
     });
     var formular = select.form;
-    if (formular) formular.addEventListener('reset', function () { setTimeout(function () { eingabe.value = ''; zeige(''); }, 0); });
+    if (formular) formular.addEventListener('reset', function () { setTimeout(function () { eingabe.value = ''; delete eingabe.dataset.gewaehlt; select.value = ''; schliesse(); info.hidden = true; }, 0); });
   }
 
   function start() { document.querySelectorAll('select[data-filter]').forEach(verbessere); }

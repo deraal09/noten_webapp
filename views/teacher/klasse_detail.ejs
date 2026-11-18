@@ -8,7 +8,7 @@
 <%# Kopfzeile: nur der erste Knopf ist immer sichtbar, alle weiteren Aktionen stecken hinter den drei Balken (☰) -- besonders am Handy sind sonst zu viele Knöpfe zu sehen. %>
 <% var kopfMenueHat = !klasse.ist_ablage || kannExportieren || istKlassenlehrer || darfVerwalten; %>
 <div class="kopf-aktionen">
-  <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
+  <a class="btn btn-zurueck" href="/teacher/klassen">← Meine Klassen</a>
   <% if (kopfMenueHat) { %>
   <details class="kopf-menue" id="kopf-menue">
     <summary class="kopf-menue-knopf" aria-label="Weitere Optionen" data-hinweis="Mehr Optionen"><span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span></summary>

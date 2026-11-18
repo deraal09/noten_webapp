@@ -1,6 +1,6 @@
 <h1>Halbjahresübersicht: <%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <p class="kopf-aktionen">
-  <a class="btn" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
+  <a class="btn btn-zurueck" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
   <% if (zeilen.length) { %>
     <a class="btn" href="/teacher/klassen/<%= klasse.id %>/konferenz/<%= zeilen[0].schueler.id %>?hj=<%= encodeURIComponent(halbjahr) %>">🎓 Konferenzmodus starten</a>
   <% } %>

@@ -1,6 +1,6 @@
 <h1>Klassenleitung: <%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <div class="kopf-aktionen">
-  <a class="btn" href="/klassenlehrer">← Klassenleitung</a>
+  <a class="btn btn-zurueck" href="/klassenlehrer">← Klassenleitung</a>
   <%- await include('../partials/kopf-menue', { id: 'kopf-menue-leitung', eintraege: [{ href: '/teacher/klassen/' + klasse.id, text: '📚 Zur Klasse' }] }) %>
 </div>
 

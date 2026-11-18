@@ -37,6 +37,34 @@
   <div class="topbar-inner">
     <a class="brand" href="/">📚 <%= appName %></a>
     <%# Alle Optionen der Leiste stecken im Menü (☰): Navigation, Konto, App installieren, Farbschema. %>
+    <%# Ab ca. 900 px Breite stehen die wichtigsten Ziele direkt in der Leiste (aktuelle Seite markiert); alles weitere liegt im Menü (☰). %>
+    <% if (typeof user !== 'undefined' && user) {
+         var pfad = (typeof aktuellerPfad !== 'undefined' && aktuellerPfad) || '';
+         var istAktiv = function(href, praefixe) {
+           var liste = praefixe || [href];
+           return liste.some(function(p) { return pfad === p || pfad.indexOf(p + '/') === 0; });
+         };
+         var topNav = user.isAdmin ? [
+           { href: '/start', text: 'Start', praefixe: ['/start'] },
+           { href: '/admin', text: 'Dashboard', praefixe: ['/admin'], genau: true },
+           { href: '/admin/users', text: 'Lehrkräfte' },
+           { href: '/admin/aktivitaet', text: 'Aktivität' },
+           { href: '/admin/zuweisungen', text: 'Zuweisungen' },
+           { href: '/admin/einladungen', text: 'Einladungen' },
+           { href: '/hilfe', text: 'Hilfe' },
+         ] : [
+           { href: '/start', text: 'Start', praefixe: ['/start'] },
+           { href: '/teacher', text: 'Noteneingabe', praefixe: ['/teacher/fach', '/teacher/faecher'], genau: true },
+           { href: '/teacher/klassen', text: 'Meine Klassen', praefixe: ['/teacher/klassen', '/teacher/papierkorb'] },
+           { href: '/teacher/sitzplaene', text: 'Sitzpläne' },
+         ].concat(typeof kannEinladen !== 'undefined' && kannEinladen ? [{ href: '/klassenlehrer', text: 'Klassenleitung' }] : []).concat([{ href: '/hilfe', text: 'Hilfe' }]);
+    %>
+      <nav class="topnav" aria-label="Hauptnavigation">
+        <% topNav.forEach(function(l) {
+             var aktiv = l.genau ? (pfad === l.href || (l.praefixe || []).some(function(p) { return pfad === p || pfad.indexOf(p + '/') === 0; })) : istAktiv(l.href, l.praefixe);
+        %><a href="<%= l.href %>"<%- aktiv ? ' aria-current="page"' : '' %>><%= l.text %></a><% }); %>
+      </nav>
+    <% } %>
     <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue" data-hinweis="Mehr Optionen" data-hinweis-rechts>☰</button>
     <div class="menue" id="hauptmenue" hidden>
       <% if (typeof user !== 'undefined' && user) { %>
@@ -158,6 +186,8 @@
 <script src="/static/js/noten-picker.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script src="/static/js/select-filter.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script src="/static/js/ui-menues.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
+<script src="/static/js/speicher-status.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
+<script src="/static/js/bestaetigen.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script>
   (function () {
     // Menü (☰): auf- und zuklappen; schließt bei Klick daneben, mit Escape und nach Wahl eines Links.

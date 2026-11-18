@@ -59,7 +59,8 @@ test('Kopfzeile: nur „← Meine Klassen“ ist sichtbar, alle weiteren Aktione
   const menueStart = k.indexOf('<details class="kopf-menue"');
   assert.ok(menueStart > 0, 'Menü vorhanden');
   const ausserhalb = k.slice(0, menueStart);
-  assert.equal((ausserhalb.match(/<a class="btn"/g) || []).length, 1, 'genau ein Knopf außerhalb des Menüs');
+  assert.equal((ausserhalb.match(/<a class="btn[ "]/g) || []).length, 1, 'genau ein Knopf außerhalb des Menüs');
+  assert.match(ausserhalb, /<a class="btn btn-zurueck" href="\/teacher\/klassen">/, 'Zurück ist ein Umriss-Knopf, keine Hauptaktion');
   assert.match(ausserhalb, /href="\/teacher\/klassen">← Meine Klassen</);
   assert.match(k, /<summary class="kopf-menue-knopf" aria-label="Weitere Optionen" data-hinweis="Mehr Optionen"><span class="drei-balken"/, 'drei Balken');
   const menue = k.slice(menueStart);

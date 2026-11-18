@@ -1,7 +1,7 @@
 <% var zeugnisArt = schueler.status === 'abgang' ? 'Abgangszeugnis' : 'Abschlusszeugnis'; %>
 <h1><%= zeugnisArt %>: <%= schueler.nachname %>, <%= schueler.vorname %> <small>(<%= schueler.klasse_name %>)</small></h1>
 <p class="kopf-aktionen">
-  <a class="btn" href="/teacher/klassen/<%= schueler.klasse_id %>">← Zur Klasse</a>
+  <a class="btn btn-zurueck" href="/teacher/klassen/<%= schueler.klasse_id %>">← Zur Klasse</a>
   <button type="button" class="btn" onclick="window.print()">🖨 Drucken</button>
 </p>
 

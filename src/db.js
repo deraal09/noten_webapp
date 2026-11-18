@@ -646,6 +646,12 @@ CREATE TABLE IF NOT EXISTS ldap_settings (
 -- Anonyme Nutzungsstatistik (src/aktivitaet.js): KEINE Verknüpfung mit Konten. profil ist ein nicht umkehrbarer Zufallswert
 -- (HMAC mit Schlüssel aus der Umgebung, nicht aus der Datenbank), nur auf Tagesebene; Tageszeiten stehen nur als Summe aller
 -- Personen in nutzung_stunden.
+-- Favoriten der Lehrkräfte in der Noteneingabe (Stern an der Fach-Kachel): reine Anzeige-Vorliebe pro Konto.
+CREATE TABLE IF NOT EXISTS fach_favoriten (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, fach_id)
+);
 CREATE TABLE IF NOT EXISTS nutzung_tage (
     profil TEXT NOT NULL,
     tag TEXT NOT NULL,

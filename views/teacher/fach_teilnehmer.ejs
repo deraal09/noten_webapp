@@ -4,9 +4,9 @@
 </h1>
 <p class="kopf-aktionen">
   <% if (fach.ist_kurs) { %>
-    <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
+    <a class="btn btn-zurueck" href="/teacher/klassen">← Meine Klassen</a>
   <% } else { %>
-    <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zur Klasse <%= fach.klasse_name %></a>
+    <a class="btn btn-zurueck" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zur Klasse <%= fach.klasse_name %></a>
   <% } %>
   <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
 </p>

@@ -85,6 +85,8 @@ try {
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'noten-picker.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'select-filter.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'ui-menues.js')))
+    .update(readFileSync(path.join(__dirname, 'static', 'js', 'speicher-status.js')))
+    .update(readFileSync(path.join(__dirname, 'static', 'js', 'bestaetigen.js')))
     .digest('hex').slice(0, 10);
 } catch { /* Fallback bleibt 'dev' */ }
 
@@ -195,6 +197,7 @@ export async function buildApp(opts = {}) {
   app.addHook('preHandler', (request, reply, done) => {
     reply.locals = reply.locals || {};
     reply.locals.appName = 'Notenverwaltung';
+    reply.locals.aktuellerPfad = request.url.split('?')[0]; // für die Markierung der aktuellen Seite in der Leiste
     reply.locals.now = new Date();
     reply.locals.PUBLIC_URL = PUBLIC_URL;
     pruefePapierkorbEinmalProTag(); // einmal am Tag: abgelaufene Klassen im Papierkorb endgültig löschen

@@ -68,8 +68,25 @@ test('Alle Optionen der Leiste stecken im Menü: Navigation, Konto, App installi
     assert.ok(menue.includes(teil), `${teil} im Menü`);
     assert.ok(!vorMenue.includes(teil), `${teil} nicht direkt in der Leiste`);
   }
-  // In der Leiste selbst: nur Name der Anwendung und Menü-Button.
+  // In der Leiste selbst: Name der Anwendung, (ab 900 px sichtbare) Hauptnavigation und Menü-Button.
   assert.deepEqual([...vorMenue.matchAll(/<(a|button)\b[^>]*class="([^"]+)"/g)].map((m) => m[2]), ['brand', 'nav-toggle']);
+  assert.match(vorMenue, /<nav class="topnav" aria-label="Hauptnavigation">/);
+});
+
+test('Hauptnavigation in der Leiste: wichtigste Ziele, aktuelle Seite markiert, nur ab 900 px sichtbar', async () => {
+  const start = await (await admin('/start')).text();
+  const leiste = /<nav class="topnav"[\s\S]*?<\/nav>/.exec(start)[0];
+  assert.match(leiste, /<a href="\/start" aria-current="page">Start<\/a>/);
+  for (const t of ['Dashboard', 'Lehrkräfte', 'Aktivität', 'Zuweisungen', 'Einladungen', 'Hilfe']) assert.ok(leiste.includes(`>${t}</a>`), t);
+  const users = await (await admin('/admin/users')).text();
+  const l2 = /<nav class="topnav"[\s\S]*?<\/nav>/.exec(users)[0];
+  assert.match(l2, /<a href="\/admin\/users" aria-current="page">Lehrkräfte<\/a>/);
+  assert.doesNotMatch(l2, /aria-current="page">Start/);
+  const dash = /<nav class="topnav"[\s\S]*?<\/nav>/.exec(await (await admin('/admin')).text())[0];
+  assert.match(dash, /<a href="\/admin" aria-current="page">Dashboard<\/a>/, 'Dashboard nur auf /admin, nicht auf Unterseiten');
+  const css = await (await fetch(base + '/static/css/app.css')).text();
+  assert.match(css, /\.topnav \{ display: none;/);
+  assert.match(css, /@media \(min-width: 900px\) \{ \.topnav \{ display: flex; \} \}/);
 });
 
 test('Ohne Anmeldung (Login-Seite): Menü mit Farbschema, aber ohne Navigation', async () => {

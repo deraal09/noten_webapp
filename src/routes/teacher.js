@@ -343,11 +343,27 @@ export default async function teacherRoutes(fastify) {
     // Klassen alphabetisch nach Klassenname (bei gleichem Namen bleibt das neuere Schuljahr vorn).
     const klassenListe = sortiereNachName(Array.from(byKlasse.values()));
     for (const k of klassenListe) k.schuljahre = [...new Set(k.faecher.flatMap((f) => f.schuljahre))];
+    const favoritenIds = new Set(getDb().prepare('SELECT fach_id FROM fach_favoriten WHERE user_id = ?').all(request.user.id).map((r) => r.fach_id));
+    for (const k of klassenListe) for (const f of k.faecher) { f.favorit = favoritenIds.has(f.id); f.klasse_name = k.name; }
+    for (const f of kurse) { f.favorit = favoritenIds.has(f.id); f.klasse_name = 'Kurs'; }
     const alleSchuljahre = sortiereSchuljahreAbsteigend([...new Set([...klassenListe.flatMap((k) => k.schuljahre), ...kurse.flatMap((f) => f.schuljahre)])].map((bezeichnung) => ({ bezeichnung })));
     for (const k of klassenListe) k.faecher = sortiereFaecher(k.faecher);
+    const favoriten = [...klassenListe.flatMap((k) => k.faecher), ...kurse].filter((f) => f.favorit);
     return reply.viewEjs('teacher/dashboard.ejs', {
-      user: request.user, byKlasse: klassenListe, kurse: sortiereNachName(kurse), alleSchuljahre: alleSchuljahre.map((s) => s.bezeichnung),
+      user: request.user, favoriten, byKlasse: klassenListe, kurse: sortiereNachName(kurse), alleSchuljahre: alleSchuljahre.map((s) => s.bezeichnung),
     });
+  });
+
+  // Stern an der Fach-Kachel: Fach als Favorit merken bzw. wieder entfernen (nur für Fächer, an denen die Lehrkraft beteiligt ist).
+  fastify.post('/faecher/:id/favorit', async (request, reply) => {
+    const fachId = Number(request.params.id);
+    const db = getDb();
+    const hatZuweisung = db.prepare('SELECT 1 FROM fach_zuweisungen WHERE fach_id = ? AND user_id = ?').get(fachId, request.user.id);
+    if (!hatZuweisung) return reply.code(404).viewEjs('error.ejs', { code: 404, message: 'Fach nicht gefunden.' });
+    const schonFavorit = db.prepare('SELECT 1 FROM fach_favoriten WHERE user_id = ? AND fach_id = ?').get(request.user.id, fachId);
+    if (schonFavorit) db.prepare('DELETE FROM fach_favoriten WHERE user_id = ? AND fach_id = ?').run(request.user.id, fachId);
+    else db.prepare('INSERT INTO fach_favoriten (user_id, fach_id) VALUES (?, ?)').run(request.user.id, fachId);
+    return reply.redirect('/teacher');
   });
 
   // ---------- Fach-Detail (Noteneingabe) ----------

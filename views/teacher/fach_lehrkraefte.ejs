@@ -1,6 +1,6 @@
 <h1>⚙ Fach einstellen: <%= fach.name %> <small>(<%= fach.klasse_name %>)</small></h1>
 <p class="kopf-aktionen">
-  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a>
+  <a class="btn btn-zurueck" href="/teacher/klassen/<%= fach.klasse_id %>#faecher-lehrkraefte">← Zurück zur Klasse</a>
   <a class="btn" href="/teacher/fach/<%= fach.id %>">📝 Zur Noteneingabe</a>
 </p>
 <%- await include('../partials/fach-reiter', { reiter: reiter, aktiv: 'lehrkraefte' }) %>

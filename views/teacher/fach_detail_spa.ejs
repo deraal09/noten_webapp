@@ -1,9 +1,12 @@
 <h1><%= fach.name %> – <%= fach.klasse_name %> <small>(SPA<%= fach.spa_bildungsgang === 'SPA_PIA' ? ' PiA' : '' %>)</small></h1>
-<p class="kopf-aktionen">
-  <a class="btn" href="/teacher">← Meine Noteneingabe</a>
-  <a class="btn" href="/teacher/klassen/<%= fach.klasse_id %>/sitzplan">🪑 Sitzplan</a>
-  <a class="btn" href="/teacher/fach/<%= fach.id %>?hj=<%= halbjahr %>">← Noteneingabe (Klausuren &amp; Unterrichtsleistung)</a>
-</p>
+<%# Kopfzeile: nur der Zurück-Knopf ist immer sichtbar; Sitzplan und Noteneingabe stecken hinter den drei Balken (☰). %>
+<div class="kopf-aktionen">
+  <a class="btn btn-zurueck" href="/teacher">← Meine Noteneingabe</a>
+  <%- await include('../partials/kopf-menue', { id: 'kopf-menue-spa', eintraege: [
+    { href: '/teacher/klassen/' + fach.klasse_id + '/sitzplan', text: '🪑 Sitzplan' },
+    { href: '/teacher/fach/' + fach.id + '?hj=' + halbjahr, text: '← Noteneingabe (Klausuren & Unterrichtsleistung)' },
+  ] }) %>
+</div>
 <h2>Direkte Endnoteneingabe</h2>
 <p class="hint">
   Endnotentabelle dieses SPA-Fachs (festes Bewertungsschema über 4 Halbjahre, siehe src/spa-schema.js):

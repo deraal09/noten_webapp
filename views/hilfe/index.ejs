@@ -32,16 +32,24 @@
 <h2>Alle Themen</h2>
 <div class="hilfe-themen">
   <% nachKategorie.forEach(function(k) { %>
-    <section class="card hilfe-kategorie">
-      <h3><%= k.icon %> <%= k.titel %></h3>
+    <details class="card hilfe-kategorie" open>
+      <summary><h3><%= k.icon %> <%= k.titel %> <small class="hint">(<%= k.artikel.length %>)</small></h3></summary>
       <ul>
         <% k.artikel.forEach(function(a) { %>
           <li><a href="/hilfe/<%= a.slug %>"><%= a.titel %></a><br><span class="hint"><%= a.kurz %></span></li>
         <% }); %>
       </ul>
-    </section>
+    </details>
   <% }); %>
 </div>
+
+<script>
+  // Am Handy sind die Themen eingeklappt (Akkordeon), am Rechner offen.
+  (function () {
+    if (!window.matchMedia || !window.matchMedia('(max-width: 600px)').matches) return;
+    document.querySelectorAll('details.hilfe-kategorie').forEach(function (d) { d.open = false; });
+  })();
+</script>
 
 <script>
   // Live-Suche: Treffer erscheinen beim Tippen unter dem Suchfeld (ohne Skript bleibt die normale Suche über „Suchen“).

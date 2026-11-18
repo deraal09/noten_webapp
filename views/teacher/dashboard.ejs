@@ -47,6 +47,25 @@
   </div>
 <% } %>
 
+<% function sternForm(f) { %>
+  <form method="post" action="/teacher/faecher/<%= f.id %>/favorit" class="inline stern-form">
+    <button type="submit" class="stern<%= f.favorit ? ' stern-an' : '' %>" aria-pressed="<%= f.favorit ? 'true' : 'false' %>" title="<%= f.favorit ? 'Aus den Favoriten entfernen' : 'Als Favorit merken' %>" aria-label="<%= f.favorit ? 'Favorit entfernen: ' : 'Als Favorit merken: ' %><%= f.name %>"><%= f.favorit ? '★' : '☆' %></button>
+  </form>
+<% } %>
+<% if (favoriten && favoriten.length) { %>
+  <section class="favoriten" aria-label="Favoriten">
+    <h2>★ Favoriten</h2>
+    <ul class="klasse-liste">
+      <% favoriten.forEach(function(f) { %>
+        <li class="fach-kachel">
+          <a href="/teacher/fach/<%= f.id %>"><div class="kachel-zeile"><span class="kachel-icon-klein">📝</span><span class="kachel-titel-klein"><%= f.klasse_name %> · <%= f.name %></span></div></a>
+          <% sternForm(f); %>
+        </li>
+      <% }); %>
+    </ul>
+  </section>
+<% } %>
+
 <% byKlasse.forEach(function(k) { %>
   <section class="klassen-gruppe" data-gruppe="klasse-<%= k.id %>" data-schuljahre="<%= k.schuljahre.join('|') %>">
     <h2 id="klasse-<%= k.id %>"><%= k.name %> <small>(<%= klassenSchuljahrText(k.id) %>, Notenschlüssel: <%= k.notenschluessel %>)</small></h2>
@@ -60,6 +79,7 @@
               <span class="kachel-titel-klein"><%= f.name %></span>
             </div>
           </a>
+          <% sternForm(f); %>
           <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)<% if (f.halbjahreText) { %> · <%= f.halbjahreText %><% } %></div>
           <% lehrkraefteZeile(f); %>
           <% var meineSelbst = f.lehrkraefte.filter(function(l) { return l.ich && l.selbst; })[0]; %>
@@ -89,6 +109,7 @@
               <span class="kachel-titel-klein"><%= f.name %></span>
             </div>
           </a>
+          <% sternForm(f); %>
           <div class="kachel-sub">
             <%= f.schuljahr_bezeichnung %>, Notenschlüssel: <%= f.notenschluessel %> ·
             <%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)<% if (f.halbjahreText) { %> · <%= f.halbjahreText %><% } %>

@@ -22,7 +22,7 @@
   }
 %>
 <div class="kopf-aktionen">
-  <a class="btn" href="/teacher">← Meine Noteneingabe</a>
+  <a class="btn btn-zurueck" href="/teacher">← Meine Noteneingabe</a>
   <%- await include('../partials/kopf-menue', { id: 'kopf-menue-fach', eintraege: kopfEintraege }) %>
 </div>
 
@@ -239,10 +239,10 @@
           </label>
         </form>
       </div>
-      <p class="hint">Anzahl Teile: 1 = normale Klausur. Bei mehreren Teilen bekommt jeder Teil eine eigene Note, die Gesamtnote wird prozentual aus den Teilnoten berechnet.
+      <details class="info-ausklapp"><summary>ⓘ Was bedeuten Teile und Arten?</summary><p class="hint">Anzahl Teile: 1 = normale Klausur. Bei mehreren Teilen bekommt jeder Teil eine eigene Note, die Gesamtnote wird prozentual aus den Teilnoten berechnet.
         Jeder Teil hat eine Art: <strong>Standard</strong> (Punkte der Aufgaben ergeben die Teilnote), <strong>Hörverstehen</strong> (eine Aufgabe mit den
         Verrechnungspunkten, meist 15; die Note folgt der Verrechnungstabelle) oder <strong>Inhalt &amp; Sprache</strong> (Mediation, Textaufgabe: für Inhalt und Sprache
-        trägst du direkt je eine <em>Note</em> bzw. Notenpunkte ein, die im einstellbaren Verhältnis, meist 50:50, zur Teilnote verrechnet werden).</p>
+        trägst du direkt je eine <em>Note</em> bzw. Notenpunkte ein, die im einstellbaren Verhältnis, meist 50:50, zur Teilnote verrechnet werden).</p></details>
       <% if (k.teileInfo) { %>
         <form method="post" action="/teacher/klausuren/<%= k.id %>/teile" class="auto-speichern-sofort" autocomplete="off">
           <table class="data">
@@ -283,7 +283,7 @@
                 <% }); %>
               </tbody>
             </table>
-            <small class="hint">Die Tabelle folgt dem Notenschlüssel der Klasse; die Verrechnungspunkte (hier <%= hm %>) trägst du über „Max. Punkte“ unter der Überschrift ein, meist 15, auch 20 oder 25. Es wird nicht nach dem Komma gerundet.</small>
+            <details class="info-ausklapp"><summary>ⓘ Wie wird die Hörverstehen-Note berechnet?</summary><small class="hint">Die Tabelle folgt dem Notenschlüssel der Klasse; die Verrechnungspunkte (hier <%= hm %>) trägst du über „Max. Punkte“ unter der Überschrift ein, meist 15, auch 20 oder 25. Es wird nicht nach dem Komma gerundet.</small></details>
           </details>
         <% } maxStart += teil.aufgaben; }); %>
       <% } %>
@@ -295,7 +295,7 @@
             <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
           </label>
         <% } %>
-        <span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.<% if (!k.teileInfo) { %> In der Spalte „Extra“ steht die Höchstzahl der Extrapunkte (optional, Extra-Aufgaben): Sie zählt nicht zur Gesamtpunktzahl, erreichte Extrapunkte kommen aber zu den Punkten dazu.<% } %></span>
+        <details class="info-ausklapp"><summary>ⓘ Hinweis zu Max. Punkten und Extra</summary><span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.<% if (!k.teileInfo) { %> In der Spalte „Extra“ steht die Höchstzahl der Extrapunkte (optional, Extra-Aufgaben): Sie zählt nicht zur Gesamtpunktzahl, erreichte Extrapunkte kommen aber zu den Punkten dazu.<% } %></span></details>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
       <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
@@ -510,7 +510,7 @@
         <label class="feld">Anzahl Aufgaben
           <input type="number" name="anzahl_aufgaben" value="<%= maxArr.length %>" min="1" max="20">
         </label>
-        <span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.</span>
+        <details class="info-ausklapp"><summary>ⓘ Hinweis zu Max. Punkten und Extra</summary><span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.</span></details>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
       <% var maxSummeUl = maxArr.reduce(function(a, b) { return a + b; }, 0); %>

@@ -6,6 +6,31 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.141.0 - 2026-11-18
+
+### UI/UX: weitere Verbesserungen
+
+- **Hauptnavigation in der Kopfzeile** (ab 900 px Breite): Start, Dashboard, Lehrkräfte,
+  Aktivität, Zuweisungen, Einladungen, Hilfe – je nach Rolle; die aktuelle Seite ist
+  hervorgehoben (`aria-current`). Am Handy bleibt alles im ☰-Menü.
+- **Zurück-Knöpfe als Umriss** (`btn-zurueck`) und „Umbenennen“ sieht anklickbar aus;
+  die Kopfzeile der **SPA-Endnotenseite** folgt jetzt auch dem Muster „erster Knopf +
+  ☰-Menü“.
+- **Hilfetexte zum Aufklappen** (ⓘ) auf der Fachseite statt langer Dauer-Hinweise;
+  die **Hilfe-Übersicht** ist am Handy ein Akkordeon (Kategorien zugeklappt).
+- **Rückmeldung beim Speichern:** ein kleines Zeichen „Speichert … / Gespeichert ✓ /
+  ⚠ Offline“ (`static/js/speicher-status.js`, gilt seitenweit, nicht pro Feld).
+- **Eigener Löschen-Dialog** statt `confirm()` (`static/js/bestaetigen.js`):
+  Frage im Klartext, klarer Knopf („Löschen“ …), **Abbrechen** ist vorausgewählt.
+- **Combobox statt Suchfeld + Auswahlliste:** alle Auswahlen mit `data-filter`
+  (Klassen, Lehrkräfte, Fächer) sind ein Eingabefeld mit Trefferliste; Pfeiltasten,
+  Enter, Escape; die eigentliche Auswahlliste bleibt im Formular (Pflichtfeld).
+- **Favoriten (★)** in der Noteneingabe: Stern an jeder Fach-/Kurs-Kachel, markierte
+  Fächer stehen oben im Abschnitt „★ Favoriten“ (neue Tabelle `fach_favoriten`,
+  `POST /teacher/faecher/:id/favorit`, nur für eigene Fächer).
+- Hilfe-Texte angepasst; neue Tests `test/ux-weitere-vorschlaege.test.js`.
+- Nicht umgesetzt: Brotkrumen-Navigation.
+
 ## 0.140.0 - 2026-11-18
 
 ### Personenlisten ohne eigenes Scrollfenster

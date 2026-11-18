@@ -33,7 +33,8 @@ export const ARTIKEL = [
         'Wer kein Schulkonto hat, bekommt von der Klassenleitung oder der Administration einen **Einladungslink** und legt damit ein eigenes Konto mit Passwort an. Wer Einladungen verschickt, gibt dazu einen **Anzeigenamen** ein, damit er in der Liste erkennt, für wen der Link gedacht ist; ohne Eingabe vergibt die App einen zufälligen Namen aus dem Star-Trek-Universum (nur als Etikett, er erscheint nicht in der Mail und nicht im neuen Konto). Das Passwort lässt sich unter **🔑 Passwort ändern** (oben rechts im Menü) ändern.',
       ] },
       { titel: 'Die Startseite', absaetze: [
-        'Nach der Anmeldung siehst du – sobald du ein Fach geöffnet hast – oben **Weitermachen** mit deinen zuletzt geöffneten Fächern (nur für diese Anmeldung, nichts bleibt gespeichert) und vier Kacheln: **Noteneingabe** (hier trägst du Noten ein), **Meine Klassen** (Klassen und Kurse verwalten), **Sitzpläne** und **Klassenleitung** (Übersicht, Konferenz, Zeugnisse).',
+        'Nach der Anmeldung siehst du – sobald du ein Fach geöffnet hast – oben **Weitermachen** mit deinen zuletzt geöffneten Fächern (nur für diese Anmeldung, nichts bleibt gespeichert) und vier Kacheln: **Noteneingabe** (hier trägst du Noten ein; mit dem **Stern ☆** an einem Fach merkst du es als **★ Favorit** – Favoriten stehen dann oben), **Meine Klassen** (Klassen und Kurse verwalten), **Sitzpläne** und **Klassenleitung** (Übersicht, Konferenz, Zeugnisse).',
+        'Beim Speichern von Eingaben zeigt oben in der Mitte ein kleines Zeichen **Speichert … / Gespeichert ✓ / ⚠ Offline**, ob die Änderung angekommen ist. Vor dem Löschen fragt ein eigenes Fenster nach; **Abbrechen** ist vorausgewählt.',
         'Das Menü **☰** oben rechts bringt dich überall hin, auch zu **❓ Hilfe**, **🤖 API-Zugang** und **Abmelden**. Mit den Symbolen daneben stellst du das Farbschema auf Hell, Dunkel oder System.',
       ], hinweis: 'Die App lässt sich auf dem Handy als **App installieren**: im Menü auf „📲 App installieren“ tippen (iPhone: Teilen → „Zum Home-Bildschirm“).' },
     ],
@@ -49,7 +50,7 @@ export const ARTIKEL = [
     abschnitte: [
       { titel: 'Neue Klasse anlegen', schritte: [
         'Im Menü **Meine Klassen** öffnen und oben auf **+ Neue Klasse anlegen** klicken.',
-        'Existiert die Klasse schon im System, wählst du unter **Vorhandene Klasse wählen** die richtige aus und trittst ihr bei. So entstehen keine doppelten Klassen. Über der Liste hilft ein **Suchfeld**: Es filtert beim Tippen (auch bei Tippfehlern, ohne Rücksicht auf Groß-/Kleinschreibung und Umlaute); **Enter** wählt den besten Treffer. Gibt es die Klasse noch nicht, legst du sie mit **+ Neue Klasse anlegen** gleich neben **Klasse wählen** an.',
+        'Existiert die Klasse schon im System, wählst du unter **Vorhandene Klasse wählen** die richtige aus und trittst ihr bei. So entstehen keine doppelten Klassen. Die Auswahl ist ein **Suchfeld mit Trefferliste**: Es filtert beim Tippen (auch bei Tippfehlern, ohne Rücksicht auf Groß-/Kleinschreibung und Umlaute); mit **↑/↓** und **Enter** wählst du einen Treffer (Enter allein nimmt den obersten). Gibt es die Klasse noch nicht, legst du sie mit **+ Neue Klasse anlegen** gleich neben **Klasse wählen** an.',
         'Sonst im Reiter **Neue Klasse anlegen** das **Schuljahr** (das aktuelle ist vorausgewählt und mit „(aktuell)“ gekennzeichnet), den **Klassennamen**, den **Notenschlüssel** (IHK 1–6, BG 0–15 Punkte oder SPA) und das **Einschulungsjahr** angeben und speichern.',
       ], hinweis: 'Klassen anlegen dürfen Lehrkräfte mit Schulkonto. Externe Lehrkräfte werden von der Klassenleitung einem Fach zugeordnet.' },
       { titel: 'Klasse umbenennen', absaetze: [
@@ -91,7 +92,7 @@ export const ARTIKEL = [
         'Über das **⚙ Zahnrad** am Fach stellst du den Namen, die **Halbjahre**, in denen das Fach gilt, **Unterfächer** und die **Verrechnung** der Halbjahre ein.',
       ] },
       { titel: 'Lehrkräfte zuordnen', absaetze: [
-        'Jedes Fach hat eine oder mehrere zugeordnete Lehrkräfte; nur sie tragen dort Noten ein. In jeder Lehrkräfte-Auswahl (auch in der Administration) gibt es über der Liste ein **Suchfeld**, das beim Tippen filtert, z. B. „mueller“ oder „anna mus“. Du kannst dich **selbst für ein freies Fach eintragen**; die Klassenleitung ordnet auch andere Lehrkräfte zu und kann die Zuordnung auf einzelne Halbjahre begrenzen.',
+        'Jedes Fach hat eine oder mehrere zugeordnete Lehrkräfte; nur sie tragen dort Noten ein. In jeder Lehrkräfte-Auswahl (auch in der Administration) ist die Auswahl ein **Suchfeld mit Trefferliste**, das beim Tippen filtert, z. B. „mueller“ oder „anna mus“. Du kannst dich **selbst für ein freies Fach eintragen**; die Klassenleitung ordnet auch andere Lehrkräfte zu und kann die Zuordnung auf einzelne Halbjahre begrenzen.',
       ] },
       { titel: 'Klassenleitung', absaetze: [
         'Mit **Als Klassenleitung eintragen** übernimmst du die Verwaltung der Klasse (sobald niemand eingetragen ist und du ein eigenes Fach in der Klasse hast). Die Klassenleitung sieht die **synchronisierten** Noten aller Fächer, führt die Notenkonferenz und erstellt Zeugnisse. Weitere Klassenlehrkräfte lassen sich eintragen.',

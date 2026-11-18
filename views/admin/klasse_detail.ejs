@@ -1,6 +1,6 @@
 <h1><%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <p class="kopf-aktionen">
-  <a class="btn" href="/admin/schuljahre/<%= klasse.schuljahr_id %>">← Schuljahr</a>
+  <a class="btn btn-zurueck" href="/admin/schuljahre/<%= klasse.schuljahr_id %>">← Schuljahr</a>
   <a class="btn" href="/admin/klassen/<%= klasse.id %>/notenschluessel">Notenschlüssel</a>
   <a class="btn" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
 </p>

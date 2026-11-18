@@ -1,6 +1,6 @@
 <h1>Zeugnisübersicht: <%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>, SPA<%= klasse.spa_bildungsgang === 'SPA_PIA' ? ' PiA' : '' %>)</small></h1>
 <p class="kopf-aktionen">
-  <a class="btn" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
+  <a class="btn btn-zurueck" href="/teacher/klassen/<%= klasse.id %>">← Zur Klasse</a>
 </p>
 <p class="hint">
   Live berechnete Endnoten/Tendenzen (siehe src/spa-noten-service.js) -- keine gespeicherte
