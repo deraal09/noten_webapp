@@ -964,3 +964,32 @@ a.fach-name { display: inline-flex; align-items: center; min-height: 44px; }
 
 /* Tastaturfokus auch bei Eingabefeldern sichtbar (z. B. Datumsfelder). */
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- Kompakte Kopfbereiche: scrollbare Leisten statt mehrzeiliger Knopf-Stapel ---------- */
+.menue-trenner { border: 0; border-top: 1px solid var(--border-subtle); margin: 0.25rem 0; width: 100%; }
+@media (max-width: 600px) {
+  .hj-tabs, .reiter-leiste { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; padding-bottom: 0.25rem; scrollbar-width: thin; }
+  .hj-tabs > *, .reiter-leiste > button { flex: 0 0 auto; scroll-snap-align: start; white-space: nowrap; }
+}
+.reiter-leiste { gap: 0.5rem; }
+/* Person-für-Person-Leiste im Konferenzmodus / bei der Notenbesprechung bleibt beim Scrollen oben stehen. */
+.besprechung-nav.klebt { position: sticky; top: 0; z-index: 20; box-shadow: 0 2px 6px var(--shadow-strong); }
+@media (max-width: 600px) {
+  .knopf-reihe { flex-wrap: nowrap; gap: 0.5rem; }
+  .knopf-reihe > button { flex: 1 1 0; padding: 0.55rem 0.4rem; font-size: 0.9rem; min-width: 0; }
+}
+
+/* Startseite: „Weitermachen“ (zuletzt geöffnete Fächer) und am Handy kompaktere Kacheln (Symbol links, Text rechts). */
+.weitermachen { width: 100%; max-width: 700px; margin: 0.5rem auto 0; text-align: left; }
+.weitermachen h2 { font-size: 1rem; margin: 0 0 0.4rem; color: var(--text-muted); font-weight: 600; }
+.weitermachen ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.weitermachen-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.9rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text); text-decoration: none; }
+.weitermachen-link:hover { background: var(--bg-tint); border-color: var(--accent); }
+@media (max-width: 600px) {
+  .start-mitte { justify-content: flex-start; min-height: 0; }
+  .start-mitte h1 { margin: 0.5rem 0; font-size: 1.5rem; }
+  .kacheln { grid-template-columns: 1fr; gap: 0.75rem; margin: 0.75rem auto; }
+  .kachel { flex-direction: row; justify-content: flex-start; padding: 1rem 1.25rem; gap: 1rem; }
+  .kachel-icon { font-size: 2.2rem; }
+  .kachel-titel { font-size: 1.2rem; }
+}

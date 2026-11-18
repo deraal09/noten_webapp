@@ -17,6 +17,15 @@
     })();
   </script>
 
+  <% if (typeof zuletzt !== 'undefined' && zuletzt.length) { %>
+    <section class="weitermachen" aria-label="Weitermachen">
+      <h2>Weitermachen</h2>
+      <ul>
+        <% zuletzt.forEach(function(z) { %><li><a class="weitermachen-link" href="<%= z.href %>">📝 <%= z.titel %></a></li><% }); %>
+      </ul>
+    </section>
+  <% } %>
+
   <div class="kacheln">
     <a class="kachel" href="/teacher">
       <span class="kachel-icon">📝</span>

@@ -84,6 +84,7 @@ try {
   jsVersion = crypto.createHash('sha1')
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'noten-picker.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'select-filter.js')))
+    .update(readFileSync(path.join(__dirname, 'static', 'js', 'ui-menues.js')))
     .digest('hex').slice(0, 10);
 } catch { /* Fallback bleibt 'dev' */ }
 

@@ -85,11 +85,16 @@ test('Menü-Knopf hat eine eigene Klasse (das Skript der Personen-Menüs „.akt
   assert.doesNotMatch(kopf(html), /aktionen-knopf/);
 });
 
-test('Menü funktioniert ohne JavaScript (details/summary) und schließt per Klick daneben und Escape', async () => {
+test('Menü funktioniert ohne JavaScript (details/summary); das gemeinsame Skript schließt es per Klick daneben und Escape', async () => {
   const html = await (await anna(`/teacher/klassen/${klasseId}`)).text();
   assert.match(html, /<details class="kopf-menue" id="kopf-menue">/);
-  assert.match(html, /menue\.open = false/);
-  assert.match(html, /e\.key === 'Escape'/);
+  assert.match(html, /\/static\/js\/ui-menues\.js\?v=/, 'Skript eingebunden');
+  const js = await (await fetch(`${base}/static/js/ui-menues.js`)).text();
+  assert.match(js, /m\.open = false/);
+  assert.match(js, /e\.key !== 'Escape'/);
+  assert.match(js, /window\.zeigeAbschnitt = function/);
+  assert.match(js, /aktiviereReiter/, 'ein Bereich in einem Reiter aktiviert zuerst den Reiter');
+  assert.match(js, /location\.hash/, 'Adresse mit #… aktiviert den Reiter');
 });
 
 test('Löschen über das Menü geht weiter (Papierkorb)', async () => {
@@ -119,7 +124,6 @@ test('Schüler/innen hinzufügen und Einschulungsjahr festlegen: erst verborgen,
   assert.match(html, new RegExp(`action="/teacher/klassen/${klasseId}/schueler/neu"`), 'Formular „Einzeln“ ist unverändert da');
   assert.match(html, /data-target="schueler-csv">CSV-Import</);
   assert.match(html, /data-verberge="schueler-hinzufuegen"/, 'Schließen-Knopf');
-  assert.match(html, /window\.zeigeAbschnitt = function/);
   // Einschulungsjahr nur für die Klassenleitung
   db().prepare("DELETE FROM klassenleitung WHERE klasse_id = ?").run(klasseId);
   const ohne = await (await anna(`/teacher/klassen/${klasseId}`)).text();
@@ -137,4 +141,45 @@ test('Hinweis „Mehr Optionen“ an allen Knöpfen mit den drei Balken (Hauptme
   const css = await (await fetch(`${base}/static/css/app.css`)).text();
   assert.match(css, /\[data-hinweis\]::after/);
   assert.match(css, /\[data-menue-abschnitt\]\[hidden\] \{ display: none !important; \}/);
+});
+
+test('Klassenseite hat die Reiter Fächer · Schüler/innen · Einstellungen; Fächer sind voreingestellt', async () => {
+  const html = await (await anna(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /<div class="reiter reiter-leiste" data-storage-key="klasse-\d+-hauptreiter">/);
+  assert.match(html, /data-target="panel-klasse-faecher">📚 Fächer</);
+  assert.match(html, /data-target="panel-klasse-schueler">👥 Schüler\/innen \(\d+\)</);
+  assert.match(html, /data-target="panel-klasse-einstellungen">⚙ Einstellungen</);
+  assert.match(html, /<div id="panel-klasse-faecher" class="reiter-panel active">/);
+  assert.match(html, /<div id="panel-klasse-schueler" class="reiter-panel">/);
+  const teil = (id, nxt) => html.slice(html.indexOf(`id="${id}"`), nxt ? html.indexOf(`id="${nxt}"`) : undefined);
+  const faecher = teil('panel-klasse-faecher', 'panel-klasse-schueler');
+  const schueler = teil('panel-klasse-schueler', 'panel-klasse-einstellungen');
+  const einst = html.slice(html.indexOf('id="panel-klasse-einstellungen"'), html.indexOf('id="aktionen-popover"'));
+  assert.match(faecher, /id="faecher-lehrkraefte"/, 'Fächer im Fächer-Reiter');
+  assert.match(schueler, /<h2>Schüler\/innen \(/);
+  assert.match(schueler, /id="schueler-hinzufuegen"/);
+  assert.match(schueler, /<table class="data">/);
+  assert.match(einst, /✏️ Klasse umbenennen/, 'Umbenennen in den Einstellungen');
+  assert.match(einst, /Automatisch für andere Lehrkräfte freigeben/, 'Freigabe in den Einstellungen');
+  assert.match(einst, /id="einschulungsjahr-festlegen"/, 'Einschulungsjahr in den Einstellungen');
+  assert.doesNotMatch(faecher, /Klasse umbenennen|Automatisch für andere/);
+  assert.match(html.slice(0, html.indexOf('class="reiter reiter-leiste"')), /Klassenleitung:<\/strong>/, 'Klassenleitung bleibt über den Reitern sichtbar');
+});
+
+test('Sammelklasse „Ohne Klasse“: keine Reiter, nur die Schüler/innen', async () => {
+  const sj = db().prepare('SELECT id FROM schuljahre').get().id;
+  const ablage = db().prepare("INSERT INTO klassen (schuljahr_id, name, notenschluessel, notenschluessel_csv, ist_ablage) VALUES (?, 'Ohne Klasse 2', 'IHK', '', 1)").run(sj).lastInsertRowid;
+  const html = await (await admin(`/teacher/klassen/${ablage}`)).text();
+  assert.doesNotMatch(html, /reiter-leiste/);
+  assert.match(html, /<div id="panel-klasse-schueler" class="reiter-panel active">/);
+  assert.doesNotMatch(html, /panel-klasse-faecher|panel-klasse-einstellungen/);
+});
+
+test('Klassenleitung ohne Eintrag: „Als Klassenleitung eintragen“ bleibt oberhalb der Reiter sichtbar', async () => {
+  db().prepare('DELETE FROM klassenleitung WHERE klasse_id = ?').run(klasseId);
+  await anna(`/teacher/klassen/${klasseId}/faecher/neu`, { name: 'Mathe' }); // der Knopf verlangt ein eigenes Fach in der Klasse
+  const html = await (await anna(`/teacher/klassen/${klasseId}`)).text();
+  const oben = html.slice(0, html.indexOf('class="reiter reiter-leiste"'));
+  assert.match(oben, /Als Klassenleitung eintragen/);
+  db().prepare('INSERT INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = ?').run(klasseId, 'anna');
 });

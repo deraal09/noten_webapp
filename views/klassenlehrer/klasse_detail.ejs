@@ -1,8 +1,8 @@
 <h1>Klassenleitung: <%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
-<p class="kopf-aktionen">
+<div class="kopf-aktionen">
   <a class="btn" href="/klassenlehrer">← Klassenleitung</a>
-  <a class="btn" href="/teacher/klassen/<%= klasse.id %>">Zur Klasse</a>
-</p>
+  <%- await include('../partials/kopf-menue', { id: 'kopf-menue-leitung', eintraege: [{ href: '/teacher/klassen/' + klasse.id, text: '📚 Zur Klasse' }] }) %>
+</div>
 
 <div class="hj-tabs">
   <% HALBJAHRE.forEach(function(h) { %>
@@ -10,7 +10,7 @@
   <% }); %>
 </div>
 
-<div class="reiter" data-storage-key="klassenleitung-reiter-<%= klasse.id %>">
+<div class="reiter reiter-leiste" data-storage-key="klassenleitung-reiter-<%= klasse.id %>">
   <button type="button" class="<%= aktiverTab === 'uebersicht' ? 'active' : '' %>" data-target="panel-uebersicht">Übersicht</button>
   <button type="button" class="<%= aktiverTab === 'halbjahr' ? 'active' : '' %>" data-target="panel-halbjahr">Halbjahresübersicht</button>
   <button type="button" class="<%= aktiverTab === 'endnoten' ? 'active' : '' %>" data-target="panel-endnoten">Endnoten (Direkteingabe)</button>

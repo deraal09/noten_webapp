@@ -1,15 +1,5 @@
 <h1><%= klasse.name %> <small>(<%= klassenSchuljahrText(klasse) %>)</small></h1>
 <% if (!klasse.ist_ablage) { %>
-  <details class="umbenennen">
-    <summary>✏️ Klasse umbenennen</summary>
-    <form method="post" action="/teacher/klassen/<%= klasse.id %>/umbenennen" class="inline">
-      <input type="text" name="name" value="<%= klasse.name %>" maxlength="60" required aria-label="Neuer Klassenname">
-      <button type="submit">Speichern</button>
-    </form>
-    <p class="hint">Der neue Name gilt sofort für alle Lehrkräfte, die in der Klasse eingetragen sind.</p>
-  </details>
-<% } %>
-<% if (!klasse.ist_ablage) { %>
   <p class="klassenleitung-zeile">
     🎓 <strong>Klassenleitung:</strong>
     <% if (klassenleitungNamen.length) { %><%= klassenleitungNamen.join(', ') %><% } else { %><span class="hint">noch niemand eingetragen</span><% } %>
@@ -47,356 +37,28 @@
       <% } %>
     </div>
   </details>
-  <script>
-    (function () {
-      var menue = document.getElementById('kopf-menue');
-      if (!menue) return;
-      document.addEventListener('click', function (e) { if (menue.open && !menue.contains(e.target)) menue.open = false; });
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menue.open) { menue.open = false; menue.querySelector('summary').focus(); } });
-
-      // Abschnitte, die das Menü einblendet (Schüler/innen hinzufügen, Einschulungsjahr festlegen): erst verborgen, dann sichtbar und angesprungen.
-      function merke(el, offen) {
-        var key = el.getAttribute('data-merken');
-        if (!key) return;
-        try { if (offen) sessionStorage.setItem(key, '1'); else sessionStorage.removeItem(key); } catch (e) { /* ohne Speicher egal */ }
-      }
-      window.zeigeAbschnitt = function (id, springen) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.hidden = false;
-        if (el.tagName === 'DETAILS') el.open = true;
-        merke(el, true);
-        if (springen !== false) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          var feld = el.querySelector('input:not([type=hidden]):not([type=checkbox]), select, textarea');
-          if (feld) setTimeout(function () { feld.focus({ preventScroll: true }); }, 250);
-        }
-      };
-      menue.querySelectorAll('[data-zeige]').forEach(function (knopf) {
-        knopf.addEventListener('click', function () { menue.open = false; window.zeigeAbschnitt(knopf.getAttribute('data-zeige')); });
-      });
-      // Die Bereiche folgen weiter unten auf der Seite: erst nach dem vollständigen Laden verdrahten.
-      document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('[data-verberge]').forEach(function (knopf) {
-          knopf.addEventListener('click', function () {
-            var el = document.getElementById(knopf.getAttribute('data-verberge'));
-            if (el) { el.hidden = true; merke(el, false); }
-          });
-        });
-        // Nach einem Absenden (Seite lädt neu) bleibt ein zuvor geöffneter Abschnitt offen; auch per Adresse (#…) erreichbar.
-        document.querySelectorAll('[data-menue-abschnitt]').forEach(function (el) {
-          var key = el.getAttribute('data-merken'), offen = false;
-          try { offen = Boolean(key && sessionStorage.getItem(key)); } catch (e) { /* egal */ }
-          if (offen || location.hash === '#' + el.id) window.zeigeAbschnitt(el.id, location.hash === '#' + el.id);
-        });
-      });
-    })();
-  </script>
   <% } %>
 </div>
 
-<% if (istKlassenlehrer) { %>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/offen-fuer-beitritt" class="inline" id="offen-beitritt-form">
-    <input type="hidden" name="offen" id="offen-beitritt-wert" value="<%= klasse.offen_fuer_beitritt ? '1' : '0' %>">
-    <label>
-      <input type="checkbox" id="offen-beitritt-checkbox" <%= klasse.offen_fuer_beitritt ? 'checked' : '' %>>
-      Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben Klassennamen anlegt, bekommt sofort Zugriff, ohne Rückfrage)
-    </label>
-  </form>
-  <script>
-    (function() {
-      var cb = document.getElementById('offen-beitritt-checkbox');
-      var hidden = document.getElementById('offen-beitritt-wert');
-      var form = document.getElementById('offen-beitritt-form');
-      cb.addEventListener('change', function() {
-        hidden.value = cb.checked ? '1' : '0';
-        form.submit();
-      });
-    })();
-  </script>
-
-  <details class="card" id="einschulungsjahr-festlegen" data-menue-abschnitt hidden>
-    <summary>Einschulungsjahr festlegen <small class="hint">(aktuell <%= laufzeit.schuljahre[0].bezeichnung %>, <%= laufzeit.jahre %> Jahre bis <%= laufzeit.schuljahre[laufzeit.schuljahre.length - 1].bezeichnung %>)</small></summary>
-    <p class="hint">
-      Eine Klasse läuft über mehrere Schuljahre; die Halbjahre werden ab dem Einschulungsjahr durchgezählt
-      (<%= laufzeit.anzahlHalbjahre %> Halbjahre). Lege fest, in welchem Schuljahr die Klasse an die Schule
-      gekommen ist und wie viele Jahre sie dort bleibt (z. B. 2 oder 3). Ohne Angabe gilt die Standarddauer
-      (SPA 2, BG/IHK 3 Jahre).
-    </p>
-    <% var optionenJahre = jahresOptionen.map(function(j) { return j.jahr; });
-       var alleJahre = jahresOptionen.slice();
-       if (optionenJahre.indexOf(laufzeit.einschulungJahr) === -1) { alleJahre.push({ jahr: laufzeit.einschulungJahr, bezeichnung: laufzeit.schuljahre[0].bezeichnung }); }
-       alleJahre.sort(function(a, b) { return a.jahr - b.jahr; }); %>
-    <form method="post" action="/teacher/klassen/<%= klasse.id %>/laufzeit">
-      <input type="hidden" name="zurueck" value="klasse">
-      <label>Einschulungsjahr
-        <select name="einschulung_jahr">
-          <% alleJahre.forEach(function(j) { %><option value="<%= j.jahr %>" <%= j.jahr === laufzeit.einschulungJahr ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
-        </select>
-      </label>
-      <label>Anzahl Jahre an der Schule
-        <select name="anzahl_jahre">
-          <option value="" <%= laufzeit.abschlussIstStandard ? 'selected' : '' %>>Standard (<%= klasse.notenschluessel === 'SPA' ? 2 : 3 %> Jahre)</option>
-          <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>" <%= (!laufzeit.abschlussIstStandard && laufzeit.jahre === aj) ? 'selected' : '' %>><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
-        </select>
-      </label>
-      <button type="submit">Speichern</button>
-    </form>
-  </details>
-<% } else if (kannSelbstAlsKlassenlehrerEintragen) { %>
+<% if (!istKlassenlehrer && kannSelbstAlsKlassenlehrerEintragen) { %>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/klassenlehrer/eintragen" class="inline">
     <button type="submit">Als Klassenleitung eintragen (alle Noten der Klasse sehen, Fächer zuordnen)</button>
   </form>
-<% } else if (klassenleitungErstMitFach) { %>
+<% } else if (!istKlassenlehrer && klassenleitungErstMitFach) { %>
   <p class="hint">Noch keine Klassenleitung eingetragen. Lege zuerst ein eigenes Fach an, dann kannst du dich als Klassenleitung eintragen.</p>
 <% } %>
 
-<h2>Schüler/innen (<%= schueler.length %>)</h2>
-<% if (!klasse.ist_ablage || darfVerwalten) { %>
-<div id="schueler-hinzufuegen" data-menue-abschnitt data-merken="klasse-<%= klasse.id %>-schueler-offen" hidden>
-<p class="hint">Schüler/innen hinzufügen <button type="button" class="abschnitt-zu" data-verberge="schueler-hinzufuegen" aria-label="Bereich schließen">✕ Schließen</button></p>
-<div class="reiter unter-reiter" data-storage-key="klasse-<%= klasse.id %>-schueler-hinzufuegen">
-  <button type="button" class="active" data-target="schueler-einzeln">Einzeln</button>
-  <button type="button" data-target="schueler-mehrere">Mehrere auf einmal</button>
-  <button type="button" data-target="schueler-csv">CSV-Import</button>
-  <% if (ablagePersonen.length) { %>
-    <button type="button" data-target="schueler-ablage">Aus „Ohne Klasse“ übernehmen (<%= ablagePersonen.length %>)</button>
-  <% } %>
-</div>
-
-<div id="schueler-einzeln" class="reiter-panel unter-panel card active">
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/neu" class="inline">
-    <input type="text" name="nachname" placeholder="Nachname" required>
-    <input type="text" name="vorname" placeholder="Vorname" required>
-    <button type="submit">+ Hinzufügen</button>
-  </form>
-</div>
-
-<div id="schueler-mehrere" class="reiter-panel unter-panel card">
-  <p class="hint">
-    Eine Zeile je Person, immer <strong>Nachname zuerst</strong>, getrennt durch Komma, Semikolon, Tab oder Leerzeichen
-    (z. B. <code>Müller, Anna</code>, <code>Müller Anna</code> oder aus einer Tabelle kopiert).
-    Bei Doppelnamen bitte ein <strong>Komma direkt nach dem Nachnamen</strong> setzen
-    (<code>Müller Schmidt, Anna Maria</code>) – sonst ist nicht erkennbar, wo der Nachname endet.
-  </p>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/bulk">
-    <textarea name="text" rows="6" id="bulk-text" placeholder="Müller, Anna
-Schmidt Bernd
-Meier;Carla"><%= bulkVorbelegung %></textarea>
-    <button type="submit">Alle anlegen</button>
-  </form>
-  <% if (bulkVorbelegung) { %>
-    <script>
-      // Zur Korrektur zurückgegebene Zeilen: direkt dieses Register öffnen.
-      document.addEventListener('DOMContentLoaded', function() {
-        if (window.zeigeAbschnitt) window.zeigeAbschnitt('schueler-hinzufuegen', false);
-        var knopf = document.querySelector('.unter-reiter button[data-target="schueler-mehrere"]');
-        if (knopf) knopf.click();
-        var feld = document.getElementById('bulk-text');
-        if (feld) { feld.focus(); feld.setSelectionRange(0, 0); }
-      });
-    </script>
-  <% } %>
-</div>
-
-<div id="schueler-csv" class="reiter-panel unter-panel card">
-  <p class="hint">
-    Erwartet eine Spalte für Nachname und eine für Vorname — mit Kopfzeile
-    (z. B. „Nachname"/„Vorname" oder englisch „Name"/„Forename") oder
-    ohne (dann werden die ersten beiden Spalten verwendet). Semikolon,
-    Komma oder Tab als Trennzeichen werden automatisch erkannt (z. B. für
-    eine von Hand aus Untis oder einer anderen Schulverwaltungssoftware
-    exportierte Liste).
-  </p>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/csv" enctype="multipart/form-data">
-    <input type="file" name="datei" accept=".csv,text/csv" required>
-    <button type="submit">Datei importieren</button>
-  </form>
-</div>
-
-<% if (ablagePersonen.length) { %>
-<div id="schueler-ablage" class="reiter-panel unter-panel card">
-  <p class="hint">
-    Personen aus der Sammelklasse „Ohne Klasse“ (z. B. nach dem Löschen einer Klasse oder bei
-    Wiederholern) auswählen und in diese Klasse übernehmen. Alle bisherigen Noten der Personen bleiben erhalten.
-  </p>
-  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/aus-ablage">
-    <label class="feld">Suche
-      <input type="text" id="ablage-suche" placeholder="Name eingeben …" autocomplete="off">
-    </label>
-    <ul class="klasse-liste" id="ablage-liste">
-      <% ablagePersonen.forEach(function(p) { %>
-        <li data-name="<%= (p.nachname + ' ' + p.vorname).toLowerCase() %>">
-          <label>
-            <input type="checkbox" name="schueler_id" value="<%= p.id %>">
-            <%= p.nachname %>, <%= p.vorname %> <small class="hint">(<%= p.schuljahr_bezeichnung %><%= p.status === 'abgang' ? ', Abgang' : '' %>)</small>
-          </label>
-        </li>
-      <% }); %>
-    </ul>
-    <button type="submit">+ Ausgewählte übernehmen</button>
-  </form>
-  <script>
-    (function() {
-      var suche = document.getElementById('ablage-suche');
-      var eintraege = document.querySelectorAll('#ablage-liste li');
-      suche.addEventListener('input', function() {
-        var q = suche.value.trim().toLowerCase();
-        eintraege.forEach(function(li) { li.hidden = q !== '' && li.dataset.name.indexOf(q) === -1; });
-      });
-    })();
-  </script>
+<%# Reiter der Klassenseite: Fächer · Schüler/innen · Einstellungen (die Sammelklasse „Ohne Klasse“ hat nur die Schüler/innen). %>
+<% if (!klasse.ist_ablage) { %>
+<div class="reiter reiter-leiste" data-storage-key="klasse-<%= klasse.id %>-hauptreiter">
+  <button type="button" class="active" data-target="panel-klasse-faecher">📚 Fächer</button>
+  <button type="button" data-target="panel-klasse-schueler">👥 Schüler/innen (<%= schueler.length %>)</button>
+  <button type="button" data-target="panel-klasse-einstellungen">⚙ Einstellungen</button>
 </div>
 <% } %>
-</div>
-<% } %>
-
-<% if (klasse.ist_ablage && !darfVerwalten) { %>
-  <p class="hint">Die Sammelklasse verwaltet der Admin. Personen von hier holst du auf der Seite deiner Klasse über „Aus Ohne Klasse übernehmen“ in die Klasse.</p>
-<% } %>
-<% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
-   var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
-<table class="data">
-  <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten || darfVersetzen) { %><th>Aktion</th><% } %></tr></thead>
-  <tbody>
-    <% schuelerAktiv.forEach(function(s) { %>
-      <tr>
-        <td><%= s.nachname %></td>
-        <td><%= s.vorname %></td>
-        <% if (darfVerwalten || darfVersetzen) { %>
-        <td class="aktionen-zelle">
-          <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Mehr Optionen für <%= s.vorname %> <%= s.nachname %>" data-hinweis="Mehr Optionen" data-hinweis-rechts>
-            <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
-          </button>
-          <div class="aktionen-inhalt" hidden>
-            <% if (versetzZiele.length) { %>
-              <button type="button" class="menue-eintrag" data-versetzen data-sid="<%= s.id %>" data-name="<%= s.vorname %> <%= s.nachname %>" title="In eine andere Klasse versetzen (Noten bleiben erhalten)">↔ Versetzen …</button>
-            <% } %>
-            <% if (darfVerwalten) { %>
-              <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
-                <button type="submit" class="menue-eintrag" name="zeugnis" value="0" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
-                <button type="submit" class="menue-eintrag" name="zeugnis" value="1" title="Abgang eintragen und direkt das Abgangszeugnis mit allen Noten erstellen">🚪🎓 Abgang + Abgangszeugnis</button>
-              </form>
-              <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren. Für einen normalen Abgang stattdessen den Eintrag „🚪 Abgang“ nutzen.')">
-                <button type="submit" class="menue-eintrag danger" title="Komplett löschen (Noten gehen verloren)">🗑 Löschen</button>
-              </form>
-            <% } %>
-          </div>
-        </td>
-        <% } %>
-      </tr>
-    <% }); %>
-  </tbody>
-</table>
-
-<% if (schuelerAbgang.length) { %>
-  <details class="card">
-    <summary>Ehemalige Schüler/innen (Abgang, <%= schuelerAbgang.length %>)</summary>
-    <table class="data">
-      <thead><tr><th>Nachname</th><th>Vorname</th><th>Abgang am</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
-      <tbody>
-        <% schuelerAbgang.forEach(function(s) { %>
-          <tr>
-            <td><%= s.nachname %></td>
-            <td><%= s.vorname %></td>
-            <td><%= s.abgang_am ? formatZeitLokal(s.abgang_am) : '–' %></td>
-            <% if (darfVerwalten) { %>
-            <td class="aktionen-zelle">
-              <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Mehr Optionen für <%= s.vorname %> <%= s.nachname %>" data-hinweis="Mehr Optionen" data-hinweis-rechts>
-                <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
-              </button>
-              <div class="aktionen-inhalt" hidden>
-                <a class="menue-eintrag" href="/teacher/schueler/<%= s.id %>/abgangszeugnis">🎓 Abgangszeugnis</a>
-                <form method="post" action="/teacher/schueler/<%= s.id %>/reaktivieren">
-                  <button type="submit" class="menue-eintrag" title="Abgang rückgängig machen">↩ Reaktivieren</button>
-                </form>
-                <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren.')">
-                  <button type="submit" class="menue-eintrag danger" title="Komplett löschen (Noten gehen verloren)">🗑 Löschen</button>
-                </form>
-              </div>
-            </td>
-            <% } %>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
-  </details>
-<% } %>
-
-<div id="aktionen-popover" class="aktionen-popover" role="menu" hidden></div>
-
-<% if (versetzZiele.length) { %>
-<dialog id="versetzen-dialog" class="notiz-dialog">
-  <form method="post" id="versetzen-form" action="">
-    <h2>Versetzen: <span id="versetzen-name"></span></h2>
-    <p class="hint">Alle bisherigen Noten bleiben der Person erhalten.</p>
-    <label>Zielklasse
-      <select name="ziel_klasse_id" required data-filter aria-label="Zielklasse">
-        <option value="">— Klasse wählen —</option>
-        <% if (!klasse.ist_ablage) { %><option value="ohne-klasse">Ohne Klasse</option><% } %>
-        <% versetzZiele.filter(function(z) { return !z.ist_ablage; }).forEach(function(z) { %>
-          <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
-        <% }); %>
-        <% versetzZiele.filter(function(z) { return z.ist_ablage; }).forEach(function(z) { %>
-          <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
-        <% }); %>
-      </select>
-    </label>
-    <div class="form-actions">
-      <button type="submit">↔ Versetzen</button>
-      <button type="button" id="versetzen-abbrechen">Abbrechen</button>
-    </div>
-  </form>
-</dialog>
-<% } %>
-
-<script>
-  // Aktionen je Person hinter den "drei Balken": ein gemeinsames Menü am Seitenende (wird
-  // nicht von der scrollbaren Tabelle abgeschnitten); "Versetzen" öffnet einen Dialog.
-  (function() {
-    var pop = document.getElementById('aktionen-popover');
-    var offen = null;
-    function schliessen() {
-      if (offen) { offen.setAttribute('aria-expanded', 'false'); offen = null; }
-      pop.hidden = true; pop.textContent = '';
-    }
-    document.querySelectorAll('.aktionen-knopf').forEach(function(knopf) {
-      knopf.addEventListener('click', function(e) {
-        e.stopPropagation();
-        if (offen === knopf) { schliessen(); return; }
-        schliessen();
-        var inhalt = knopf.parentElement.querySelector('.aktionen-inhalt');
-        Array.from(inhalt.children).forEach(function(kind) { pop.appendChild(kind.cloneNode(true)); });
-        pop.hidden = false;
-        var r = knopf.getBoundingClientRect();
-        var breite = pop.offsetWidth;
-        pop.style.top = (window.scrollY + r.bottom + 4) + 'px';
-        pop.style.left = Math.max(8, window.scrollX + Math.min(r.right - breite, document.documentElement.clientWidth - breite - 8)) + 'px';
-        knopf.setAttribute('aria-expanded', 'true');
-        offen = knopf;
-        var erster = pop.querySelector('button, a'); if (erster) erster.focus();
-      });
-    });
-    document.addEventListener('click', function(e) {
-      var ziel = e.target.closest('[data-versetzen]');
-      if (ziel) {
-        var dlg = document.getElementById('versetzen-dialog');
-        document.getElementById('versetzen-form').action = '/teacher/schueler/' + ziel.dataset.sid + '/versetzen';
-        document.getElementById('versetzen-name').textContent = ziel.dataset.name;
-        schliessen();
-        dlg.showModal();
-        return;
-      }
-      if (offen && !pop.contains(e.target)) schliessen();
-    });
-    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') schliessen(); });
-    window.addEventListener('resize', schliessen);
-    var abbrechen = document.getElementById('versetzen-abbrechen');
-    if (abbrechen) abbrechen.addEventListener('click', function() { document.getElementById('versetzen-dialog').close(); });
-  })();
-</script>
 
 <% if (!klasse.ist_ablage) { %>
+<div id="panel-klasse-faecher" class="reiter-panel active">
 <h2 id="faecher-lehrkraefte">Fächer und Lehrkräftezuordnung</h2>
 <p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen.
   <% if (istKlassenlehrer) { %>Als Klassenleitung stellst du alles zu einem Fach über das Zahnrad (⚙) ein: Name, Halbjahre, Lehrkräfte je Halbjahr, Unterfächer, Verrechnung, Teilnehmer/innen und Löschen.
@@ -726,7 +388,318 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
   })();
 </script>
 
+</div>
 <% } %>
+
+<div id="panel-klasse-schueler" class="reiter-panel<%= klasse.ist_ablage ? ' active' : '' %>">
+<h2>Schüler/innen (<%= schueler.length %>)</h2>
+<% if (!klasse.ist_ablage || darfVerwalten) { %>
+<div id="schueler-hinzufuegen" data-menue-abschnitt data-merken="klasse-<%= klasse.id %>-schueler-offen" hidden>
+<p class="hint">Schüler/innen hinzufügen <button type="button" class="abschnitt-zu" data-verberge="schueler-hinzufuegen" aria-label="Bereich schließen">✕ Schließen</button></p>
+<div class="reiter unter-reiter" data-storage-key="klasse-<%= klasse.id %>-schueler-hinzufuegen">
+  <button type="button" class="active" data-target="schueler-einzeln">Einzeln</button>
+  <button type="button" data-target="schueler-mehrere">Mehrere auf einmal</button>
+  <button type="button" data-target="schueler-csv">CSV-Import</button>
+  <% if (ablagePersonen.length) { %>
+    <button type="button" data-target="schueler-ablage">Aus „Ohne Klasse“ übernehmen (<%= ablagePersonen.length %>)</button>
+  <% } %>
+</div>
+
+<div id="schueler-einzeln" class="reiter-panel unter-panel card active">
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/neu" class="inline">
+    <input type="text" name="nachname" placeholder="Nachname" required>
+    <input type="text" name="vorname" placeholder="Vorname" required>
+    <button type="submit">+ Hinzufügen</button>
+  </form>
+</div>
+
+<div id="schueler-mehrere" class="reiter-panel unter-panel card">
+  <p class="hint">
+    Eine Zeile je Person, immer <strong>Nachname zuerst</strong>, getrennt durch Komma, Semikolon, Tab oder Leerzeichen
+    (z. B. <code>Müller, Anna</code>, <code>Müller Anna</code> oder aus einer Tabelle kopiert).
+    Bei Doppelnamen bitte ein <strong>Komma direkt nach dem Nachnamen</strong> setzen
+    (<code>Müller Schmidt, Anna Maria</code>) – sonst ist nicht erkennbar, wo der Nachname endet.
+  </p>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/bulk">
+    <textarea name="text" rows="6" id="bulk-text" placeholder="Müller, Anna
+Schmidt Bernd
+Meier;Carla"><%= bulkVorbelegung %></textarea>
+    <button type="submit">Alle anlegen</button>
+  </form>
+  <% if (bulkVorbelegung) { %>
+    <script>
+      // Zur Korrektur zurückgegebene Zeilen: direkt dieses Register öffnen.
+      document.addEventListener('DOMContentLoaded', function() {
+        if (window.zeigeAbschnitt) window.zeigeAbschnitt('schueler-hinzufuegen', false);
+        var knopf = document.querySelector('.unter-reiter button[data-target="schueler-mehrere"]');
+        if (knopf) knopf.click();
+        var feld = document.getElementById('bulk-text');
+        if (feld) { feld.focus(); feld.setSelectionRange(0, 0); }
+      });
+    </script>
+  <% } %>
+</div>
+
+<div id="schueler-csv" class="reiter-panel unter-panel card">
+  <p class="hint">
+    Erwartet eine Spalte für Nachname und eine für Vorname — mit Kopfzeile
+    (z. B. „Nachname"/„Vorname" oder englisch „Name"/„Forename") oder
+    ohne (dann werden die ersten beiden Spalten verwendet). Semikolon,
+    Komma oder Tab als Trennzeichen werden automatisch erkannt (z. B. für
+    eine von Hand aus Untis oder einer anderen Schulverwaltungssoftware
+    exportierte Liste).
+  </p>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/csv" enctype="multipart/form-data">
+    <input type="file" name="datei" accept=".csv,text/csv" required>
+    <button type="submit">Datei importieren</button>
+  </form>
+</div>
+
+<% if (ablagePersonen.length) { %>
+<div id="schueler-ablage" class="reiter-panel unter-panel card">
+  <p class="hint">
+    Personen aus der Sammelklasse „Ohne Klasse“ (z. B. nach dem Löschen einer Klasse oder bei
+    Wiederholern) auswählen und in diese Klasse übernehmen. Alle bisherigen Noten der Personen bleiben erhalten.
+  </p>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/schueler/aus-ablage">
+    <label class="feld">Suche
+      <input type="text" id="ablage-suche" placeholder="Name eingeben …" autocomplete="off">
+    </label>
+    <ul class="klasse-liste" id="ablage-liste">
+      <% ablagePersonen.forEach(function(p) { %>
+        <li data-name="<%= (p.nachname + ' ' + p.vorname).toLowerCase() %>">
+          <label>
+            <input type="checkbox" name="schueler_id" value="<%= p.id %>">
+            <%= p.nachname %>, <%= p.vorname %> <small class="hint">(<%= p.schuljahr_bezeichnung %><%= p.status === 'abgang' ? ', Abgang' : '' %>)</small>
+          </label>
+        </li>
+      <% }); %>
+    </ul>
+    <button type="submit">+ Ausgewählte übernehmen</button>
+  </form>
+  <script>
+    (function() {
+      var suche = document.getElementById('ablage-suche');
+      var eintraege = document.querySelectorAll('#ablage-liste li');
+      suche.addEventListener('input', function() {
+        var q = suche.value.trim().toLowerCase();
+        eintraege.forEach(function(li) { li.hidden = q !== '' && li.dataset.name.indexOf(q) === -1; });
+      });
+    })();
+  </script>
+</div>
+<% } %>
+</div>
+<% } %>
+
+<% if (klasse.ist_ablage && !darfVerwalten) { %>
+  <p class="hint">Die Sammelklasse verwaltet der Admin. Personen von hier holst du auf der Seite deiner Klasse über „Aus Ohne Klasse übernehmen“ in die Klasse.</p>
+<% } %>
+<% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
+   var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
+<table class="data">
+  <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten || darfVersetzen) { %><th>Aktion</th><% } %></tr></thead>
+  <tbody>
+    <% schuelerAktiv.forEach(function(s) { %>
+      <tr>
+        <td><%= s.nachname %></td>
+        <td><%= s.vorname %></td>
+        <% if (darfVerwalten || darfVersetzen) { %>
+        <td class="aktionen-zelle">
+          <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Mehr Optionen für <%= s.vorname %> <%= s.nachname %>" data-hinweis="Mehr Optionen" data-hinweis-rechts>
+            <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
+          </button>
+          <div class="aktionen-inhalt" hidden>
+            <% if (versetzZiele.length) { %>
+              <button type="button" class="menue-eintrag" data-versetzen data-sid="<%= s.id %>" data-name="<%= s.vorname %> <%= s.nachname %>" title="In eine andere Klasse versetzen (Noten bleiben erhalten)">↔ Versetzen …</button>
+            <% } %>
+            <% if (darfVerwalten) { %>
+              <form method="post" action="/teacher/schueler/<%= s.id %>/abgang" onsubmit="return confirm('Abgang aus der Klasse eintragen? Die Person zählt danach nicht mehr als aktuelle/r Schüler/in, alle bisherigen Noten bleiben aber erhalten.')">
+                <button type="submit" class="menue-eintrag" name="zeugnis" value="0" title="Abgang aus der Klasse (Noten bleiben erhalten)">🚪 Abgang</button>
+                <button type="submit" class="menue-eintrag" name="zeugnis" value="1" title="Abgang eintragen und direkt das Abgangszeugnis mit allen Noten erstellen">🚪🎓 Abgang + Abgangszeugnis</button>
+              </form>
+              <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren. Für einen normalen Abgang stattdessen den Eintrag „🚪 Abgang“ nutzen.')">
+                <button type="submit" class="menue-eintrag danger" title="Komplett löschen (Noten gehen verloren)">🗑 Löschen</button>
+              </form>
+            <% } %>
+          </div>
+        </td>
+        <% } %>
+      </tr>
+    <% }); %>
+  </tbody>
+</table>
+
+<% if (schuelerAbgang.length) { %>
+  <details class="card">
+    <summary>Ehemalige Schüler/innen (Abgang, <%= schuelerAbgang.length %>)</summary>
+    <table class="data">
+      <thead><tr><th>Nachname</th><th>Vorname</th><th>Abgang am</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
+      <tbody>
+        <% schuelerAbgang.forEach(function(s) { %>
+          <tr>
+            <td><%= s.nachname %></td>
+            <td><%= s.vorname %></td>
+            <td><%= s.abgang_am ? formatZeitLokal(s.abgang_am) : '–' %></td>
+            <% if (darfVerwalten) { %>
+            <td class="aktionen-zelle">
+              <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Mehr Optionen für <%= s.vorname %> <%= s.nachname %>" data-hinweis="Mehr Optionen" data-hinweis-rechts>
+                <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
+              </button>
+              <div class="aktionen-inhalt" hidden>
+                <a class="menue-eintrag" href="/teacher/schueler/<%= s.id %>/abgangszeugnis">🎓 Abgangszeugnis</a>
+                <form method="post" action="/teacher/schueler/<%= s.id %>/reaktivieren">
+                  <button type="submit" class="menue-eintrag" title="Abgang rückgängig machen">↩ Reaktivieren</button>
+                </form>
+                <form method="post" action="/teacher/schueler/<%= s.id %>/loeschen" onsubmit="return confirm('Schüler/in komplett löschen? ALLE Noten gehen dabei unwiderruflich verloren.')">
+                  <button type="submit" class="menue-eintrag danger" title="Komplett löschen (Noten gehen verloren)">🗑 Löschen</button>
+                </form>
+              </div>
+            </td>
+            <% } %>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </details>
+<% } %>
+
+</div>
+
+<% if (!klasse.ist_ablage) { %>
+<div id="panel-klasse-einstellungen" class="reiter-panel">
+  <details class="umbenennen">
+    <summary>✏️ Klasse umbenennen</summary>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/umbenennen" class="inline">
+      <input type="text" name="name" value="<%= klasse.name %>" maxlength="60" required aria-label="Neuer Klassenname">
+      <button type="submit">Speichern</button>
+    </form>
+    <p class="hint">Der neue Name gilt sofort für alle Lehrkräfte, die in der Klasse eingetragen sind.</p>
+  </details>
+<% if (istKlassenlehrer) { %>
+  <form method="post" action="/teacher/klassen/<%= klasse.id %>/offen-fuer-beitritt" class="inline" id="offen-beitritt-form">
+    <input type="hidden" name="offen" id="offen-beitritt-wert" value="<%= klasse.offen_fuer_beitritt ? '1' : '0' %>">
+    <label>
+      <input type="checkbox" id="offen-beitritt-checkbox" <%= klasse.offen_fuer_beitritt ? 'checked' : '' %>>
+      Automatisch für andere Lehrkräfte freigeben (wer ein Fach mit demselben Klassennamen anlegt, bekommt sofort Zugriff, ohne Rückfrage)
+    </label>
+  </form>
+  <script>
+    (function() {
+      var cb = document.getElementById('offen-beitritt-checkbox');
+      var hidden = document.getElementById('offen-beitritt-wert');
+      var form = document.getElementById('offen-beitritt-form');
+      cb.addEventListener('change', function() {
+        hidden.value = cb.checked ? '1' : '0';
+        form.submit();
+      });
+    })();
+  </script>
+
+  <details class="card" id="einschulungsjahr-festlegen" data-menue-abschnitt hidden>
+    <summary>Einschulungsjahr festlegen <small class="hint">(aktuell <%= laufzeit.schuljahre[0].bezeichnung %>, <%= laufzeit.jahre %> Jahre bis <%= laufzeit.schuljahre[laufzeit.schuljahre.length - 1].bezeichnung %>)</small></summary>
+    <p class="hint">
+      Eine Klasse läuft über mehrere Schuljahre; die Halbjahre werden ab dem Einschulungsjahr durchgezählt
+      (<%= laufzeit.anzahlHalbjahre %> Halbjahre). Lege fest, in welchem Schuljahr die Klasse an die Schule
+      gekommen ist und wie viele Jahre sie dort bleibt (z. B. 2 oder 3). Ohne Angabe gilt die Standarddauer
+      (SPA 2, BG/IHK 3 Jahre).
+    </p>
+    <% var optionenJahre = jahresOptionen.map(function(j) { return j.jahr; });
+       var alleJahre = jahresOptionen.slice();
+       if (optionenJahre.indexOf(laufzeit.einschulungJahr) === -1) { alleJahre.push({ jahr: laufzeit.einschulungJahr, bezeichnung: laufzeit.schuljahre[0].bezeichnung }); }
+       alleJahre.sort(function(a, b) { return a.jahr - b.jahr; }); %>
+    <form method="post" action="/teacher/klassen/<%= klasse.id %>/laufzeit">
+      <input type="hidden" name="zurueck" value="klasse">
+      <label>Einschulungsjahr
+        <select name="einschulung_jahr">
+          <% alleJahre.forEach(function(j) { %><option value="<%= j.jahr %>" <%= j.jahr === laufzeit.einschulungJahr ? 'selected' : '' %>><%= j.bezeichnung %></option><% }); %>
+        </select>
+      </label>
+      <label>Anzahl Jahre an der Schule
+        <select name="anzahl_jahre">
+          <option value="" <%= laufzeit.abschlussIstStandard ? 'selected' : '' %>>Standard (<%= klasse.notenschluessel === 'SPA' ? 2 : 3 %> Jahre)</option>
+          <% for (var aj = 1; aj <= 6; aj++) { %><option value="<%= aj %>" <%= (!laufzeit.abschlussIstStandard && laufzeit.jahre === aj) ? 'selected' : '' %>><%= aj %> <%= aj === 1 ? 'Jahr' : 'Jahre' %></option><% } %>
+        </select>
+      </label>
+      <button type="submit">Speichern</button>
+    </form>
+  </details>
+<% } %>
+</div>
+<% } %>
+
+<div id="aktionen-popover" class="aktionen-popover" role="menu" hidden></div>
+
+<% if (versetzZiele.length) { %>
+<dialog id="versetzen-dialog" class="notiz-dialog">
+  <form method="post" id="versetzen-form" action="">
+    <h2>Versetzen: <span id="versetzen-name"></span></h2>
+    <p class="hint">Alle bisherigen Noten bleiben der Person erhalten.</p>
+    <label>Zielklasse
+      <select name="ziel_klasse_id" required data-filter aria-label="Zielklasse">
+        <option value="">— Klasse wählen —</option>
+        <% if (!klasse.ist_ablage) { %><option value="ohne-klasse">Ohne Klasse</option><% } %>
+        <% versetzZiele.filter(function(z) { return !z.ist_ablage; }).forEach(function(z) { %>
+          <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
+        <% }); %>
+        <% versetzZiele.filter(function(z) { return z.ist_ablage; }).forEach(function(z) { %>
+          <option value="<%= z.id %>"><%= z.name %> (<%= z.schuljahr_bezeichnung %>)</option>
+        <% }); %>
+      </select>
+    </label>
+    <div class="form-actions">
+      <button type="submit">↔ Versetzen</button>
+      <button type="button" id="versetzen-abbrechen">Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+<% } %>
+
+<script>
+  // Aktionen je Person hinter den "drei Balken": ein gemeinsames Menü am Seitenende (wird
+  // nicht von der scrollbaren Tabelle abgeschnitten); "Versetzen" öffnet einen Dialog.
+  (function() {
+    var pop = document.getElementById('aktionen-popover');
+    var offen = null;
+    function schliessen() {
+      if (offen) { offen.setAttribute('aria-expanded', 'false'); offen = null; }
+      pop.hidden = true; pop.textContent = '';
+    }
+    document.querySelectorAll('.aktionen-knopf').forEach(function(knopf) {
+      knopf.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (offen === knopf) { schliessen(); return; }
+        schliessen();
+        var inhalt = knopf.parentElement.querySelector('.aktionen-inhalt');
+        Array.from(inhalt.children).forEach(function(kind) { pop.appendChild(kind.cloneNode(true)); });
+        pop.hidden = false;
+        var r = knopf.getBoundingClientRect();
+        var breite = pop.offsetWidth;
+        pop.style.top = (window.scrollY + r.bottom + 4) + 'px';
+        pop.style.left = Math.max(8, window.scrollX + Math.min(r.right - breite, document.documentElement.clientWidth - breite - 8)) + 'px';
+        knopf.setAttribute('aria-expanded', 'true');
+        offen = knopf;
+        var erster = pop.querySelector('button, a'); if (erster) erster.focus();
+      });
+    });
+    document.addEventListener('click', function(e) {
+      var ziel = e.target.closest('[data-versetzen]');
+      if (ziel) {
+        var dlg = document.getElementById('versetzen-dialog');
+        document.getElementById('versetzen-form').action = '/teacher/schueler/' + ziel.dataset.sid + '/versetzen';
+        document.getElementById('versetzen-name').textContent = ziel.dataset.name;
+        schliessen();
+        dlg.showModal();
+        return;
+      }
+      if (offen && !pop.contains(e.target)) schliessen();
+    });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') schliessen(); });
+    window.addEventListener('resize', schliessen);
+    var abbrechen = document.getElementById('versetzen-abbrechen');
+    if (abbrechen) abbrechen.addEventListener('click', function() { document.getElementById('versetzen-dialog').close(); });
+  })();
+</script>
 
 <script>
   // Register (Einzeln/Mehrere auf einmal/CSV-Import) umschalten, gewählter

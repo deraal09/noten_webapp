@@ -193,8 +193,8 @@ const aufnahmen = [
   { datei: 'start', url: '/start', hoehe: 520 },
   { datei: 'klassen-liste', url: '/teacher/klassen', hoehe: 760, markiere: ['a[href="/teacher/papierkorb"]'] },
   { datei: 'klasse-anlegen', url: '/teacher/klassen', klick: ['button[data-target="panel-klasse-anlegen"]'], hoehe: 820 },
-  { datei: 'klasse-detail', url: L(), hoehe: 760, markiere: ['details.umbenennen summary'] },
-  { datei: 'schueler-csv', url: L(), klick: ['button[data-target="schueler-csv"]'], ausschnitt: '#schueler-csv', warte: 200 },
+  { datei: 'klasse-detail', url: L(), hoehe: 760, markiere: ['.kopf-menue-knopf'], vorher: async (page) => { await page.evaluate(() => { document.getElementById('kopf-menue').open = true; }); } },
+  { datei: 'schueler-csv', url: L(), ausschnitt: '#schueler-csv', warte: 200, vorher: async (page) => { await page.evaluate(() => { document.querySelector('button[data-target="panel-klasse-schueler"]').click(); window.zeigeAbschnitt('schueler-hinzufuegen', false); document.querySelector('.unter-reiter button[data-target="schueler-csv"]').click(); }); } },
   { datei: 'faecher-lehrkraefte', url: L('#faecher-lehrkraefte'), ausschnitt: '#faecher-lehrkraefte' },
   { datei: 'kurs-teilnehmer', url: `/teacher/fach/${kurs}/teilnehmer`, hoehe: 900, markiere: ['#teilnehmer-csv'] },
   { datei: 'papierkorb', url: '/teacher/papierkorb', hoehe: 460 },
@@ -219,6 +219,7 @@ const aufnahmen = [
   { datei: 'hilfe', url: '/hilfe', hoehe: 760 },
   { datei: 'admin-notenschluessel', url: '/admin/notenschluessel', user: admin, klick: ['#ns-IHK summary'], hoehe: 760 },
 ];
+await anna(`/teacher/fach/${eng}`); // damit „Weitermachen“ auf der Startseite zu sehen ist
 const nur = process.argv.slice(2);
 for (const a of aufnahmen) {
   if (nur.length && !nur.includes(a.datei)) continue;

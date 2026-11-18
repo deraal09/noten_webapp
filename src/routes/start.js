@@ -1,15 +1,16 @@
 /**
  * Startseite nach dem Anmelden — Kachel-Navigation zu den vier
  * meistgenutzten Bereichen (Meine Klassen, Sitzpläne, Noteneingabe,
- * Klassenleitung). Rein statische Übersicht, keine eigene Datenabfrage.
+ * Klassenleitung), dazu „Weitermachen“ mit den zuletzt geöffneten Fächern dieser Anmeldung (src/zuletzt-benutzt.js).
  */
 
 import { requireAuth } from '../auth.js';
+import { ladeZuletztBenutzt } from '../zuletzt-benutzt.js';
 
 export default async function startRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
 
   fastify.get('/', async (request, reply) => {
-    return reply.viewEjs('start.ejs', { user: request.user });
+    return reply.viewEjs('start.ejs', { user: request.user, zuletzt: ladeZuletztBenutzt(request) });
   });
 }

@@ -52,6 +52,7 @@ import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { legeKursAn } from '../kurse.js';
 import { legeKlasseAn, aendereLaufzeit } from '../klasse-anlegen.js';
 import { legeEinladungAn } from '../einladungen.js';
+import { merkeZuletztBenutzt } from '../zuletzt-benutzt.js';
 import { loescheFuerMich, stelleWiederHer, ladePapierkorb, anzahlImPapierkorb, loescheSofort, FRIST_TAGE } from '../papierkorb.js';
 import { sortiereSchuljahreAbsteigend, sortiereSchuljahreFuerReiter, parseSchuljahr, liegtInDerZukunft } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE, KOMPONENTEN_NAMEN, WPK_KURSE, standardKonfig, pruefeKonfig } from '../spa-schema.js';
@@ -380,6 +381,7 @@ export default async function teacherRoutes(fastify) {
       }
       return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
     }
+    merkeZuletztBenutzt(request, fach.id); // für „Weitermachen“ auf der Startseite (nur in der Sitzung, wird beim Abmelden verworfen)
     // Strikt je Halbjahr: nur die Halbjahre der Zuordnung (siehe src/unterfaecher.js).
     // Ein nicht erlaubtes (oder fehlendes) Halbjahr führt auf das nächstliegende erlaubte.
     const erlaubteHj = erlaubteHalbjahreImFach(request.user, fach.id);

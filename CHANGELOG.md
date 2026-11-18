@@ -6,6 +6,37 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.139.0 - 2026-11-18
+
+### UI/UX: aufgeräumte Seitenköpfe, Reiter auf der Klassenseite, „Weitermachen“
+
+- **Klassenseite in drei Reitern:** **📚 Fächer** (voreingestellt) · **👥 Schüler/innen**
+  · **⚙ Einstellungen** (Klasse umbenennen, Freigabe für andere Lehrkräfte,
+  Einschulungsjahr). Die Klassenleitung und „Als Klassenleitung eintragen“ bleiben
+  über den Reitern sichtbar; die Sammelklasse „Ohne Klasse“ zeigt nur die
+  Schüler/innen. Der zuletzt gewählte Reiter wird gemerkt; „Schüler/innen
+  hinzufügen“ und „Einschulungsjahr festlegen“ im ☰-Menü wechseln selbst in den
+  richtigen Reiter, ebenso Adressen mit `#faecher-lehrkraefte`, `#verrechnung` usw.
+- **Fachseite:** In der Kopfzeile bleibt nur „← Meine Noteneingabe“; Sitzplan,
+  Notenbesprechung und Zufällig starten stecken im ☰-Menü (vorher vier gestapelte
+  Knöpfe). Die Tabelle beginnt am Handy rund 170 px weiter oben.
+- **Klassenleitung und Konferenzmodus:** „Zur Klasse“ im ☰-Menü; Halbjahr-Tabs und
+  Reiter sind am Handy je **eine scrollbare Zeile** (der aktive Eintrag wird ins
+  Sichtfeld geholt) statt acht Zeilen Knöpfe; die **Zurück/Weiter-Leiste im
+  Konferenzmodus bleibt beim Scrollen oben stehen**.
+- **Meine Klassen:** Papierkorb und Infos stecken im ☰-Menü neben „Zur
+  Noteneingabe“; „+ Neue Klasse anlegen“ und „+ Neuen Kurs anlegen“ stehen am Handy
+  nebeneinander in einer Zeile – die Klassenliste beginnt deutlich früher.
+- **Startseite:** am Handy kompakte Kacheln (Symbol links, Text rechts; die ganze
+  Seite passt auf einen Bildschirm) und **„Weitermachen“** mit den bis zu drei
+  zuletzt geöffneten Fächern dieser Anmeldung. Sie werden nur in der Sitzung
+  gehalten (`src/zuletzt-benutzt.js`): nichts am Konto, nichts auf dem Gerät, beim
+  Abmelden weg; es erscheinen nur Fächer, auf die noch Zugriff besteht.
+- Technik: gemeinsames Skript `static/js/ui-menues.js` (Menüs schließen per Klick
+  daneben/Escape, Bereiche einblenden, Reiter über Adresse aktivieren) und
+  Vorlage `views/partials/kopf-menue.ejs` für die ☰-Menüs. Hilfe-Texte und die
+  Bildschirmfotos (Klassenseite, Schüler hinzufügen u. a.) sind angepasst.
+
 ## 0.138.0 - 2026-11-18
 
 ### UI/UX: schnelle Gewinne aus der Überprüfung

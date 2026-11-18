@@ -1,0 +1,23 @@
+<%# Menü hinter den drei Balken (☰) für die Kopfzeile. Erwartet `id` und `eintraege` (Liste); leere Liste = kein Menü.
+    Eintrag: { href, text } Link · { zeige, text } blendet den Bereich mit dieser id ein · { form: { action, felder: [[name, wert]], bestaetigen }, text, name, value, danger, title } Formular-Knopf · { trenner: true }. %>
+<% if (eintraege && eintraege.length) { %>
+<details class="kopf-menue" id="<%= id %>">
+  <summary class="kopf-menue-knopf" aria-label="Weitere Optionen" data-hinweis="Mehr Optionen"><span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span></summary>
+  <div class="kopf-popover" role="menu">
+    <% eintraege.forEach(function(e) { %>
+      <% if (e.trenner) { %>
+        <hr class="menue-trenner">
+      <% } else if (e.href) { %>
+        <a class="menue-eintrag<%= e.danger ? ' danger' : '' %>" role="menuitem" href="<%= e.href %>"><%= e.text %></a>
+      <% } else if (e.zeige) { %>
+        <button type="button" class="menue-eintrag" role="menuitem" data-zeige="<%= e.zeige %>"><%= e.text %></button>
+      <% } else if (e.form) { %>
+        <form method="post" action="<%= e.form.action %>" class="menue-form"<% if (e.form.bestaetigen) { %> onsubmit="return confirm(<%= jsonFuerSkript(e.form.bestaetigen) %>)"<% } %>>
+          <% (e.form.felder || []).forEach(function(f) { %><input type="hidden" name="<%= f[0] %>" value="<%= f[1] %>"><% }); %>
+          <button type="submit" class="menue-eintrag<%= e.danger ? ' danger' : '' %>" role="menuitem"<% if (e.name) { %> name="<%= e.name %>" value="<%= e.value %>"<% } %><% if (e.title) { %> title="<%= e.title %>"<% } %>><%= e.text %></button>
+        </form>
+      <% } %>
+    <% }); %>
+  </div>
+</details>
+<% } %>

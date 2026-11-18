@@ -1,9 +1,13 @@
 <h1>Meine Klassen</h1>
-<p class="kopf-aktionen">
+<%# Kopfzeile: nur „Zur Noteneingabe“ ist immer sichtbar; Papierkorb und Infos stecken hinter den drei Balken (☰). %>
+<div class="kopf-aktionen">
   <a class="btn" href="/teacher">📝 Zur Noteneingabe</a>
-  <a class="btn" href="/teacher/papierkorb">🗑 Papierkorb<% if (papierkorbAnzahl > 0) { %> (<%= papierkorbAnzahl %>)<% } %></a>
-</p>
-<details class="hinweis-aufklappbar" id="klassen-infos">
+  <%- await include('../partials/kopf-menue', { id: 'kopf-menue-klassen', eintraege: [
+    { href: '/teacher/papierkorb', text: '🗑 Papierkorb' + (papierkorbAnzahl > 0 ? ' (' + papierkorbAnzahl + ')' : '') },
+    { zeige: 'klassen-infos', text: 'ℹ️ Infos zu Klassen und Kursen' },
+  ] }) %>
+</div>
+<details class="hinweis-aufklappbar" id="klassen-infos" data-menue-abschnitt hidden>
   <summary>ℹ️ Infos zu Klassen und Kursen</summary>
   <div class="hint">
     <p>

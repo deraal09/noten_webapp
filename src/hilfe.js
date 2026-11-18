@@ -33,7 +33,7 @@ export const ARTIKEL = [
         'Wer kein Schulkonto hat, bekommt von der Klassenleitung oder der Administration einen **Einladungslink** und legt damit ein eigenes Konto mit Passwort an. Wer Einladungen verschickt, gibt dazu einen **Anzeigenamen** ein, damit er in der Liste erkennt, für wen der Link gedacht ist; ohne Eingabe vergibt die App einen zufälligen Namen aus dem Star-Trek-Universum (nur als Etikett, er erscheint nicht in der Mail und nicht im neuen Konto). Das Passwort lässt sich unter **🔑 Passwort ändern** (oben rechts im Menü) ändern.',
       ] },
       { titel: 'Die Startseite', absaetze: [
-        'Nach der Anmeldung siehst du vier Kacheln: **Noteneingabe** (hier trägst du Noten ein), **Meine Klassen** (Klassen und Kurse verwalten), **Sitzpläne** und **Klassenleitung** (Übersicht, Konferenz, Zeugnisse).',
+        'Nach der Anmeldung siehst du – sobald du ein Fach geöffnet hast – oben **Weitermachen** mit deinen zuletzt geöffneten Fächern (nur für diese Anmeldung, nichts bleibt gespeichert) und vier Kacheln: **Noteneingabe** (hier trägst du Noten ein), **Meine Klassen** (Klassen und Kurse verwalten), **Sitzpläne** und **Klassenleitung** (Übersicht, Konferenz, Zeugnisse).',
         'Das Menü **☰** oben rechts bringt dich überall hin, auch zu **❓ Hilfe**, **🤖 API-Zugang** und **Abmelden**. Mit den Symbolen daneben stellst du das Farbschema auf Hell, Dunkel oder System.',
       ], hinweis: 'Die App lässt sich auf dem Handy als **App installieren**: im Menü auf „📲 App installieren“ tippen (iPhone: Teilen → „Zum Home-Bildschirm“).' },
     ],
@@ -45,7 +45,7 @@ export const ARTIKEL = [
     slug: 'klasse-anlegen', kategorie: 'klassen', titel: 'Klasse anlegen, umbenennen und löschen',
     kurz: 'Eine neue Klasse mit Schuljahr und Notenschlüssel anlegen; Klasse umbenennen; was „Klasse löschen“ bedeutet.',
     schlagworte: ['klasse', 'neue klasse', 'anlegen', 'schuljahr', 'notenschlüssel', 'ihk', 'bg', 'spa', 'einschulung', 'laufzeit', 'umbenennen', 'name ändern', 'löschen', 'beitreten', 'vorhandene klasse'],
-    bilder: [{ datei: 'klassen-liste', text: 'Meine Klassen' }, { datei: 'klasse-anlegen', text: 'Neue Klasse anlegen' }, { datei: 'klasse-detail', text: 'Klassenseite mit „Klasse umbenennen“' }],
+    bilder: [{ datei: 'klassen-liste', text: 'Meine Klassen' }, { datei: 'klasse-anlegen', text: 'Neue Klasse anlegen' }, { datei: 'klasse-detail', text: 'Klassenseite: erster Knopf und Menü hinter den drei Balken, Reiter Fächer · Schüler/innen · Einstellungen' }],
     abschnitte: [
       { titel: 'Neue Klasse anlegen', schritte: [
         'Im Menü **Meine Klassen** öffnen und oben auf **+ Neue Klasse anlegen** klicken.',
@@ -53,10 +53,10 @@ export const ARTIKEL = [
         'Sonst im Reiter **Neue Klasse anlegen** das **Schuljahr** (das aktuelle ist vorausgewählt und mit „(aktuell)“ gekennzeichnet), den **Klassennamen**, den **Notenschlüssel** (IHK 1–6, BG 0–15 Punkte oder SPA) und das **Einschulungsjahr** angeben und speichern.',
       ], hinweis: 'Klassen anlegen dürfen Lehrkräfte mit Schulkonto. Externe Lehrkräfte werden von der Klassenleitung einem Fach zugeordnet.' },
       { titel: 'Klasse umbenennen', absaetze: [
-        'Auf der Klassenseite gibt es unter der Überschrift **✏️ Klasse umbenennen**. Das darf **jede Lehrkraft, die der Klasse angehört**. Der neue Name gilt sofort für alle, die in der Klasse eingetragen sind. Im Schuljahr darf es keine zwei Klassen mit gleichem Namen geben.',
+        'Auf der Klassenseite im Reiter **⚙ Einstellungen** gibt es **✏️ Klasse umbenennen**. Das darf **jede Lehrkraft, die der Klasse angehört**. Der neue Name gilt sofort für alle, die in der Klasse eingetragen sind. Im Schuljahr darf es keine zwei Klassen mit gleichem Namen geben.',
       ] },
       { titel: 'Klasse löschen und Papierkorb', absaetze: [
-        '**🗑 Klasse löschen** blendet die Klasse nur **für dich** aus und legt sie in deinen Papierkorb. Die anderen Lehrkräfte sehen sie weiter. Mehr dazu im Artikel „Papierkorb“.',
+        '**🗑 Klasse löschen** (im Menü **☰** neben „← Meine Klassen“) blendet die Klasse nur **für dich** aus und legt sie in deinen Papierkorb. Die anderen Lehrkräfte sehen sie weiter. Mehr dazu im Artikel „Papierkorb“.',
       ] },
     ],
     links: [{ text: 'Meine Klassen öffnen', href: '/teacher/klassen' }], verwandt: ['schueler-eintragen', 'faecher-lehrkraefte', 'papierkorb'],
@@ -65,9 +65,10 @@ export const ARTIKEL = [
     slug: 'schueler-eintragen', kategorie: 'klassen', titel: 'Schüler:innen eintragen (einzeln, mehrere, CSV)',
     kurz: 'Personen einer Klasse hinzufügen: einzeln, als Liste oder per CSV-Datei; Abgang und Versetzen.',
     schlagworte: ['schüler', 'schülerinnen', 'personen', 'hinzufügen', 'import', 'csv', 'untis', 'excel', 'liste', 'mehrere auf einmal', 'abgang', 'versetzen', 'ohne klasse', 'sammelklasse', 'trennzeichen', 'semikolon'],
-    bilder: [{ datei: 'klasse-detail', text: 'Schüler:innen: Einzeln, Mehrere auf einmal, CSV-Import' }, { datei: 'schueler-csv', text: 'CSV-Import in der Klasse' }],
+    bilder: [{ datei: 'schueler-csv', text: 'Schüler/innen hinzufügen: Einzeln, Mehrere auf einmal, CSV-Import' }],
     abschnitte: [
       { titel: 'Drei Wege', schritte: [
+        'Auf der Klassenseite im Menü **☰ → ➕ Schüler/innen hinzufügen** wählen (oder den Reiter **👥 Schüler/innen** öffnen). Der Bereich bleibt offen, bis du ihn mit **✕ Schließen** ausblendest – praktisch für mehrere Personen nacheinander.',
         '**Einzeln:** Nachname und Vorname eintragen und auf **+ Hinzufügen** klicken.',
         '**Mehrere auf einmal:** Eine Person pro Zeile einfügen, z. B. aus einer Tabelle (`Müller, Anna` oder `Müller;Anna`). Bei Doppelnamen ohne Komma fragt die App nach, was Nach- und Vorname ist.',
         '**CSV-Import:** Eine CSV-Datei mit den Spalten Nachname und Vorname hochladen. Eine Kopfzeile und das Trennzeichen (Semikolon, Komma, Tab) erkennt die App selbst, z. B. bei Listen aus Excel oder Untis.',
@@ -127,7 +128,7 @@ export const ARTIKEL = [
     abschnitte: [
       { titel: 'So funktioniert es', absaetze: [
         '**Klasse löschen** blendet die Klasse nur für dich aus (Meine Klassen, Noteneingabe, Klassenleitung). Die anderen Lehrkräfte der Klasse sehen sie weiter.',
-        'Im **🗑 Papierkorb** (in „Meine Klassen“) liegen deine gelöschten Klassen. Mit **↩ Wiederherstellen** holst du eine Klasse für dich zurück.',
+        'Im **🗑 Papierkorb** (in „Meine Klassen“, im Menü **☰** neben „📝 Zur Noteneingabe“) liegen deine gelöschten Klassen. Mit **↩ Wiederherstellen** holst du eine Klasse für dich zurück.',
         'Solange noch Lehrkräfte die Klasse nutzen, steht dort **„noch keine Ablaufzeit“**. Haben **alle** Lehrkräfte der Klasse sie gelöscht, läuft eine Frist von **30 Tagen** (das Datum steht im Papierkorb). Danach werden Fächer, Klausuren und Noten **unwiderruflich** gelöscht. Wer in der Frist wiederherstellt, stoppt sie.',
         'Nutzt **niemand sonst** die Klasse mehr (steht ein Datum im Papierkorb), kannst du sie mit **🗑 Sofort löschen** ohne Wartezeit **endgültig** löschen. Das geht nicht, solange andere Lehrkräfte die Klasse noch nutzen. Auch ein KI-Agent kann das über die API (`DELETE /papierkorb/{id}`).',
         'Legst du danach eine neue Klasse mit dem **gleichen Namen** im selben Schuljahr an, blockiert die gelöschte Klasse den Namen nicht: Sie bleibt im Papierkorb und behält ihren Namen zurück, wenn du sie wiederherstellst (ist er dann vergeben, mit dem Zusatz „(wiederhergestellt)“).',
@@ -252,7 +253,7 @@ export const ARTIKEL = [
     bilder: [{ datei: 'besprechung', text: 'Notenbesprechung einer Person' }],
     abschnitte: [
       { titel: 'Besprechung starten', schritte: [
-        'In der Fachseite auf **🗣 Notenbesprechung starten** klicken: Du siehst eine Person nach der anderen mit allen Noten.',
+        'In der Fachseite im Menü **☰** neben „← Meine Noteneingabe“ auf **🗣 Notenbesprechung starten** klicken: Du siehst eine Person nach der anderen mit allen Noten.',
         'Mit **🎲 Zufällig starten** (oder dem Würfelknopf in der Besprechung) kommt die nächste Person **zufällig** dran; jede nur einmal. Die Zählung läuft weiter, so siehst du, wie viele noch kommen.',
         'Sind dir mehrere Fächer der Klasse zugeordnet, schaltest du oben zwischen den **Fächern** um.',
       ] },
@@ -395,7 +396,7 @@ export const ARTIKEL = [
         'In der Spalte **Aktion** öffnet **🎓 Abgangs-/Abschlusszeugnis** das Zeugnis der Person mit den Noten aller Fächer.',
       ] },
       { titel: 'Abgang und Laufzeit', absaetze: [
-        'Verlässt eine Person die Klasse während des Schuljahres, trägst du auf der Klassenseite über **☰ → Abgang** einen Abgang ein (die Noten bleiben erhalten; **Reaktivieren** macht es rückgängig). Die **Laufzeit** der Klasse (Einschulung, Abschlussjahr) stellst du auf der Klassenseite ein; danach richten sich Halbjahre und „abgeschlossen“.',
+        'Verlässt eine Person die Klasse während des Schuljahres, trägst du auf der Klassenseite über **☰ → Abgang** einen Abgang ein (die Noten bleiben erhalten; **Reaktivieren** macht es rückgängig). Die **Laufzeit** der Klasse (Einschulung, Abschlussjahr) stellst du auf der Klassenseite ein (**☰ → 📅 Einschulungsjahr festlegen**); danach richten sich Halbjahre und „abgeschlossen“.',
       ] },
       { titel: 'SPA und Export', absaetze: [
         'Für SPA-Klassen gibt es auf der Klassenseite die **📋 Zeugnisübersicht** mit den Zeugnisnoten nach dem SPA-Bewertungssystem. Den Notenstand der Klasse exportierst du über **📥 CSV-Export** auf der Klassenseite.',
