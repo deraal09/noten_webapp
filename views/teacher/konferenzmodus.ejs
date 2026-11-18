@@ -75,10 +75,10 @@
           <form method="post" action="/teacher/klassen/<%= klasse.id %>/konferenz/<%= schueler.id %>/note" class="inline">
             <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
             <input type="hidden" name="fach_id" value="<%= z.fach.id %>">
-            <input type="number" name="note" step="0.1"
+            <input type="number" name="note" step="0.1" aria-label="Konferenznote <%= z.fach.name %>"
                    min="<%= klasse.notenschluessel === 'BG' ? 0 : 1 %>" max="<%= klasse.notenschluessel === 'BG' ? 15 : 6 %>"
                    value="<%= z.konferenzNote === null ? '' : z.konferenzNote %>" placeholder="unverändert">
-            <button type="submit">💾</button>
+            <button type="submit" aria-label="Konferenznote <%= z.fach.name %> speichern" title="Konferenznote speichern">💾</button>
           </form>
         </td>
       </tr>

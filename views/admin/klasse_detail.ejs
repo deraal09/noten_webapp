@@ -17,7 +17,7 @@
           <td><%= kl.display_name || kl.username %></td>
           <td>
             <form method="post" action="/admin/klassenleitung/<%= kl.id %>/entfernen" class="inline" onsubmit="return confirm('Klassenleitung entfernen?')">
-              <button type="submit" class="danger">🗑</button>
+              <button type="submit" class="danger" aria-label="<%= kl.display_name || kl.username %> als Klassenleitung entfernen" title="Klassenleitung entfernen">🗑</button>
             </form>
           </td>
         </tr>
@@ -61,7 +61,7 @@ Meier, Carla"></textarea>
         <td><%= s.vorname %></td>
         <td>
           <form method="post" action="/admin/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in löschen?')">
-            <button type="submit" class="danger">🗑</button>
+            <button type="submit" class="danger" aria-label="<%= s.vorname %> <%= s.nachname %> löschen" title="Schüler/in löschen">🗑</button>
           </form>
         </td>
       </tr>
@@ -83,7 +83,7 @@ Meier, Carla"></textarea>
         <td><%= f.lehrer_liste || '—' %></td>
         <td>
           <form method="post" action="/admin/faecher/<%= f.id %>/loeschen" class="inline" onsubmit="return confirm('Fach löschen?')">
-            <button type="submit" class="danger">🗑</button>
+            <button type="submit" class="danger" aria-label="Fach <%= f.name %> löschen" title="Fach löschen">🗑</button>
           </form>
         </td>
       </tr>

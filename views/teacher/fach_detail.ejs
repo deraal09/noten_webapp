@@ -217,7 +217,7 @@
     <% var maxArr = JSON.parse(k.max_punkte_pro_aufgabe); %>
     <div id="klausur-panel-<%= k.id %>" class="reiter-panel unter-panel card <%= i === 0 ? 'active' : '' %>">
       <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
-        <button type="submit" class="danger">🗑</button>
+        <button type="submit" class="danger" aria-label="Klausur <%= k.name %> löschen" title="Klausur löschen">🗑</button>
       </form>
       <p class="hint">Änderungen werden automatisch gespeichert.</p>
       <div class="einstellungen-reihe">
@@ -359,7 +359,7 @@
               <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
-                <td><input type="number" class="punkt" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
+                <td><input type="number" class="punkt" aria-label="Punkte <%= r.nachname %>, <%= r.vorname %> – Aufgabe <%= i + 1 %>" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
                 <% if (teilEnde[i] !== undefined) {
                      var tn = (eintrag && eintrag.teilNoten) ? eintrag.teilNoten[teilEnde[i]] : null; %>
                   <td class="note-cell k-teilnote" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-teil="<%= teilEnde[i] %>"><%= (tn === null || tn === undefined) ? '–' : formatNote(tn) %></td>
@@ -435,7 +435,7 @@
                 <%= t.datum.split('-').reverse().join('.') %><% if (t.korrektur) { %> <small class="hint" title="Korrekturwerte aus der Notenbesprechung">Korrektur</small><% } %>
                 <form method="post" action="/teacher/unterricht/termine/<%= t.id %>/loeschen" class="inline"
                       onsubmit="return confirm('<%= t.korrektur ? 'Korrektur-Termin löschen? Alle Korrekturwerte dieses Tages gehen verloren.' : 'Termin löschen? Alle Noten dieses Termins gehen verloren.' %>')">
-                  <button type="submit" class="danger" title="Termin löschen">🗑</button>
+                  <button type="submit" class="danger" title="Termin löschen" aria-label="Termin vom <%= t.datum.split('-').reverse().join('.') %> löschen">🗑</button>
                 </form>
                 <textarea class="termin-inhalt" data-termin="<%= t.id %>" rows="2" maxlength="300" placeholder="Unterrichtsinhalt" title="Unterrichtsinhalt dieses Termins (kurze Notiz)" aria-label="Unterrichtsinhalt am <%= t.datum.split('-').reverse().join('.') %>"><%= t.inhalt || '' %></textarea>
               </th>
@@ -490,7 +490,7 @@
     <% var maxArr = JSON.parse(u.max_punkte_pro_aufgabe); %>
     <div id="ul-panel-<%= u.id %>" class="reiter-panel unter-panel card">
       <form method="post" action="/teacher/uls/<%= u.id %>/loeschen" class="inline right" onsubmit="return confirm('Zusatzleistung löschen?')">
-        <button type="submit" class="danger">🗑</button>
+        <button type="submit" class="danger" aria-label="Zusatzleistung <%= u.name %> löschen" title="Zusatzleistung löschen">🗑</button>
       </form>
       <p class="hint">Änderungen werden automatisch gespeichert.</p>
       <div class="einstellungen-reihe">
@@ -540,7 +540,7 @@
               <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
-                <td><input type="number" class="punkt" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
+                <td><input type="number" class="punkt" aria-label="Punkte <%= r.nachname %>, <%= r.vorname %> – Aufgabe <%= i + 1 %>" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
               <% }); %>
               <td class="note-cell u-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>" data-max="<%= maxSummeUl %>"><%= summeUl %> / <%= maxSummeUl %></td>
               <td class="note-cell u-note" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>

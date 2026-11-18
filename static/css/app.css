@@ -34,8 +34,12 @@
   --accent: #0b66c2;
   --accent-hover: #084e96;
 
-  --danger: #e63946;
-  --danger-hover: #b32b35;
+  --danger: #c62833;
+  --danger-hover: #a8202a;
+  --accent-fill: #0b66c2;
+  --accent-fill-hover: #084e96;
+  --danger-fill: #c62833;
+  --danger-fill-hover: #a8202a;
 
   --shadow: rgba(0, 0, 0, 0.05);
   --shadow-strong: rgba(0, 0, 0, 0.1);
@@ -83,6 +87,10 @@
     --primary-text: var(--accent);
 
     --accent: #4a9eef;
+    --accent-fill: #2f6fc0;
+    --accent-fill-hover: #3573c4;
+    --danger-fill: #b8323d;
+    --danger-fill-hover: #cf4450;
     --accent-hover: #6cb2f4;
 
     --danger: #e35d68;
@@ -127,6 +135,10 @@
   --primary-text: var(--accent);
 
   --accent: #4a9eef;
+  --accent-fill: #2f6fc0;
+  --accent-fill-hover: #3573c4;
+  --danger-fill: #b8323d;
+  --danger-fill-hover: #cf4450;
   --accent-hover: #6cb2f4;
 
   --danger: #e35d68;
@@ -287,7 +299,7 @@ table.data thead th, table.tafel thead th { background: var(--bg-header); font-w
    selbst scrollt jetzt seitlich (die Kopfzeile bleibt oben stehen, siehe
    überall zusammen gehörende thead/tbody -- die bleiben trotz display:block
    auf dem <table> intakt, weil sie selbst ihre table-*-Anzeige behalten). */
-table.data, table.tafel { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.data, table.tafel { display: block; width: fit-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table.data tbody tr:nth-child(even) { background: var(--bg-subtle); }
 table.data .name, table.tafel .name { white-space: nowrap; }
 
@@ -333,10 +345,10 @@ button, .btn {
   border: none; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none;
 }
 button:hover, .btn:hover { background: var(--primary-hover); }
-button.danger { background: var(--danger); }
-button.danger:hover { background: var(--danger-hover); }
-.btn { background: var(--accent); }
-.btn:hover { background: var(--accent-hover); }
+button.danger { background: var(--danger-fill); }
+button.danger:hover { background: var(--danger-fill-hover); }
+.btn { background: var(--accent-fill); }
+.btn:hover { background: var(--accent-fill-hover); }
 
 form.inline { display: inline-block; margin: 0; }
 form.inline input, form.inline select { width: auto; display: inline-block; margin-right: 0.5rem; }
@@ -414,7 +426,7 @@ form.inline input, form.inline select { width: auto; display: inline-block; marg
 .notiz-text { white-space: pre-wrap; }
 .notiz-meta { margin-top: 0.2rem; }
 
-.btn.disabled { background: var(--border-strong); color: var(--text-muted); cursor: default; pointer-events: none; }
+.btn.disabled { background: var(--bg-header); color: var(--text-muted); border: 1px dashed var(--border-strong); cursor: default; pointer-events: none; }
 
 .aufgabe-liste { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; vertical-align: middle; margin: 0.3rem 0; }
 .aufgabe-feld { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; margin: 0; font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
@@ -927,3 +939,28 @@ form.inline .select-filter-info { display: inline-block; margin: 0 .5rem 0 0; }
 [data-hinweis][data-hinweis-rechts]::after { left: auto; right: 0; }
 [data-hinweis]:hover::after, [data-hinweis]:focus-visible::after { opacity: 1; visibility: visible; }
 [data-hinweis][aria-expanded="true"]::after, details[open] > [data-hinweis]::after { display: none; }
+
+/* ---------- Ausreichend große Berührungsflächen (mind. 44 px, WCAG 2.5.5) und lesbare Fußzeile ---------- */
+.footer small { font-size: 0.85rem; }
+.footer-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.5rem; }
+.topbar .brand { display: inline-flex; align-items: center; min-height: 44px; }
+.hilfe-banner a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.3rem; }
+.hilfe-banner-zu { min-width: 44px; min-height: 44px; }
+.kachel-aktionen a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.3rem; }
+a.fach-name { display: inline-flex; align-items: center; min-height: 44px; }
+.hinweis-aufklappbar > summary { padding: 0.7rem 0; }
+.nav-toggle { min-width: 44px; }
+.klasse-liste li > a { display: block; }
+.klasse-liste .kachel-zeile { min-height: 44px; }
+@media (pointer: coarse), (max-width: 600px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]), select, textarea { min-height: 44px; box-sizing: border-box; }
+  [data-target][title] { min-width: 44px; }
+  table.tafel input.punkt, .aufgabe-feld input[type=number], input.maxpunkt { min-height: 44px; }
+  table.tafel input.punkt { width: 56px; }
+  .aufgabe-feld input[type=number] { min-width: 3.5rem; }
+  button.danger, .notiz-meta button.danger { min-height: 44px; min-width: 44px; }
+  .notiz-meta button.danger { padding: 0 0.6rem; }
+}
+
+/* Tastaturfokus auch bei Eingabefeldern sichtbar (z. B. Datumsfelder). */
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

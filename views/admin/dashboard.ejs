@@ -28,10 +28,10 @@
           <label>Gewichtung Unterrichtsleistung
             <input type="number" name="gewichtung" min="0" max="100" value="<%= sj.gewichtung_muendlich %>" size="4">%
           </label>
-          <button type="submit">💾</button>
+          <button type="submit" aria-label="Gewichtung für <%= sj.bezeichnung %> speichern" title="Gewichtung speichern">💾</button>
         </form>
         <form method="post" action="/admin/schuljahre/<%= sj.id %>/loeschen" class="inline" onsubmit="return confirm('Schuljahr wirklich löschen?')">
-          <button type="submit" class="danger">🗑</button>
+          <button type="submit" class="danger" aria-label="Schuljahr <%= sj.bezeichnung %> löschen" title="Schuljahr löschen">🗑</button>
         </form>
       </div>
     </li>

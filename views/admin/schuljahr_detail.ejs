@@ -22,7 +22,7 @@
       <div class="kachel-aktionen">
         <a class="btn" href="/export/klasse/<%= k.id %>.csv">📥 CSV</a>
         <form method="post" action="/admin/klassen/<%= k.id %>/loeschen" class="inline" onsubmit="return confirm('Klasse löschen? Schüler/innen und Fächer gehen verloren.')">
-          <button type="submit" class="danger">🗑</button>
+          <button type="submit" class="danger" aria-label="Klasse <%= k.name %> löschen" title="Klasse löschen">🗑</button>
         </form>
       </div>
     </li>

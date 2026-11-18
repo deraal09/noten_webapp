@@ -365,7 +365,7 @@
           <td><%= kl.display_name || kl.username %></td>
           <td>
             <form method="post" action="/teacher/klassenleitung/<%= kl.id %>/entfernen" class="inline" onsubmit="return confirm('Klassenleitung entfernen?')">
-              <button type="submit" class="danger">🗑</button>
+              <button type="submit" class="danger" aria-label="<%= kl.display_name || kl.username %> als Klassenleitung entfernen" title="Klassenleitung entfernen">🗑</button>
             </form>
           </td>
         </tr>

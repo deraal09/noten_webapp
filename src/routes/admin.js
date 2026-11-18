@@ -548,7 +548,7 @@ export default async function adminRoutes(fastify) {
       "SELECT id, username, display_name FROM users WHERE role != 'admin' ORDER BY username"
     ).all();
     const faecher = getDb().prepare(`
-      SELECT f.id, f.name, k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
+      SELECT f.id, f.name, CASE WHEN k.ist_kurs_huelle = 1 THEN 'Kurs' ELSE k.name END AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
       FROM faecher f
       JOIN klassen k ON k.id = f.klasse_id
       JOIN schuljahre s ON s.id = k.schuljahr_id
@@ -578,7 +578,7 @@ export default async function adminRoutes(fastify) {
       "SELECT * FROM users WHERE role != 'admin' AND active = 1 ORDER BY username"
     ).all();
     const faecher = getDb().prepare(`
-      SELECT f.id, f.name, k.id AS klasse_id, k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
+      SELECT f.id, f.name, k.id AS klasse_id, k.ist_kurs_huelle AS huelle, CASE WHEN k.ist_kurs_huelle = 1 THEN 'Kurs' ELSE k.name END AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
       FROM faecher f
       JOIN klassen k ON k.id = f.klasse_id
       JOIN schuljahre s ON s.id = k.schuljahr_id
@@ -586,7 +586,7 @@ export default async function adminRoutes(fastify) {
     `).all();
     const zuweisungen = getDb().prepare(`
       SELECT fz.id, u.username, u.display_name, f.name AS fach_name,
-             k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
+             CASE WHEN k.ist_kurs_huelle = 1 THEN 'Kurs' ELSE k.name END AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
       FROM fach_zuweisungen fz
       JOIN users u ON u.id = fz.user_id
       JOIN faecher f ON f.id = fz.fach_id
@@ -596,7 +596,7 @@ export default async function adminRoutes(fastify) {
     `).all();
     const klassenlehrer = getDb().prepare(`
       SELECT kl.id, u.username, u.display_name, f.name AS fach_name,
-             k.name AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
+             CASE WHEN k.ist_kurs_huelle = 1 THEN 'Kurs' ELSE k.name END AS klasse_name, s.bezeichnung AS schuljahr_bezeichnung
       FROM klassen_lehrkraefte kl
       JOIN users u ON u.id = kl.user_id
       JOIN faecher f ON f.id = kl.fach_id

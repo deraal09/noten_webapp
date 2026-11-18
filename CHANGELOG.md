@@ -6,6 +6,33 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.138.0 - 2026-11-18
+
+### UI/UX: schnelle Gewinne aus der Überprüfung
+
+- **Kontraste:** Die blauen und roten Knöpfe mit weißer Schrift erreichen jetzt in
+  Hell, Dunkel (System) und Dunkel (Auswahl) mindestens 4,5:1 (vorher im
+  Dunkelmodus nur 2,8:1 bzw. 3,5:1, hell 4,2:1); neue Farb-Token `--accent-fill`,
+  `--danger-fill` (je mit `-hover`). Rote Schrift („Klasse löschen“) wurde
+  abgedunkelt, der deaktivierte „← Zurück“ besser lesbar. Ein Test rechnet die
+  Kontraste aus der CSS nach.
+- **Tabellen** (Schülerliste, Notenübersicht, Verwaltungslisten) schrumpfen auf ihre
+  Breite; der leere weiße Block daneben entfällt. Bei Platzmangel scrollen sie wie
+  bisher.
+- **Berührungsflächen:** Mindestens 44 px für Fußzeilen-Links (Schrift nicht mehr
+  11 px), Markenname, Menü-Knopf, Kartenlinks (Noteneingabe/Sitzplan), Klassenkacheln,
+  Fachnamen, Hinweis-Banner und – am Handy – Eingabefelder, Punktefelder,
+  Löschen-Knöpfe. Gemessen im Handy-Format: 213 → 12 zu kleine Berührungsflächen
+  über 17 geprüfte Seiten.
+- **Beschriftungen:** Alle Icon-Knöpfe 🗑 und 💾 haben einen Namen für Screenreader
+  (z. B. „Klasse 12A löschen“, „Konferenznote Englisch speichern“), die
+  Punktefelder („Punkte Adler, Anna – Aufgabe 2“) und Konferenznoten sind
+  beschriftet; ein Test prüft alle Vorlagen. Eingabefelder (auch Datum) zeigen den
+  Tastaturfokus.
+- **Admin → Zuweisungen:** Interne Kurs-Hüllen erschienen als „__kurshuelle_…“ (in
+  der Tabelle und in der Fach-Auswahl, auch bei den Einladungen). Jetzt steht dort
+  „Kurs“; bei der Klassenleitung tauchen Kurse nicht mehr auf.
+
 ## 0.137.0 - 2026-11-18
 
 ### Klassenseite: weitere Punkte ins ☰-Menü, Hinweis „Mehr Optionen“

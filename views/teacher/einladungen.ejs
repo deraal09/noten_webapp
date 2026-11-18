@@ -49,7 +49,7 @@
           <td>
             <% if (!e.used_at) { %>
               <form method="post" action="/teacher/einladungen/<%= e.id %>/loeschen" class="inline" onsubmit="return confirm('Einladung löschen?')">
-                <button type="submit" class="danger">🗑</button>
+                <button type="submit" class="danger" aria-label="Einladung für <%= e.display_name || 'ohne Namen' %> löschen" title="Einladung löschen">🗑</button>
               </form>
             <% } %>
           </td>
