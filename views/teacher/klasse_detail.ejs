@@ -497,7 +497,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 <% } %>
 <% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
    var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
-<table class="data">
+<table class="data tabelle-offen">
   <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten || darfVersetzen) { %><th>Aktion</th><% } %></tr></thead>
   <tbody>
     <% schuelerAktiv.forEach(function(s) { %>
@@ -533,7 +533,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 <% if (schuelerAbgang.length) { %>
   <details class="card">
     <summary>Ehemalige Schüler/innen (Abgang, <%= schuelerAbgang.length %>)</summary>
-    <table class="data">
+    <table class="data tabelle-offen">
       <thead><tr><th>Nachname</th><th>Vorname</th><th>Abgang am</th><% if (darfVerwalten) { %><th>Aktion</th><% } %></tr></thead>
       <tbody>
         <% schuelerAbgang.forEach(function(s) { %>

@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.140.0 - 2026-11-18
+
+### Personenlisten ohne eigenes Scrollfenster
+
+- Die Listen der **Schüler/innen** (Klassenseite, auch die ehemaligen mit Abgang,
+  und Admin-Klassenseite) und der **Teilnehmer/innen** (Fach/Kurs) sind wieder
+  normale Tabellen über die volle Breite – kein eigenes Scrollfenster und kein
+  schmaler Block mehr (Klasse `tabelle-offen`). Die breiten Notentafeln und
+  Verwaltungslisten behalten ihr seitliches Scrollen, damit die Seite nicht über
+  den Rand läuft.
+
 ## 0.139.0 - 2026-11-18
 
 ### UI/UX: aufgeräumte Seitenköpfe, Reiter auf der Klassenseite, „Weitermachen“

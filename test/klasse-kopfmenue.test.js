@@ -158,7 +158,7 @@ test('Klassenseite hat die Reiter Fächer · Schüler/innen · Einstellungen; F�
   assert.match(faecher, /id="faecher-lehrkraefte"/, 'Fächer im Fächer-Reiter');
   assert.match(schueler, /<h2>Schüler\/innen \(/);
   assert.match(schueler, /id="schueler-hinzufuegen"/);
-  assert.match(schueler, /<table class="data">/);
+  assert.match(schueler, /<table class="data tabelle-offen">/);
   assert.match(einst, /✏️ Klasse umbenennen/, 'Umbenennen in den Einstellungen');
   assert.match(einst, /Automatisch für andere Lehrkräfte freigeben/, 'Freigabe in den Einstellungen');
   assert.match(einst, /id="einschulungsjahr-festlegen"/, 'Einschulungsjahr in den Einstellungen');

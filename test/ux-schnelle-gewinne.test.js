@@ -61,6 +61,15 @@ test('Tabellen schrumpfen auf ihre Breite (kein leerer weißer Block daneben) un
   assert.match(css, /table\.data, table\.tafel \{ display: block; width: fit-content; max-width: 100%; overflow-x: auto;/);
 });
 
+test('Personenlisten (Schüler/innen, Teilnehmer/innen) sind normale Tabellen ohne eigenes Scrollfenster', () => {
+  assert.match(css, /table\.data\.tabelle-offen \{ display: table; width: 100%; max-width: 100%; overflow: visible; \}/);
+  const ansichten = { 'views/teacher/klasse_detail.ejs': 2, 'views/teacher/fach_teilnehmer.ejs': 1, 'views/admin/klasse_detail.ejs': 1 };
+  for (const [datei, erwartet] of Object.entries(ansichten)) {
+    const n = (fs.readFileSync(path.join(ROOT, datei), 'utf8').match(/<table class="data tabelle-offen">/g) || []).length;
+    assert.equal(n, erwartet, `${datei}: Personenlisten mit tabelle-offen`);
+  }
+});
+
 test('Berührungsflächen: Fußzeile, Markenname, Kartenlinks, Fachlinks, Punktefelder am Handy', () => {
   assert.match(css, /\.footer-links a \{[^}]*min-height: 44px/);
   assert.match(css, /\.footer small \{ font-size: 0\.85rem; \}/, 'Fußzeile nicht kleiner als 12 px');

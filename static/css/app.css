@@ -993,3 +993,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
   .kachel-icon { font-size: 2.2rem; }
   .kachel-titel { font-size: 1.2rem; }
 }
+
+/* Personenlisten (Schüler/innen, Teilnehmer/innen) sind normale Tabellen über die volle Breite -- kein eigenes Scrollfenster. */
+table.data.tabelle-offen { display: table; width: 100%; max-width: 100%; overflow: visible; }
+table.data.tabelle-offen th, table.data.tabelle-offen td { overflow-wrap: anywhere; }
