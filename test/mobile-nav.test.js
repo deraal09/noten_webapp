@@ -55,7 +55,7 @@ await form(admin, '/setup', {
 
 test('Menü-Button vorhanden, standardmäßig zugeklappt (aria-expanded=false)', async () => {
   const html = await (await admin('/start')).text();
-  assert.match(html, /<button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue">☰<\/button>/);
+  assert.match(html, /<button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue" data-hinweis="Mehr Optionen" data-hinweis-rechts>☰<\/button>/);
   assert.match(html, /<div class="menue" id="hauptmenue" hidden>/);
 });
 

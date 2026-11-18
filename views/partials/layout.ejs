@@ -37,7 +37,7 @@
   <div class="topbar-inner">
     <a class="brand" href="/">📚 <%= appName %></a>
     <%# Alle Optionen der Leiste stecken im Menü (☰): Navigation, Konto, App installieren, Farbschema. %>
-    <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue">☰</button>
+    <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue" data-hinweis="Mehr Optionen" data-hinweis-rechts>☰</button>
     <div class="menue" id="hauptmenue" hidden>
       <% if (typeof user !== 'undefined' && user) { %>
         <div class="menue-kopf">

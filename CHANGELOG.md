@@ -6,6 +6,26 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.137.0 - 2026-11-18
+
+### Klassenseite: weitere Punkte ins ☰-Menü, Hinweis „Mehr Optionen“
+
+- **➕ Schüler/innen hinzufügen** und **📅 Einschulungsjahr festlegen** (nur
+  Klassenleitung) stehen jetzt ebenfalls im ☰-Menü der Klassenseite. Die Bereiche
+  (Einzeln / Mehrere auf einmal / CSV-Import / Aus „Ohne Klasse“ bzw. das
+  Einschulungsjahr-Formular) sind zunächst verborgen; ein Klick im Menü blendet
+  sie ein, springt hin und setzt den Cursor ins erste Feld. Ein zuvor geöffneter
+  Schüler-Bereich bleibt nach dem Hinzufügen offen (praktisch für mehrere
+  Personen nacheinander), „✕ Schließen“ blendet ihn wieder aus; zur Korrektur
+  zurückgegebene Zeilen („Mehrere auf einmal“) öffnen ihn von selbst, und die
+  Adresse `#einschulungsjahr-festlegen` bzw. `#schueler-hinzufuegen` öffnet den
+  jeweiligen Bereich.
+- **Hinweis „Mehr Optionen“** wie ein Hover an **allen** Drei-Balken-Knöpfen:
+  Hauptmenü der Leiste, Menü der Klassenseite und Menü je Person (statt des
+  bisherigen `title`). Er erscheint beim Darüberfahren bzw. mit der Tastatur und
+  verschwindet, sobald das Menü offen ist. Auf Touch-Geräten gibt es kein Hovern;
+  dort bleibt das ☰ als Zeichen.
+
 ## 0.136.0 - 2026-11-18
 
 ### Klassenseite: aufgeräumte Kopfzeile

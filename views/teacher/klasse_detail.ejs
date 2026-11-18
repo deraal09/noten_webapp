@@ -21,10 +21,16 @@
   <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
   <% if (kopfMenueHat) { %>
   <details class="kopf-menue" id="kopf-menue">
-    <summary class="kopf-menue-knopf" aria-label="Weitere Aktionen" title="Weitere Aktionen"><span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span></summary>
+    <summary class="kopf-menue-knopf" aria-label="Weitere Optionen" data-hinweis="Mehr Optionen"><span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span></summary>
     <div class="kopf-popover" role="menu">
       <% if (!klasse.ist_ablage) { %><a class="menue-eintrag" role="menuitem" href="/teacher#klasse-<%= klasse.id %>">📝 Noteneingabe</a><% } %>
       <% if (!klasse.ist_ablage) { %><a class="menue-eintrag" role="menuitem" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a><% } %>
+      <% if (!klasse.ist_ablage || darfVerwalten) { %>
+        <button type="button" class="menue-eintrag" role="menuitem" data-zeige="schueler-hinzufuegen">➕ Schüler/innen hinzufügen</button>
+      <% } %>
+      <% if (istKlassenlehrer) { %>
+        <button type="button" class="menue-eintrag" role="menuitem" data-zeige="einschulungsjahr-festlegen">📅 Einschulungsjahr festlegen</button>
+      <% } %>
       <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
         <a class="menue-eintrag" role="menuitem" href="/teacher/klassen/<%= klasse.id %>/zeugnis">📋 Zeugnisübersicht</a>
       <% } %>
@@ -47,6 +53,43 @@
       if (!menue) return;
       document.addEventListener('click', function (e) { if (menue.open && !menue.contains(e.target)) menue.open = false; });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menue.open) { menue.open = false; menue.querySelector('summary').focus(); } });
+
+      // Abschnitte, die das Menü einblendet (Schüler/innen hinzufügen, Einschulungsjahr festlegen): erst verborgen, dann sichtbar und angesprungen.
+      function merke(el, offen) {
+        var key = el.getAttribute('data-merken');
+        if (!key) return;
+        try { if (offen) sessionStorage.setItem(key, '1'); else sessionStorage.removeItem(key); } catch (e) { /* ohne Speicher egal */ }
+      }
+      window.zeigeAbschnitt = function (id, springen) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.hidden = false;
+        if (el.tagName === 'DETAILS') el.open = true;
+        merke(el, true);
+        if (springen !== false) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          var feld = el.querySelector('input:not([type=hidden]):not([type=checkbox]), select, textarea');
+          if (feld) setTimeout(function () { feld.focus({ preventScroll: true }); }, 250);
+        }
+      };
+      menue.querySelectorAll('[data-zeige]').forEach(function (knopf) {
+        knopf.addEventListener('click', function () { menue.open = false; window.zeigeAbschnitt(knopf.getAttribute('data-zeige')); });
+      });
+      // Die Bereiche folgen weiter unten auf der Seite: erst nach dem vollständigen Laden verdrahten.
+      document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-verberge]').forEach(function (knopf) {
+          knopf.addEventListener('click', function () {
+            var el = document.getElementById(knopf.getAttribute('data-verberge'));
+            if (el) { el.hidden = true; merke(el, false); }
+          });
+        });
+        // Nach einem Absenden (Seite lädt neu) bleibt ein zuvor geöffneter Abschnitt offen; auch per Adresse (#…) erreichbar.
+        document.querySelectorAll('[data-menue-abschnitt]').forEach(function (el) {
+          var key = el.getAttribute('data-merken'), offen = false;
+          try { offen = Boolean(key && sessionStorage.getItem(key)); } catch (e) { /* egal */ }
+          if (offen || location.hash === '#' + el.id) window.zeigeAbschnitt(el.id, location.hash === '#' + el.id);
+        });
+      });
     })();
   </script>
   <% } %>
@@ -72,7 +115,7 @@
     })();
   </script>
 
-  <details class="card" id="einschulungsjahr-festlegen">
+  <details class="card" id="einschulungsjahr-festlegen" data-menue-abschnitt hidden>
     <summary>Einschulungsjahr festlegen <small class="hint">(aktuell <%= laufzeit.schuljahre[0].bezeichnung %>, <%= laufzeit.jahre %> Jahre bis <%= laufzeit.schuljahre[laufzeit.schuljahre.length - 1].bezeichnung %>)</small></summary>
     <p class="hint">
       Eine Klasse läuft über mehrere Schuljahre; die Halbjahre werden ab dem Einschulungsjahr durchgezählt
@@ -110,6 +153,8 @@
 
 <h2>Schüler/innen (<%= schueler.length %>)</h2>
 <% if (!klasse.ist_ablage || darfVerwalten) { %>
+<div id="schueler-hinzufuegen" data-menue-abschnitt data-merken="klasse-<%= klasse.id %>-schueler-offen" hidden>
+<p class="hint">Schüler/innen hinzufügen <button type="button" class="abschnitt-zu" data-verberge="schueler-hinzufuegen" aria-label="Bereich schließen">✕ Schließen</button></p>
 <div class="reiter unter-reiter" data-storage-key="klasse-<%= klasse.id %>-schueler-hinzufuegen">
   <button type="button" class="active" data-target="schueler-einzeln">Einzeln</button>
   <button type="button" data-target="schueler-mehrere">Mehrere auf einmal</button>
@@ -144,6 +189,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
     <script>
       // Zur Korrektur zurückgegebene Zeilen: direkt dieses Register öffnen.
       document.addEventListener('DOMContentLoaded', function() {
+        if (window.zeigeAbschnitt) window.zeigeAbschnitt('schueler-hinzufuegen', false);
         var knopf = document.querySelector('.unter-reiter button[data-target="schueler-mehrere"]');
         if (knopf) knopf.click();
         var feld = document.getElementById('bulk-text');
@@ -202,6 +248,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
   </script>
 </div>
 <% } %>
+</div>
 <% } %>
 
 <% if (klasse.ist_ablage && !darfVerwalten) { %>
@@ -218,7 +265,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
         <td><%= s.vorname %></td>
         <% if (darfVerwalten || darfVersetzen) { %>
         <td class="aktionen-zelle">
-          <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Aktionen für <%= s.vorname %> <%= s.nachname %>" title="Aktionen">
+          <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Mehr Optionen für <%= s.vorname %> <%= s.nachname %>" data-hinweis="Mehr Optionen" data-hinweis-rechts>
             <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
           </button>
           <div class="aktionen-inhalt" hidden>
@@ -255,7 +302,7 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
             <td><%= s.abgang_am ? formatZeitLokal(s.abgang_am) : '–' %></td>
             <% if (darfVerwalten) { %>
             <td class="aktionen-zelle">
-              <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Aktionen für <%= s.vorname %> <%= s.nachname %>" title="Aktionen">
+              <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Mehr Optionen für <%= s.vorname %> <%= s.nachname %>" data-hinweis="Mehr Optionen" data-hinweis-rechts>
                 <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
               </button>
               <div class="aktionen-inhalt" hidden>

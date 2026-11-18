@@ -61,9 +61,9 @@ test('Kopfzeile: nur „← Meine Klassen“ ist sichtbar, alle weiteren Aktione
   const ausserhalb = k.slice(0, menueStart);
   assert.equal((ausserhalb.match(/<a class="btn"/g) || []).length, 1, 'genau ein Knopf außerhalb des Menüs');
   assert.match(ausserhalb, /href="\/teacher\/klassen">← Meine Klassen</);
-  assert.match(k, /<summary class="kopf-menue-knopf" aria-label="Weitere Aktionen"[^>]*><span class="drei-balken"/, 'drei Balken');
+  assert.match(k, /<summary class="kopf-menue-knopf" aria-label="Weitere Optionen" data-hinweis="Mehr Optionen"><span class="drei-balken"/, 'drei Balken');
   const menue = k.slice(menueStart);
-  for (const text of ['📝 Noteneingabe', '🪑 Sitzplan', '🎓 Klassenleitung', '🗑 Klasse löschen']) assert.ok(menue.includes(text), `${text} im Menü`);
+  for (const text of ['📝 Noteneingabe', '🪑 Sitzplan', '➕ Schüler/innen hinzufügen', '📅 Einschulungsjahr festlegen', '🎓 Klassenleitung', '🗑 Klasse löschen']) assert.ok(menue.includes(text), `${text} im Menü`);
   // CSV-Export (nur mit Export-Recht) steht ebenfalls im Menü, nie offen daneben
   const adminKopf = kopf(await (await admin(`/teacher/klassen/${klasseId}`)).text());
   assert.ok(adminKopf.slice(adminKopf.indexOf('<details class="kopf-menue"')).includes('📥 CSV-Export'));
@@ -106,4 +106,35 @@ test('Menü ist leer? Dann kein Menü: Fremde Lehrkraft ohne Rechte bekommt kein
   assert.match(k, /← Meine Klassen/);
   assert.match(k, /🗑 Klasse löschen/, 'Admin darf die Sammelklasse löschen');
   assert.doesNotMatch(k, /📝 Noteneingabe|🪑 Sitzplan/, 'keine Noteneingabe/Sitzplan für die Sammelklasse');
+});
+
+test('Schüler/innen hinzufügen und Einschulungsjahr festlegen: erst verborgen, das Menü blendet sie ein', async () => {
+  const html = await (await anna(`/teacher/klassen/${klasseId}`)).text();
+  // Menüeinträge öffnen die Bereiche
+  assert.match(html, /data-zeige="schueler-hinzufuegen">➕ Schüler\/innen hinzufügen</);
+  assert.match(html, /data-zeige="einschulungsjahr-festlegen">📅 Einschulungsjahr festlegen</);
+  // beide Bereiche sind vorhanden (Formulare, Reiter), aber zunächst verborgen
+  assert.match(html, /<div id="schueler-hinzufuegen" data-menue-abschnitt data-merken="klasse-\d+-schueler-offen" hidden>/);
+  assert.match(html, /<details class="card" id="einschulungsjahr-festlegen" data-menue-abschnitt hidden>/);
+  assert.match(html, new RegExp(`action="/teacher/klassen/${klasseId}/schueler/neu"`), 'Formular „Einzeln“ ist unverändert da');
+  assert.match(html, /data-target="schueler-csv">CSV-Import</);
+  assert.match(html, /data-verberge="schueler-hinzufuegen"/, 'Schließen-Knopf');
+  assert.match(html, /window\.zeigeAbschnitt = function/);
+  // Einschulungsjahr nur für die Klassenleitung
+  db().prepare("DELETE FROM klassenleitung WHERE klasse_id = ?").run(klasseId);
+  const ohne = await (await anna(`/teacher/klassen/${klasseId}`)).text();
+  assert.doesNotMatch(ohne, /data-zeige="einschulungsjahr-festlegen"/);
+  db().prepare('INSERT INTO klassenleitung (klasse_id, user_id) SELECT ?, id FROM users WHERE username = ?').run(klasseId, 'anna');
+});
+
+test('Hinweis „Mehr Optionen“ an allen Knöpfen mit den drei Balken (Hauptmenü, Klassenmenü, Personen-Menü)', async () => {
+  await anna(`/teacher/klassen/${klasseId}/schueler/neu`, { nachname: 'Adler', vorname: 'Anna' });
+  const html = await (await anna(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /class="nav-toggle"[^>]*data-hinweis="Mehr Optionen"/, 'Hauptmenü ☰');
+  assert.match(html, /class="kopf-menue-knopf"[^>]*data-hinweis="Mehr Optionen"/, 'Klassenmenü');
+  assert.match(html, /class="aktionen-knopf"[^>]*data-hinweis="Mehr Optionen"/, 'Menü je Person');
+  assert.doesNotMatch(html, /class="aktionen-knopf"[^>]*title="Aktionen"/, 'kein doppelter Hinweis über title');
+  const css = await (await fetch(`${base}/static/css/app.css`)).text();
+  assert.match(css, /\[data-hinweis\]::after/);
+  assert.match(css, /\[data-menue-abschnitt\]\[hidden\] \{ display: none !important; \}/);
 });
