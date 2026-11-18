@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.136.0 - 2026-11-18
+
+### Klassenseite: aufgeräumte Kopfzeile
+
+- **Meine Klassen → Klasse:** In der Kopfzeile ist nur noch der erste Knopf
+  („← Meine Klassen“) immer sichtbar. Alle weiteren Aktionen – 📝 Noteneingabe,
+  🪑 Sitzplan, 📋 Zeugnisübersicht (SPA), 📥 CSV-Export, 🎓 Klassenleitung und
+  🗑 Klasse löschen – stecken hinter den **drei Balken (☰)** daneben und klappen
+  als Liste auf (am Handy wie am Rechner). Das Menü schließt per Klick daneben
+  und mit Escape, funktioniert auch ohne JavaScript, und „Klasse löschen“ fragt
+  wie bisher nach. Gibt es außer dem ersten Knopf nichts, erscheint kein Menü.
+- Technisch: Die Kopfzeile ist ein `<div>` statt `<p>` (ein `<details>` darf nicht
+  in einem Absatz stehen); der Menü-Knopf hat eine eigene Klasse, damit ihn das
+  Skript der Personen-Menüs („Abgang“, „Versetzen“ …) nicht erfasst.
+
 ## 0.135.0 - 2026-11-15
 
 ### „App neu laden“ im Menü

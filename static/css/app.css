@@ -901,3 +901,13 @@ textarea.termin-inhalt { display: block; width: 9rem; height: 3.2rem; min-height
 form.inline .select-filter { display: inline-block; width: 12rem; margin: 0 .25rem 0 0; }
 form.inline .select-filter-info { display: inline-block; margin: 0 .5rem 0 0; }
 .select-filter-info[hidden] { display: none; }
+
+/* Kopfzeile der Klassenseite: erster Knopf sichtbar, weitere Aktionen hinter den drei Balken (eigene Klassen, damit das Skript der Personen-Menüs ".aktionen-knopf" sie nicht erfasst). */
+.kopf-aktionen { position: relative; }
+.kopf-menue > summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; padding: 0; background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; cursor: pointer; }
+.kopf-menue > summary::-webkit-details-marker { display: none; }
+.kopf-menue > summary::marker { content: ''; }
+.kopf-menue > summary:hover, .kopf-menue[open] > summary { background: var(--bg-tint); border-color: var(--accent); }
+.kopf-popover { position: absolute; left: 0; top: calc(100% + 4px); z-index: 1000; min-width: 15rem; max-width: 100%; box-sizing: border-box; padding: 0.35rem; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 6px 20px var(--shadow); display: flex; flex-direction: column; gap: 0.15rem; }
+.kopf-popover .menue-form { margin: 0; }
+.kopf-popover .menue-eintrag { min-height: 2.5rem; display: flex; align-items: center; box-sizing: border-box; }

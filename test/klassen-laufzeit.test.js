@@ -198,7 +198,8 @@ test('Buttons zur Noteneingabe: auf "Meine Klassen" (oben und je Klasse) und auf
   assert.match(liste, /<a class="btn" href="\/teacher">📝 Zur Noteneingabe<\/a>/);
   assert.match(liste, new RegExp(`<a href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
   const klasse = await (await admin(`/teacher/klassen/${ihkId}`)).text();
-  assert.match(klasse, new RegExp(`<a class="btn" href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
+  // Auf der Klassenseite steckt die Noteneingabe im Menü hinter den drei Balken (nur „← Meine Klassen“ ist immer sichtbar)
+  assert.match(klasse, new RegExp(`<a class="menue-eintrag" role="menuitem" href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
 });
 
 test('Einschulungsjahr festlegen (Klassenseite): Anzahl Jahre 2 oder 3 einstellbar, Standard wiederherstellbar, Rücksprung zur Klasse', async () => {

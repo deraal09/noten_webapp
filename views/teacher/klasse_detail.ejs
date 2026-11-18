@@ -15,25 +15,42 @@
     <% if (klassenleitungNamen.length) { %><%= klassenleitungNamen.join(', ') %><% } else { %><span class="hint">noch niemand eingetragen</span><% } %>
   </p>
 <% } %>
-<p class="kopf-aktionen">
+<%# Kopfzeile: nur der erste Knopf ist immer sichtbar, alle weiteren Aktionen stecken hinter den drei Balken (☰) -- besonders am Handy sind sonst zu viele Knöpfe zu sehen. %>
+<% var kopfMenueHat = !klasse.ist_ablage || kannExportieren || istKlassenlehrer || darfVerwalten; %>
+<div class="kopf-aktionen">
   <a class="btn" href="/teacher/klassen">← Meine Klassen</a>
-  <% if (!klasse.ist_ablage) { %><a class="btn" href="/teacher#klasse-<%= klasse.id %>">📝 Noteneingabe</a><% } %>
-  <% if (!klasse.ist_ablage) { %><a class="btn" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a><% } %>
-  <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
-    <a class="btn" href="/teacher/klassen/<%= klasse.id %>/zeugnis">📋 Zeugnisübersicht</a>
-  <% } %>
-  <% if (kannExportieren) { %>
-    <a class="btn" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
-  <% } %>
-  <% if (istKlassenlehrer) { %>
-    <a class="btn" href="/klassenlehrer/klasse/<%= klasse.id %>">🎓 Klassenleitung</a>
-  <% } %>
-  <% if (darfVerwalten || !klasse.ist_ablage) { %>
-    <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="inline" onsubmit="return confirm('<% if (klasse.ist_ablage) { %>Sammelklasse löschen? Die enthaltenen Schüler/innen gehen dabei verloren.<% } else if (user.isAdmin) { %>Klasse endgültig löschen? Fächer, Klausuren und Noten dieser Klasse gehen verloren. Die Schüler/innen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“ erhalten und können von dort in andere Klassen übernommen werden.<% } else { %>Klasse löschen? Sie verschwindet für dich aus „Meine Klassen“ und liegt im Papierkorb, wo du sie wiederherstellen kannst. Endgültig gelöscht wird sie erst 30 Tage, nachdem alle Lehrkräfte der Klasse sie gelöscht haben.<% } %>')">
-      <button type="submit" class="danger">🗑 Klasse löschen</button>
+  <% if (kopfMenueHat) { %>
+  <details class="kopf-menue" id="kopf-menue">
+    <summary class="kopf-menue-knopf" aria-label="Weitere Aktionen" title="Weitere Aktionen"><span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span></summary>
+    <div class="kopf-popover" role="menu">
+      <% if (!klasse.ist_ablage) { %><a class="menue-eintrag" role="menuitem" href="/teacher#klasse-<%= klasse.id %>">📝 Noteneingabe</a><% } %>
+      <% if (!klasse.ist_ablage) { %><a class="menue-eintrag" role="menuitem" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a><% } %>
+      <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
+        <a class="menue-eintrag" role="menuitem" href="/teacher/klassen/<%= klasse.id %>/zeugnis">📋 Zeugnisübersicht</a>
+      <% } %>
+      <% if (kannExportieren) { %>
+        <a class="menue-eintrag" role="menuitem" href="/export/klasse/<%= klasse.id %>.csv">📥 CSV-Export</a>
+      <% } %>
+      <% if (istKlassenlehrer) { %>
+        <a class="menue-eintrag" role="menuitem" href="/klassenlehrer/klasse/<%= klasse.id %>">🎓 Klassenleitung</a>
+      <% } %>
+      <% if (darfVerwalten || !klasse.ist_ablage) { %>
+        <form method="post" action="/teacher/klassen/<%= klasse.id %>/loeschen" class="menue-form" onsubmit="return confirm('<% if (klasse.ist_ablage) { %>Sammelklasse löschen? Die enthaltenen Schüler/innen gehen dabei verloren.<% } else if (user.isAdmin) { %>Klasse endgültig löschen? Fächer, Klausuren und Noten dieser Klasse gehen verloren. Die Schüler/innen (nur Name) bleiben in der Sammelklasse „Ohne Klasse“ erhalten und können von dort in andere Klassen übernommen werden.<% } else { %>Klasse löschen? Sie verschwindet für dich aus „Meine Klassen“ und liegt im Papierkorb, wo du sie wiederherstellen kannst. Endgültig gelöscht wird sie erst 30 Tage, nachdem alle Lehrkräfte der Klasse sie gelöscht haben.<% } %>')">
+      <button type="submit" class="menue-eintrag danger" role="menuitem">🗑 Klasse löschen</button>
     </form>
+      <% } %>
+    </div>
+  </details>
+  <script>
+    (function () {
+      var menue = document.getElementById('kopf-menue');
+      if (!menue) return;
+      document.addEventListener('click', function (e) { if (menue.open && !menue.contains(e.target)) menue.open = false; });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menue.open) { menue.open = false; menue.querySelector('summary').focus(); } });
+    })();
+  </script>
   <% } %>
-</p>
+</div>
 
 <% if (istKlassenlehrer) { %>
   <form method="post" action="/teacher/klassen/<%= klasse.id %>/offen-fuer-beitritt" class="inline" id="offen-beitritt-form">
