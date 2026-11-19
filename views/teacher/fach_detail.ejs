@@ -1047,9 +1047,12 @@
           const x = document.createElement('button');
           x.type = 'button'; x.className = 'danger'; x.textContent = '🗑'; x.title = 'Notiz löschen';
           x.addEventListener('click', function() {
-            if (!confirm('Notiz löschen?')) return;
-            fetch('/teacher/unterricht/notizen/' + n.id + '/loeschen', { method: 'POST' })
-              .then(function(r) { return r.json(); }).then(function(d) { if (d.ok) zeige(d.notizen); });
+            const loeschen = function() {
+              fetch('/teacher/unterricht/notizen/' + n.id + '/loeschen', { method: 'POST' })
+                .then(function(r) { return r.json(); }).then(function(d) { if (d.ok) zeige(d.notizen); });
+            };
+            if (window.bestaetigen) window.bestaetigen('Notiz löschen?', true, x).then(function(ja) { if (ja) loeschen(); });
+            else if (confirm('Notiz löschen?')) loeschen();
           });
           m.appendChild(x);
         }

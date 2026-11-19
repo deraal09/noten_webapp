@@ -141,3 +141,11 @@ test('Bestätigungsdialog: Formular aus dem Aktionsmenü wird auch abgeschickt, 
   const html = await (await lehrer(`/teacher/klassen/${klasseId}`)).text();
   assert.match(html, /!e\.target\.closest\('dialog'\)/, 'Klick im Dialog schließt das Aktionsmenü nicht');
 });
+
+test('Kein altes Browser-Fenster mehr: Teilnehmer entfernen (nach Suche) und Notiz löschen nutzen den Dialog', () => {
+  const teilnehmer = fs.readFileSync(path.join(ROOT, 'views/teacher/fach_teilnehmer.ejs'), 'utf8');
+  assert.ok(!/addEventListener\('submit', function\(e\) \{ if \(!confirm/.test(teilnehmer));
+  assert.match(teilnehmer, /setAttribute\('onsubmit', "return confirm\('Aus diesem Fach entfernen\?'\)"\)/);
+  const fach = fs.readFileSync(path.join(ROOT, 'views/teacher/fach_detail.ejs'), 'utf8');
+  assert.match(fach, /window\.bestaetigen\('Notiz löschen\?', true, x\)/);
+});

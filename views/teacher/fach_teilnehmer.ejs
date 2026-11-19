@@ -114,7 +114,7 @@
       var aktionZelle = document.createElement('td');
       var form = document.createElement('form');
       form.method = 'post'; form.action = '/teacher/fach/<%= fach.id %>/teilnehmer/entfernen'; form.className = 'inline';
-      form.addEventListener('submit', function(e) { if (!confirm('Aus diesem Fach entfernen?')) e.preventDefault(); });
+      form.setAttribute('onsubmit', "return confirm('Aus diesem Fach entfernen?')"); // static/js/bestaetigen.js zeigt dafür den Dialog
       var sid = document.createElement('input'); sid.type = 'hidden'; sid.name = 'schueler_id'; sid.value = t.id;
       var del = document.createElement('button'); del.type = 'submit'; del.className = 'danger'; del.textContent = '🗑';
       form.appendChild(sid); form.appendChild(del); aktionZelle.appendChild(form);

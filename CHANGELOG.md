@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.142.3 - 2026-11-19
+
+### Alle Bestätigungsdialoge geprüft
+
+- Alle Bestätigungen der App (Löschen, Abgang, Entfernen, Widerrufen, Sperren,
+  Sitzplan übertragen …) wurden mit den Demo-Daten für Lehrkraft und Admin im Browser
+  ausgelöst und mit „Löschen/Bestätigen“ beantwortet: in allen 166 geprüften Fällen
+  kam der Dialog, und die Aktion wurde abgeschickt. Weitere Fehler wie bei den Personen
+  in der Klassenliste (0.142.2) gab es nicht.
+- „Teilnehmer entfernen“ bei nachträglich per Suche hinzugefügten Zeilen und „Notiz
+  löschen“ (Unterrichtsnotizen) fragen jetzt ebenfalls im neuen Dialog statt im
+  Browser-Fenster nach.
+
 ## 0.142.2 - 2026-11-19
 
 ### Fehler behoben: Löschen aus dem Aktionsmenü wirkungslos
