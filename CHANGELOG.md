@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.142.1 - 2026-11-19
+
+### Namen ändern: Felder untereinander
+
+- Im Dialog „Name ändern“ (und im Aufklapper der Admin-Klassenseite) stehen
+  **Nachname** und **Vorname** jetzt untereinander, mit Beschriftung über dem Feld
+  und Feldern über die volle Breite – vorher standen sie versetzt nebeneinander.
+
 ## 0.142.0 - 2026-11-19
 
 ### Namen von Schüler/innen korrigieren

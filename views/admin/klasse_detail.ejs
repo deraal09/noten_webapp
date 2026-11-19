@@ -62,10 +62,10 @@ Meier, Carla"></textarea>
         <td>
           <details class="umbenennen">
             <summary aria-label="Name von <%= s.vorname %> <%= s.nachname %> ändern">✏️ Name ändern</summary>
-            <form method="post" action="/teacher/schueler/<%= s.id %>/umbenennen" class="inline">
+            <form method="post" action="/teacher/schueler/<%= s.id %>/umbenennen" class="name-aendern">
               <input type="hidden" name="zurueck" value="admin">
-              <input type="text" name="nachname" value="<%= s.nachname %>" maxlength="100" required aria-label="Nachname">
-              <input type="text" name="vorname" value="<%= s.vorname %>" maxlength="100" required aria-label="Vorname">
+              <label>Nachname <input type="text" name="nachname" value="<%= s.nachname %>" maxlength="100" required></label>
+              <label>Vorname <input type="text" name="vorname" value="<%= s.vorname %>" maxlength="100" required></label>
               <button type="submit">Speichern</button>
             </form>
           </details>

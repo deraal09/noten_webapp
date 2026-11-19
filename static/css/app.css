@@ -1056,3 +1056,11 @@ select.sf-versteckt { position: absolute; width: 1px; height: 1px; opacity: 0; p
 .favoriten { margin-bottom: 1.5rem; }
 @media (pointer: coarse), (max-width: 600px) { .fach-kachel .stern { min-width: 44px; min-height: 44px; } }
 .fach-kachel .kachel-zeile { padding-right: 2.2rem; }
+
+/* Namen ändern: Nachname und Vorname untereinander, Felder über die volle Breite */
+.notiz-dialog label { display: block; margin: 0.75rem 0 0; font-weight: 500; }
+.notiz-dialog label input[type="text"] { display: block; width: 100%; box-sizing: border-box; margin: 0.25rem 0 0; }
+.notiz-dialog .form-actions { margin-top: 1rem; }
+form.name-aendern { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; max-width: 20rem; margin: 0.5rem 0; }
+form.name-aendern input { width: 100%; box-sizing: border-box; margin: 0; }
+form.name-aendern button { align-self: flex-start; }
