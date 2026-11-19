@@ -102,6 +102,7 @@ test('Dokumentation ist öffentlich (OpenAPI und Seite), Endpunkte und Hinweise 
   assert.equal(spec.openapi, '3.0.3');
   for (const p of ['/me', '/klassen', '/faecher/{id}/noten', '/klausuren/{id}/ergebnisse', '/faecher/{id}/endnoten', '/berechnen/klausur']) assert.ok(spec.paths[p], p);
   assert.ok(spec.paths['/klausuren/{id}/ergebnisse'].put.requestBody);
+  assert.ok(spec.paths['/schueler/{id}/name'].put);
   assert.ok(spec.paths['/klassen'].post && spec.paths['/klassen/{id}/laufzeit'].put && spec.paths['/klassen/{id}/schueler'].post && spec.paths['/klassen/{id}/faecher'].post);
   assert.ok(spec.paths['/papierkorb'].get && spec.paths['/klassen/{id}'].delete && spec.paths['/papierkorb/{id}'].delete && spec.paths['/papierkorb/{id}/wiederherstellen'].post);
   const html = await (await fetch(`${base}/api/v1/docs`)).text();
@@ -484,6 +485,41 @@ test('Klasse umbenennen über die API: jede Lehrkraft der Klasse, gilt für alle
   assert.equal((await api(schreibKey, 'PUT', `/klassen/${ablage}/name`, { name: 'Anders' })).status, 403);
   // Zurück für spätere Tests
   await api(schreibKey, 'PUT', `/klassen/${klasseId}/name`, { name: '12E' });
+});
+
+test('Schüler:in umbenennen über die API: jede Lehrkraft der Klasse, gilt für alle; Regeln; Probelauf; Rechte', async () => {
+  const zeile = () => db().prepare('SELECT nachname, vorname FROM schueler WHERE id = ?').get(sid1);
+  assert.equal((await api(leseKey, 'PUT', `/schueler/${sid1}/name`, { nachname: 'X' })).status, 403, 'lesender Schlüssel');
+  const trocken = await api(schreibKey, 'PUT', `/schueler/${sid1}/name?dry_run=true`, { nachname: 'Adlr2' });
+  assert.equal(trocken.status, 200);
+  assert.equal(trocken.json.gespeichert, false);
+  assert.equal(trocken.json.dry_run, true);
+  assert.deepEqual({ ...zeile() }, { nachname: 'Adler', vorname: 'Anna' }, 'Probelauf ändert nichts');
+  // Nur ein Feld angeben: das andere bleibt
+  const r = await api(schreibKey, 'PUT', `/schueler/${sid1}/name`, { nachname: '  Adlerr ' });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.gespeichert, true);
+  assert.deepEqual(r.json.schueler, { id: sid1, klasse_id: klasseId, nachname: 'Adlerr', vorname: 'Anna', vorher: { nachname: 'Adler', vorname: 'Anna' } });
+  assert.deepEqual({ ...zeile() }, { nachname: 'Adlerr', vorname: 'Anna' });
+  // gilt für alle: Lesen über die API und die App
+  assert.ok((await api(leseKey, 'GET', `/klassen/${klasseId}/schueler`)).json.schueler.some((x) => x.id === sid1 && x.nachname === 'Adlerr'));
+  assert.match(await (await anna(`/teacher/klassen/${klasseId}`)).text(), /<td>Adlerr<\/td>/);
+  // unverändert -> gespeichert: false
+  assert.equal((await api(schreibKey, 'PUT', `/schueler/${sid1}/name`, { nachname: 'Adlerr', vorname: 'Anna' })).json.gespeichert, false);
+  // Regeln
+  for (const body of [{}, { nachname: '' }, { vorname: '   ' }, { nachname: 'x'.repeat(101) }, { nachname: 5 }, { vorname: null }]) {
+    assert.equal((await api(schreibKey, 'PUT', `/schueler/${sid1}/name`, body)).status, 422, JSON.stringify(body));
+  }
+  const doppelt = await api(schreibKey, 'PUT', `/schueler/${sid1}/name`, { nachname: 'berger', vorname: ' bert ' });
+  assert.equal(doppelt.status, 409);
+  assert.equal(doppelt.json.error, 'conflict');
+  assert.deepEqual({ ...zeile() }, { nachname: 'Adlerr', vorname: 'Anna' });
+  // Fremde Lehrkraft, unbekannte Person
+  assert.equal((await api(coraKeyGlobal(), 'PUT', `/schueler/${sid1}/name`, { nachname: 'Gekapert' })).status, 403);
+  assert.equal((await api(schreibKey, 'PUT', '/schueler/99999/name', { nachname: 'X' })).status, 404);
+  // Zurück für spätere Tests
+  await api(schreibKey, 'PUT', `/schueler/${sid1}/name`, { nachname: 'Adler' });
+  assert.equal(zeile().nachname, 'Adler');
 });
 
 test('Kurs umbenennen über die API: zugeordnete Lehrkraft, gilt für alle; nur Kurse; Probelauf; Rechte', async () => {

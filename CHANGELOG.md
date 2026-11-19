@@ -6,6 +6,23 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.143.0 - 2026-11-19
+
+### API: Schüler:innen umbenennen
+
+- Neuer Endpunkt **`PUT /api/v1/schueler/{id}/name`** (Scope `schreiben`) mit Body
+  `{ "nachname": "…", "vorname": "…" }` – ein oder beide Felder; nicht angegebene
+  bleiben unverändert. Wie in der App darf das jede Lehrkraft, die der Klasse
+  angehört; die Korrektur gilt sofort für alle (ein Datensatz je Person, `schueler_id`
+  und Noten bleiben).
+- `?dry_run=true` prüft nur. Leere oder zu lange Namen (> 100 Zeichen) → 422, ein
+  schon vorhandener Name in der Klasse → 409 `conflict`, fremde Lehrkraft → 403,
+  unbekannte Person → 404; die Sammelklasse „Ohne Klasse“ nur für den Admin.
+- Antwort: `{ gespeichert, schueler: { id, klasse_id, nachname, vorname, vorher } }`.
+- `benenneSchuelerUm` (`src/schueler-utils.js`) kann jetzt Probelauf und einzelne
+  Felder; Doku in `src/api-docs.js` (OpenAPI, `/api/v1/docs`) und `docs/API.md`;
+  Test in `test/api-v1.test.js`.
+
 ## 0.142.3 - 2026-11-19
 
 ### Alle Bestätigungsdialoge geprüft

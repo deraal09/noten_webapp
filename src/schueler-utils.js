@@ -59,19 +59,24 @@ export function findeOderLegeSchuelerAn(klasseId, nachname, vorname) {
 /**
  * Korrigiert Nachname/Vorname einer Person (z. B. bei Schreibfehlern). Es gibt nur EINEN Datensatz je Person -- die Änderung gilt damit
  * sofort überall (Klasse, Fächer, Kurse, Zeugnisse, Sitzplan) und für alle Lehrkräfte, die die Klasse sehen. Noten hängen an der ID und
- * bleiben unberührt. Gibt { ok: true, geaendert } oder { ok: false, fehler: 'leer' | 'zu-lang' | 'nicht-gefunden' | 'doppelt' } zurück.
+ * bleiben unberührt. Ein nicht angegebenes Feld (undefined) bleibt unverändert; ein leeres ist ein Fehler. Mit `{ speichern: false }`
+ * wird nur geprüft (Probelauf). Gibt { ok: true, geaendert, klasse_id, alt, neu } oder
+ * { ok: false, fehler: 'leer' | 'zu-lang' | 'nicht-gefunden' | 'doppelt' } zurück.
  */
-export function benenneSchuelerUm(schuelerId, nachname, vorname) {
-  const nn = String(nachname ?? '').replace(/\s+/g, ' ').trim();
-  const vn = String(vorname ?? '').replace(/\s+/g, ' ').trim();
-  if (!nn || !vn) return { ok: false, fehler: 'leer' };
-  if (nn.length > 100 || vn.length > 100) return { ok: false, fehler: 'zu-lang' };
+export function benenneSchuelerUm(schuelerId, nachname, vorname, { speichern = true } = {}) {
   const db = getDb();
   const s = db.prepare('SELECT id, klasse_id, nachname, vorname FROM schueler WHERE id = ?').get(schuelerId);
   if (!s) return { ok: false, fehler: 'nicht-gefunden' };
-  if (s.nachname === nn && s.vorname === vn) return { ok: true, geaendert: false, klasse_id: s.klasse_id };
+  const bereinige = (wert, bisher) => (wert === undefined ? bisher : String(wert ?? '').replace(/\s+/g, ' ').trim());
+  const nn = bereinige(nachname, s.nachname);
+  const vn = bereinige(vorname, s.vorname);
+  if (!nn || !vn) return { ok: false, fehler: 'leer' };
+  if (nn.length > 100 || vn.length > 100) return { ok: false, fehler: 'zu-lang' };
+  const alt = { nachname: s.nachname, vorname: s.vorname };
+  const neu = { nachname: nn, vorname: vn };
+  if (s.nachname === nn && s.vorname === vn) return { ok: true, geaendert: false, klasse_id: s.klasse_id, alt, neu };
   const anderer = holeSchuelerId(s.klasse_id, nn, vn);
   if (anderer !== null && anderer !== s.id) return { ok: false, fehler: 'doppelt', klasse_id: s.klasse_id };
-  db.prepare('UPDATE schueler SET nachname = ?, vorname = ? WHERE id = ?').run(nn, vn, s.id);
-  return { ok: true, geaendert: true, klasse_id: s.klasse_id, alt: { nachname: s.nachname, vorname: s.vorname } };
+  if (speichern) db.prepare('UPDATE schueler SET nachname = ?, vorname = ? WHERE id = ?').run(nn, vn, s.id);
+  return { ok: true, geaendert: true, klasse_id: s.klasse_id, alt, neu };
 }

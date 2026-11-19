@@ -31,7 +31,7 @@ import { benenneKlasseUm, benenneKursUm } from '../umbenennen.js';
 import { legeKursAn, kursNotenschluessel } from '../kurse.js';
 import { legeKlasseAn, berechneLaufzeit, aendereLaufzeit, KLASSEN_NOTENSCHLUESSEL } from '../klasse-anlegen.js';
 import { loescheFuerMich, stelleWiederHer, ladePapierkorb, loescheSofort, aktiveLehrkraefte, ablaufDatum } from '../papierkorb.js';
-import { holeSchuelerId, findeOderLegeSchuelerAn } from '../schueler-utils.js';
+import { holeSchuelerId, findeOderLegeSchuelerAn, benenneSchuelerUm } from '../schueler-utils.js';
 import { baueSchuljahrBezeichnung } from '../schuljahr-utils.js';
 import { BILDUNGSGAENGE } from '../spa-schema.js';
 import { ladeSpaVorlage } from '../spa-vorlagen.js';
@@ -367,6 +367,27 @@ export default async function apiV1Routes(fastify) {
       const neu = schueler.filter((x) => x.status !== 'vorhanden').length;
       if (speichern(request) && neu) request.log.info({ key: request.apiKey.id, klasse: klasse.id, anzahl: neu }, 'api: Schüler angelegt');
       return { gespeichert: speichern(request) && neu > 0, ...(speichern(request) ? {} : { dry_run: true }), klasse: { id: klasse.id, name: klasse.name }, neu, vorhanden: schueler.length - neu, schueler };
+    });
+
+    // Schüler:in umbenennen (Schreibfehler korrigieren): wie in der App darf das jede Lehrkraft der Klasse; es gibt nur einen Datensatz je
+    // Person, die Korrektur gilt also sofort für alle. Nicht angegebene Felder bleiben unverändert.
+    route('PUT', '/schueler/:id/name', 'schreiben', async (request, reply) => {
+      const person = getDb().prepare('SELECT s.id, s.klasse_id, k.ist_ablage, k.ist_kurs_huelle FROM schueler s JOIN klassen k ON k.id = s.klasse_id WHERE s.id = ?').get(parseInt(request.params.id, 10));
+      if (!person || person.ist_kurs_huelle) return senden(reply, 404, 'not_found', 'Person nicht gefunden.');
+      if (person.ist_ablage && !request.apiUser.isAdmin) return senden(reply, 403, 'forbidden', 'Die Sammelklasse „Ohne Klasse“ verwaltet nur der Admin.');
+      if (!userHatKlassenZugriff(request.apiUser, person.klasse_id)) return senden(reply, 403, 'forbidden', 'Kein Zugriff auf die Klasse dieser Person.');
+      const b = request.body || {};
+      if (b.nachname === undefined && b.vorname === undefined) return senden(reply, 422, 'invalid', 'nachname und/oder vorname angeben.');
+      for (const feld of ['nachname', 'vorname']) {
+        if (b[feld] !== undefined && typeof b[feld] !== 'string') return senden(reply, 422, 'invalid', `${feld}: Text mit 1 bis 100 Zeichen.`);
+      }
+      const r = benenneSchuelerUm(person.id, b.nachname, b.vorname, { speichern: speichern(request) });
+      if (!r.ok) {
+        const text = { leer: 'nachname und vorname dürfen nicht leer sein.', 'zu-lang': 'nachname und vorname: höchstens 100 Zeichen.', doppelt: 'In dieser Klasse gibt es schon eine Person mit diesem Namen.' }[r.fehler] || 'Person nicht gefunden.';
+        return senden(reply, r.fehler === 'doppelt' ? 409 : r.fehler === 'nicht-gefunden' ? 404 : 422, r.fehler === 'doppelt' ? 'conflict' : r.fehler === 'nicht-gefunden' ? 'not_found' : 'invalid', text);
+      }
+      if (speichern(request) && r.geaendert) request.log.info({ key: request.apiKey.id, schueler: person.id }, 'api: Schüler umbenannt');
+      return { gespeichert: speichern(request) && r.geaendert, ...(speichern(request) ? {} : { dry_run: true }), schueler: { id: person.id, klasse_id: person.klasse_id, ...r.neu, vorher: r.alt } };
     });
 
     // Fach in einer Klasse anlegen: wie „+ Neues Fach anlegen“ in der App; die Lehrkraft des Schlüssels wird dem Fach zugeordnet, die Teilnehmerliste startet mit der Klasse.

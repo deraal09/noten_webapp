@@ -259,6 +259,14 @@ export const ENDPOINTS = [
     antwort: { gespeichert: true, kurs: { id: 47, name: 'Philosophie Q1', vorher: 'Philo-AG' } },
   },
   {
+    id: 'schueler-name', method: 'PUT', path: '/schueler/{id}/name', scope: 'schreiben',
+    summary: 'Schüler:in umbenennen (Schreibfehler korrigieren)',
+    beschreibung: 'Ändert Nachname und/oder Vorname einer Person -- wie in der App darf das jede Lehrkraft, die der Klasse angehört. Es gibt je Person nur einen Datensatz: Die Korrektur gilt sofort für alle Lehrkräfte der Klasse, in allen Fächern und Kursen; `schueler_id` und alle Noten bleiben unverändert. Nicht angegebene Felder bleiben, wie sie sind. Leere oder mehr als 100 Zeichen lange Namen sind ein Fehler (422); gibt es in der Klasse schon eine Person mit diesem Namen (Groß-/Kleinschreibung egal), antwortet die API mit 409 `conflict`. Die IDs stehen bei `GET /klassen/{id}/schueler`.',
+    query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts ändern' }],
+    body: { nachname: 'Müller', vorname: 'Anna' },
+    antwort: { gespeichert: true, schueler: { id: 301, klasse_id: 12, nachname: 'Müller', vorname: 'Anna', vorher: { nachname: 'Mueler', vorname: 'Anna' } } },
+  },
+  {
     id: 'sync', method: 'POST', path: '/faecher/{id}/sync', scope: 'schreiben',
     summary: 'Fach mit der Klassenleitung synchronisieren („Jetzt synchronisieren“)',
     beschreibung: 'Überträgt den aktuellen Notenstand (Gesamtnote je Person) des Fachs und Halbjahres in den Stand, den die Klassenleitung sieht -- wie der Knopf in der App. Die Klassenleitung sieht nie die Live-Noten, nur den zuletzt synchronisierten Stand. Hat die Lehrkraft den automatischen Sync eingeschaltet, geschieht das nach jeder Eintragung von selbst.',
