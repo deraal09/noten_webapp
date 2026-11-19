@@ -133,3 +133,11 @@ test('SPA-Endnotenseite: Kopfzeile nur Zurück-Knopf + ☰-Menü', () => {
   assert.match(quelle, /partials\/kopf-menue/);
   assert.ok(!/<p class="kopf-aktionen">/.test(quelle));
 });
+
+test('Bestätigungsdialog: Formular aus dem Aktionsmenü wird auch abgeschickt, wenn es nicht mehr im Dokument liegt', async () => {
+  const quelle = fs.readFileSync(path.join(ROOT, 'static/js/bestaetigen.js'), 'utf8');
+  assert.match(quelle, /isConnected/, 'Kopie des Formulars, falls das Aktionsmenü sich geleert hat');
+  assert.match(quelle, /absenden\(form, ausloeser\)/);
+  const html = await (await lehrer(`/teacher/klassen/${klasseId}`)).text();
+  assert.match(html, /!e\.target\.closest\('dialog'\)/, 'Klick im Dialog schließt das Aktionsmenü nicht');
+});

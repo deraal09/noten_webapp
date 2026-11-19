@@ -56,6 +56,27 @@
     try { fn(); } finally { window.confirm = original; }
   }
 
+  /**
+   * Formular nach der Bestätigung absenden. Liegt es nicht mehr im Dokument (z. B. weil sich das Aktionsmenü einer Tabellenzeile beim Klick
+   * in den Dialog geleert hat), würde requestSubmit() ins Leere laufen -- dann wird eine Kopie des Formulars abgeschickt.
+   */
+  function absenden(form, ausloeser) {
+    if (form.isConnected) {
+      if (form.requestSubmit) form.requestSubmit(ausloeser || undefined); else form.submit();
+      return;
+    }
+    var kopie = form.cloneNode(true);
+    kopie.removeAttribute('onsubmit');
+    kopie.hidden = true;
+    if (ausloeser && ausloeser.name) {
+      var feld = document.createElement('input');
+      feld.type = 'hidden'; feld.name = ausloeser.name; feld.value = ausloeser.value;
+      kopie.appendChild(feld);
+    }
+    document.body.appendChild(kopie);
+    kopie.submit();
+  }
+
   document.addEventListener('submit', function (e) {
     var form = e.target;
     if (!form || form.tagName !== 'FORM' || form.dataset.bestaetigt || !/confirm\(/.test(form.getAttribute('onsubmit') || '')) return;
@@ -67,7 +88,7 @@
     frage(text, ausloeser && ausloeser.classList.contains('danger'), ausloeser).then(function (ja) {
       if (!ja) return;
       form.dataset.bestaetigt = '1';
-      mitJa(function () { if (form.requestSubmit) form.requestSubmit(ausloeser || undefined); else form.submit(); });
+      mitJa(function () { absenden(form, ausloeser); });
       delete form.dataset.bestaetigt;
     });
   }, true);

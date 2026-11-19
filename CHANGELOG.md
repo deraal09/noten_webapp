@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.142.2 - 2026-11-19
+
+### Fehler behoben: Löschen aus dem Aktionsmenü wirkungslos
+
+- Nach der Bestätigung im neuen Dialog („Löschen“, „Abgang“ …) wurde die Aktion bei
+  den Personen in der Klassenliste nicht ausgeführt, die Person blieb erhalten.
+  Ursache: Ein Klick im Dialog schloss das Aktionsmenü der Zeile und entfernte
+  damit das Formular, das danach abgeschickt werden sollte. Jetzt bleibt das Menü
+  beim Klick im Dialog offen, und `static/js/bestaetigen.js` schickt zur Sicherheit
+  eine Kopie des Formulars ab, falls es nicht mehr im Dokument liegt.
+
 ## 0.142.1 - 2026-11-19
 
 ### Namen ändern: Felder untereinander
