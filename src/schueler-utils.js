@@ -55,3 +55,23 @@ export function findeOderLegeSchuelerAn(klasseId, nachname, vorname) {
   fuegeZuEigenenFaechernHinzu(klasseId, info.lastInsertRowid);
   return info.lastInsertRowid;
 }
+
+/**
+ * Korrigiert Nachname/Vorname einer Person (z. B. bei Schreibfehlern). Es gibt nur EINEN Datensatz je Person -- die Änderung gilt damit
+ * sofort überall (Klasse, Fächer, Kurse, Zeugnisse, Sitzplan) und für alle Lehrkräfte, die die Klasse sehen. Noten hängen an der ID und
+ * bleiben unberührt. Gibt { ok: true, geaendert } oder { ok: false, fehler: 'leer' | 'zu-lang' | 'nicht-gefunden' | 'doppelt' } zurück.
+ */
+export function benenneSchuelerUm(schuelerId, nachname, vorname) {
+  const nn = String(nachname ?? '').replace(/\s+/g, ' ').trim();
+  const vn = String(vorname ?? '').replace(/\s+/g, ' ').trim();
+  if (!nn || !vn) return { ok: false, fehler: 'leer' };
+  if (nn.length > 100 || vn.length > 100) return { ok: false, fehler: 'zu-lang' };
+  const db = getDb();
+  const s = db.prepare('SELECT id, klasse_id, nachname, vorname FROM schueler WHERE id = ?').get(schuelerId);
+  if (!s) return { ok: false, fehler: 'nicht-gefunden' };
+  if (s.nachname === nn && s.vorname === vn) return { ok: true, geaendert: false, klasse_id: s.klasse_id };
+  const anderer = holeSchuelerId(s.klasse_id, nn, vn);
+  if (anderer !== null && anderer !== s.id) return { ok: false, fehler: 'doppelt', klasse_id: s.klasse_id };
+  db.prepare('UPDATE schueler SET nachname = ?, vorname = ? WHERE id = ?').run(nn, vn, s.id);
+  return { ok: true, geaendert: true, klasse_id: s.klasse_id, alt: { nachname: s.nachname, vorname: s.vorname } };
+}

@@ -74,6 +74,9 @@ export const ARTIKEL = [
         '**Mehrere auf einmal:** Eine Person pro Zeile einfügen, z. B. aus einer Tabelle (`Müller, Anna` oder `Müller;Anna`). Bei Doppelnamen ohne Komma fragt die App nach, was Nach- und Vorname ist.',
         '**CSV-Import:** Eine CSV-Datei mit den Spalten Nachname und Vorname hochladen. Eine Kopfzeile und das Trennzeichen (Semikolon, Komma, Tab) erkennt die App selbst, z. B. bei Listen aus Excel oder Untis.',
       ], hinweis: 'Wer schon in der Klasse ist, wird nicht doppelt angelegt; die Meldung nennt, wie viele übersprungen wurden.' },
+      { titel: 'Schreibfehler im Namen korrigieren', absaetze: [
+        'Hinter jeder Person öffnet **☰** den Eintrag **✏️ Name ändern …**. Das darf **jede Lehrkraft, die der Klasse zugeordnet ist** – nicht nur die Klassenleitung. Es gibt je Person nur einen Eintrag: Die Korrektur gilt sofort für **alle Lehrkräfte der Klasse**, in allen Fächern und Kursen, auf Zeugnissen und im Sitzplan. Deshalb muss den Schreibfehler nur eine Person korrigieren. Alle Noten bleiben erhalten.',
+      ], hinweis: 'Gibt es in der Klasse schon jemanden mit genau diesem Namen, wird nicht geändert (so entstehen keine Doppelten).' },
       { titel: 'Abgang, Versetzen, Löschen', absaetze: [
         'Hinter jeder Person öffnet **☰** die Aktionen: **Versetzen** in eine andere Klasse (alle Noten bleiben erhalten), **Abgang** (Person verlässt die Klasse, Noten bleiben, ein Abgangszeugnis ist möglich) oder **Löschen** (entfernt die Person samt Noten unwiderruflich – nur, solange keine Noten anderer Lehrkräfte daran hängen).',
         'Wird eine Klasse endgültig gelöscht, landen ihre Personen (nur der Name) in der Sammelklasse **„Ohne Klasse“**. Von dort lassen sie sich über **Aus Ohne Klasse übernehmen** in eine eigene Klasse holen.',

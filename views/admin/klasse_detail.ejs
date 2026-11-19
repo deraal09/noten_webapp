@@ -60,6 +60,15 @@ Meier, Carla"></textarea>
         <td><%= s.nachname %></td>
         <td><%= s.vorname %></td>
         <td>
+          <details class="umbenennen">
+            <summary aria-label="Name von <%= s.vorname %> <%= s.nachname %> ändern">✏️ Name ändern</summary>
+            <form method="post" action="/teacher/schueler/<%= s.id %>/umbenennen" class="inline">
+              <input type="hidden" name="zurueck" value="admin">
+              <input type="text" name="nachname" value="<%= s.nachname %>" maxlength="100" required aria-label="Nachname">
+              <input type="text" name="vorname" value="<%= s.vorname %>" maxlength="100" required aria-label="Vorname">
+              <button type="submit">Speichern</button>
+            </form>
+          </details>
           <form method="post" action="/admin/schueler/<%= s.id %>/loeschen" class="inline" onsubmit="return confirm('Schüler/in löschen?')">
             <button type="submit" class="danger" aria-label="<%= s.vorname %> <%= s.nachname %> löschen" title="Schüler/in löschen">🗑</button>
           </form>

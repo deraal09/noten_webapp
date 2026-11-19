@@ -43,7 +43,7 @@ import {
   ladeVersetzZiele, versetzeSchueler, loescheKlasseMitSchuelerUebernahme, ladeAblagePersonen, uebernehmeAusAblage,
 } from '../klassenwechsel.js';
 import { parseSchuelerCsv } from '../csv-import.js';
-import { fuegeSchuelerHinzuFallsNeu } from '../schueler-utils.js';
+import { fuegeSchuelerHinzuFallsNeu, benenneSchuelerUm } from '../schueler-utils.js';
 import {
   seedeTeilnehmerAusKlasse, ladeTeilnehmerMitHerkunft, fuegeTeilnehmerHinzu, entferneTeilnehmer,
   sucheSchuelerFuerFach, legeManuellenTeilnehmerAn,
@@ -1993,7 +1993,7 @@ export default async function teacherRoutes(fastify) {
       user: request.user, klasse, schueler, kannExportieren, darfVerwalten,
       istKlassenlehrer, kannSelbstAlsKlassenlehrerEintragen, klassenleitungErstMitFach, zuweisbareLehrkraefte,
       jahresOptionen: jahresOptionen(),
-      darfVersetzen: darfVerwalten,
+      darfVersetzen: darfVerwalten, darfUmbenennen: userHatKlassenZugriff(request.user, klasse.id),
       versetzZiele: darfVerwalten ? ladeVersetzZiele(klasse).filter((k) => k.ist_ablage || userDarfKlasseVerwalten(request.user, k.id)) : [],
       ablagePersonen: darfVerwalten && !klasse.ist_ablage ? ladeAblagePersonen() : [],
     });
@@ -2324,6 +2324,26 @@ export default async function teacherRoutes(fastify) {
         + (uebersprungen ? ` ${uebersprungen} bereits vorhandene(r) übersprungen.` : ''));
       return reply.redirect(`/teacher/klassen/${request.params.id}`);
     });
+  });
+
+  // Namen korrigieren (Schreibfehler): Es gibt nur einen Datensatz je Person, die Änderung gilt daher sofort für ALLE Lehrkräfte der
+  // Klasse. Darum darf es jede Lehrkraft mit Zugriff auf die Klasse (wie beim Anlegen von Personen), nicht nur die Klassenleitung.
+  fastify.post('/schueler/:id/umbenennen', async (request, reply) => {
+    const s = getDb().prepare('SELECT klasse_id FROM schueler WHERE id = ?').get(request.params.id);
+    if (!s) return reply.redirect('/teacher/klassen');
+    if (!userHatKlassenZugriff(request.user, s.klasse_id)) {
+      return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'Keine Berechtigung.' });
+    }
+    const ergebnis = benenneSchuelerUm(request.params.id, request.body?.nachname, request.body?.vorname);
+    if (ergebnis.ok && ergebnis.geaendert) request.flash?.('success', 'Name geändert -- die Änderung gilt für alle Lehrkräfte dieser Klasse.');
+    else if (!ergebnis.ok) {
+      request.flash?.('error', {
+        leer: 'Nachname und Vorname dürfen nicht leer sein.',
+        'zu-lang': 'Der Name ist zu lang (höchstens 100 Zeichen je Feld).',
+        doppelt: 'In dieser Klasse gibt es bereits eine Person mit diesem Namen -- nicht geändert.',
+      }[ergebnis.fehler] || 'Name konnte nicht geändert werden.');
+    }
+    return reply.redirect(request.body?.zurueck === 'admin' ? `/admin/klassen/${s.klasse_id}` : `/teacher/klassen/${s.klasse_id}`);
   });
 
   // Komplettes Löschen: entfernt die Person samt ALLER Noten unwiderruflich

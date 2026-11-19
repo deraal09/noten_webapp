@@ -6,6 +6,26 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.142.0 - 2026-11-19
+
+### Namen von Schüler/innen korrigieren
+
+- Neuer Eintrag **✏️ Name ändern …** im ☰-Menü jeder Person (Klassenseite; in der
+  Administration als Aufklapper „Name ändern“). Der Dialog ändert Nachname und
+  Vorname, z. B. bei Schreibfehlern.
+- Es gibt je Person nur einen Datensatz: Die Korrektur gilt **sofort für alle
+  Lehrkräfte der Klasse** und überall (Fächer, Kurse, Notentafeln, Zeugnisse,
+  Sitzplan); Noten, Notizen und Zuordnungen bleiben unverändert. Es muss also nur
+  eine Person den Fehler beheben.
+- Erlaubt ist es jeder Lehrkraft mit Zugriff auf die Klasse (Klassenleitung,
+  Fachlehrkräfte, Ersteller/in, Admin) – wie das Anlegen von Personen. Fremde
+  Lehrkräfte erhalten 403. Leere oder zu lange (> 100 Zeichen) Namen und ein Name,
+  den es in der Klasse schon gibt, werden abgelehnt; nur die Schreibweise der
+  eigenen Person (Groß-/Kleinschreibung) zu ändern ist erlaubt.
+- `POST /teacher/schueler/:id/umbenennen`, Funktion `benenneSchuelerUm`
+  (`src/schueler-utils.js`), Hilfe-Abschnitt ergänzt, Tests in
+  `test/schueler-umbenennen.test.js`.
+
 ## 0.141.0 - 2026-11-18
 
 ### UI/UX: weitere Verbesserungen

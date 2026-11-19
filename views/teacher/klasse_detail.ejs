@@ -498,18 +498,21 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 <% var schuelerAktiv = schueler.filter(function(s) { return s.status !== 'abgang'; });
    var schuelerAbgang = schueler.filter(function(s) { return s.status === 'abgang'; }); %>
 <table class="data tabelle-offen">
-  <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten || darfVersetzen) { %><th>Aktion</th><% } %></tr></thead>
+  <thead><tr><th>Nachname</th><th>Vorname</th><% if (darfVerwalten || darfVersetzen || darfUmbenennen) { %><th>Aktion</th><% } %></tr></thead>
   <tbody>
     <% schuelerAktiv.forEach(function(s) { %>
       <tr>
         <td><%= s.nachname %></td>
         <td><%= s.vorname %></td>
-        <% if (darfVerwalten || darfVersetzen) { %>
+        <% if (darfVerwalten || darfVersetzen || darfUmbenennen) { %>
         <td class="aktionen-zelle">
           <button type="button" class="aktionen-knopf" aria-haspopup="true" aria-expanded="false" aria-label="Mehr Optionen für <%= s.vorname %> <%= s.nachname %>" data-hinweis="Mehr Optionen" data-hinweis-rechts>
             <span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span>
           </button>
           <div class="aktionen-inhalt" hidden>
+            <% if (darfUmbenennen) { %>
+              <button type="button" class="menue-eintrag" data-umbenennen data-sid="<%= s.id %>" data-nachname="<%= s.nachname %>" data-vorname="<%= s.vorname %>" title="Schreibfehler im Namen korrigieren (gilt für alle Lehrkräfte der Klasse)">✏️ Name ändern …</button>
+            <% } %>
             <% if (versetzZiele.length) { %>
               <button type="button" class="menue-eintrag" data-versetzen data-sid="<%= s.id %>" data-name="<%= s.vorname %> <%= s.nachname %>" title="In eine andere Klasse versetzen (Noten bleiben erhalten)">↔ Versetzen …</button>
             <% } %>
@@ -630,6 +633,21 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
 
 <div id="aktionen-popover" class="aktionen-popover" role="menu" hidden></div>
 
+<% if (darfUmbenennen) { %>
+<dialog id="umbenennen-dialog" class="notiz-dialog">
+  <form method="post" id="umbenennen-form" action="">
+    <h2>Name ändern</h2>
+    <p class="hint">Zum Korrigieren von Schreibfehlern. Die Änderung gilt sofort für <strong>alle Lehrkräfte</strong>, die dieser Klasse zugeordnet sind – alle Noten bleiben erhalten.</p>
+    <label>Nachname <input type="text" name="nachname" id="umbenennen-nachname" maxlength="100" required autocomplete="off"></label>
+    <label>Vorname <input type="text" name="vorname" id="umbenennen-vorname" maxlength="100" required autocomplete="off"></label>
+    <div class="form-actions">
+      <button type="submit">Speichern</button>
+      <button type="button" id="umbenennen-abbrechen">Abbrechen</button>
+    </div>
+  </form>
+</dialog>
+<% } %>
+
 <% if (versetzZiele.length) { %>
 <dialog id="versetzen-dialog" class="notiz-dialog">
   <form method="post" id="versetzen-form" action="">
@@ -683,6 +701,17 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
       });
     });
     document.addEventListener('click', function(e) {
+      var um = e.target.closest('[data-umbenennen]');
+      if (um) {
+        var udlg = document.getElementById('umbenennen-dialog');
+        document.getElementById('umbenennen-form').action = '/teacher/schueler/' + um.dataset.sid + '/umbenennen';
+        document.getElementById('umbenennen-nachname').value = um.dataset.nachname;
+        document.getElementById('umbenennen-vorname').value = um.dataset.vorname;
+        schliessen();
+        udlg.showModal();
+        document.getElementById('umbenennen-nachname').focus();
+        return;
+      }
       var ziel = e.target.closest('[data-versetzen]');
       if (ziel) {
         var dlg = document.getElementById('versetzen-dialog');
@@ -696,6 +725,8 @@ Meier;Carla"><%= bulkVorbelegung %></textarea>
     });
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') schliessen(); });
     window.addEventListener('resize', schliessen);
+    var uAbbrechen = document.getElementById('umbenennen-abbrechen');
+    if (uAbbrechen) uAbbrechen.addEventListener('click', function() { document.getElementById('umbenennen-dialog').close(); });
     var abbrechen = document.getElementById('versetzen-abbrechen');
     if (abbrechen) abbrechen.addEventListener('click', function() { document.getElementById('versetzen-dialog').close(); });
   })();
