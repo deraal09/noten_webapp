@@ -138,7 +138,7 @@ test('Regression: Punkte-Eingabe funktioniert mit der Kodierung, die der Browser
   const template = fs.readFileSync(
     path.join(process.cwd(), 'views/teacher/fach_detail.ejs'), 'utf8',
   );
-  const punktListenerBlock = template.slice(template.indexOf("querySelectorAll('input.punkt')"));
+  const punktListenerBlock = template.slice(template.indexOf('async function speichereFeld'));
   assert.doesNotMatch(punktListenerBlock, /new FormData\(\)/,
     'Die Punkt-Eingabe darf keine FormData mehr verwenden (führt zu 415 statt gespeicherten Punkten)');
   assert.match(punktListenerBlock, /new URLSearchParams\(\)/);

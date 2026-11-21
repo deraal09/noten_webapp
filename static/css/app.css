@@ -1129,3 +1129,9 @@ details.erweitert > summary { cursor: pointer; font-weight: 600; padding: 0.35re
 .card .funktionen-liste label, .card label.feedback-name { display: flex; margin: 0; }
 .card label.feedback-art { display: inline-flex; margin: 0; }
 .brand { white-space: nowrap; }
+
+/* Punktefelder sind Textfelder (damit man auch Rechnungen eintippen kann) */
+table.tafel input.extrapunkt { text-align: center; padding: 0.2rem; border: 1px solid var(--border-strong); border-radius: 3px; background: var(--bg-input); color: var(--text); }
+input.punkt.speicherfehler, input.extrapunkt.speicherfehler { background: var(--flash-error-bg); outline: 2px solid var(--flash-error-border); }
+/* [hidden] gewinnt immer gegen display-Regeln (z. B. beim Banner „Neu hier?“, das sich sonst nicht schließen ließ) */
+[hidden] { display: none !important; }

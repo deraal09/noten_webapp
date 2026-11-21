@@ -367,14 +367,14 @@
               <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
-                <td><input type="number" class="punkt" aria-label="Punkte <%= r.nachname %>, <%= r.vorname %> – Aufgabe <%= i + 1 %>" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
+                <td><input type="text" inputmode="decimal" autocomplete="off" class="punkt" aria-label="Punkte <%= r.nachname %>, <%= r.vorname %> – Aufgabe <%= i + 1 %>" data-kind="k" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" max="<%= mp %>" title="Punkte oder Rechnung, z. B. 2+1,5+3" value="<%= p === null || p === undefined ? '' : String(p).replace('.', ',') %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
                 <% if (teilEnde[i] !== undefined) {
                      var tn = (eintrag && eintrag.teilNoten) ? eintrag.teilNoten[teilEnde[i]] : null; %>
                   <td class="note-cell k-teilnote" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-teil="<%= teilEnde[i] %>"><%= (tn === null || tn === undefined) ? '–' : formatNote(tn) %></td>
                 <% } %>
               <% }); %>
               <% if (!k.teileInfo) { %>
-                <td><input type="number" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" min="0" max="<%= k.max_extrapunkte > 0 ? k.max_extrapunkte : maxSumme %>" step="0.5" value="<%= extra || '' %>" placeholder="–" title="Extrapunkte (optional<%= k.max_extrapunkte > 0 ? ', höchstens ' + k.max_extrapunkte : '' %>)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
+                <td><input type="text" inputmode="decimal" autocomplete="off" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" max="<%= k.max_extrapunkte > 0 ? k.max_extrapunkte : maxSumme %>" value="<%= extra ? String(extra).replace('.', ',') : '' %>" placeholder="–" title="Extrapunkte (optional<%= k.max_extrapunkte > 0 ? ', höchstens ' + k.max_extrapunkte : '' %>; auch als Rechnung)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
               <% } %>
               <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe + extra %> / <%= maxSumme %><% if (extra && maxSumme > 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
               <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
@@ -561,7 +561,7 @@
               <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (r.herkunftKlasse) { %> <small class="hint">(<%= r.herkunftKlasse %>)</small><% } %><% if (gesperrt) { %> 🔒<% } %></td>
               <% maxArr.forEach(function(mp, i) {
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
-                <td><input type="number" class="punkt" aria-label="Punkte <%= r.nachname %>, <%= r.vorname %> – Aufgabe <%= i + 1 %>" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" min="0" max="<%= mp %>" step="0.5" value="<%= p === null || p === undefined ? '' : p %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
+                <td><input type="text" inputmode="decimal" autocomplete="off" class="punkt" aria-label="Punkte <%= r.nachname %>, <%= r.vorname %> – Aufgabe <%= i + 1 %>" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" max="<%= mp %>" title="Punkte oder Rechnung, z. B. 2+1,5+3" value="<%= p === null || p === undefined ? '' : String(p).replace('.', ',') %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
               <% }); %>
               <td class="note-cell u-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>" data-max="<%= maxSummeUl %>"><%= summeUl %> / <%= maxSummeUl %></td>
               <td class="note-cell u-note" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
@@ -638,6 +638,7 @@
 
 <% } %>
 
+<script src="/static/js/punkte-rechnen.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>"></script>
 <script>
   // Reiter (Notenübersicht/Unterrichtsleistung/Klausuren, sowie die
   // Unter-Reiter je Klausur und je Zusatzleistung) umschalten (beim Öffnen des Fachs ist die Notenübersicht vorn, siehe unten). Jede
@@ -820,37 +821,60 @@
     } catch (e) { console.warn(e); }
   }
   function debounce(fn, ms) { let t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
-  document.querySelectorAll('input.punkt').forEach(function(inp) {
+  // Punktefelder (Klausur, Zusatzleistung, Extrapunkte): man darf eine Zahl ODER eine Rechnung eintippen (z. B. 2+1,5+3).
+  // Eine Zahl wird nach kurzer Pause gespeichert, eine Rechnung beim Verlassen des Feldes (oder mit Enter/Pfeiltasten): Das Feld zeigt
+  // dann die Summe, und die Summe wird gespeichert (static/js/punkte-rechnen.js, ohne eval).
+  const PR = window.punkteRechnen;
+  async function speichereFeld(inp, wertText) {
+    // URLSearchParams statt FormData: fetch setzt dafür automatisch Content-Type: application/x-www-form-urlencoded, das Einzige,
+    // was der Server (@fastify/formbody) versteht (mit multipart/form-data käme 415 und nichts würde gespeichert).
+    const body = new URLSearchParams();
+    body.append('schueler_id', inp.dataset.sid);
+    const extra = inp.classList.contains('extrapunkt');
+    if (!extra) body.append('aufgabe_idx', inp.dataset.idx);
+    body.append('wert', wertText);
+    const url = extra ? '/teacher/klausuren/' + inp.dataset.kid + '/extrapunkte'
+      : (inp.dataset.kind === 'k' ? '/teacher/klausuren/' + inp.dataset.kid + '/punkte' : '/teacher/uls/' + inp.dataset.kid + '/punkte');
+    let d = null;
+    try { d = await (await fetch(url, { method: 'POST', body })).json(); } catch (e) { /* ignorieren */ }
+    const ok = Boolean(d && d.ok);
+    inp.classList.toggle('speicherfehler', !ok);
+    if (!ok) inp.title = (d && d.error) ? 'Nicht gespeichert: ' + d.error : 'Nicht gespeichert.';
+    if (ok) refresh();
+    return ok;
+  }
+  // Wert aus dem Feld lesen: '' (leer), eine Zahl (als Text mit Punkt) oder null (ungültig)
+  function feldWert(inp) {
+    const t = inp.value.trim();
+    if (t === '') return '';
+    const z = PR ? PR.rechne(t) : Number(t.replace(',', '.'));
+    return z === null || z === undefined || isNaN(z) ? null : String(z);
+  }
+  async function auswerten(inp) {
+    const t = inp.value.trim();
+    const w = feldWert(inp);
+    if (w === null) { inp.classList.add('speicherfehler'); inp.title = 'Keine gültige Zahl oder Rechnung.'; return; }
+    inp.title = inp.dataset.titel || 'Punkte oder Rechnung, z. B. 2+1,5+3';
+    if (PR && t !== '' && (PR.istRechnung(t) || /\./.test(t))) {
+      if (PR.istRechnung(t)) inp.title = 'Rechnung: ' + t + ' = ' + PR.formatiere(Number(w));
+      inp.value = PR.formatiere(Number(w));
+    }
+    await speichereFeld(inp, w);
+  }
+  document.querySelectorAll('input.punkt, input.extrapunkt').forEach(function(inp) {
+    inp.dataset.titel = inp.title;
+    inp.addEventListener('input', function() { inp.classList.remove('speicherfehler'); });
     inp.addEventListener('input', debounce(async function() {
-      // URLSearchParams statt FormData: fetch setzt dafür automatisch
-      // Content-Type: application/x-www-form-urlencoded, das Einzige, was
-      // der Server (@fastify/formbody) versteht. Mit FormData (→
-      // multipart/form-data) antwortet der Server mit 415 und die Punkte
-      // werden nie gespeichert — genau das führte dazu, dass live weder
-      // Note noch Gesamtnote berechnet wurden.
-      const body = new URLSearchParams();
-      body.append('schueler_id', inp.dataset.sid);
-      body.append('aufgabe_idx', inp.dataset.idx);
-      body.append('wert', inp.value);
-      const url = inp.dataset.kind === 'k'
-        ? '/teacher/klausuren/' + inp.dataset.kid + '/punkte'
-        : '/teacher/uls/' + inp.dataset.kid + '/punkte';
-      await fetch(url, { method: 'POST', body });
-      refresh();
+      const t = inp.value.trim();
+      if (PR && PR.istRechnung(t)) return; // Rechnung: erst beim Verlassen des Feldes
+      const w = feldWert(inp);
+      if (w === null) { inp.classList.add('speicherfehler'); inp.title = 'Keine gültige Zahl oder Rechnung.'; return; }
+      await speichereFeld(inp, w);
     }, 400));
-  });
-  // Extrapunkte (optional, einteilige Klausuren): speichern, dann Summe/Note neu laden; ein abgelehnter Wert wird markiert.
-  document.querySelectorAll('input.extrapunkt').forEach(function(inp) {
-    inp.addEventListener('input', debounce(async function() {
-      const body = new URLSearchParams();
-      body.append('schueler_id', inp.dataset.sid);
-      body.append('wert', inp.value);
-      let d = null;
-      try { d = await (await fetch('/teacher/klausuren/' + inp.dataset.kid + '/extrapunkte', { method: 'POST', body })).json(); } catch (e) { /* ignorieren */ }
-      inp.classList.toggle('speicherfehler', !(d && d.ok));
-      inp.title = (d && d.ok) ? 'Extrapunkte (optional)' : ((d && d.error) || 'Nicht gespeichert.');
-      if (d && d.ok) refresh();
-    }, 400));
+    inp.addEventListener('change', function() { auswerten(inp); });
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') auswerten(inp); // Enter in der letzten Zeile verlässt das Feld nicht -- trotzdem ausrechnen
+    });
   });
   // Unterrichtsinhalt je Termin der Datumstabelle: beim Verlassen des Feldes speichern.
   document.querySelectorAll('textarea.termin-inhalt').forEach(function(feld) {

@@ -6,6 +6,27 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.146.0 - 2026-11-21
+
+### Rechnen in den Punktefeldern; Banner „Neu hier?“ lässt sich schließen
+
+- **Rechnungen als Punkte:** In den Punktefeldern von Klausuren, Zusatzleistungen und
+  Extrapunkten darf man statt einer Zahl eine Rechnung eintippen, z. B. `2+1,5+3` oder
+  `(4+2)/2`. Beim Verlassen des Feldes (Tab, Enter, Pfeiltasten) wird sie ausgerechnet, das Feld
+  zeigt die Summe, und die Summe wird als Punktzahl der Aufgabe gespeichert (Tipp am Feld:
+  „Rechnung: … = …“). Erlaubt: Zahlen mit Komma oder Punkt, `+ − * / × · ÷ :` und Klammern.
+  Gerechnet wird mit einem eigenen kleinen Parser, **nicht** mit `eval`
+  (`static/js/punkte-rechnen.js`). Ergebnisse werden auf zwei Nachkommastellen geglättet.
+- Ungültige Eingaben (`3+`, `abc`, Division durch 0) und Summen über den Höchstpunkten werden rot
+  markiert und nicht gespeichert – vorher blieb ein abgelehnter Wert unbemerkt.
+- Die Felder sind jetzt Textfelder (`inputmode="decimal"`, Handy-Zahlenblock) und zeigen
+  Kommazahlen; gespeichert wird weiterhin eine Zahl, die API und Berechnungen sind unverändert.
+  Die Klausur-Statistik rechnet mit dem fertigen Ergebnis.
+- **Fehler behoben:** Das Banner „👋 Neu hier?“ auf der Startseite ließ sich mit dem ✕ nicht
+  schließen: Seine `display`-Regel hebelte das Attribut `hidden` aus. Jetzt gilt global
+  `[hidden] { display: none !important; }` – das beseitigt dieselbe Fehlerklasse auch an anderen Stellen.
+- Hilfe ergänzt; Tests in `test/punkte-rechnen.test.js`.
+
 ## 0.145.0 - 2026-11-21
 
 ### Aufgeräumte Oberfläche, „Meine Funktionen“, Funktionsstatistik und Feedback
