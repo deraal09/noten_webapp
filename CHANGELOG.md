@@ -6,6 +6,14 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.148.0 - 2026-11-21
+
+### Punkte gesamt mit Prozentwert
+
+- In der Spalte **Punkte gesamt** (Klausuren und Zusatzleistungen) steht jetzt immer der
+  Prozentwert dabei, z. B. `24 / 25 (96 %)` – bisher nur bei Klausuren mit Extrapunkten. Er
+  aktualisiert sich beim Eintragen mit; mit Extrapunkten kann er über 100 % liegen.
+
 ## 0.147.0 - 2026-11-21
 
 ### Pfeiltasten-Navigation in den Eingabetabellen

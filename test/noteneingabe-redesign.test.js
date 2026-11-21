@@ -343,6 +343,10 @@ test('Punkte gesamt: erreichte/maximale Punktsumme wird bei Klausur und UL angez
   assert.match(html, /30 \/ 50/, 'vollständige Klausur-Punktsumme (10+20 von 20+30) muss angezeigt werden');
   assert.match(html, /5 \/ 50/, 'unvollständige Klausur-Punktsumme (nur Aufgabe 1) muss trotzdem angezeigt werden');
   assert.match(html, /0 \/ 20/, 'UL ohne jede Eingabe zeigt Punktsumme 0');
+  // Der Prozentwert steht immer dabei (auch ohne Extrapunkte; Klausur und Zusatzleistung)
+  assert.match(html, /30 \/ 50 <small>\(60 %\)<\/small>/, 'Klausur: 30 von 50 = 60 %');
+  assert.match(html, /5 \/ 50 <small>\(10 %\)<\/small>/, 'unvollständig: 5 von 50 = 10 %');
+  assert.match(html, /0 \/ 20 <small>\(0 %\)<\/small>/, 'Zusatzleistung ohne Eingabe: 0 %');
 });
 
 test('Notenbesprechungsmodus: Navigation, Zugriffsschutz, Notizen (Besprechung + Konferenz)', async () => {

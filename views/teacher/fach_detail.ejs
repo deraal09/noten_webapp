@@ -376,7 +376,7 @@
               <% if (!k.teileInfo) { %>
                 <td><input type="text" inputmode="decimal" autocomplete="off" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" max="<%= k.max_extrapunkte > 0 ? k.max_extrapunkte : maxSumme %>" value="<%= extra ? String(extra).replace('.', ',') : '' %>" placeholder="–" title="Extrapunkte (optional<%= k.max_extrapunkte > 0 ? ', höchstens ' + k.max_extrapunkte : '' %>; auch als Rechnung)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
               <% } %>
-              <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe + extra %> / <%= maxSumme %><% if (extra && maxSumme > 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
+              <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe + extra %> / <%= maxSumme %><% if (maxSumme > 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
               <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
             </tr>
           <% }); %>
@@ -563,7 +563,7 @@
                    var p = (eintrag && eintrag.punkte) ? eintrag.punkte[i] : null; %>
                 <td><input type="text" inputmode="decimal" autocomplete="off" class="punkt" aria-label="Punkte <%= r.nachname %>, <%= r.vorname %> – Aufgabe <%= i + 1 %>" data-kind="u" data-kid="<%= u.id %>" data-sid="<%= r.schueler_id %>" data-idx="<%= i %>" max="<%= mp %>" title="Punkte oder Rechnung, z. B. 2+1,5+3" value="<%= p === null || p === undefined ? '' : String(p).replace('.', ',') %>" placeholder="–" <%= gesperrt ? 'disabled' : '' %>></td>
               <% }); %>
-              <td class="note-cell u-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>" data-max="<%= maxSummeUl %>"><%= summeUl %> / <%= maxSummeUl %></td>
+              <td class="note-cell u-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>" data-max="<%= maxSummeUl %>"><%= summeUl %> / <%= maxSummeUl %><% if (maxSummeUl > 0) { %> <small>(<%= Math.round(summeUl / maxSummeUl * 100) %> %)</small><% } %></td>
               <td class="note-cell u-note" data-sid="<%= r.schueler_id %>" data-kid="<%= u.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
             </tr>
           <% }); %>
@@ -770,7 +770,7 @@
           const extra = (k && k.extrapunkte) || 0;
           const max = Number(cell.dataset.max);
           cell.textContent = (summe + extra) + ' / ' + cell.dataset.max;
-          if (extra && max > 0) {
+          if (max > 0) { // Prozentwert steht immer dabei (mit Extrapunkten auch über 100 %)
             const prozent = document.createElement('small');
             prozent.textContent = ' (' + Math.round((summe + extra) / max * 100) + ' %)';
             cell.appendChild(prozent);
@@ -780,6 +780,12 @@
           const u = s.uls.find(function(x) { return x.id === Number(cell.dataset.kid); });
           const summe = (u && u.punkte) ? u.punkte.reduce(function(a, b) { return a + (b || 0); }, 0) : 0;
           cell.textContent = summe + ' / ' + cell.dataset.max;
+          const maxU = Number(cell.dataset.max);
+          if (maxU > 0) {
+            const prozent = document.createElement('small');
+            prozent.textContent = ' (' + Math.round(summe / maxU * 100) + ' %)';
+            cell.appendChild(prozent);
+          }
         });
         const tr = document.querySelector('#uebersicht tr[data-schueler="' + s.schueler_id + '"]');
         if (tr) {
