@@ -15,8 +15,8 @@
 <%# Kopfzeile: nur der erste Knopf ist immer sichtbar; Sitzplan und Notenbesprechung stecken hinter den drei Balken (☰). %>
 <%
   var kopfEintraege = [];
-  if (!fach.ist_kurs) kopfEintraege.push({ href: '/teacher/klassen/' + fach.klasse_id + '/sitzplan', text: '🪑 Sitzplan' });
-  if (schueler.length) {
+  if (!fach.ist_kurs && (!funktionen || funktionen.sitzplan)) kopfEintraege.push({ href: '/teacher/klassen/' + fach.klasse_id + '/sitzplan', text: '🪑 Sitzplan' });
+  if (schueler.length && (!funktionen || funktionen.notenbesprechung)) {
     kopfEintraege.push({ href: '/teacher/fach/' + fach.id + '/besprechung/' + schueler[0].id + '?hj=' + encodeURIComponent(halbjahr), text: '🗣 Notenbesprechung starten' });
     kopfEintraege.push({ form: { action: '/teacher/fach/' + fach.id + '/besprechung/wuerfeln', felder: [['hj', halbjahr]] }, text: '🎲 Zufällig starten', name: 'aktion', value: 'neu', title: 'Notenbesprechung mit zufälliger Reihenfolge starten (jede Person kommt einmal dran)' });
   }
@@ -96,18 +96,20 @@
     <% }); %>
   </div>
 
+<%# Reihenfolge nach dem Arbeitsablauf: erst eintragen (Klausuren, Unterrichtsleistung), dann die Übersicht. Die Synchronisation steckt hinter
+    „⋮ Mehr“ und erscheint nur, wenn sie gebraucht wird (Klasse mit Klassenleitung) oder in „Meine Funktionen“ eingeschaltet ist. %>
 <div class="reiter" data-storage-key="noteneingabe-reiter-<%= fach.id %>">
-  <button type="button" class="active" data-target="panel-uebersicht">Notenübersicht</button>
+  <button type="button" class="active" data-target="panel-klausuren">Klausuren</button>
+  <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
+  <button type="button" data-target="panel-uebersicht">Notenübersicht</button>
+  <% if (syncSichtbar && !spaLeistung) { %>
   <div class="reiter-mehr-wrapper">
     <button type="button" class="reiter-mehr-toggle" aria-haspopup="true" aria-expanded="false">⋮ Mehr</button>
     <div class="reiter-mehr-menu">
-      <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
-      <button type="button" data-target="panel-klausuren">Klausuren</button>
-      <% if (!spaLeistung) { %>
-        <button type="button" data-target="panel-sync">Synchronisation</button>
-      <% } %>
+      <button type="button" data-target="panel-sync">Synchronisation</button>
     </div>
   </div>
+  <% } %>
 </div>
 
 <%
@@ -115,7 +117,7 @@
   var zeigeNaSpalte = termine.length > 0;
   var sichtbareSpalten = 2 + (zeigeNaSpalte ? 1 : 0) + (verrechnung && verrechnung.prozent ? 1 : 0) + 2 + (spaLeistung ? (spaLeistung.komponente ? 1 : 2) : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
-<div id="panel-uebersicht" class="reiter-panel active">
+<div id="panel-uebersicht" class="reiter-panel">
   <h2>Notenübersicht</h2>
   <% if (spaLeistung && !spaLeistung.komponente) { %>
     <p class="kopf-aktionen">
@@ -204,8 +206,7 @@
   </table>
 </div>
 
-<div id="panel-klausuren" class="reiter-panel">
-  <%- await include('../partials/klausur-hilfe') %>
+<div id="panel-klausuren" class="reiter-panel active">
   <div class="reiter unter-reiter card" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
     <% klausuren.forEach(function(k, i) { %>
       <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%<%= k.datum ? ', ' + k.datum.split('-').reverse().join('.') : '' %>)</small></button>
@@ -219,7 +220,12 @@
       <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
         <button type="submit" class="danger" aria-label="Klausur <%= k.name %> löschen" title="Klausur löschen">🗑</button>
       </form>
-      <label class="statistik-schalter" title="Zeigt unter der Tabelle, welche Aufgaben für die Klasse zu schwer oder zu leicht waren"><input type="checkbox" data-statistik-schalter> 📊 Statistik</label>
+      <% if (!funktionen || funktionen.statistik) { %><label class="statistik-schalter" title="Zeigt unter der Tabelle, welche Aufgaben für die Klasse zu schwer oder zu leicht waren"><input type="checkbox" data-statistik-schalter> 📊 Statistik</label><% } %>
+      <%
+        var klausurHatPunkte = rows.some(function(r) { var e = r.klausuren.find(function(x) { return x.id === k.id; }); return e && e.punkte && e.punkte.some(function(p) { return p !== null && p !== undefined; }); });
+      %>
+      <details class="klausur-einstellungen"<%= klausurHatPunkte ? '' : ' open' %>>
+      <summary>⚙ Klausur einstellen <small class="hint">(Gewichtung, Datum, Teile, Aufgaben)</small></summary>
       <p class="hint">Änderungen werden automatisch gespeichert.</p>
       <div class="einstellungen-reihe">
         <form method="post" action="/teacher/klausuren/<%= k.id %>/gewichtung" class="einstellungen auto-speichern">
@@ -299,6 +305,7 @@
         <details class="info-ausklapp"><summary>ⓘ Hinweis zu Max. Punkten und Extra</summary><span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.<% if (!k.teileInfo) { %> In der Spalte „Extra“ steht die Höchstzahl der Extrapunkte (optional, Extra-Aufgaben): Sie zählt nicht zur Gesamtpunktzahl, erreichte Extrapunkte kommen aber zu den Punkten dazu.<% } %></span></details>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
+      </details>
       <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
       <table class="tafel">
         <%
@@ -381,10 +388,12 @@
         var statLabels = maxArr.map(function(_, i) { return aufgabenKopf[i] ? aufgabenKopf[i].replace(/-/g, '') : 'A' + (i + 1); });
         if (k.teileInfo) { var sPos = 0; k.teileInfo.teile.forEach(function(t) { if (t.art === 'inhalt_sprache') { for (var si = 0; si < t.aufgaben; si++) statAusschluss.push(sPos + si); } sPos += t.aufgaben; }); }
       %>
+      <% if (!funktionen || funktionen.statistik) { %>
       <div class="klausur-statistik card" data-klausur-statistik data-klausur="<%= k.id %>" data-ausschluss="<%= JSON.stringify(statAusschluss) %>" data-labels="<%= JSON.stringify(statLabels) %>" hidden>
         <h3>📊 Statistik zur Klausur</h3>
         <div class="statistik-inhalt" aria-live="polite"></div>
       </div>
+      <% } %>
       <label class="klausur-notiz-label">Notizen zur Klausur
         <textarea class="klausur-notiz" data-kid="<%= k.id %>" rows="4" maxlength="5000" placeholder="z. B. Auffälligkeiten, Nachschreiber, Hinweise zur Korrektur"><%= k.notiz || '' %></textarea>
       </label>
@@ -406,6 +415,7 @@
       <button type="submit">+ Klausur anlegen</button>
     </form>
   </div>
+  <%- await include('../partials/klausur-hilfe') %>
 </div>
 
 <div id="panel-uls" class="reiter-panel">

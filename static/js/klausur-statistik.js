@@ -212,8 +212,12 @@
       clearTimeout(timer);
       timer = setTimeout(function () { Array.prototype.forEach.call(panels, zeichne); }, 200);
     }
+    // Einschalten wird anonym gezählt (Admin → Aktivität: „Welche Funktionen werden genutzt?“), sonst ist die Funktion für die Statistik unsichtbar.
+    function melde() {
+      try { fetch('/funktion-genutzt', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'funktion=statistik', credentials: 'same-origin' }); } catch (e) { /* egal */ }
+    }
     Array.prototype.forEach.call(schalter, function (s) {
-      s.addEventListener('change', function () { an = s.checked; merke(an); anwenden(); });
+      s.addEventListener('change', function () { an = s.checked; merke(an); anwenden(); if (an) melde(); });
     });
     document.addEventListener('input', function (ev) { if (ev.target && ev.target.classList && ev.target.classList.contains('punkt')) spaeter(); });
     document.addEventListener('change', function (ev) { if (ev.target && ev.target.classList && ev.target.classList.contains('punkt')) spaeter(); });

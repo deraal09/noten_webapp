@@ -4,6 +4,7 @@
  *  - Einträge mit data-zeige="<id>" blenden einen verborgenen Bereich ein (data-menue-abschnitt), springen hin und setzen den Cursor;
  *    liegt der Bereich in einem Reiter (.reiter-panel), wird dieser Reiter erst aktiviert. data-merken hält den Bereich nach einem
  *    Neuladen offen, data-verberge="<id>" blendet ihn wieder aus.
+ *  - Einträge mit data-klick-auf="<id>" lösen eine vorhandene (ggf. versteckte) Schaltfläche der Seite aus.
  *  - Eine Adresse mit #<id> aktiviert den Reiter, in dem das Ziel liegt.
  *  - Reiter-Leisten und Halbjahr-Tabs (.hj-tabs, .reiter-leiste) scrollen den aktiven Eintrag ins Sichtfeld.
  */
@@ -57,6 +58,15 @@
         var menue = knopf.closest('.kopf-menue');
         if (menue) menue.open = false;
         window.zeigeAbschnitt(knopf.getAttribute('data-zeige'));
+      });
+    });
+    // Menü-Einträge, die eine vorhandene Schaltfläche der Seite auslösen (data-klick-auf="<id>")
+    document.querySelectorAll('[data-klick-auf]').forEach(function (knopf) {
+      knopf.addEventListener('click', function () {
+        var menue = knopf.closest('.kopf-menue');
+        if (menue) menue.open = false;
+        var ziel = document.getElementById(knopf.getAttribute('data-klick-auf'));
+        if (ziel) ziel.click();
       });
     });
     document.querySelectorAll('[data-verberge]').forEach(function (knopf) {

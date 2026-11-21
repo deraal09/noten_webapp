@@ -50,10 +50,14 @@ import teacherRoutes from './src/routes/teacher.js';
 import klassenlehrerRoutes from './src/routes/klassenlehrer.js';
 import exportRoutes from './src/routes/export.js';
 import sitzplanRoutes from './src/routes/sitzplan.js';
+import funktionenRoutes from './src/routes/funktionen.js';
+import feedbackRoutes from './src/routes/feedback.js';
 import startRoutes from './src/routes/start.js';
 import ssoRoutes from './src/routes/sso.js';
 import apiExternRoutes from './src/routes/api-extern.js';
-import { erfasse as erfasseAktivitaet, starteTimer as starteAktivitaetTimer, stoppeTimer as stoppeAktivitaetTimer } from './src/aktivitaet.js';
+import { erfasse as erfasseAktivitaet, erfasseFunktion, funktionFuerAnfrage, starteTimer as starteAktivitaetTimer, stoppeTimer as stoppeAktivitaetTimer } from './src/aktivitaet.js';
+import { funktionenFuer } from './src/funktionen.js';
+import { feedbackZahlen } from './src/feedback.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === 'production';
@@ -193,6 +197,8 @@ export async function buildApp(opts = {}) {
     const pfad = request.url.split('?')[0];
     if (pfad.startsWith('/static/') || pfad === '/hilfe/suche') return; // Dateien und Live-Suche sind keine „Nutzung“
     erfasseAktivitaet(request.user.id, { eingabe: !['GET', 'HEAD', 'OPTIONS'].includes(request.method) });
+    // Welche Funktion wurde benutzt? (anonym, nur je Profil und Tag -- siehe src/aktivitaet.js)
+    erfasseFunktion(request.user.id, funktionFuerAnfrage(request.method, request.routeOptions?.url));
   });
 
   app.addHook('preHandler', (request, reply, done) => {
@@ -224,6 +230,11 @@ export async function buildApp(opts = {}) {
     // und Klassenleitung — einmal pro Request berechnet statt in der
     // Layout-Vorlage selbst eine DB-Abfrage zu brauchen.
     reply.locals.kannEinladen = request.user ? istIrgendeineKlassenleitung(request.user) : false;
+    // Eigene Funktionsauswahl (src/funktionen.js): steuert, welche Menüpunkte/Reiter/Kacheln sichtbar sind. Klassenleitung erscheint
+    // von selbst, sobald man als Klassenleitung eingetragen ist.
+    reply.locals.funktionen = request.user ? funktionenFuer(request.user) : null;
+    reply.locals.feedbackNeu = request.user?.isAdmin && request.method === 'GET' ? (() => { try { return feedbackZahlen().neu; } catch { return 0; } })() : 0;
+    if (reply.locals.funktionen && reply.locals.kannEinladen && !request.user.isAdmin) reply.locals.funktionen.klassenleitung = true;
     // Link "Lehrerkalender" in der Navigation, sobald LEHRERKALENDER_URL gesetzt
     // ist — dank SSO ohne zweite Anmeldung (siehe src/sso.js).
     reply.locals.kalenderUrl = ssoConfig().kalenderUrl || null;
@@ -288,6 +299,8 @@ export async function buildApp(opts = {}) {
   await app.register(apiV1Routes, { prefix: '/api/v1' });
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(adminApiRoutes, { prefix: '/admin' });
+  await app.register(funktionenRoutes, { prefix: '' });
+  await app.register(feedbackRoutes, { prefix: '' });
   await app.register(startRoutes, { prefix: '/start' });
   await app.register(teacherRoutes, { prefix: '/teacher' });
   await app.register(sitzplanRoutes, { prefix: '/teacher' });

@@ -91,7 +91,7 @@ test('Klassenseite: Bernd sieht seine Fächer und darunter aufklappbar die übri
   assert.match(noten, /kachel-titel-klein">Deutsch</);
   assert.doesNotMatch(noten, /kachel-titel-klein">(Mathe|Sport)</);
   assert.doesNotMatch(noten, /lehrkraefte-schalter|Lehrkräfte der Fächer anzeigen/, 'kein Schalter mehr');
-  assert.match(noten, /🎓 (Du|anna)/, 'Lehrkräfte des eigenen Fachs bleiben sichtbar');
+  assert.doesNotMatch(noten, /🎓 Du/, 'bin nur ich im Fach eingetragen, ist der Hinweis überflüssig');
   // Carla (kein Zugriff) sieht die Klasse nicht
   assert.doesNotMatch(await (await carla('/teacher/klassen')).text(), new RegExp(`href="/teacher/klassen/${klasseId}"`));
 });

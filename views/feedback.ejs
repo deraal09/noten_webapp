@@ -1,0 +1,37 @@
+<h1>💬 Feedback</h1>
+<% if (gesendet) { %>
+  <div class="flash flash-success">Danke für deine Rückmeldung! Sie wurde an die Administration gesendet.</div>
+<% } %>
+<p class="hint">Was läuft gut, was fehlt dir, was stört? Deine Rückmeldung hilft, die Notenverwaltung zu verbessern. Sie geht an die Administration und ist <strong>anonym</strong>, solange du nicht ausdrücklich deinen Namen mitsendest.</p>
+<% if (fehler) { %><div class="flash flash-error"><%= fehler %></div><% } %>
+
+<form method="post" action="/feedback" class="card feedback-form">
+  <fieldset class="feedback-arten">
+    <legend>Worum geht es?</legend>
+    <% ARTEN.forEach(function(a, i) { %>
+      <label class="feedback-art">
+        <input type="radio" name="art" value="<%= a.id %>"<%= werte.art === a.id || (!werte.art && i === 1) ? ' checked' : '' %> required>
+        <span><%= a.symbol %> <%= a.titel %></span>
+      </label>
+    <% }); %>
+  </fieldset>
+  <label>Deine Rückmeldung
+    <textarea name="text" rows="6" minlength="<%= MIN_ZEICHEN %>" maxlength="<%= MAX_ZEICHEN %>" required placeholder="Schreibe einfach drauflos …"><%= werte.text %></textarea>
+  </label>
+  <label>Betrifft eine bestimmte Funktion? <span class="hint">(optional)</span>
+    <select name="funktion">
+      <option value="">Allgemein / keine bestimmte</option>
+      <% FUNKTIONEN.forEach(function(f) { %><option value="<%= f.id %>"<%= werte.funktion === f.id ? ' selected' : '' %>><%= f.symbol %> <%= f.titel %></option><% }); %>
+      <option value="noteneingabe"<%= werte.funktion === 'noteneingabe' ? ' selected' : '' %>>📝 Noteneingabe</option>
+      <option value="klassen"<%= werte.funktion === 'klassen' ? ' selected' : '' %>>🏫 Klassen und Schüler/innen</option>
+      <option value="hilfe"<%= werte.funktion === 'hilfe' ? ' selected' : '' %>>❓ Hilfe</option>
+    </select>
+  </label>
+  <input type="hidden" name="seite" value="<%= werte.seite %>">
+  <label class="feedback-name">
+    <input type="checkbox" name="mit_name" value="1"<%= werte.mitName ? ' checked' : '' %>>
+    <span>Meinen Namen mitsenden <span class="hint">(dann kann die Administration bei Rückfragen auf dich zugehen; ohne Häkchen bleibt es anonym)</span></span>
+  </label>
+  <p class="hint">Bitte keine Namen oder Noten von Schüler/innen eintragen.</p>
+  <button type="submit">Feedback senden</button>
+</form>

@@ -195,7 +195,7 @@ test('Überschrift zeigt die Laufzeit der Klasse und folgt dem Einschulungsjahr'
 
 test('Buttons zur Noteneingabe: auf "Meine Klassen" (oben und je Klasse) und auf der Klassenseite', async () => {
   const liste = await (await admin('/teacher/klassen')).text();
-  assert.match(liste, /<a class="btn" href="\/teacher">📝 Zur Noteneingabe<\/a>/);
+  assert.match(liste, /<a class="menue-eintrag" role="menuitem" href="\/teacher">📝 Zur Noteneingabe<\/a>/, 'oben im Menü hinter den drei Balken');
   assert.match(liste, new RegExp(`<a href="/teacher#klasse-${ihkId}">📝 Noteneingabe</a>`));
   const klasse = await (await admin(`/teacher/klassen/${ihkId}`)).text();
   // Auf der Klassenseite steckt die Noteneingabe im Menü hinter den drei Balken (nur „← Meine Klassen“ ist immer sichtbar)

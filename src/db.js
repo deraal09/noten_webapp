@@ -652,6 +652,33 @@ CREATE TABLE IF NOT EXISTS fach_favoriten (
     fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, fach_id)
 );
+-- Eigene Auswahl der Funktionen je Konto (src/funktionen.js): profil = gewähltes Startprofil ('einfach' | 'klassenleitung' | 'alles'),
+-- NULL = noch nicht gewählt (dann ist alles sichtbar); aktiv = JSON-Liste der eingeschalteten Funktionen.
+CREATE TABLE IF NOT EXISTS user_funktionen (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    profil TEXT,
+    aktiv TEXT NOT NULL DEFAULT '[]'
+);
+-- Anonyme Funktionsnutzung (siehe src/aktivitaet.js): wie nutzung_tage nur ein nicht umkehrbares Profil je Person, nur Tage.
+CREATE TABLE IF NOT EXISTS nutzung_funktionen (
+    profil TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    funktion TEXT NOT NULL,
+    aufrufe INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (profil, tag, funktion)
+);
+CREATE INDEX IF NOT EXISTS idx_nutzung_funktionen_tag ON nutzung_funktionen(tag);
+-- Rückmeldungen der Nutzer:innen (src/feedback.js): ohne Konto-Bezug, solange „Namen mitsenden“ nicht gewählt wurde.
+CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    art TEXT NOT NULL,
+    text TEXT NOT NULL,
+    funktion TEXT,
+    seite TEXT,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT 'neu',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS nutzung_tage (
     profil TEXT NOT NULL,
     tag TEXT NOT NULL,

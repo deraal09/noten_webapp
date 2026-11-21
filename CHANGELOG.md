@@ -6,6 +6,57 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.145.0 - 2026-11-21
+
+### Aufgeräumte Oberfläche, „Meine Funktionen“, Funktionsstatistik und Feedback
+
+**Oberfläche für den Normalfall (Klasse anlegen, Noten eintragen):**
+
+- **Fachseite:** Die Reiter folgen dem Arbeitsablauf: **Klausuren · Unterrichtsleistung ·
+  Notenübersicht** (die Eingabe steht vorn, nicht mehr hinter „⋮ Mehr“). Die
+  Einstellungen einer Klausur (Gewichtung, Datum, Teile, Anzahl Aufgaben) stecken in
+  **⚙ Klausur einstellen**: bei einer neuen Klausur offen, sobald Punkte eingetragen
+  sind eingeklappt. Die Kurzanleitung steht unten. Die **Synchronisation** (unter
+  „⋮ Mehr“) erscheint nur an Klassen mit Klassenleitung.
+- **Noteneingabe:** Filter erst bei mehr als drei Klassen/Kursen; Kacheln ohne „0 Klausur(en)“
+  und ohne „🎓 Du“, wenn nur man selbst eingetragen ist.
+- **Meine Klassen:** „+ Neue Klasse anlegen“ ist der Hauptknopf, „+ Neuen Kurs anlegen“ als
+  Umriss daneben; „Zur Noteneingabe“ steht im ☰-Menü; der rote „Löschen“-Knopf ist von der
+  Kurs-Karte verschwunden (jetzt „⚙ Einstellungen“ → Kurs löschen).
+- **Klassenseite:** Reiter nur noch **Fächer · Schüler/innen**; „Einstellungen“ ist im ☰-Menü
+  als **⚙ Klasse einstellen**, ebenso „📥 Fächer aus Vorlage importieren“ und „💾 Fächer als Vorlage
+  speichern“; der erklärende Absatz steckt hinter ⓘ.
+- **Fach-Einstellungen:** Unterfächer und Verrechnung unter „Erweitert“ (eingeklappt, solange
+  nichts davon in Gebrauch ist).
+
+**Meine Funktionen (Konto):**
+
+- Beim ersten Anmelden wählt man auf der Startseite ein **Startprofil**: *Nur Klassen und Noten*,
+  *Klassenleitung* oder *Alles anzeigen*. Unter **☰ → ⚙ Meine Funktionen** lassen sich außerdem
+  **Sitzpläne, Notenbesprechung, Klausur-Statistik, Favoriten, Klassenleitung, Synchronisation und
+  API-Zugang** einzeln ein- und ausschalten. Es wird nur die **Anzeige** gesteuert (Menüpunkte,
+  Reiter, Kacheln, Sterne); nichts ist gesperrt, und die Seiten bleiben erreichbar.
+- **Klassenleitung** erscheint von selbst, sobald man als Klassenleitung eingetragen ist;
+  **Synchronisation** an Fächern von Klassen mit Klassenleitung. Wer noch nichts gewählt hat,
+  sieht wie bisher alles. Die Auswahl liegt in der neuen Tabelle `user_funktionen`.
+
+**Statistik für die Administration (Aktivität):** Neuer Abschnitt **„Welche Funktionen werden
+genutzt?“** mit Personen, Anteil der Aktiven, Aufrufen und Tagen je Funktion (Kernfunktionen,
+weitere Funktionen, Konto), Hinweis „kaum genutzt“/„nicht genutzt“, dazu **„Was haben die
+Lehrkräfte eingeschaltet?“** (Profile und Funktionen, nur Anzahlen). Gezählt wird anonym wie
+bisher: ein nicht umkehrbares Profil je Person und **Tag**, keine Uhrzeit, keine Inhalte
+(Tabelle `nutzung_funktionen`, nach 400 Tagen gelöscht). Die Klausur-Statistik meldet das
+Einschalten per `POST /funktion-genutzt`.
+
+**Feedback:** Unter **💬 Feedback** (Fußzeile und ☰-Menü) können Nutzer:innen **Lob, Wünsche und
+Probleme** schreiben, optional mit Funktion. Anonym, solange nicht „Meinen Namen mitsenden“
+gewählt ist; 5 bis 2000 Zeichen, höchstens 10 am Tag je Konto. Die Administration sieht sie unter
+**Feedback** (Zähler neuer Rückmeldungen in der Leiste, Filter nach Art und Status, „Gelesen“,
+„Erledigt“, Löschen). Tabelle `feedback`.
+
+Hilfe ergänzt (Meine Funktionen, Feedback; Reiter der Fachseite); Tests in
+`test/funktionen-feedback.test.js`.
+
 ## 0.144.0 - 2026-11-21
 
 ### Klausur-Statistik, „Neu hinzufügen“, heutiges Datum in der Datumstabelle

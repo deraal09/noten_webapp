@@ -44,6 +44,8 @@
            var liste = praefixe || [href];
            return liste.some(function(p) { return pfad === p || pfad.indexOf(p + '/') === 0; });
          };
+         var fkt = (typeof funktionen !== 'undefined' && funktionen) || {};
+         var feedbackText = 'Feedback' + (typeof feedbackNeu !== 'undefined' && feedbackNeu ? ' (' + feedbackNeu + ')' : '');
          var topNav = user.isAdmin ? [
            { href: '/start', text: 'Start', praefixe: ['/start'] },
            { href: '/admin', text: 'Dashboard', praefixe: ['/admin'], genau: true },
@@ -51,13 +53,13 @@
            { href: '/admin/aktivitaet', text: 'Aktivität' },
            { href: '/admin/zuweisungen', text: 'Zuweisungen' },
            { href: '/admin/einladungen', text: 'Einladungen' },
+           { href: '/admin/feedback', text: feedbackText },
            { href: '/hilfe', text: 'Hilfe' },
          ] : [
            { href: '/start', text: 'Start', praefixe: ['/start'] },
            { href: '/teacher', text: 'Noteneingabe', praefixe: ['/teacher/fach', '/teacher/faecher'], genau: true },
            { href: '/teacher/klassen', text: 'Meine Klassen', praefixe: ['/teacher/klassen', '/teacher/papierkorb'] },
-           { href: '/teacher/sitzplaene', text: 'Sitzpläne' },
-         ].concat(typeof kannEinladen !== 'undefined' && kannEinladen ? [{ href: '/klassenlehrer', text: 'Klassenleitung' }] : []).concat([{ href: '/hilfe', text: 'Hilfe' }]);
+         ].concat(fkt.sitzplan ? [{ href: '/teacher/sitzplaene', text: 'Sitzpläne' }] : []).concat(fkt.klassenleitung ? [{ href: '/klassenlehrer', text: 'Klassenleitung' }] : []).concat([{ href: '/hilfe', text: 'Hilfe' }]);
     %>
       <nav class="topnav" aria-label="Hauptnavigation">
         <% topNav.forEach(function(l) {
@@ -84,6 +86,7 @@
             <a href="/admin/rechtliches">Rechtliches</a>
             <a href="/admin/ldap">LDAP-Import</a>
             <a href="/admin/einladungen">Einladungen</a>
+            <a href="/admin/feedback"><%= feedbackText %></a>
             <a href="/admin/zuweisungen">Zuweisungen</a>
             <a href="/admin/api">API-Zugänge</a>
           <% } else { %>
@@ -93,9 +96,9 @@
             <% } %>
           <% } %>
           <% if (!user.isAdmin) { %><a href="/notenschluessel">Notenschlüssel</a><% } %>
-          <a href="/teacher/sitzplaene">Sitzpläne</a>
+          <% if (user.isAdmin || fkt.sitzplan) { %><a href="/teacher/sitzplaene">Sitzpläne</a><% } %>
           <a href="/teacher">Noteneingabe</a>
-          <a href="/klassenlehrer">Klassenleitung</a>
+          <% if (user.isAdmin || fkt.klassenleitung) { %><a href="/klassenlehrer">Klassenleitung</a><% } %>
           <% if (typeof kalenderUrl !== 'undefined' && kalenderUrl) { %>
             <%# Schwester-App: dank Single Sign-on ohne zweite Anmeldung (src/sso.js) %>
             <a href="<%= kalenderUrl %>" target="_blank" rel="noopener">Lehrerkalender ↗</a>
@@ -103,7 +106,9 @@
         </nav>
         <div class="userbox">
           <a href="/hilfe">❓ Hilfe</a>
-          <% if (user.authSource === 'ldap') { %><a href="/konto/api" title="API-Schlüssel für KI-Agenten">🤖 API-Zugang</a><% } %>
+          <a href="/feedback">💬 Feedback</a>
+          <% if (!user.isAdmin) { %><a href="/konto/funktionen" title="Bestimmen, welche Funktionen du siehst">⚙ Meine Funktionen</a><% } %>
+          <% if (user.authSource === 'ldap' && (user.isAdmin || fkt.api)) { %><a href="/konto/api" title="API-Schlüssel für KI-Agenten">🤖 API-Zugang</a><% } %>
           <% if (user.authSource !== 'ldap') { %><a href="/konto/passwort">🔑 Passwort ändern</a><% } %>
           <a class="logout" href="/logout">Abmelden</a>
         </div>
@@ -178,7 +183,7 @@
 <% } %>
 <% if (!(typeof embed !== 'undefined' && embed)) { %>
 <footer class="footer">
-  <small class="footer-links"><a href="/hilfe">Hilfe</a> · <a href="/datenschutz">Datenschutz</a> · <a href="/impressum">Impressum</a></small><br>
+  <small class="footer-links"><a href="/hilfe">Hilfe</a> · <% if (typeof user !== 'undefined' && user) { %><a href="/feedback">Feedback</a> · <% } %><a href="/datenschutz">Datenschutz</a> · <a href="/impressum">Impressum</a></small><br>
   <small>Notenverwaltung · <%= now.getFullYear() %><% if (typeof appVersion !== 'undefined' && appVersion) { %> · v<%= appVersion %><%
     if (typeof appReleaseDate !== 'undefined' && appReleaseDate) { %> (<%= appReleaseDate.split('-').reverse().join('.') %>)<% } %><% } %></small>
 </footer>

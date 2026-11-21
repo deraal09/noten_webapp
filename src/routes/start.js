@@ -6,11 +6,12 @@
 
 import { requireAuth } from '../auth.js';
 import { ladeZuletztBenutzt } from '../zuletzt-benutzt.js';
+import { PROFILE } from '../funktionen.js';
 
 export default async function startRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
 
   fastify.get('/', async (request, reply) => {
-    return reply.viewEjs('start.ejs', { user: request.user, zuletzt: ladeZuletztBenutzt(request) });
+    return reply.viewEjs('start.ejs', { user: request.user, zuletzt: ladeZuletztBenutzt(request), PROFILE });
   });
 }

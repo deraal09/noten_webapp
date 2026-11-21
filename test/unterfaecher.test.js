@@ -231,7 +231,7 @@ test('Fächer werden alphabetisch sortiert (deutsch: Groß-/Kleinschreibung egal
   assert.ok(vergleicheNamen('b', 'A') > 0);
 });
 
-test('Noteneingabe: Klassenfilter oben, sobald Fächer in mehreren Klassen/Kursen liegen', async () => {
+test('Noteneingabe: Klassenfilter oben, sobald Fächer in mehr als drei Klassen/Kursen liegen', async () => {
   const einzel = await (await lehrer('/teacher')).text();
   assert.doesNotMatch(einzel, /id="klassenfilter"/, 'bei nur einer Klasse kein Filter');
   const sj = getDb().prepare('SELECT schuljahr_id FROM klassen WHERE id = ?').get(klasseId).schuljahr_id;
@@ -240,6 +240,14 @@ test('Noteneingabe: Klassenfilter oben, sobald Fächer in mehreren Klassen/Kurse
   await form(admin, `/teacher/klassen/${b}/faecher/neu`, { name: 'Sport' });
   const sport = getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ?').get(b).id;
   getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES ((SELECT id FROM users WHERE username = ?), ?)').run('fremd', sport);
+  assert.doesNotMatch(await (await fremd('/teacher')).text(), /id="klassenfilter"/, 'bei zwei Klassen noch kein Filter (erst ab mehr als drei Klassen/Kursen)');
+  for (const name of ['11C', '11D']) {
+    await form(admin, '/teacher/klassen/neu', { schuljahr_id: String(sj), name, notenschluessel: 'IHK' });
+    const kid = getDb().prepare('SELECT id FROM klassen WHERE name = ?').get(name).id;
+    await form(admin, `/teacher/klassen/${kid}/faecher/neu`, { name: `Fach ${name}` });
+    const fid = getDb().prepare('SELECT id FROM faecher WHERE klasse_id = ?').get(kid).id;
+    getDb().prepare('INSERT INTO fach_zuweisungen (user_id, fach_id) VALUES ((SELECT id FROM users WHERE username = ?), ?)').run('fremd', fid);
+  }
   const html = await (await fremd('/teacher')).text();
   assert.match(html, /<select id="klassenfilter">\s*<option value="">Alle Klassen<\/option>/);
   assert.match(html, new RegExp(`<option value="klasse-${b}">11B`));

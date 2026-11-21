@@ -1083,3 +1083,49 @@ form.name-aendern button { align-self: flex-start; }
 .statistik-marke.t-gut, .statistik-marke.ausgewogen { border-color: var(--accent); }
 .statistik-hinweis { margin-top: 0.5rem; }
 .card .statistik-schalter { display: inline-flex; margin: 0 0.75rem 0.5rem 0; }
+
+/* Meine Funktionen (views/funktionen.ejs) und Start-Auswahl */
+.profil-liste { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; margin: 0.5rem 0; }
+.profil-karte { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.9rem 1rem; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-card); margin: 0; }
+.profil-karte.aktiv { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.profil-karte button { align-self: flex-start; margin-top: auto; }
+.funktionen-liste { list-style: none; padding: 0; margin: 0.5rem 0 1rem; }
+.funktionen-liste li { padding: 0.5rem 0; border-bottom: 1px solid var(--border-subtle); }
+.funktionen-liste label { display: flex; gap: 0.75rem; align-items: flex-start; font-weight: 400; margin: 0; cursor: pointer; }
+.funktionen-liste input[type="checkbox"] { width: auto; min-width: 1.2rem; min-height: 1.2rem; margin-top: 0.2rem; }
+
+/* Feedback (views/feedback.ejs, views/admin/feedback.ejs) */
+.feedback-arten { border: 0; padding: 0; margin: 0 0 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.feedback-arten legend { font-weight: 600; padding: 0; margin-bottom: 0.4rem; }
+.feedback-art { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; border: 1px solid var(--border-strong); border-radius: 999px; cursor: pointer; margin: 0; font-weight: 500; background: var(--bg-card); }
+.feedback-art:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.feedback-art input { width: auto; margin: 0; min-width: 1rem; min-height: 1rem; }
+.feedback-form textarea { width: 100%; box-sizing: border-box; }
+.feedback-name { display: flex; gap: 0.6rem; align-items: flex-start; font-weight: 400; }
+.feedback-name input { width: auto; min-width: 1.1rem; min-height: 1.1rem; margin-top: 0.2rem; }
+.feedback-eintrag { border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; padding: 0.7rem 1rem; margin: 0.6rem 0; background: var(--bg-card); }
+.feedback-eintrag.lob { border-left-color: #2e7d32; }
+.feedback-eintrag.wunsch { border-left-color: var(--accent); }
+.feedback-eintrag.problem { border-left-color: var(--danger); }
+.feedback-eintrag.erledigt { opacity: 0.65; }
+.feedback-kopf { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+.feedback-text { white-space: pre-wrap; margin: 0.3rem 0 0.6rem; }
+.feedback-aktionen { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.feedback-aktionen form { margin: 0; }
+.funktion-ungenutzt td { color: var(--text-muted); }
+
+/* Klausur: Einstellungen eingeklappt, sobald Punkte eingetragen sind */
+details.klausur-einstellungen { margin: 0.5rem 0; }
+details.klausur-einstellungen > summary { cursor: pointer; font-weight: 600; padding: 0.35rem 0; }
+
+/* Zweitrangige Aktion in der Knopf-Reihe (z. B. „Neuen Kurs anlegen“): Umriss statt Füllung */
+.knopf-reihe > button.sekundaer { background: var(--bg-card); color: var(--primary-text); border: 1px solid var(--primary-text); }
+.knopf-reihe > button.sekundaer:hover, .knopf-reihe > button.sekundaer.active { background: var(--primary); color: var(--on-dark); }
+
+.reiter > button[hidden], .knopf-leiste > button[hidden] { display: none; }
+details.erweitert { margin: 1rem 0; }
+details.erweitert > summary { cursor: pointer; font-weight: 600; padding: 0.35rem 0; }
+/* .card label ist display:block -- Auswahlfelder mit Text daneben brauchen Flex */
+.card .funktionen-liste label, .card label.feedback-name { display: flex; margin: 0; }
+.card label.feedback-art { display: inline-flex; margin: 0; }
+.brand { white-space: nowrap; }

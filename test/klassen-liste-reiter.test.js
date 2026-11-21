@@ -89,7 +89,7 @@ test('Vorbereitung: Admin, Lehrkraft, drei Schuljahre (das älteste zuletzt/"nac
 test('"Neue Klasse anlegen" ist als Reiter-Button neben "Neuen Kurs anlegen" vorhanden', async () => {
   const html = await (await lehrerA('/teacher/klassen')).text();
   assert.match(html, /<button type="button" data-target="panel-klasse-anlegen">\+ Neue Klasse anlegen<\/button>/);
-  assert.match(html, /<button type="button" data-target="panel-kurs-anlegen">\+ Neuen Kurs anlegen<\/button>/);
+  assert.match(html, /<button type="button" class="sekundaer" data-target="panel-kurs-anlegen">\+ Neuen Kurs anlegen<\/button>/);
   assert.match(html, /<div id="panel-klasse-anlegen" class="reiter-panel">/);
 });
 

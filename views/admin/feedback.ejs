@@ -1,0 +1,59 @@
+<%
+  const art = (id) => ARTEN.find(function(a) { return a.id === id; }) || { symbol: '•', titel: id };
+  const fkt = (id) => { const f = FUNKTIONEN.find(function(x) { return x.id === id; }); return f ? f.symbol + ' ' + f.titel : id; };
+  const zeit = (z) => formatZeitLokal(z);
+%>
+<h1>💬 Feedback</h1>
+<p class="hint">Rückmeldungen der Nutzer:innen. Sie sind anonym, außer jemand hat den Namen ausdrücklich mitgesendet.</p>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val"><%= zahlen.neu %></div><div class="kpi-lbl">neu</div></div>
+  <div class="kpi"><div class="kpi-val"><%= zahlen.proArt.lob %></div><div class="kpi-lbl">👍 Lob</div></div>
+  <div class="kpi"><div class="kpi-val"><%= zahlen.proArt.wunsch %></div><div class="kpi-lbl">💡 Wünsche</div></div>
+  <div class="kpi"><div class="kpi-val"><%= zahlen.proArt.problem %></div><div class="kpi-lbl">🐞 Probleme</div></div>
+</div>
+
+<form method="get" action="/admin/feedback" class="inline filter-zeile">
+  <label>Art
+    <select name="art">
+      <option value="">Alle</option>
+      <% ARTEN.forEach(function(a) { %><option value="<%= a.id %>"<%= filter.art === a.id ? ' selected' : '' %>><%= a.symbol %> <%= a.titel %></option><% }); %>
+    </select>
+  </label>
+  <label>Status
+    <select name="status">
+      <option value="">Alle</option>
+      <% STATI.forEach(function(s) { %><option value="<%= s.id %>"<%= filter.status === s.id ? ' selected' : '' %>><%= s.titel %></option><% }); %>
+    </select>
+  </label>
+  <button type="submit">Filtern</button>
+</form>
+
+<% if (!eintraege.length) { %>
+  <p class="hint">Keine Rückmeldungen<%= filter.art || filter.status ? ' für diese Auswahl' : ' bisher' %>.</p>
+<% } %>
+<% eintraege.forEach(function(e) { var a = art(e.art); %>
+  <article class="feedback-eintrag <%= e.art %> <%= e.status %>">
+    <div class="feedback-kopf">
+      <strong><%= a.symbol %> <%= a.titel %></strong>
+      <span><%= zeit(e.created_at) %></span>
+      <% if (e.funktion) { %><span>Funktion: <%= fkt(e.funktion) %></span><% } %>
+      <% if (e.seite) { %><span>Seite: <code><%= e.seite %></code></span><% } %>
+      <span><%= e.name ? 'Von: ' + e.name : 'anonym' %></span>
+      <span class="statistik-marke"><%= (STATI.find(function(s) { return s.id === e.status; }) || {}).titel %></span>
+    </div>
+    <p class="feedback-text"><%= e.text %></p>
+    <div class="feedback-aktionen">
+      <% STATI.filter(function(s) { return s.id !== e.status; }).forEach(function(s) { %>
+        <form method="post" action="/admin/feedback/<%= e.id %>/status">
+          <input type="hidden" name="status" value="<%= s.id %>">
+          <input type="hidden" name="zurueck" value="/admin/feedback<%= filter.art || filter.status ? '?art=' + filter.art + '&status=' + filter.status : '' %>">
+          <button type="submit"><%= s.id === 'erledigt' ? '✓ Erledigt' : (s.id === 'gelesen' ? 'Als gelesen markieren' : 'Wieder auf neu') %></button>
+        </form>
+      <% }); %>
+      <form method="post" action="/admin/feedback/<%= e.id %>/loeschen" onsubmit="return confirm('Rückmeldung löschen?')">
+        <button type="submit" class="danger" aria-label="Rückmeldung löschen">🗑</button>
+      </form>
+    </div>
+  </article>
+<% }); %>

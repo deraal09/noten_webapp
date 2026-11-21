@@ -66,7 +66,7 @@ test('Noteneingabe: in der Schuljahr-Auswahl steht das aktuelle Schuljahr mit "(
   getDb().prepare("UPDATE users SET auth_source = 'ldap' WHERE username = 'lehrer'").run();
   await admin('/admin/schuljahre/neu', { bezeichnung: '2024/25' });
   const sj = Object.fromEntries(getDb().prepare('SELECT id, bezeichnung FROM schuljahre').all().map((r) => [r.bezeichnung, r.id]));
-  for (const [name, bez] of [['9Z', '2024/25'], ['10A', '2025/26'], ['11B', '2026/27']]) {
+  for (const [name, bez] of [['9Z', '2024/25'], ['9Y', '2024/25'], ['10A', '2025/26'], ['10B', '2025/26'], ['11B', '2026/27']]) { // mehr als drei sichtbare Klassen: erst dann zeigt die Noteneingabe Filter
     await lehrer('/teacher/klassen/neu', { schuljahr_id: String(sj[bez]), name, notenschluessel: 'IHK', einschulung_jahr: bez.slice(0, 4) });
     const k = getDb().prepare('SELECT id FROM klassen WHERE name = ?').get(name).id;
     await lehrer(`/teacher/klassen/${k}/faecher/neu`, { name: 'Mathe' });

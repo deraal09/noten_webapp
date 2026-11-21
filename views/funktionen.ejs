@@ -1,0 +1,35 @@
+<h1>Meine Funktionen</h1>
+<p class="hint">Hier bestimmst du, was du in der Notenverwaltung siehst. Nichts davon ist gesperrt – ausgeschaltete Funktionen sind nur ausgeblendet und lassen sich hier oder über die Suche in der <a href="/hilfe">Hilfe</a> jederzeit wieder einschalten.</p>
+
+<section class="card">
+  <h2>Startprofil</h2>
+  <div class="profil-liste">
+    <% Object.keys(PROFILE).forEach(function(id) { var p = PROFILE[id]; %>
+      <form method="post" action="/konto/funktionen/profil" class="profil-karte<%= aktuell.profil === id ? ' aktiv' : '' %>">
+        <input type="hidden" name="profil" value="<%= id %>">
+        <input type="hidden" name="weiter" value="/konto/funktionen">
+        <strong><%= p.titel %></strong>
+        <span class="hint"><%= p.text %></span>
+        <button type="submit"<%= aktuell.profil === id ? ' aria-pressed="true"' : '' %>><%= aktuell.profil === id ? '✓ Gewählt' : 'Wählen' %></button>
+      </form>
+    <% }); %>
+  </div>
+  <% if (!aktuell.gewaehlt) { %><p class="hint">Noch kein Profil gewählt: Bis dahin siehst du alles.</p><% } %>
+</section>
+
+<form method="post" action="/konto/funktionen" class="card">
+  <h2>Einzelne Funktionen</h2>
+  <ul class="funktionen-liste">
+    <% FUNKTIONEN.forEach(function(f) { %>
+      <li>
+        <label>
+          <input type="checkbox" name="funktion" value="<%= f.id %>"<%= aktuell[f.id] ? ' checked' : '' %><%= f.id === 'api' && user.authSource !== 'ldap' ? ' disabled' : '' %>>
+          <span><strong><%= f.symbol %> <%= f.titel %></strong><br><span class="hint"><%= f.text %></span></span>
+        </label>
+      </li>
+    <% }); %>
+  </ul>
+  <button type="submit">Speichern</button>
+</form>
+
+<p class="hint">Fehlt dir etwas oder gefällt dir etwas besonders gut? <a href="/feedback">Gib uns Feedback</a>.</p>

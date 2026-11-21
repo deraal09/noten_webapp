@@ -31,6 +31,8 @@ import { BILDUNGSGAENGE } from '../spa-schema.js';
 import { TYPEN as NS_TYPEN, globalerSchluessel, vorgabeCsv, folgtGlobal, pruefeCsv, speichereGlobal, klassenZahlen, MAX_HINWEIS } from '../notenschluessel.js';
 import { seedeSpaFaecher } from '../spa-noten-service.js';
 import { auswertung as aktivitaetsAuswertung, ZEITRAEUME as AKTIVITAET_ZEITRAEUME, WOCHENTAGE } from '../aktivitaet.js';
+import { funktionenUebersicht, FUNKTIONEN, PROFILE } from '../funktionen.js';
+import { ARTEN as FEEDBACK_ARTEN, STATI as FEEDBACK_STATI, ladeFeedback, feedbackZahlen, setzeFeedbackStatus, loescheFeedback } from '../feedback.js';
 
 export default async function adminRoutes(fastify) {
   fastify.addHook('preHandler', requireAdmin);
@@ -41,7 +43,26 @@ export default async function adminRoutes(fastify) {
     const tage = AKTIVITAET_ZEITRAEUME.includes(gewuenscht) ? gewuenscht : 90;
     return reply.viewEjs('admin/aktivitaet.ejs', {
       user: request.user, a: aktivitaetsAuswertung(tage), ZEITRAEUME: AKTIVITAET_ZEITRAEUME, WOCHENTAGE,
+      funktionenUebersicht: funktionenUebersicht(), FUNKTIONEN, PROFILE,
     });
+  });
+
+  // ---------- Feedback der Nutzer:innen ----------
+  fastify.get('/feedback', async (request, reply) => {
+    const art = String(request.query?.art || '');
+    const status = String(request.query?.status || '');
+    return reply.viewEjs('admin/feedback.ejs', {
+      user: request.user, eintraege: ladeFeedback({ art, status }), zahlen: feedbackZahlen(), ARTEN: FEEDBACK_ARTEN, STATI: FEEDBACK_STATI, FUNKTIONEN,
+      filter: { art, status },
+    });
+  });
+  fastify.post('/feedback/:id/status', async (request, reply) => {
+    setzeFeedbackStatus(Number(request.params.id), String(request.body?.status || ''));
+    return reply.redirect(String(request.body?.zurueck || '').startsWith('/admin/feedback') ? request.body.zurueck : '/admin/feedback');
+  });
+  fastify.post('/feedback/:id/loeschen', async (request, reply) => {
+    loescheFeedback(Number(request.params.id));
+    return reply.redirect(String(request.body?.zurueck || '').startsWith('/admin/feedback') ? request.body.zurueck : '/admin/feedback');
   });
 
   // ---------- Dashboard ----------

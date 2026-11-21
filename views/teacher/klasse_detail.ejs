@@ -14,12 +14,19 @@
     <summary class="kopf-menue-knopf" aria-label="Weitere Optionen" data-hinweis="Mehr Optionen"><span class="drei-balken" aria-hidden="true"><span></span><span></span><span></span></span></summary>
     <div class="kopf-popover" role="menu">
       <% if (!klasse.ist_ablage) { %><a class="menue-eintrag" role="menuitem" href="/teacher#klasse-<%= klasse.id %>">📝 Noteneingabe</a><% } %>
-      <% if (!klasse.ist_ablage) { %><a class="menue-eintrag" role="menuitem" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a><% } %>
+      <% if (!klasse.ist_ablage && (!funktionen || funktionen.sitzplan)) { %><a class="menue-eintrag" role="menuitem" href="/teacher/klassen/<%= klasse.id %>/sitzplan">🪑 Sitzplan</a><% } %>
       <% if (!klasse.ist_ablage || darfVerwalten) { %>
         <button type="button" class="menue-eintrag" role="menuitem" data-zeige="schueler-hinzufuegen">➕ Schüler/innen hinzufügen</button>
       <% } %>
+      <% if (!klasse.ist_ablage) { %>
+        <button type="button" class="menue-eintrag" role="menuitem" data-zeige="panel-klasse-einstellungen" title="Klasse umbenennen, freigeben, Einschulungsjahr">⚙ Klasse einstellen</button>
+      <% } %>
       <% if (istKlassenlehrer) { %>
         <button type="button" class="menue-eintrag" role="menuitem" data-zeige="einschulungsjahr-festlegen">📅 Einschulungsjahr festlegen</button>
+      <% } %>
+      <% if (!klasse.ist_ablage) { %>
+        <button type="button" class="menue-eintrag" role="menuitem" data-klick-auf="vorlage-import-knopf">📥 Fächer aus Vorlage importieren</button>
+        <% if (speicherbareFaecher.length) { %><button type="button" class="menue-eintrag" role="menuitem" data-klick-auf="vorlage-speichern-knopf">💾 Fächer als Vorlage speichern</button><% } %>
       <% } %>
       <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>
         <a class="menue-eintrag" role="menuitem" href="/teacher/klassen/<%= klasse.id %>/zeugnis">📋 Zeugnisübersicht</a>
@@ -53,16 +60,17 @@
 <div class="reiter reiter-leiste" data-storage-key="klasse-<%= klasse.id %>-hauptreiter">
   <button type="button" class="active" data-target="panel-klasse-faecher">📚 Fächer</button>
   <button type="button" data-target="panel-klasse-schueler">👥 Schüler/innen (<%= schueler.length %>)</button>
-  <button type="button" data-target="panel-klasse-einstellungen">⚙ Einstellungen</button>
+  <%# Kein eigener Reiter mehr: „⚙ Klasse einstellen“ steckt im Menü (☰); der versteckte Knopf hält die Reiter-Logik und Adressen wie #verrechnung am Laufen. %>
+  <button type="button" hidden data-target="panel-klasse-einstellungen">⚙ Einstellungen</button>
 </div>
 <% } %>
 
 <% if (!klasse.ist_ablage) { %>
 <div id="panel-klasse-faecher" class="reiter-panel active">
 <h2 id="faecher-lehrkraefte">Fächer und Lehrkräftezuordnung</h2>
-<p><small>Ein neu angelegtes Fach wird dir automatisch zugewiesen.
+<details class="info-ausklapp"><summary>ⓘ Hinweise zu Fächern und Lehrkräften</summary><p class="hint">Ein neu angelegtes Fach wird dir automatisch zugewiesen.
   <% if (istKlassenlehrer) { %>Als Klassenleitung stellst du alles zu einem Fach über das Zahnrad (⚙) ein: Name, Halbjahre, Lehrkräfte je Halbjahr, Unterfächer, Verrechnung, Teilnehmer/innen und Löschen.
-  <% } else { %>Lehrkräfte kann die Klassenleitung oder der Admin zuordnen.<% } %></small></p>
+  <% } else { %>Lehrkräfte kann die Klassenleitung oder der Admin zuordnen.<% } %></p></details>
 <%
   function hjBereiche(nummern) {
     var teile = []; var start = null; var vor = null;
@@ -240,8 +248,9 @@
 
 <p class="knopf-leiste">
   <button type="button" id="fach-neu-knopf">+ Neues Fach anlegen</button>
-  <button type="button" id="vorlage-import-knopf">📥 Fächer aus Vorlage importieren</button>
-  <% if (speicherbareFaecher.length) { %><button type="button" id="vorlage-speichern-knopf">💾 Fächer als Vorlage speichern</button><% } %>
+  <%# Die Vorlagen-Knöpfe liegen im Menü (☰) und lösen diese (versteckten) Knöpfe aus. %>
+  <button type="button" hidden id="vorlage-import-knopf">📥 Fächer aus Vorlage importieren</button>
+  <% if (speicherbareFaecher.length) { %><button type="button" hidden id="vorlage-speichern-knopf">💾 Fächer als Vorlage speichern</button><% } %>
 </p>
 
 <% if (klasse.notenschluessel === 'SPA' && istKlassenlehrer) { %>

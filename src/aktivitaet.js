@@ -100,6 +100,7 @@ export function erfasse(userId, { eingabe = false, jetzt = new Date() } = {}) {
 
 /** Schreibt die gesammelten Zähler in die Datenbank (addiert zu vorhandenen Zeilen). */
 export function speichere() {
+  speichereFunktionen();
   if (tageBuffer.size === 0 && stundenBuffer.size === 0) return;
   const tage = [...tageBuffer.values()];
   const stunden = [...stundenBuffer.values()].map((s) => ({ ...s, nutzer: stundenNutzer.get(`${s.tag}|${s.stunde}`)?.size || 0 }));
@@ -130,12 +131,83 @@ export function speichere() {
   }
 }
 
+function speichereFunktionen() {
+  if (funktionenBuffer.size === 0) return;
+  const zeilen = [...funktionenBuffer.values()];
+  funktionenBuffer.clear();
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT INTO nutzung_funktionen (profil, tag, funktion, aufrufe) VALUES (?, ?, ?, ?)
+    ON CONFLICT(profil, tag, funktion) DO UPDATE SET aufrufe = aufrufe + excluded.aufrufe
+  `);
+  try {
+    db.transaction(() => { for (const z of zeilen) stmt.run(z.profil, z.tag, z.funktion, z.aufrufe); })();
+  } catch (err) {
+    console.warn('[aktivitaet] Funktionen speichern fehlgeschlagen:', err.message);
+  }
+}
+
 /** Löscht Zähler, die älter als die Aufbewahrungsfrist sind. */
 export function bereinige(jetzt = new Date()) {
   const grenze = tagPlus(ortszeit(jetzt).tag, -AUFBEWAHRUNG_TAGE);
   const db = getDb();
   db.prepare('DELETE FROM nutzung_tage WHERE tag < ?').run(grenze);
   db.prepare('DELETE FROM nutzung_stunden WHERE tag < ?').run(grenze);
+  db.prepare('DELETE FROM nutzung_funktionen WHERE tag < ?').run(grenze);
+}
+
+// ---------- Funktionsnutzung ----------
+/**
+ * Welche Funktionen werden benutzt? Jede Anfrage wird anhand ihres Routenmusters („METHODE /teacher/fach/:id“) einer Funktion
+ * zugeordnet. Gezählt wird – wie bei der übrigen Statistik – nur je anonymem Profil und TAG (nie Uhrzeit, keine Adressen, keine
+ * Inhalte). Die Reihenfolge ist wichtig: das erste passende Muster gilt. `gruppe` ordnet die Zeilen auf der Admin-Seite.
+ */
+export const NUTZUNG_FUNKTIONEN = [
+  { id: 'noteneingabe', gruppe: 'Kern', titel: 'Noteneingabe (Fächerliste)', re: /^GET \/teacher\/?$/ },
+  { id: 'fach', gruppe: 'Kern', titel: 'Fachseite öffnen', re: /^GET \/teacher\/fach\/:id$/ },
+  { id: 'klausur-anlegen', gruppe: 'Kern', titel: 'Klausur anlegen', re: /^POST \/teacher\/fach\/:id\/klausuren\/neu$/ },
+  { id: 'punkte', gruppe: 'Kern', titel: 'Punkte und Noten eintragen', re: /^POST \/teacher\/(klausuren\/:id\/(punkte|extrapunkte)|uls\/:id\/punkte|unterricht\/termine\/:id\/note|fach\/:id\/(endnote|spa\/eingabe)|klassen\/:id\/endnote)$/ },
+  { id: 'unterricht', gruppe: 'Kern', titel: 'Unterrichtsleistung (Datumstabelle, Zusatzleistung)', re: /^POST \/teacher\/(fach\/:id\/(uls\/neu|unterricht\/termine\/neu)|unterricht\/termine\/:id\/inhalt)$/ },
+  { id: 'klassen', gruppe: 'Kern', titel: 'Meine Klassen', re: /^GET \/teacher\/klassen$/ },
+  { id: 'klasse-anlegen', gruppe: 'Kern', titel: 'Klasse anlegen', re: /^POST \/teacher\/klassen\/neu$/ },
+  { id: 'klasse', gruppe: 'Kern', titel: 'Klassenseite öffnen', re: /^GET \/teacher\/klassen\/:id$/ },
+  { id: 'schueler', gruppe: 'Kern', titel: 'Schüler/innen anlegen oder ändern', re: /^POST \/teacher\/(klassen\/:id\/schueler\/.*|schueler\/:id\/(umbenennen|abgang|reaktivieren|versetzen|loeschen))$/ },
+  { id: 'kurse', gruppe: 'Kern', titel: 'Kurse', re: /^(POST \/teacher\/(kurse\/.*|fach\/:id\/teilnehmer\/.*)|GET \/teacher\/fach\/:id\/teilnehmer.*)$/ },
+  { id: 'sitzplan', gruppe: 'Funktion', titel: 'Sitzpläne', re: /^(GET|POST) \/teacher\/(klassen\/:id\/sitzplan.*|sitzplaene)$/ },
+  { id: 'notenbesprechung', gruppe: 'Funktion', titel: 'Notenbesprechung', re: /^(GET|POST) \/teacher\/fach\/:id\/besprechung.*$/ },
+  { id: 'statistik', gruppe: 'Funktion', titel: 'Klausur-Statistik eingeschaltet', re: /^POST \/funktion-genutzt$/ },
+  { id: 'favoriten', gruppe: 'Funktion', titel: 'Favoriten (★)', re: /^POST \/teacher\/faecher\/:id\/favorit$/ },
+  { id: 'fach-anlegen', gruppe: 'Kern', titel: 'Fach anlegen oder einstellen', re: /^(POST \/teacher\/(klassen\/:id\/faecher\/neu|faecher\/:id\/.*)|GET \/teacher\/faecher\/:id\/.*)$/ },
+  { id: 'synchronisation', gruppe: 'Funktion', titel: 'Synchronisation mit der Klassenleitung', re: /^POST \/teacher\/fach\/:id\/(sync|auto-sync)$/ },
+  { id: 'klassenleitung', gruppe: 'Funktion', titel: 'Klassenleitung (Konferenz, Zeugnisse, Fehlzeiten)', re: /^(GET|POST) \/(klassenlehrer.*|teacher\/klassen\/:id\/(konferenz.*|zeugnis.*|abschluss|uebersicht)|teacher\/schueler\/:id\/abgangszeugnis)$/ },
+  { id: 'export', gruppe: 'Funktion', titel: 'CSV-Export', re: /^GET \/export\/.*$/ },
+  { id: 'vorlagen', gruppe: 'Funktion', titel: 'Fächer-Vorlagen', re: /^(GET|POST) \/teacher\/(klassen\/:id\/(vorlagen|spa-vorlage)\/.*|vorlagen\/.*|spa-vorlagen.*)$/ },
+  { id: 'papierkorb', gruppe: 'Funktion', titel: 'Papierkorb', re: /^(GET|POST) \/teacher\/papierkorb.*$/ },
+  { id: 'einladungen', gruppe: 'Funktion', titel: 'Einladungen verschicken', re: /^(GET|POST) \/teacher\/einladungen.*$/ },
+  { id: 'api', gruppe: 'Funktion', titel: 'API-Zugang (Schlüssel verwalten)', re: /^(GET|POST) \/konto\/api.*$/ },
+  { id: 'funktionen', gruppe: 'Konto', titel: 'Meine Funktionen', re: /^(GET|POST) \/konto\/funktionen.*$/ },
+  { id: 'hilfe', gruppe: 'Konto', titel: 'Hilfe', re: /^GET \/hilfe.*$/ },
+  { id: 'feedback', gruppe: 'Konto', titel: 'Feedback geben', re: /^POST \/feedback$/ },
+];
+
+/** Ordnet eine Anfrage (Methode + Routenmuster) einer Funktion zu; null = zählt nicht als eigene Funktion. */
+export function funktionFuerAnfrage(methode, muster) {
+  const schluessel = `${String(methode).toUpperCase()} ${String(muster || '').replace(/(.)\/+$/, '$1')}`;
+  for (const f of NUTZUNG_FUNKTIONEN) if (f.re.test(schluessel)) return f.id;
+  return null;
+}
+
+const funktionenBuffer = new Map(); // "profil|tag|funktion" -> { profil, tag, funktion, aufrufe }
+
+/** Zählt eine Nutzung einer Funktion (im Speicher; `speichere()` schreibt sie). */
+export function erfasseFunktion(userId, funktion, { jetzt = new Date() } = {}) {
+  if (!userId || !funktion) return;
+  const { tag } = ortszeit(jetzt);
+  const profil = profilFuer(userId);
+  const key = `${profil}|${tag}|${funktion}`;
+  const z = funktionenBuffer.get(key) || { profil, tag, funktion, aufrufe: 0 };
+  z.aufrufe += 1;
+  funktionenBuffer.set(key, z);
 }
 
 let timer = null;
@@ -265,8 +337,18 @@ export function auswertung(tage = 90, jetzt = new Date(), { personen: mitPersone
     }).sort((a, b) => (b.tage - a.tage) || (b.anfragen - a.anfragen) || a.name.localeCompare(b.name, 'de'));
   }
 
+  // Funktionen: je Funktion Aufrufe, verschiedene Personen und Tage im Zeitraum (nur Zahlen, keine Einzelpersonen).
+  const nutzungF = new Map(db.prepare(`
+    SELECT funktion, SUM(aufrufe) AS aufrufe, COUNT(DISTINCT profil) AS personen, COUNT(DISTINCT tag) AS tage
+    FROM nutzung_funktionen WHERE tag >= ? GROUP BY funktion
+  `).all(von).map((r) => [r.funktion, r]));
+  const funktionen = NUTZUNG_FUNKTIONEN.map((f) => {
+    const r = nutzungF.get(f.id) || { aufrufe: 0, personen: 0, tage: 0 };
+    return { id: f.id, titel: f.titel, gruppe: f.gruppe, aufrufe: r.aufrufe, personen: r.personen, tage: r.tage, anteil: aktive ? r.personen / aktive : 0 };
+  });
+
   return {
-    personen, tage, von, bis: heute, seit, erfassungKuerzer: Boolean(seit && seit > von),
+    funktionen, personen, tage, von, bis: heute, seit, erfassungKuerzer: Boolean(seit && seit > von),
     konten: gesamt, aktiveImZeitraum: aktive, kleineGruppe: gesamt < 10,
     aktiv7: aktivSeit(7), aktiv30: aktivSeit(30), nieAktiv,
     ohneEingaben, wiederkehrend, wiederkehrQuote: aktive ? wiederkehrend / aktive : 0,

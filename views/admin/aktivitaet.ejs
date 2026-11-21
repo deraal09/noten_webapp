@@ -75,6 +75,48 @@
   <li><span><strong><%= a.nieAktiv %></strong> noch nie aktiv erfasst</span></li>
 </ul>
 
+<h2>Welche Funktionen werden genutzt?</h2>
+<p class="hint">Wie viele der aktiven Personen haben im Zeitraum welche Funktion benutzt (anonym gezählt: ein nicht umkehrbarer Wert je Person und Tag, keine Inhalte). So lässt sich erkennen, welche Funktionen kaum gebraucht werden und im Alltag nur stören. Eine kleine Zahl heißt nicht automatisch „unnötig“ – manche Funktionen braucht nur die Klassenleitung oder man nutzt sie selten.</p>
+<% if (!a.aktiveImZeitraum) { %>
+  <p class="hint">Noch keine Nutzungsdaten im Zeitraum.</p>
+<% } else { %>
+  <% ['Kern', 'Funktion', 'Konto'].forEach(function(gruppe) {
+       var zeilen = a.funktionen.filter(function(f) { return f.gruppe === gruppe; }).sort(function(x, y) { return (y.personen - x.personen) || (y.aufrufe - x.aufrufe); });
+       if (!zeilen.length) return; %>
+    <h3><%= gruppe === 'Kern' ? 'Kernfunktionen (Klassen und Noten)' : (gruppe === 'Funktion' ? 'Weitere Funktionen' : 'Konto und Hilfe') %></h3>
+    <div class="tabelle-scroll">
+    <table class="data tabelle-offen">
+      <thead><tr><th>Funktion</th><th>Personen</th><th>Anteil der Aktiven</th><th>Aufrufe</th><th>Tage mit Nutzung</th></tr></thead>
+      <tbody>
+        <% zeilen.forEach(function(f) { %>
+          <tr<%- f.personen === 0 ? ' class="funktion-ungenutzt"' : '' %>>
+            <td><%= f.titel %><% if (f.personen === 0) { %> <span class="statistik-marke">nicht genutzt</span><% } else if (a.aktiveImZeitraum >= 10 && f.anteil < 0.1 && gruppe === 'Funktion') { %> <span class="statistik-marke zu-leicht">kaum genutzt</span><% } %></td>
+            <td><%= f.personen %></td>
+            <td><span class="statistik-balken"><span class="statistik-fuell" style="width: <%= Math.round(f.anteil * 100) %>%"></span></span> <%= proz(f.anteil) %></td>
+            <td><%= f.aufrufe %></td>
+            <td><%= f.tage %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    </div>
+  <% }); %>
+<% } %>
+<%
+  const fu = funktionenUebersicht;
+  const profilName = function(id) { return id === 'ohne' ? 'noch nicht gewählt (sieht alles)' : (PROFILE[id] ? PROFILE[id].titel : 'angepasst'); };
+%>
+<h3>Was haben die Lehrkräfte eingeschaltet?</h3>
+<p class="hint">Aus „Meine Funktionen“ (nur Anzahlen, ohne Namen): <strong><%= fu.gewaehlt %></strong> von <%= fu.konten %> Lehrkräften haben schon ein Profil gewählt.</p>
+<ul class="akt-legende">
+  <% Object.keys(fu.profile).forEach(function(id) { %><li><span><strong><%= fu.profile[id] %></strong> × <%= profilName(id) %></span></li><% }); %>
+</ul>
+<% if (fu.gewaehlt) { %>
+<ul class="akt-legende">
+  <% FUNKTIONEN.forEach(function(f) { %><li><span><%= f.symbol %> <%= f.titel %>: <strong><%= fu.proFunktion[f.id] %></strong> von <%= fu.gewaehlt %> haben sie eingeschaltet</span></li><% }); %>
+</ul>
+<% } %>
+
 <h2>Verlauf: aktive Personen <%= a.woche ? 'je Woche' : 'je Tag' %></h2>
 <%
   const maxN = Math.max(1, ...a.verlauf.map(function(v) { return v.nutzer; }));

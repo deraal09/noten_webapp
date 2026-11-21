@@ -4,7 +4,8 @@
   <p>Du bist noch keinen Fächern zugewiesen. Bitte wende dich an den Admin oder lege selbst eine <a href="/teacher/klassen">Klasse</a> an.</p>
 <% } %>
 
-<% var zeigeKlassenfilter = byKlasse.length + (kurse.length ? 1 : 0) > 1; var zeigeSchuljahrfilter = alleSchuljahre.length > 1; %>
+<%# Filter erst, wenn die Liste lang wird (mehr als drei Klassen/Kurse) -- sonst nur Rauschen. %>
+<% var vieleGruppen = byKlasse.length + (kurse.length ? 1 : 0) > 3; var zeigeKlassenfilter = vieleGruppen; var zeigeSchuljahrfilter = vieleGruppen && alleSchuljahre.length > 1; %>
 <% if (zeigeKlassenfilter || zeigeSchuljahrfilter) { %>
   <p class="klassenfilter">
     <% if (zeigeSchuljahrfilter) { %>
@@ -41,13 +42,15 @@
   </form>
 <% } %>
 <% function lehrkraefteZeile(f) { %>
+  <%# Nur anzeigen, wenn es etwas Besonderes gibt: andere Lehrkräfte, ein Halbjahr-Zuschnitt oder gar keine Lehrkraft. Bin nur ich eingetragen, ist „Du“ überflüssig. %>
+  <% if (f.lehrkraefte.length === 1 && f.lehrkraefte[0].ich && !f.lehrkraefte[0].halbjahre) return; %>
   <div class="kachel-sub lehrkraefte-zeile">
     <% if (f.lehrkraefte.length) { %>🎓 <%= f.lehrkraefte.map(function(l) { return (l.ich ? 'Du' : l.name) + (l.halbjahre ? ' (' + l.halbjahre + ')' : ''); }).join(', ') %>
     <% } else { %><span class="hint">keine Lehrkraft</span><% } %>
   </div>
 <% } %>
 
-<% function sternForm(f) { %>
+<% function sternForm(f) { if (funktionen && !funktionen.favoriten) return; %>
   <form method="post" action="/teacher/faecher/<%= f.id %>/favorit" class="inline stern-form">
     <button type="submit" class="stern<%= f.favorit ? ' stern-an' : '' %>" aria-pressed="<%= f.favorit ? 'true' : 'false' %>" title="<%= f.favorit ? 'Aus den Favoriten entfernen' : 'Als Favorit merken' %>" aria-label="<%= f.favorit ? 'Favorit entfernen: ' : 'Als Favorit merken: ' %><%= f.name %>"><%= f.favorit ? '★' : '☆' %></button>
   </form>
@@ -80,7 +83,8 @@
             </div>
           </a>
           <% sternForm(f); %>
-          <div class="kachel-sub"><%= f.anzahl_klausuren %> Klausur(en) · <%= f.anzahl_uls %> UL(s)<% if (f.halbjahreText) { %> · <%= f.halbjahreText %><% } %></div>
+          <% var kachelInfo = []; if (f.anzahl_klausuren) kachelInfo.push(f.anzahl_klausuren + ' Klausur(en)'); if (f.anzahl_uls) kachelInfo.push(f.anzahl_uls + ' UL(s)'); if (f.halbjahreText) kachelInfo.push(f.halbjahreText); %>
+          <% if (kachelInfo.length) { %><div class="kachel-sub"><%= kachelInfo.join(' · ') %></div><% } %>
           <% lehrkraefteZeile(f); %>
           <% var meineSelbst = f.lehrkraefte.filter(function(l) { return l.ich && l.selbst; })[0]; %>
           <% if (meineSelbst || (f.frei && f.frei.length)) { %>

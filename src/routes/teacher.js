@@ -463,6 +463,8 @@ export default async function teacherRoutes(fastify) {
       };
     }
     return reply.viewEjs('teacher/fach_detail.ejs', {
+      // Synchronisation: sichtbar, wenn die Klasse eine Klassenleitung hat oder die Funktion in „Meine Funktionen“ eingeschaltet ist
+      syncSichtbar: Boolean(reply.locals.funktionen?.synchronisation) || klasseHatKlassenleitung(fach.klasse_id),
       // Vorbelegung des Datumsfelds der Datumstabelle: heute (Ortszeit der Schule)
       heute: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(jetzt()),
       // Halbjahre in noch nicht begonnenen Schuljahren werden ausgeblendet (das angezeigte Halbjahr bleibt immer sichtbar).

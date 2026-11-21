@@ -17,6 +17,24 @@
     })();
   </script>
 
+  <% if (!user.isAdmin && funktionen && !funktionen.gewaehlt) { %>
+    <section class="card profil-wahl" aria-label="Startprofil wählen">
+      <h2>Wie möchtest du die Notenverwaltung nutzen?</h2>
+      <p class="hint">Wähle, was du sehen willst. Du kannst das jederzeit unter ⚙ <a href="/konto/funktionen">Meine Funktionen</a> ändern – nichts geht verloren oder ist gesperrt.</p>
+      <div class="profil-liste">
+        <% Object.keys(PROFILE).forEach(function(id) { var pr = PROFILE[id]; %>
+          <form method="post" action="/konto/funktionen/profil" class="profil-karte">
+            <input type="hidden" name="profil" value="<%= id %>">
+            <input type="hidden" name="weiter" value="/start">
+            <strong><%= pr.titel %></strong>
+            <span class="hint"><%= pr.text %></span>
+            <button type="submit">Auswählen</button>
+          </form>
+        <% }); %>
+      </div>
+    </section>
+  <% } %>
+
   <% if (typeof zuletzt !== 'undefined' && zuletzt.length) { %>
     <section class="weitermachen" aria-label="Weitermachen">
       <h2>Weitermachen</h2>
@@ -35,13 +53,17 @@
       <span class="kachel-icon">🏫</span>
       <span class="kachel-titel">Meine Klassen</span>
     </a>
+    <% if (!funktionen || funktionen.sitzplan) { %>
     <a class="kachel" href="/teacher/sitzplaene">
       <span class="kachel-icon">🪑</span>
       <span class="kachel-titel">Sitzpläne</span>
     </a>
+    <% } %>
+    <% if (!funktionen || funktionen.klassenleitung) { %>
     <a class="kachel" href="/klassenlehrer">
       <span class="kachel-icon">🧑‍🏫</span>
       <span class="kachel-titel">Klassenleitung</span>
     </a>
+    <% } %>
   </div>
 </div>

@@ -54,7 +54,7 @@ export const ARTIKEL = [
         'Sonst im Reiter **Neue Klasse anlegen** das **Schuljahr** (das aktuelle ist vorausgewählt und mit „(aktuell)“ gekennzeichnet), den **Klassennamen**, den **Notenschlüssel** (IHK 1–6, BG 0–15 Punkte oder SPA) und das **Einschulungsjahr** angeben und speichern.',
       ], hinweis: 'Klassen anlegen dürfen Lehrkräfte mit Schulkonto. Externe Lehrkräfte werden von der Klassenleitung einem Fach zugeordnet.' },
       { titel: 'Klasse umbenennen', absaetze: [
-        'Auf der Klassenseite im Reiter **⚙ Einstellungen** gibt es **✏️ Klasse umbenennen**. Das darf **jede Lehrkraft, die der Klasse angehört**. Der neue Name gilt sofort für alle, die in der Klasse eingetragen sind. Im Schuljahr darf es keine zwei Klassen mit gleichem Namen geben.',
+        'Auf der Klassenseite im Menü **☰ → ⚙ Klasse einstellen** gibt es **✏️ Klasse umbenennen**. Das darf **jede Lehrkraft, die der Klasse angehört**. Der neue Name gilt sofort für alle, die in der Klasse eingetragen sind. Im Schuljahr darf es keine zwei Klassen mit gleichem Namen geben.',
       ] },
       { titel: 'Klasse löschen und Papierkorb', absaetze: [
         '**🗑 Klasse löschen** (im Menü **☰** neben „← Meine Klassen“) blendet die Klasse nur **für dich** aus und legt sie in deinen Papierkorb. Die anderen Lehrkräfte sehen sie weiter. Mehr dazu im Artikel „Papierkorb“.',
@@ -152,7 +152,7 @@ export const ARTIKEL = [
         'Unter **Noteneingabe** siehst du deine Fächer, nach Klassen gruppiert, und die Kurse. Mit der **Schuljahr-Auswahl** blendest du ein Schuljahr ein; das laufende ist mit **(aktuell)** gekennzeichnet. Schuljahre, die erst noch beginnen, werden ausgeblendet (neues Schuljahr: 1. August).',
       ] },
       { titel: 'Ein Fach öffnen', absaetze: [
-        'Ein Klick auf ein Fach öffnet die **Notenübersicht** des aktuellen Halbjahres. Oben wechselst du das **Halbjahr**. Unter **⋮ Mehr** erreichst du **Unterrichtsleistung** und **Klausuren**.',
+        'Ein Klick auf ein Fach öffnet die Fachseite des aktuellen Halbjahres. Oben wechselst du das **Halbjahr**. Die Reiter folgen dem Arbeitsablauf: **Klausuren** (zuerst, dort trägst du Punkte ein), **Unterrichtsleistung**, **Notenübersicht**. Die **Synchronisation** steckt unter **⋮ Mehr**, sobald die Klasse eine Klassenleitung hat.',
         'Die Tabelle zeigt je Person die Note der Unterrichtsleistung, die schriftliche Note (Klausuren) und die **Gesamtnote**. Mit dem Haken **ganze Note** unter einer Spaltenüberschrift rundest du die Anzeige dieser Spalte auf ganze Noten (nur die Anzeige; gespeichert wird genau).',
       ] },
       { titel: 'Direkte Endnoteneingabe', absaetze: [
@@ -168,12 +168,12 @@ export const ARTIKEL = [
     bilder: [{ datei: 'klausur-eintragen', text: 'Klausur mit Punkten je Aufgabe' }],
     abschnitte: [
       { titel: 'Klausur anlegen', schritte: [
-        'In der Fachseite **⋮ Mehr → Klausuren** öffnen und mit **＋ Neu hinzufügen** eine Klausur anlegen (Name, optional Datum).',
-        'Bei **Anzahl Aufgaben** die Zahl der Aufgaben eintragen und in der Zeile **Max. Punkte** die erreichbaren Punkte je Aufgabe.',
+        'In der Fachseite den Reiter **Klausuren** öffnen und mit **＋ Neu hinzufügen** eine Klausur anlegen (Name, optional Datum).',
+        'Unter **⚙ Klausur einstellen** (bei einer neuen Klausur aufgeklappt, sobald Punkte da sind eingeklappt) stehen Gewichtung, Datum, Anzahl der Teile und **Anzahl Aufgaben**. In der Zeile **Max. Punkte** über der Tabelle trägst du die erreichbaren Punkte je Aufgabe ein.',
         'In der Tabelle je Person die **erreichten Punkte** je Aufgabe eintragen. Die Note erscheint sofort nach dem Notenschlüssel der Klasse; alles wird automatisch gespeichert.',
       ] },
       { titel: 'Statistik: welche Aufgaben waren zu schwer oder zu leicht?', absaetze: [
-        'Über dem Eingabefeld der Klausur schaltest du mit **📊 Statistik** eine Auswertung unter der Tabelle ein oder aus (sie ist zunächst aus; die Wahl merkt sich der Browser). Sie rechnet beim Eintragen von selbst mit und zeigt je Aufgabe: **Ø Punkte**, den **Lösungsgrad** (Ø Punkte geteilt durch die Höchstpunkte) mit der Einschätzung **zu schwer** (unter 30 %), **ausgewogen** oder **zu leicht** (ab 85 %), den Anteil mit **voller Punktzahl** und mit **0 Punkten** sowie die **Trennschärfe**.',
+        'Über dem Eingabefeld der Klausur schaltest du mit **📊 Statistik** eine Auswertung unter der Tabelle ein oder aus (sie ist zunächst aus; die Wahl merkt sich der Browser; die Funktion lässt sich unter **Meine Funktionen** ganz ausblenden). Sie rechnet beim Eintragen von selbst mit und zeigt je Aufgabe: **Ø Punkte**, den **Lösungsgrad** (Ø Punkte geteilt durch die Höchstpunkte) mit der Einschätzung **zu schwer** (unter 30 %), **ausgewogen** oder **zu leicht** (ab 85 %), den Anteil mit **voller Punktzahl** und mit **0 Punkten** sowie die **Trennschärfe**.',
         'Die **Trennschärfe** sagt, wie gut eine Aufgabe zwischen stärkeren und schwächeren Leistungen unterscheidet (Korrelation der Aufgabe mit den übrigen Aufgaben): ab 0,3 gut, unter 0,2 schwach. **Negativ** ist ein Warnzeichen – gerade die Starken verlieren dort Punkte; dann lohnt ein Blick auf Aufgabenstellung und Bewertung. Sie wird erst ab 10 Personen berechnet.',
         'Leere Felder zählen wie in der Punktesumme als 0 Punkte; Personen ganz ohne Eintrag werden nicht mitgezählt. Das sind **Hinweise, keine Urteile**: Eine schwere Aufgabe kann bewusst anspruchsvoll sein, und bei kleinen Klassen (unter 30 Personen) schwanken die Werte stark. Bei mehrteiligen Klausuren bleiben die Inhalt-/Sprache-Noten außen vor.',
       ] },
@@ -213,7 +213,7 @@ export const ARTIKEL = [
     bilder: [{ datei: 'datumstabelle', text: 'Datumstabelle mit Terminen und Noten' }],
     abschnitte: [
       { titel: 'Datumstabelle', schritte: [
-        'In der Fachseite **⋮ Mehr → Unterrichtsleistung** öffnen und ein Datum mit **+ Datum hinzufügen** anlegen. Im Datumsfeld steht schon **das heutige Datum**: Für heute genügt der Klick auf den Knopf, sonst wählst du vorher ein anderes Datum.',
+        'In der Fachseite den Reiter **Unterrichtsleistung** öffnen und ein Datum mit **+ Datum hinzufügen** anlegen. Im Datumsfeld steht schon **das heutige Datum**: Für heute genügt der Klick auf den Knopf, sonst wählst du vorher ein anderes Datum.',
         'Je Person die Note für diesen Termin eintragen; **n.a.** steht für „nicht anwesend“ (zählt nicht mit). Am Handy erscheint beim Antippen eine Auswahl der Noten.',
         'Unter jedem Datum kannst du eine kurze Notiz zum **Unterrichtsinhalt** eintragen. Das Notizsymbol hinter dem Namen öffnet Notizen zur Person.',
       ] },
@@ -290,7 +290,7 @@ export const ARTIKEL = [
     slug: 'sync', kategorie: 'auswerten', titel: 'Synchronisation mit der Klassenleitung',
     kurz: 'Die Klassenleitung sieht nur den synchronisierten Notenstand: per Knopf oder automatisch.',
     schlagworte: ['sync', 'synchronisieren', 'synchronisation', 'klassenleitung', 'auto', 'automatisch', 'halbjahresübersicht', 'stand'],
-    bilder: [{ datei: 'fach-uebersicht', text: 'Fachseite (Sync-Funktionen unter „⋮ Mehr“)' }],
+    bilder: [{ datei: 'fach-uebersicht', text: 'Fachseite (Reiter Klausuren, Unterrichtsleistung, Notenübersicht; Synchronisation unter „⋮ Mehr“)' }],
     abschnitte: [
       { titel: 'Warum Sync?', absaetze: [
         'Die Klassenleitung sieht **nie** die Live-Noten deiner Fächer, nur den Stand, den du **synchronisiert** hast. So behältst du die Kontrolle, bis du die Noten freigeben möchtest.',
@@ -436,6 +436,35 @@ export const ARTIKEL = [
   },
   // ---------------------------------------------------------------- Weitere Funktionen
   {
+    slug: 'funktionen', kategorie: 'mehr', titel: 'Meine Funktionen: nur sehen, was du brauchst',
+    kurz: 'Startprofil wählen und Funktionen wie Sitzpläne, Notenbesprechung oder Statistik ein- und ausschalten.',
+    schlagworte: ['funktionen', 'profil', 'einfach', 'ausblenden', 'einblenden', 'sitzplan', 'sitzpläne', 'notenbesprechung', 'statistik', 'favoriten', 'api', 'klassenleitung', 'synchronisation', 'übersichtlich', 'menü', 'einschalten', 'ausschalten'],
+    abschnitte: [
+      { titel: 'Startprofil', absaetze: [
+        'Beim ersten Anmelden fragt die Startseite, wie du die App nutzen möchtest: **Nur Klassen und Noten** (Klassen anlegen, Schüler/innen eintragen, Noten eingeben – sonst nichts), **Klassenleitung** (zusätzlich Notenbesprechung, Synchronisation, Statistik und die Klassenleitungs-Seiten) oder **Alles anzeigen**. Bis du gewählt hast, siehst du alles.',
+      ] },
+      { titel: 'Einzelne Funktionen ein- und ausschalten', schritte: [
+        'Im Menü **☰ → ⚙ Meine Funktionen** öffnen.',
+        'Bei **Einzelne Funktionen** die Haken setzen oder entfernen und **Speichern**.',
+        'Ausgeschaltete Funktionen sind nur **ausgeblendet** (Menüpunkte, Reiter, Kacheln); nichts wird gelöscht oder gesperrt. Mit dem Haken erscheinen sie sofort wieder.',
+      ], hinweis: 'Die **Klassenleitung** erscheint von selbst, sobald du als Klassenleitung eingetragen bist, und die **Synchronisation** an Fächern von Klassen mit Klassenleitung – auch bei „Nur Klassen und Noten“.' },
+    ],
+    links: [{ text: 'Meine Funktionen öffnen', href: '/konto/funktionen' }], verwandt: ['noteneingabe-ueberblick', 'api'],
+  },
+  {
+    slug: 'feedback', kategorie: 'mehr', titel: 'Feedback geben: Lob, Wünsche und Probleme',
+    kurz: 'Der Administration mitteilen, was gut funktioniert, was fehlt oder was nicht stimmt – anonym oder mit Namen.',
+    schlagworte: ['feedback', 'rückmeldung', 'wunsch', 'wünsche', 'lob', 'problem', 'fehler', 'verbesserung', 'vorschlag', 'melden', 'anonym'],
+    abschnitte: [
+      { titel: 'Feedback senden', schritte: [
+        'Unten auf jeder Seite (**Feedback**) oder im Menü **☰ → 💬 Feedback** öffnen.',
+        'Wählen, worum es geht: **👍 Das gefällt mir**, **💡 Ich wünsche mir …** oder **🐞 Etwas stimmt nicht**.',
+        'Text schreiben (mindestens 5, höchstens 2000 Zeichen), optional die betroffene **Funktion** wählen und **Feedback senden**.',
+      ], hinweis: 'Dein Feedback ist **anonym**: Es wird kein Konto gespeichert, solange du nicht **Meinen Namen mitsenden** ankreuzt. Bitte schreibe keine Namen oder Noten von Schüler/innen hinein.' },
+    ],
+    links: [{ text: 'Feedback geben', href: '/feedback' }], verwandt: ['funktionen'],
+  },
+  {
     slug: 'api', kategorie: 'mehr', titel: 'API-Zugang für KI-Agenten',
     kurz: 'Persönliche API-Schlüssel, damit ein KI-Agent Noten auslesen, auswerten und eintragen kann.',
     schlagworte: ['api', 'schlüssel', 'token', 'ki', 'agent', 'claude', 'automatisierung', 'openapi', 'dokumentation', 'dry run', 'probelauf', 'schreiben', 'lesen'],
@@ -465,7 +494,7 @@ export const RUNDGANG = [
   { titel: 'Fächer und Lehrkräfte', bild: 'faecher-lehrkraefte', text: 'Lege die **Fächer** der Klasse an und ordne **Lehrkräfte** zu. Du kannst dich auch selbst für ein freies Fach eintragen oder dich als **Klassenleitung** eintragen.', artikel: 'faecher-lehrkraefte', href: '/teacher/klassen', linkText: 'Zu den Klassen' },
   { titel: 'Noteneingabe', bild: 'noteneingabe', text: 'In der **Noteneingabe** siehst du deine Fächer. Die **Schuljahr-Auswahl** zeigt das aktuelle Schuljahr mit „(aktuell)“, künftige Schuljahre sind ausgeblendet. Ein Klick auf ein Fach öffnet die Notenübersicht.', artikel: 'noteneingabe-ueberblick', href: '/teacher', linkText: 'Noteneingabe öffnen' },
   { titel: 'Notenübersicht', bild: 'fach-uebersicht', text: 'Oben wechselst du das **Halbjahr**. Die Tabelle zeigt Unterrichtsleistung, schriftliche Note und **Gesamtnote**. Mit dem Haken **ganze Note** rundest du die Anzeige einer Spalte. Weitere Reiter findest du unter **⋮ Mehr**.', artikel: 'noteneingabe-ueberblick', href: '/teacher', linkText: 'Ein Fach öffnen' },
-  { titel: 'Klausuren', bild: 'klausur-eintragen', text: 'Unter **⋮ Mehr → Klausuren** legst du Klausuren an: Aufgaben, **Max. Punkte** je Aufgabe und die erreichten Punkte je Person. Die Note erscheint sofort nach dem Notenschlüssel; alles wird automatisch gespeichert.', artikel: 'klausuren', href: '/teacher', linkText: 'Zur Noteneingabe' },
+  { titel: 'Klausuren', bild: 'klausur-eintragen', text: 'Im Reiter **Klausuren** legst du Klausuren an: Aufgaben, **Max. Punkte** je Aufgabe und die erreichten Punkte je Person. Die Note erscheint sofort nach dem Notenschlüssel; alles wird automatisch gespeichert.', artikel: 'klausuren', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Mehrteilige Klausuren', bild: 'klausur-teile', text: 'Klausuren können aus **Teilen** bestehen: **Hörverstehen** (Verrechnungspunkte, Tabelle ohne Rundung) und **Inhalt & Sprache** (zwei direkt eingetragene Noten, meist 50:50). Die Teilnoten gehen gewichtet in die Gesamtnote ein.', artikel: 'klausur-teile', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Unterrichtsleistung', bild: 'datumstabelle', text: 'In der **Datumstabelle** trägst du je Unterrichtstermin eine Note ein (**n.a.** = nicht anwesend) und kannst den Unterrichtsinhalt notieren. Zusatzleistungen wie Referate legst du daneben an.', artikel: 'unterrichtsleistung', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Notenschlüssel', bild: 'notenschluessel', text: 'Unter **Notenschlüssel** siehst du, wie Prozent in Noten umgerechnet werden (IHK, BG, SPA). Ändert die Administration einen Schlüssel, bekommst du einen Hinweis.', artikel: 'notenschluessel', href: '/notenschluessel', linkText: 'Notenschlüssel ansehen' },

@@ -20,6 +20,14 @@
     <p class="hint">Halbjahre, in denen schon Leistungen oder Endnoten eingetragen sind, lassen sich nicht abwählen.</p>
   </fieldset>
 
+  <%# Erweitert: nur für Fächer mit Unterfächern oder Verrechnung -- bleibt eingeklappt, solange nichts davon in Gebrauch ist. %>
+  <%
+    var erweitertOffen = String((typeof eingabeText !== 'undefined' && eingabeText !== undefined ? eingabeText : unterfaecherText) || '').trim() !== ''
+      || (laufzeit.anzahlHalbjahre >= 2 && Object.keys(verrechnung || {}).some(function(k) { return Number(verrechnung[k]) > 0; }))
+      || (typeof fehler !== 'undefined' && fehler);
+  %>
+  <details class="erweitert"<%= erweitertOffen ? ' open' : '' %>>
+  <summary>Erweitert: Unterfächer und Verrechnung der Halbjahre</summary>
   <label>Unterfächer <small class="hint">(eines pro Zeile)</small>
     <textarea name="unterfaecher" rows="6" placeholder="Algebra; 3; 3-4&#10;Geometrie; 1; alle"><%= typeof eingabeText !== 'undefined' && eingabeText !== undefined ? eingabeText : unterfaecherText %></textarea>
   </label>
@@ -44,6 +52,8 @@
       <p class="hint">0 % = die Note des Halbjahres fließt nicht in das nächste ein.</p>
     </fieldset>
   <% } %>
+
+  </details>
 
   <div class="form-actions">
     <button type="submit">💾 Speichern</button>
