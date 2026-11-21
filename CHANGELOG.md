@@ -6,6 +6,20 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.147.0 - 2026-11-21
+
+### Pfeiltasten-Navigation in den Eingabetabellen
+
+- In der **Klausur-**, **Zusatzleistungs-** und **Datumstabelle** lässt sich jetzt wie in einer
+  Tabellenkalkulation navigieren: **↑ ↓** und **Enter** springen in derselben Spalte zur Person
+  darüber/darunter, neu **← →** zum Nachbarfeld derselben Zeile (nächste Aufgabe, Extrapunkte,
+  nächster Termin).
+- Links/rechts springt nur, wenn der Cursor am Rand des Textes steht oder der Inhalt markiert
+  ist – so bleibt das Bearbeiten im Feld normal; nach einem Sprung ist der Inhalt markiert.
+  Gesperrte Felder (Notenkonferenz-Sperre) werden übersprungen; eine eingetippte Rechnung wird
+  beim Wechsel ausgerechnet. Die Extrapunkte-Spalte hat nun ebenfalls ↑ ↓/Enter.
+- Hilfe ergänzt; Test in `test/punkte-rechnen.test.js`.
+
 ## 0.146.0 - 2026-11-21
 
 ### Rechnen in den Punktefeldern; Banner „Neu hier?“ lässt sich schließen

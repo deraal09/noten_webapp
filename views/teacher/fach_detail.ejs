@@ -1138,30 +1138,52 @@
     document.getElementById('unterricht-notiz-schliessen').addEventListener('click', function() { dlg.close(); });
   })();
 
-  // Pfeiltasten hoch/runter und Enter springen in derselben Spalte (also
-  // z. B. derselben Aufgabe/demselben Termin) zur vorherigen/nächsten
-  // Person, statt bei Pfeiltasten den Zahlenwert eines <input type="number">
-  // hoch-/runterzuzählen (Standardverhalten des Browsers, wird deshalb
-  // bewusst unterdrückt) bzw. bei Enter ein umgebendes <form> abzuschicken.
+  // Tastaturnavigation in den Tabellen (Klausur, Zusatzleistung, Datumstabelle) wie in einer Tabellenkalkulation:
+  //  - Pfeil hoch/runter und Enter springen in derselben Spalte (derselben Aufgabe/demselben Termin) zur vorherigen/nächsten Person
+  //    (statt Zahlenwerte hoch-/runterzuzählen bzw. ein umgebendes <form> abzuschicken);
+  //  - Pfeil links/rechts springen in derselben Zeile zum Nachbarfeld (nächste Aufgabe, Extrapunkte bzw. nächster Termin) -- aber nur,
+  //    wenn der Cursor am Rand des Textes steht oder der ganze Inhalt markiert ist (so lässt sich im Feld weiter normal editieren;
+  //    nach einem Sprung ist der Inhalt markiert, man kann also direkt weiter durch die Tabelle pfeilen);
+  //  - gesperrte (disabled) Felder werden übersprungen. Beim Wechsel wird das Feld verlassen: eine Rechnung wird ausgerechnet.
+  const NAVIGATIONSFELDER = 'input.punkt, input.extrapunkt, input.note-datum';
+  function fokussiere(ziel) { if (ziel) { ziel.focus(); ziel.select(); } }
+  function naechstes(liste, start, richtung) {
+    for (let i = start + richtung; i >= 0 && i < liste.length; i += richtung) if (!liste[i].disabled) return liste[i];
+    return null;
+  }
+  function amRand(inp, richtung) {
+    const a = inp.selectionStart, b = inp.selectionEnd;
+    if (a === null || a === undefined) return true;
+    if (a === 0 && b === inp.value.length) return true; // alles markiert
+    return richtung < 0 ? (a === 0 && b === 0) : (a === inp.value.length && b === inp.value.length);
+  }
   function aktiviereSpaltenNavigation(selector, gruppierungsAttribut) {
     document.querySelectorAll(selector).forEach(function(inp) {
       inp.addEventListener('keydown', function(e) {
-        if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-        e.preventDefault();
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
         const tabelle = inp.closest('table');
         if (!tabelle) return;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          const richtung = e.key === 'ArrowLeft' ? -1 : 1;
+          if (!amRand(inp, richtung)) return;
+          const zeile = Array.from(inp.closest('tr').querySelectorAll(NAVIGATIONSFELDER));
+          const ziel = naechstes(zeile, zeile.indexOf(inp), richtung);
+          if (ziel) { e.preventDefault(); fokussiere(ziel); }
+          return;
+        }
+        if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
         let spalte = Array.from(tabelle.querySelectorAll(selector));
         if (gruppierungsAttribut) {
           const wert = inp.dataset[gruppierungsAttribut];
           spalte = spalte.filter(function(el) { return el.dataset[gruppierungsAttribut] === wert; });
         }
-        const idx = spalte.indexOf(inp);
-        const ziel = e.key === 'ArrowUp' ? spalte[idx - 1] : spalte[idx + 1];
-        if (ziel) { ziel.focus(); ziel.select(); }
+        fokussiere(naechstes(spalte, spalte.indexOf(inp), e.key === 'ArrowUp' ? -1 : 1));
       });
     });
   }
   aktiviereSpaltenNavigation('input.punkt', 'idx');
+  aktiviereSpaltenNavigation('input.extrapunkt', null);
   aktiviereSpaltenNavigation('input.note-datum', 'termin');
 
 </script>

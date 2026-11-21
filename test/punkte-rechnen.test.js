@@ -109,3 +109,13 @@ test('[hidden] ist nie überschreibbar (Banner „Neu hier?“ lässt sich schli
   assert.match(css, /\[hidden\] \{ display: none !important; \}/);
   assert.match(css, /\.hilfe-banner \{[^}]*display: flex/, 'die Regel, die [hidden] früher aushebelte, existiert weiter');
 });
+
+test('Tabellennavigation: Pfeiltasten links/rechts/hoch/runter und Enter in Klausur-, Zusatzleistungs- und Datumstabelle', () => {
+  const ansicht = fs.readFileSync(path.join(ROOT, 'views/teacher/fach_detail.ejs'), 'utf8');
+  assert.match(ansicht, /const NAVIGATIONSFELDER = 'input\.punkt, input\.extrapunkt, input\.note-datum';/);
+  assert.match(ansicht, /e\.key === 'ArrowLeft' \|\| e\.key === 'ArrowRight'/);
+  assert.match(ansicht, /e\.key !== 'Enter' && e\.key !== 'ArrowDown' && e\.key !== 'ArrowUp'/);
+  for (const s of ["aktiviereSpaltenNavigation('input.punkt', 'idx')", "aktiviereSpaltenNavigation('input.extrapunkt', null)", "aktiviereSpaltenNavigation('input.note-datum', 'termin')"]) assert.ok(ansicht.includes(s), s);
+  assert.match(ansicht, /function amRand\(inp, richtung\)/, 'Pfeil links/rechts springt nur am Rand des Textes bzw. bei markiertem Inhalt');
+  assert.match(ansicht, /if \(!liste\[i\]\.disabled\) return liste\[i\]/, 'gesperrte Felder werden übersprungen');
+});
