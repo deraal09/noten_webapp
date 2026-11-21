@@ -463,6 +463,8 @@ export default async function teacherRoutes(fastify) {
       };
     }
     return reply.viewEjs('teacher/fach_detail.ejs', {
+      // Vorbelegung des Datumsfelds der Datumstabelle: heute (Ortszeit der Schule)
+      heute: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(jetzt()),
       // Halbjahre in noch nicht begonnenen Schuljahren werden ausgeblendet (das angezeigte Halbjahr bleibt immer sichtbar).
       HALBJAHRE: halbjahreFuerFach(fach).filter((h) => (!erlaubteHj || erlaubteHj.includes(halbjahrNr(h)))
         && (h === halbjahr || !liegtInDerZukunft(halbjahrSchuljahrMap(fach.klasse_id)[h], jetzt()))),

@@ -87,6 +87,7 @@ try {
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'ui-menues.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'speicher-status.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'bestaetigen.js')))
+    .update(readFileSync(path.join(__dirname, 'static', 'js', 'klausur-statistik.js')))
     .digest('hex').slice(0, 10);
 } catch { /* Fallback bleibt 'dev' */ }
 

@@ -1064,3 +1064,22 @@ select.sf-versteckt { position: absolute; width: 1px; height: 1px; opacity: 0; p
 form.name-aendern { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; max-width: 20rem; margin: 0.5rem 0; }
 form.name-aendern input { width: 100%; box-sizing: border-box; margin: 0; }
 form.name-aendern button { align-self: flex-start; }
+
+/* Klausur-Statistik (static/js/klausur-statistik.js): Schalter und Anzeige */
+.statistik-schalter { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0 0.75rem 0.5rem 0; font-weight: 500; cursor: pointer; }
+.statistik-schalter input { width: auto; margin: 0; min-width: 1.1rem; min-height: 1.1rem; }
+.klausur-statistik { margin-top: 1rem; }
+.klausur-statistik[hidden] { display: none; }
+.klausur-statistik h3 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+.statistik-kopf { font-weight: 500; margin: 0.25rem 0 0.5rem; }
+.statistik-grad { white-space: nowrap; }
+.statistik-balken { display: inline-block; width: 6rem; height: 0.7rem; vertical-align: middle; background: var(--bg-header); border: 1px solid var(--border-strong); border-radius: 4px; overflow: hidden; }
+.statistik-fuell { display: block; height: 100%; background: var(--accent-fill); }
+.statistik-fuell.zu-schwer { background: var(--danger-fill); }
+.statistik-fuell.zu-leicht { background: #b7791f; }
+.statistik-marke { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.85rem; border: 1px solid var(--border-strong); background: var(--bg-subtle); color: var(--text); white-space: nowrap; }
+.statistik-marke.zu-schwer, .statistik-marke.t-negativ { border-color: var(--danger); color: var(--danger); font-weight: 600; }
+.statistik-marke.zu-leicht, .statistik-marke.t-schwach { border-color: #b7791f; }
+.statistik-marke.t-gut, .statistik-marke.ausgewogen { border-color: var(--accent); }
+.statistik-hinweis { margin-top: 0.5rem; }
+.card .statistik-schalter { display: inline-flex; margin: 0 0.75rem 0.5rem 0; }

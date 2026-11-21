@@ -210,7 +210,7 @@
     <% klausuren.forEach(function(k, i) { %>
       <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%<%= k.datum ? ', ' + k.datum.split('-').reverse().join('.') : '' %>)</small></button>
     <% }); %>
-    <button type="button" class="<%= klausuren.length === 0 ? 'active' : '' %>" data-target="klausur-panel-anlegen" title="Klausur anlegen" aria-label="Klausur anlegen">+</button>
+    <button type="button" class="<%= klausuren.length === 0 ? 'active' : '' %>" data-target="klausur-panel-anlegen" title="Neue Klausur anlegen">＋ Neu hinzufügen</button>
   </div>
 
   <% klausuren.forEach(function(k, i) { %>
@@ -219,6 +219,7 @@
       <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
         <button type="submit" class="danger" aria-label="Klausur <%= k.name %> löschen" title="Klausur löschen">🗑</button>
       </form>
+      <label class="statistik-schalter" title="Zeigt unter der Tabelle, welche Aufgaben für die Klasse zu schwer oder zu leicht waren"><input type="checkbox" data-statistik-schalter> 📊 Statistik</label>
       <p class="hint">Änderungen werden automatisch gespeichert.</p>
       <div class="einstellungen-reihe">
         <form method="post" action="/teacher/klausuren/<%= k.id %>/gewichtung" class="einstellungen auto-speichern">
@@ -374,6 +375,16 @@
           <% }); %>
         </tbody>
       </table>
+      <%
+        // Aufgaben, die keine Punkte sind (Inhalt-/Sprache-Noten), werden in der Statistik nicht ausgewertet.
+        var statAusschluss = [];
+        var statLabels = maxArr.map(function(_, i) { return aufgabenKopf[i] ? aufgabenKopf[i].replace(/-/g, '') : 'A' + (i + 1); });
+        if (k.teileInfo) { var sPos = 0; k.teileInfo.teile.forEach(function(t) { if (t.art === 'inhalt_sprache') { for (var si = 0; si < t.aufgaben; si++) statAusschluss.push(sPos + si); } sPos += t.aufgaben; }); }
+      %>
+      <div class="klausur-statistik card" data-klausur-statistik data-klausur="<%= k.id %>" data-ausschluss="<%= JSON.stringify(statAusschluss) %>" data-labels="<%= JSON.stringify(statLabels) %>" hidden>
+        <h3>📊 Statistik zur Klausur</h3>
+        <div class="statistik-inhalt" aria-live="polite"></div>
+      </div>
       <label class="klausur-notiz-label">Notizen zur Klausur
         <textarea class="klausur-notiz" data-kid="<%= k.id %>" rows="4" maxlength="5000" placeholder="z. B. Auffälligkeiten, Nachschreiber, Hinweise zur Korrektur"><%= k.notiz || '' %></textarea>
       </label>
@@ -403,7 +414,7 @@
     <% uls.forEach(function(u) { %>
       <button type="button" data-target="ul-panel-<%= u.id %>"><%= u.name %> <small>(<%= u.gewichtung %>%<%= u.datum ? ', ' + u.datum.split('-').reverse().join('.') : '' %>)</small></button>
     <% }); %>
-    <button type="button" data-target="ul-panel-anlegen" title="Zusatzleistung anlegen" aria-label="Zusatzleistung anlegen">+</button>
+    <button type="button" data-target="ul-panel-anlegen" title="Neue Zusatzleistung anlegen">＋ Neu hinzufügen</button>
   </div>
 
   <div id="ul-panel-datumstabelle" class="reiter-panel unter-panel card active">
@@ -419,7 +430,7 @@
       </p>
     </details>
     <form method="post" action="/teacher/fach/<%= fach.id %>/unterricht/termine/neu" class="inline">
-      <input type="date" name="datum" required>
+      <input type="date" name="datum" value="<%= heute %>" required aria-label="Datum des Unterrichtstermins">
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       <button type="submit">+ Datum hinzufügen</button>
     </form>
@@ -1120,3 +1131,4 @@
   aktiviereSpaltenNavigation('input.note-datum', 'termin');
 
 </script>
+<script src="/static/js/klausur-statistik.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>

@@ -6,6 +6,30 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.144.0 - 2026-11-21
+
+### Klausur-Statistik, „Neu hinzufügen“, heutiges Datum in der Datumstabelle
+
+- **📊 Statistik zur Klausur** (an-/abschaltbar): Schalter über der Tabelle jeder
+  Klausur, zunächst aus, die Wahl wird im Browser gemerkt. Unter der Tabelle zeigt
+  sie je Aufgabe Ø Punkte, **Lösungsgrad** (Ø / Höchstpunkte, Balken) mit der
+  Einschätzung *zu schwer* (< 30 %) / *ausgewogen* / *zu leicht* (≥ 85 %), den Anteil
+  mit voller Punktzahl und mit 0 Punkten und die **Trennschärfe**
+  (Item-Rest-Korrelation: wie gut die Aufgabe starke von schwächeren Leistungen
+  trennt; ab 0,3 gut, negativ = Warnung). Darüber: Personenzahl, Ø, Median.
+  Die Werte rechnen beim Eintragen live mit (`static/js/klausur-statistik.js`).
+- Vorsichtig gedacht: Leere Felder zählen als 0, Personen ohne jeden Eintrag nicht
+  mit; die Trennschärfe gibt es erst ab 10 Personen, unter 30 Personen steht ein
+  Hinweis „nur Orientierung“; Inhalt-/Sprache-Noten mehrteiliger Klausuren werden
+  nicht ausgewertet. Nicht enthalten (bewusst, damit die Oberfläche ruhig bleibt):
+  Notenverteilung, Cronbachs α, Vergleich über mehrere Klausuren.
+- Der **＋-Reiter** bei Klausuren und Unterrichtsleistung heißt jetzt
+  **＋ Neu hinzufügen**.
+- **Datumstabelle:** Das Datumsfeld ist mit dem heutigen Datum (Ortszeit Berlin)
+  vorbelegt; für heute genügt „+ Datum hinzufügen“, sonst vorher ein Datum wählen.
+- Hilfe ergänzt (Klausuren, Unterrichtsleistung); neue Tests
+  `test/klausur-statistik.test.js`.
+
 ## 0.143.0 - 2026-11-19
 
 ### API: Schüler:innen umbenennen

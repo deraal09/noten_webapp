@@ -168,9 +168,14 @@ export const ARTIKEL = [
     bilder: [{ datei: 'klausur-eintragen', text: 'Klausur mit Punkten je Aufgabe' }],
     abschnitte: [
       { titel: 'Klausur anlegen', schritte: [
-        'In der Fachseite **⋮ Mehr → Klausuren** öffnen und mit **+** eine Klausur anlegen (Name, optional Datum).',
+        'In der Fachseite **⋮ Mehr → Klausuren** öffnen und mit **＋ Neu hinzufügen** eine Klausur anlegen (Name, optional Datum).',
         'Bei **Anzahl Aufgaben** die Zahl der Aufgaben eintragen und in der Zeile **Max. Punkte** die erreichbaren Punkte je Aufgabe.',
         'In der Tabelle je Person die **erreichten Punkte** je Aufgabe eintragen. Die Note erscheint sofort nach dem Notenschlüssel der Klasse; alles wird automatisch gespeichert.',
+      ] },
+      { titel: 'Statistik: welche Aufgaben waren zu schwer oder zu leicht?', absaetze: [
+        'Über dem Eingabefeld der Klausur schaltest du mit **📊 Statistik** eine Auswertung unter der Tabelle ein oder aus (sie ist zunächst aus; die Wahl merkt sich der Browser). Sie rechnet beim Eintragen von selbst mit und zeigt je Aufgabe: **Ø Punkte**, den **Lösungsgrad** (Ø Punkte geteilt durch die Höchstpunkte) mit der Einschätzung **zu schwer** (unter 30 %), **ausgewogen** oder **zu leicht** (ab 85 %), den Anteil mit **voller Punktzahl** und mit **0 Punkten** sowie die **Trennschärfe**.',
+        'Die **Trennschärfe** sagt, wie gut eine Aufgabe zwischen stärkeren und schwächeren Leistungen unterscheidet (Korrelation der Aufgabe mit den übrigen Aufgaben): ab 0,3 gut, unter 0,2 schwach. **Negativ** ist ein Warnzeichen – gerade die Starken verlieren dort Punkte; dann lohnt ein Blick auf Aufgabenstellung und Bewertung. Sie wird erst ab 10 Personen berechnet.',
+        'Leere Felder zählen wie in der Punktesumme als 0 Punkte; Personen ganz ohne Eintrag werden nicht mitgezählt. Das sind **Hinweise, keine Urteile**: Eine schwere Aufgabe kann bewusst anspruchsvoll sein, und bei kleinen Klassen (unter 30 Personen) schwanken die Werte stark. Bei mehrteiligen Klausuren bleiben die Inhalt-/Sprache-Noten außen vor.',
       ] },
       { titel: 'Gewichtung, Extrapunkte, Notizen', absaetze: [
         '**Gewichtung:** Wie stark die Klausur in die schriftliche Note eingeht (verteilt sich automatisch, lässt sich ändern).',
@@ -208,12 +213,12 @@ export const ARTIKEL = [
     bilder: [{ datei: 'datumstabelle', text: 'Datumstabelle mit Terminen und Noten' }],
     abschnitte: [
       { titel: 'Datumstabelle', schritte: [
-        'In der Fachseite **⋮ Mehr → Unterrichtsleistung** öffnen und ein Datum mit **+ Datum hinzufügen** anlegen.',
+        'In der Fachseite **⋮ Mehr → Unterrichtsleistung** öffnen und ein Datum mit **+ Datum hinzufügen** anlegen. Im Datumsfeld steht schon **das heutige Datum**: Für heute genügt der Klick auf den Knopf, sonst wählst du vorher ein anderes Datum.',
         'Je Person die Note für diesen Termin eintragen; **n.a.** steht für „nicht anwesend“ (zählt nicht mit). Am Handy erscheint beim Antippen eine Auswahl der Noten.',
         'Unter jedem Datum kannst du eine kurze Notiz zum **Unterrichtsinhalt** eintragen. Das Notizsymbol hinter dem Namen öffnet Notizen zur Person.',
       ] },
       { titel: 'Zusatzleistungen', absaetze: [
-        'Mit **+** neben der Datumstabelle legst du Zusatzleistungen an (z. B. Referat). Wie bei Klausuren trägst du Punkte ein; die **Gewichtung** bestimmt den Anteil am Topf der Unterrichtsleistung. Der Rest geht in die Datumstabelle.',
+        'Mit **＋ Neu hinzufügen** neben der Datumstabelle legst du Zusatzleistungen an (z. B. Referat). Wie bei Klausuren trägst du Punkte ein; die **Gewichtung** bestimmt den Anteil am Topf der Unterrichtsleistung. Der Rest geht in die Datumstabelle.',
       ] },
     ],
     links: [{ text: 'Zur Noteneingabe', href: '/teacher' }], verwandt: ['klausuren', 'verrechnung-endnoten'],
