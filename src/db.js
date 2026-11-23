@@ -917,6 +917,8 @@ function migrate(db) {
   ensureColumn(db, 'users', 'login_sub', 'login_sub TEXT');
   // 1 = der Anzeigename der Einladung wurde zufällig erzeugt (Etikett zum Wiederfinden), nicht eingegeben: nie als Anrede/Kontoname verwenden.
   ensureColumn(db, 'invitations', 'name_generiert', 'name_generiert INTEGER NOT NULL DEFAULT 0');
+  // Gültigkeitsdauer eines API-Schlüssels in Tagen (für „Verlängern“ in der App); ältere Schlüssel: aus Anlage- und Ablaufdatum abgeleitet
+  ensureColumn(db, 'api_keys', 'gueltig_tage', 'gueltig_tage INTEGER');
   // 0.127.0 hatte personenbezogene Nutzungsdaten eingeführt; seit 0.128.0 ist die Statistik anonym -- Altdaten entfernen.
   db.exec('DROP TABLE IF EXISTS nutzer_aktivitaet');
   for (const spalte of ['letzter_login', 'anmeldungen']) {

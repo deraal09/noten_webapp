@@ -319,6 +319,7 @@ export function baueOpenApi({ version, serverUrl }) {
       version,
       description: 'API für KI-Agenten und Programme: Klassen, Fächer und Noten auslesen und verarbeiten, Noten eintragen. '
         + 'Jeder Schlüssel handelt mit den Rechten seiner Lehrkraft. Schlüssel gibt es nur für Schulkonten (LDAP), gültig höchstens ein Jahr. '
+        + 'Die Gültigkeit lässt sich nur in der App verlängern (Seite „API-Zugang“, Knopf „Verlängern“) – nie über die API: Ohne Besuch in der App läuft ein Schlüssel ab. '
         + 'Ausführliche Anleitung: /api/v1/docs.',
     },
     servers: [{ url: serverUrl + API_BASIS }],

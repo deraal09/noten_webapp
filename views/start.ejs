@@ -35,6 +35,34 @@
     </section>
   <% } %>
 
+  <% if (ersteSchritte) { %>
+    <section class="card erste-schritte" id="erste-schritte" aria-label="Erste Schritte">
+      <h2>Erste Schritte <small class="hint">(<%= ersteSchritte.erledigt %> von <%= ersteSchritte.schritte.length %> erledigt)</small></h2>
+      <ol class="schritte-liste">
+        <% ersteSchritte.schritte.forEach(function(st) { %>
+          <li class="<%= st.erledigt ? 'erledigt' : '' %>">
+            <span class="schritt-haken" aria-hidden="true"><%= st.erledigt ? '✓' : '○' %></span>
+            <span>
+              <% if (!st.erledigt && st.href) { %><a href="<%= st.href %>"><strong><%= st.titel %></strong></a><% } else { %><strong><%= st.titel %></strong><% } %>
+              <% if (st.erledigt) { %><span class="visually-hidden"> (erledigt)</span><% } else { %><br><small class="hint"><%= st.text %></small><% } %>
+            </span>
+          </li>
+        <% }); %>
+      </ol>
+      <p><button type="button" id="erste-schritte-zu" class="link-knopf">Ausblenden</button></p>
+    </section>
+    <script>
+      (function () {
+        var k = document.getElementById('erste-schritte');
+        try { if (localStorage.getItem('erste-schritte-zu') === '1') { k.hidden = true; return; } } catch (e) { /* ohne Speicher: anzeigen */ }
+        document.getElementById('erste-schritte-zu').addEventListener('click', function () {
+          k.hidden = true;
+          try { localStorage.setItem('erste-schritte-zu', '1'); } catch (e) { /* egal */ }
+        });
+      })();
+    </script>
+  <% } %>
+
   <% if (typeof zuletzt !== 'undefined' && zuletzt.length) { %>
     <section class="weitermachen" aria-label="Weitermachen">
       <h2>Weitermachen</h2>
@@ -44,6 +72,11 @@
     </section>
   <% } %>
 
+  <% var nochNichtsErledigt = ersteSchritte && ersteSchritte.erledigt === 0; %>
+  <% if (nochNichtsErledigt) { %>
+    <%# Ganz neu: Statt der Kachelauswahl führt die Checkliste durch die ersten Schritte. %>
+    <p class="hint start-links"><a href="/teacher">Noteneingabe</a> · <a href="/teacher/klassen">Meine Klassen</a><% if (!funktionen || funktionen.klassenleitung) { %> · <a href="/klassenlehrer">Klassenleitung</a><% } %></p>
+  <% } else { %>
   <div class="kacheln">
     <a class="kachel" href="/teacher">
       <span class="kachel-icon">📝</span>
@@ -66,4 +99,5 @@
     </a>
     <% } %>
   </div>
+  <% } %>
 </div>

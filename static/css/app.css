@@ -1135,3 +1135,38 @@ table.tafel input.extrapunkt { text-align: center; padding: 0.2rem; border: 1px 
 input.punkt.speicherfehler, input.extrapunkt.speicherfehler { background: var(--flash-error-bg); outline: 2px solid var(--flash-error-border); }
 /* [hidden] gewinnt immer gegen display-Regeln (z. B. beim Banner „Neu hier?“, das sich sonst nicht schließen ließ) */
 [hidden] { display: none !important; }
+
+/* Suche „Was möchtest du tun?“ (static/js/suche.js) */
+.suche-knopf { background: transparent; color: var(--topbar-link); border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; padding: 0.35rem 0.7rem; font-size: 0.95rem; cursor: pointer; min-height: 36px; }
+.suche-knopf:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.suche-knopf-text { display: none; }
+@media (min-width: 700px) { .suche-knopf-text { display: inline; } }
+dialog.suche-dialog { max-width: 36rem; width: 94vw; padding: 1rem 1.25rem; }
+.suche-dialog h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+.suche-dialog input[type="search"] { width: 100%; box-sizing: border-box; font-size: 1.05rem; padding: 0.6rem 0.75rem; }
+.suche-liste { list-style: none; margin: 0.5rem 0 0; padding: 0; max-height: 52vh; overflow-y: auto; }
+.suche-abschnitt { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); padding: 0.6rem 0.4rem 0.2rem; }
+.suche-eintrag { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.55rem 0.6rem; border-radius: 6px; cursor: pointer; min-height: 44px; box-sizing: border-box; }
+.suche-eintrag[aria-selected="true"], .suche-eintrag:hover { background: var(--bg-tint); }
+.suche-symbol { width: 1.6rem; text-align: center; font-size: 1.2rem; flex: none; }
+.suche-text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.suche-marke { display: inline-block; margin-left: 0.5rem; font-size: 0.75rem; padding: 0.05rem 0.5rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-muted); }
+.suche-aus strong { color: var(--text-muted); }
+.suche-info { margin: 0.4rem 0 0; min-height: 1.2em; }
+.suche-dialog .form-actions { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.6rem; }
+
+/* Erste Schritte (Startseite) */
+.erste-schritte { margin: 1rem 0; }
+.erste-schritte h2 { margin-top: 0; }
+.schritte-liste { list-style: none; margin: 0.5rem 0; padding: 0; }
+.schritte-liste li { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.45rem 0; border-bottom: 1px solid var(--border-subtle); }
+.schritte-liste li:last-child { border-bottom: 0; }
+.schritt-haken { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px solid var(--accent); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; color: var(--accent); }
+.schritte-liste li.erledigt .schritt-haken { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+.schritte-liste li.erledigt strong { color: var(--text-muted); text-decoration: line-through; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.link-knopf { background: none; border: 0; color: var(--link); padding: 0.2rem 0; text-decoration: underline; cursor: pointer; min-height: 0; }
+label.profil-karte { cursor: pointer; font-weight: 400; }
+label.profil-karte input[type="radio"] { width: auto; margin: 0 0.4rem 0 0; min-width: 1.1rem; min-height: 1.1rem; }
+.erste-schritte { text-align: left; }
+.start-links { text-align: center; }

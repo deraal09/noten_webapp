@@ -31,7 +31,7 @@ import { BILDUNGSGAENGE } from '../spa-schema.js';
 import { TYPEN as NS_TYPEN, globalerSchluessel, vorgabeCsv, folgtGlobal, pruefeCsv, speichereGlobal, klassenZahlen, MAX_HINWEIS } from '../notenschluessel.js';
 import { seedeSpaFaecher } from '../spa-noten-service.js';
 import { auswertung as aktivitaetsAuswertung, ZEITRAEUME as AKTIVITAET_ZEITRAEUME, WOCHENTAGE } from '../aktivitaet.js';
-import { funktionenUebersicht, FUNKTIONEN, PROFILE } from '../funktionen.js';
+import { funktionenUebersicht, FUNKTIONEN, PROFILE, standardProfil, setzeStandardProfil } from '../funktionen.js';
 import { ARTEN as FEEDBACK_ARTEN, STATI as FEEDBACK_STATI, ladeFeedback, feedbackZahlen, setzeFeedbackStatus, loescheFeedback } from '../feedback.js';
 
 export default async function adminRoutes(fastify) {
@@ -45,6 +45,17 @@ export default async function adminRoutes(fastify) {
       user: request.user, a: aktivitaetsAuswertung(tage), ZEITRAEUME: AKTIVITAET_ZEITRAEUME, WOCHENTAGE,
       funktionenUebersicht: funktionenUebersicht(), FUNKTIONEN, PROFILE,
     });
+  });
+
+  // ---------- Startprofil für neue Lehrkräfte ----------
+  fastify.get('/funktionen', async (request, reply) => reply.viewEjs('admin/funktionen.ejs', {
+    user: request.user, PROFILE, FUNKTIONEN, standard: standardProfil(), uebersicht: funktionenUebersicht(),
+  }));
+  fastify.post('/funktionen', async (request, reply) => {
+    const profil = String(request.body?.profil || '');
+    if (!setzeStandardProfil(profil)) request.flash?.('error', 'Unbekanntes Profil.');
+    else request.flash?.('success', profil ? `Neue Lehrkräfte starten mit „${PROFILE[profil].titel}“.` : 'Keine Vorgabe: Neue Lehrkräfte wählen ihr Startprofil selbst.');
+    return reply.redirect('/admin/funktionen');
   });
 
   // ---------- Feedback der Nutzer:innen ----------

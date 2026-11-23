@@ -61,16 +61,46 @@ export function erzeugeSchluessel(userId, { name, scope, gueltigTage = 90 }, heu
   const anzahl = db.prepare('SELECT COUNT(*) AS c FROM api_keys WHERE user_id = ? AND revoked_at IS NULL').get(userId).c;
   if (anzahl >= MAX_KEYS_PRO_USER) return { ok: false, fehler: `Höchstens ${MAX_KEYS_PRO_USER} aktive Schlüssel -- bitte nicht mehr benötigte widerrufen.` };
   const key = neuerSchluessel();
-  const info = db.prepare('INSERT INTO api_keys (user_id, name, key_hash, key_prefix, scope, expires_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(userId, bezeichnung, hash(key), key.slice(0, 11), scope, ablauf);
+  const info = db.prepare('INSERT INTO api_keys (user_id, name, key_hash, key_prefix, scope, expires_at, gueltig_tage) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(userId, bezeichnung, hash(key), key.slice(0, 11), scope, ablauf, Number(gueltigTage));
   return { ok: true, id: Number(info.lastInsertRowid), key };
 }
 
 /** Schlüssel einer Lehrkraft (ohne Klartext), neueste zuerst. */
 export function ladeSchluessel(userId) {
   return getDb().prepare(`
-    SELECT id, name, key_prefix, scope, created_at, expires_at, last_used_at, revoked_at, gesperrt_at FROM api_keys WHERE user_id = ? ORDER BY id DESC
-  `).all(userId);
+    SELECT id, name, key_prefix, scope, created_at, expires_at, last_used_at, revoked_at, gesperrt_at, gueltig_tage FROM api_keys WHERE user_id = ? ORDER BY id DESC
+  `).all(userId).map((k) => ({ ...k, gueltig_tage: gueltigkeitInTagen(k) }));
+}
+
+/** Eingestellte Gültigkeitsdauer eines Schlüssels (Tage); bei älteren Schlüsseln aus Anlage- und Ablaufdatum abgeleitet. */
+export function gueltigkeitInTagen(zeile) {
+  if (Number.isInteger(zeile.gueltig_tage) && zeile.gueltig_tage > 0) return Math.min(zeile.gueltig_tage, MAX_GUELTIG_TAGE);
+  const von = new Date(String(zeile.created_at).replace(' ', 'T') + (String(zeile.created_at).includes('Z') ? '' : 'Z')).getTime();
+  const bis = new Date(zeile.expires_at).getTime();
+  const tage = Math.round((bis - von) / 86400000);
+  return Number.isFinite(tage) && tage > 0 ? Math.min(tage, MAX_GUELTIG_TAGE) : 90;
+}
+
+/**
+ * Verlängert die Gültigkeit eines EIGENEN Schlüssels auf die eingestellte Dauer ab heute (nie kürzer als bisher). Das geht nur
+ * in der App (angemeldete Person, Knopf unter „API-Zugang“) -- bewusst NICHT über die API: Ohne Besuch in der App läuft ein
+ * Schlüssel also irgendwann ab. Widerrufene oder vom Admin deaktivierte Schlüssel lassen sich nicht verlängern, abgelaufene schon.
+ * @returns {{ok: true, geaendert: boolean, expires_at: string, tage: number} | {ok: false, fehler: string}}
+ */
+export function verlaengereSchluessel(id, userId, heute = new Date()) {
+  const db = getDb();
+  if (!apiAktiv()) return { ok: false, fehler: 'Die API ist vom Admin abgeschaltet.' };
+  const row = db.prepare('SELECT * FROM api_keys WHERE id = ? AND user_id = ?').get(id, userId);
+  if (!row) return { ok: false, fehler: 'Schlüssel nicht gefunden.' };
+  if (row.revoked_at) return { ok: false, fehler: 'Widerrufene Schlüssel lassen sich nicht verlängern.' };
+  if (row.gesperrt_at) return { ok: false, fehler: 'Der Schlüssel wurde vom Admin deaktiviert.' };
+  const tage = gueltigkeitInTagen(row);
+  const neu = ablaufNachTagen(tage, heute);
+  const alt = row.expires_at ? new Date(row.expires_at).getTime() : 0;
+  const geaendert = new Date(neu).getTime() - alt > 60000; // weniger als eine Minute Unterschied: es gibt nichts zu verlängern
+  if (geaendert) db.prepare('UPDATE api_keys SET expires_at = ?, gueltig_tage = ? WHERE id = ?').run(neu, tage, id);
+  return { ok: true, geaendert, expires_at: geaendert ? neu : row.expires_at, tage };
 }
 
 /** Widerruft einen eigenen Schlüssel (der Admin darf jeden). */

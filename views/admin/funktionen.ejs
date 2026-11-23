@@ -1,0 +1,31 @@
+<h1>⚙ Startprofil für neue Lehrkräfte</h1>
+<p class="hint">
+  Lehrkräfte wählen beim ersten Anmelden selbst, welche Funktionen sie sehen (siehe <a href="/konto/funktionen">Meine Funktionen</a>).
+  Hier legst du fest, womit <strong>neu angelegte Konten</strong> beginnen – zum Beispiel mit der schlanken Ansicht „Nur Klassen und Noten“.
+  Alle können das Profil jederzeit selbst ändern; nichts ist gesperrt.
+</p>
+
+<form method="post" action="/admin/funktionen" class="card">
+  <h2>Vorgabe für neue Konten</h2>
+  <div class="profil-liste">
+    <label class="profil-karte<%= !standard ? ' aktiv' : '' %>">
+      <input type="radio" name="profil" value=""<%= !standard ? ' checked' : '' %>>
+      <strong>Keine Vorgabe</strong>
+      <span class="hint">Jede Person wird beim ersten Anmelden gefragt (bis dahin sieht sie alles).</span>
+    </label>
+    <% Object.keys(PROFILE).forEach(function(id) { var p = PROFILE[id]; %>
+      <label class="profil-karte<%= standard && standard.profil === id ? ' aktiv' : '' %>">
+        <input type="radio" name="profil" value="<%= id %>"<%= standard && standard.profil === id ? ' checked' : '' %>>
+        <strong><%= p.titel %></strong>
+        <span class="hint"><%= p.text %></span>
+      </label>
+    <% }); %>
+  </div>
+  <button type="submit">Speichern</button>
+  <p class="hint">
+    Gilt nur für Konten, die <em>nach</em> dem Speichern angelegt werden und noch kein eigenes Profil gewählt haben; bestehende Konten ändern sich nicht.
+    <% if (standard) { %>Aktuell festgelegt seit <%= formatZeitLokal(standard.seit.replace(' ', 'T') + 'Z') %>.<% } %>
+  </p>
+</form>
+
+<p class="hint">Wer welches Profil gewählt hat, siehst du anonym gezählt unter <a href="/admin/aktivitaet">Aktivität</a> („Was haben die Lehrkräfte eingeschaltet?“): derzeit haben <%= uebersicht.gewaehlt %> von <%= uebersicht.konten %> Lehrkräften ein Profil gewählt.</p>

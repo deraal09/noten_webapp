@@ -39,7 +39,19 @@ export function funktionenFuer(user) {
   if (!user) return { ...alleAn(), gewaehlt: true, profil: null };
   if (user.isAdmin) return { ...alleAn(), gewaehlt: true, profil: 'alles' };
   const zeile = getDb().prepare('SELECT profil, aktiv FROM user_funktionen WHERE user_id = ?').get(user.id);
-  if (!zeile || !zeile.profil) return { ...alleAn(), gewaehlt: false, profil: null };
+  if (!zeile || !zeile.profil) {
+    // Noch keine eigene Wahl: gilt das Standardprofil der Administration, falls es für NEUE Konten festgelegt wurde (ältere Konten
+    // behalten ihre bisherige Ansicht, bis sie selbst wählen).
+    const standard = standardProfil();
+    if (standard) {
+      const angelegt = getDb().prepare('SELECT created_at FROM users WHERE id = ?').get(user.id)?.created_at;
+      if (angelegt && angelegt > standard.seit) {
+        const menge = new Set(PROFILE[standard.profil].funktionen);
+        return { ...Object.fromEntries(FUNKTION_IDS.map((id) => [id, menge.has(id)])), gewaehlt: true, profil: standard.profil, vomAdmin: true };
+      }
+    }
+    return { ...alleAn(), gewaehlt: false, profil: null };
+  }
   let aktiv = [];
   try { aktiv = JSON.parse(zeile.aktiv); } catch { /* leer */ }
   const menge = new Set(Array.isArray(aktiv) ? aktiv : []);
@@ -65,6 +77,40 @@ export function setzeFunktionen(userId, ids) {
     ON CONFLICT(user_id) DO UPDATE SET profil = excluded.profil, aktiv = excluded.aktiv
   `).run(userId, bisher?.profil || 'angepasst', JSON.stringify(aktiv));
   return aktiv;
+}
+
+/** Standardprofil der Administration für neue Konten: { profil, seit } oder null (keine Vorgabe: jede Person wählt selbst). */
+export function standardProfil() {
+  const db = getDb();
+  const profil = db.prepare("SELECT value FROM app_einstellungen WHERE key = 'standardprofil'").get()?.value;
+  if (!profil || !PROFILE[profil]) return null;
+  const seit = db.prepare("SELECT value FROM app_einstellungen WHERE key = 'standardprofil_seit'").get()?.value || '0000-00-00 00:00:00';
+  return { profil, seit };
+}
+
+/** Legt das Standardprofil für neue Konten fest ('' = keine Vorgabe). Gilt nur für Konten, die NACH dem Festlegen angelegt werden. */
+export function setzeStandardProfil(profil) {
+  const db = getDb();
+  if (!profil) {
+    db.prepare("DELETE FROM app_einstellungen WHERE key IN ('standardprofil', 'standardprofil_seit')").run();
+    return true;
+  }
+  if (!PROFILE[profil]) return false;
+  const upsert = db.prepare('INSERT INTO app_einstellungen (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+  upsert.run('standardprofil', profil);
+  upsert.run('standardprofil_seit', db.prepare("SELECT datetime('now') AS t").get().t);
+  return true;
+}
+
+/** Schaltet eine einzelne Funktion ein (z. B. aus der Suche); ohne bisherige Auswahl bleibt alles sichtbar, es ist also nichts zu tun. */
+export function schalteFunktionEin(userId, id) {
+  if (!FUNKTION_IDS.includes(id)) return false;
+  const zeile = getDb().prepare('SELECT profil, aktiv FROM user_funktionen WHERE user_id = ?').get(userId);
+  if (!zeile || !zeile.profil) return true;
+  let aktiv = [];
+  try { aktiv = JSON.parse(zeile.aktiv); } catch { /* leer */ }
+  setzeFunktionen(userId, [...new Set([...(Array.isArray(aktiv) ? aktiv : []), id])]);
+  return true;
 }
 
 /** Anonyme Übersicht für die Administration: wie viele Konten haben welches Profil und welche Funktion eingeschaltet? */

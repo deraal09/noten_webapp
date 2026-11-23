@@ -5,12 +5,14 @@
  */
 
 import { requireAuth } from '../auth.js';
-import { FUNKTIONEN, FUNKTION_IDS, PROFILE, setzeProfil, setzeFunktionen, funktionenFuer } from '../funktionen.js';
+import { FUNKTIONEN, FUNKTION_IDS, PROFILE, setzeProfil, setzeFunktionen, schalteFunktionEin, funktionenFuer } from '../funktionen.js';
+import { suche } from '../suche.js';
+import { istIrgendeineKlassenleitung } from '../auth.js';
 
 /** Nur interne Ziele zulassen (kein offener Weiterleiter). */
 function sichereAdresse(wert, vorgabe) {
   const w = String(wert || '');
-  return /^\/[A-Za-z0-9\-_/]*$/.test(w) && !w.startsWith('//') ? w : vorgabe;
+  return /^\/[A-Za-z0-9\-_/]*(#[A-Za-z0-9\-_]+)?$/.test(w) && !w.startsWith('//') ? w : vorgabe;
 }
 
 export default async function funktionenRoutes(fastify) {
@@ -36,6 +38,22 @@ export default async function funktionenRoutes(fastify) {
     request.flash?.('success', 'Gespeichert.');
     return reply.redirect('/konto/funktionen');
   });
+
+  // Eine ausgeschaltete Funktion aus der Suche heraus einschalten und gleich öffnen („einschalten und öffnen“).
+  fastify.post('/konto/funktionen/einschalten', async (request, reply) => {
+    const id = String(request.body?.funktion || '');
+    if (FUNKTION_IDS.includes(id) && !request.user.isAdmin) {
+      schalteFunktionEin(request.user.id, id);
+      request.flash?.('success', `${FUNKTIONEN.find((f) => f.id === id).titel} ist jetzt eingeschaltet. Du kannst das unter „Meine Funktionen“ jederzeit ändern.`);
+    }
+    return reply.redirect(sichereAdresse(request.body?.weiter, '/start'));
+  });
+
+  // Suche „Was möchtest du tun?“ (JSON): Seiten/Aktionen und Hilfe-Artikel; findet auch ausgeschaltete Funktionen.
+  fastify.get('/suche', async (request) => suche(String(request.query?.q ?? '').slice(0, 100), {
+    istAdmin: Boolean(request.user.isAdmin), ldap: request.user.authSource === 'ldap',
+    kannEinladen: !request.user.isAdmin && istIrgendeineKlassenleitung(request.user), funktionen: funktionenFuer(request.user),
+  }));
 
   // Zählt die Nutzung einer im Browser laufenden Funktion (nur bekannte Namen; die Zählung selbst macht der onResponse-Hook).
   fastify.post('/funktion-genutzt', async (request, reply) => {

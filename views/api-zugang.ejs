@@ -43,7 +43,7 @@
     </select>
   </label>
   <button type="submit">🔑 Schlüssel erzeugen</button>
-  <p class="hint">Höchstens <%= maxKeys %> aktive Schlüssel, jeweils höchstens ein Jahr gültig. Empfehlung: für jedes Programm einen eigenen, möglichst nur lesend.</p>
+  <p class="hint">Höchstens <%= maxKeys %> aktive Schlüssel, jeweils höchstens ein Jahr gültig. Empfehlung: für jedes Programm einen eigenen, möglichst nur lesend. Vor dem Ablauf (oder danach) verlängerst du einen Schlüssel hier in der App mit <strong>↻ Verlängern</strong> – das geht <em>nicht</em> über die API, ein Programm kann sich seinen Schlüssel also nicht selbst verlängern.</p>
 </form>
 <% } %>
 
@@ -54,19 +54,25 @@
   <table class="data">
     <thead><tr><th>Name</th><th>Beginnt mit</th><th>Berechtigung</th><th>Angelegt</th><th>Läuft ab</th><th>Zuletzt benutzt</th><th></th></tr></thead>
     <tbody>
-      <% schluessel.forEach(function(s) { var abgelaufen = s.expires_at && new Date(s.expires_at) <= new Date(); %>
+      <% schluessel.forEach(function(s) { var abgelaufen = s.expires_at && new Date(s.expires_at) <= new Date();
+           var bald = s.expires_at && !abgelaufen && (new Date(s.expires_at) - new Date()) < 14 * 86400000; %>
         <tr <%- s.revoked_at || s.gesperrt_at || abgelaufen ? 'class="ausgegraut"' : '' %>>
           <td><%= s.name %></td>
           <td><code><%= s.key_prefix %>…</code></td>
           <td><%= s.scope %></td>
           <td><%= formatZeit(s.created_at) %></td>
-          <td><%= s.expires_at ? formatZeit(s.expires_at) : '–' %></td>
+          <td><%= s.expires_at ? formatZeit(s.expires_at) : '–' %><% if (bald) { %><br><small class="hint">läuft bald ab</small><% } %></td>
           <td><%= s.last_used_at ? formatZeit(s.last_used_at) : '–' %></td>
           <td>
             <% if (s.revoked_at) { %><span class="hint">widerrufen</span>
-            <% } else if (abgelaufen) { %><span class="hint">abgelaufen</span>
+            <% } else if (s.gesperrt_at) { %><span class="hint">vom Admin deaktiviert</span>
             <% } else { %>
-              <% if (s.gesperrt_at) { %><span class="hint">vom Admin deaktiviert</span><% } %>
+              <% if (abgelaufen) { %><span class="hint">abgelaufen</span><% } %>
+              <% if (darf && apiAktiv) { %>
+              <form method="post" action="/konto/api/<%= s.id %>/verlaengern" class="inline" title="Gültigkeit auf <%= s.gueltig_tage %> Tage ab heute verlängern (geht nur hier in der App, nicht über die API)">
+                <button type="submit">↻ Verlängern</button>
+              </form>
+              <% } %>
               <form method="post" action="/konto/api/<%= s.id %>/widerrufen" class="inline" onsubmit="return confirm('Schlüssel „<%= s.name.replace(/'/g, '') %>“ widerrufen? Programme, die ihn nutzen, verlieren sofort den Zugriff.')">
                 <button type="submit" class="danger">Widerrufen</button>
               </form>

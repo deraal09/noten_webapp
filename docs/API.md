@@ -10,7 +10,7 @@ Die ausführliche, immer aktuelle Beschreibung steht in der laufenden App: **`/a
   (auch der Admin) haben keinen API-Zugang; ein Schlüssel eines Kontos, das kein Schulkonto (mehr) ist, wird mit `403 nur_ldap` abgelehnt.
 * Format `nk_…`. Der Klartext wird **nur einmal** angezeigt; in der Datenbank steht nur der SHA-256-Hash (Tabelle `api_keys`).
 * Berechtigung je Schlüssel: **lesen** (Abfragen und Berechnungen) oder **schreiben** (zusätzlich Noten eintragen).
-* Gültigkeit: 30 Tage, 90 Tage, 6 Monate oder 1 Jahr (höchstens ein Jahr); Widerruf wirkt sofort. Höchstens 20 aktive Schlüssel je Person.
+* Gültigkeit: 30 Tage, 90 Tage, 6 Monate oder 1 Jahr (höchstens ein Jahr); Widerruf wirkt sofort. Die Gültigkeit verlängert man **nur in der App** (Seite „API-Zugang“, Knopf „↻ Verlängern“: auf die eingestellte Dauer ab heute) – **nicht über die API**; ohne Besuch in der App läuft ein Schlüssel also irgendwann ab. Höchstens 20 aktive Schlüssel je Person.
   Früher unbegrenzte Schlüssel laufen ein Jahr nach dem Update auf 0.131.0 ab.
 * Admin (`/admin/api`): sieht alle Schlüssel, kann sie **deaktivieren** (`401`, wieder aktivierbar) oder **löschen** und die API
   insgesamt **abschalten** (Vorgabe: an) -- dann antwortet jeder Aufruf mit `503 api_deaktiviert`; die Dokumentation bleibt erreichbar.

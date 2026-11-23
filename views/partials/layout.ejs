@@ -67,6 +67,9 @@
         %><a href="<%= l.href %>"<%- aktiv ? ' aria-current="page"' : '' %>><%= l.text %></a><% }); %>
       </nav>
     <% } %>
+    <% if (typeof user !== 'undefined' && user) { %>
+      <button type="button" class="suche-knopf" id="suche-oeffnen" aria-label="Suchen: Was möchtest du tun?" title="Suchen (Strg+K oder /)"><span aria-hidden="true">🔍</span><span class="suche-knopf-text"> Suchen</span></button>
+    <% } %>
     <button type="button" class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="hauptmenue" data-hinweis="Mehr Optionen" data-hinweis-rechts>☰</button>
     <div class="menue" id="hauptmenue" hidden>
       <% if (typeof user !== 'undefined' && user) { %>
@@ -87,6 +90,7 @@
             <a href="/admin/ldap">LDAP-Import</a>
             <a href="/admin/einladungen">Einladungen</a>
             <a href="/admin/feedback"><%= feedbackText %></a>
+            <a href="/admin/funktionen">Startprofil</a>
             <a href="/admin/zuweisungen">Zuweisungen</a>
             <a href="/admin/api">API-Zugänge</a>
           <% } else { %>
@@ -192,6 +196,16 @@
 <script src="/static/js/select-filter.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script src="/static/js/ui-menues.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script src="/static/js/speicher-status.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
+<% if (typeof user !== 'undefined' && user) { %>
+<dialog id="suche-dialog" class="notiz-dialog suche-dialog" aria-labelledby="suche-titel">
+  <h2 id="suche-titel">Was möchtest du tun?</h2>
+  <input type="search" placeholder="z. B. Klausur anlegen, Zeugnis, Passwort …" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="suche-liste" aria-autocomplete="list" aria-label="Suchen">
+  <ul class="suche-liste" id="suche-liste" role="listbox" aria-label="Treffer"></ul>
+  <p class="suche-info hint" aria-live="polite"></p>
+  <div class="form-actions"><span class="hint">↑ ↓ wählen · Enter öffnen · Esc schließen</span><button type="button" class="suche-zu">Schließen</button></div>
+</dialog>
+<script src="/static/js/suche.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
+<% } %>
 <script src="/static/js/bestaetigen.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
 <script>
   (function () {

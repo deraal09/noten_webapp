@@ -438,6 +438,22 @@ export const ARTIKEL = [
   },
   // ---------------------------------------------------------------- Weitere Funktionen
   {
+    slug: 'suche', kategorie: 'start', titel: 'Suche „Was möchtest du tun?“ und Erste Schritte',
+    kurz: 'Seiten, Aktionen und Hilfe mit einem Tastendruck finden – auch ausgeschaltete Funktionen; Checkliste für den Einstieg.',
+    schlagworte: ['suche', 'suchen', 'finden', 'tastenkürzel', 'strg k', 'schnellzugriff', 'erste schritte', 'checkliste', 'einstieg', 'neu', 'funktion einschalten', 'ausgeschaltet'],
+    abschnitte: [
+      { titel: 'Suchen und direkt hinspringen', schritte: [
+        'Oben auf **🔍 Suchen** klicken oder **Strg+K** (Mac: **⌘+K**) bzw. **/** drücken.',
+        'Etwas eintippen, z. B. „Klausur“, „Zeugnis“, „Passwort“ oder „Klasse anlegen“. Es erscheinen **Seiten und Aktionen** und passende **Hilfe-Artikel**.',
+        'Mit **↑ ↓** wählen und **Enter** drücken (oder anklicken). **Esc** schließt die Suche.',
+      ], hinweis: 'Die Suche findet auch **ausgeschaltete Funktionen** (siehe „Meine Funktionen“). Sie sind mit „ausgeschaltet“ markiert; **Enter schaltet sie ein und öffnet sie gleich**.' },
+      { titel: 'Erste Schritte auf der Startseite', absaetze: [
+        'Wer noch am Anfang steht, sieht auf der Startseite eine **Checkliste**: Klasse anlegen → Fach anlegen → Schüler/innen eintragen → erste Klausur anlegen. Jeder Schritt ist ein Link; erledigte Schritte werden abgehakt. Sind alle erledigt, verschwindet die Checkliste von selbst; mit **Ausblenden** geht das früher.',
+      ] },
+    ],
+    links: [{ text: 'Zur Startseite', href: '/start' }], verwandt: ['funktionen', 'noteneingabe-ueberblick'],
+  },
+  {
     slug: 'funktionen', kategorie: 'mehr', titel: 'Meine Funktionen: nur sehen, was du brauchst',
     kurz: 'Startprofil wählen und Funktionen wie Sitzpläne, Notenbesprechung oder Statistik ein- und ausschalten.',
     schlagworte: ['funktionen', 'profil', 'einfach', 'ausblenden', 'einblenden', 'sitzplan', 'sitzpläne', 'notenbesprechung', 'statistik', 'favoriten', 'api', 'klassenleitung', 'synchronisation', 'übersichtlich', 'menü', 'einschalten', 'ausschalten'],
@@ -448,6 +464,7 @@ export const ARTIKEL = [
       { titel: 'Einzelne Funktionen ein- und ausschalten', schritte: [
         'Im Menü **☰ → ⚙ Meine Funktionen** öffnen.',
         'Bei **Einzelne Funktionen** die Haken setzen oder entfernen und **Speichern**.',
+        'Eine ausgeschaltete Funktion lässt sich auch über die **Suche** (🔍) finden und mit Enter gleich einschalten.',
         'Ausgeschaltete Funktionen sind nur **ausgeblendet** (Menüpunkte, Reiter, Kacheln); nichts wird gelöscht oder gesperrt. Mit dem Haken erscheinen sie sofort wieder.',
       ], hinweis: 'Die **Klassenleitung** erscheint von selbst, sobald du als Klassenleitung eingetragen bist, und die **Synchronisation** an Fächern von Klassen mit Klassenleitung – auch bei „Nur Klassen und Noten“.' },
     ],
@@ -476,6 +493,7 @@ export const ARTIKEL = [
         'Im Menü **🤖 API-Zugang** einen **Namen** (wofür?), die **Berechtigung** („nur lesen“ oder „lesen und Noten eintragen“) und die **Gültigkeit** wählen.',
         '**Schlüssel erzeugen** und den angezeigten Schlüssel (`nk_…`) **sofort kopieren**: Er wird nur dieses eine Mal gezeigt.',
         'Den Schlüssel dem Programm geben, das ihn als `Authorization: Bearer nk_…` mitsendet. Widerrufen wirkt sofort.',
+        'Vor dem Ablauf (oder danach) verlängerst du einen Schlüssel mit **↻ Verlängern**: Er gilt dann wieder für die eingestellte Dauer ab heute. Das geht **nur hier in der App**, nicht über die API – ein Programm kann sich seinen Schlüssel also nicht selbst verlängern, ohne Besuch in der App läuft er irgendwann ab.',
       ], hinweis: 'Ein Schlüssel hat genau deine Rechte. API-Schlüssel gibt es nur für Schulkonten (LDAP), jeweils höchstens ein Jahr gültig. Gelöscht werden über die API nur Klassen, und nur über den Papierkorb (in den Papierkorb legen, wiederherstellen, bei Nichtnutzung durch andere sofort endgültig löschen); Eintragungen lassen sich mit `?dry_run=true` vorab prüfen.' },
       { titel: 'Verwaltung durch den Admin', absaetze: [
         'Unter **API-Zugänge** sieht der Admin alle Schlüssel mit Lehrkraft, Ablauf und letzter Nutzung. Er kann einzelne Schlüssel **deaktivieren** (und wieder aktivieren) oder **löschen** und die API insgesamt **abschalten** (Vorgabe: eingeschaltet). Ein deaktivierter Schlüssel steht in deiner Liste als „vom Admin deaktiviert“.',

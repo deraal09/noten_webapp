@@ -186,6 +186,7 @@ export const NUTZUNG_FUNKTIONEN = [
   { id: 'einladungen', gruppe: 'Funktion', titel: 'Einladungen verschicken', re: /^(GET|POST) \/teacher\/einladungen.*$/ },
   { id: 'api', gruppe: 'Funktion', titel: 'API-Zugang (Schlüssel verwalten)', re: /^(GET|POST) \/konto\/api.*$/ },
   { id: 'funktionen', gruppe: 'Konto', titel: 'Meine Funktionen', re: /^(GET|POST) \/konto\/funktionen.*$/ },
+  { id: 'suche', gruppe: 'Konto', titel: 'Suche „Was möchtest du tun?“', re: /^GET \/suche$/ },
   { id: 'hilfe', gruppe: 'Konto', titel: 'Hilfe', re: /^GET \/hilfe.*$/ },
   { id: 'feedback', gruppe: 'Konto', titel: 'Feedback geben', re: /^POST \/feedback$/ },
 ];

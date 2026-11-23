@@ -6,6 +6,28 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.149.0 - 2026-11-23
+
+### Suche „Was möchtest du tun?“, Erste Schritte, Standardprofil, API-Schlüssel verlängern
+
+- **🔍 Suche in der Kopfzeile** (Strg+K / ⌘+K / `/`): findet Seiten und Aktionen (z. B. „Klasse anlegen“, „Zeugnis“,
+  „Passwort“, „Papierkorb“) und Hilfe-Artikel; ↑ ↓ wählen, Enter öffnet, Esc schließt. **Ausgeschaltete Funktionen** werden
+  mit „ausgeschaltet“ gefunden, **Enter schaltet sie ein und öffnet sie** (`POST /konto/funktionen/einschalten`). Admins finden
+  die Admin-Seiten. Neu: `src/suche.js`, `static/js/suche.js`, `GET /suche` (JSON).
+- **Erste Schritte** auf der Startseite: Checkliste Klasse → Fach → Schüler/innen → erste Klausur (aus den vorhandenen Daten
+  abgeleitet, jeder Schritt ein Link). Ganz neu (nichts erledigt) ersetzt sie die Kachelauswahl; sie verschwindet, sobald alles
+  erledigt ist, oder mit „Ausblenden“.
+- **Startprofil für neue Lehrkräfte** (Admin → Startprofil): Neu angelegte Konten ohne eigene Wahl beginnen mit „Nur Klassen und
+  Noten“, „Klassenleitung“ oder „Alles anzeigen“ – ohne Auswahl-Frage. Bestehende Konten bleiben unverändert; jede Person kann das
+  Profil jederzeit selbst ändern.
+- **API-Schlüssel verlängern:** Auf der Seite „API-Zugang“ gibt es je Schlüssel **↻ Verlängern**: Die Gültigkeit wird auf die
+  eingestellte Dauer ab heute gesetzt (nie kürzer als bisher; abgelaufene, nicht widerrufene Schlüssel werden damit wieder
+  gültig). Das geht **nur in der App** (angemeldete Person) – die API selbst kann Schlüssel nicht verlängern, ohne Besuch in der
+  App läuft ein Schlüssel also ab. Die gewählte Dauer wird jetzt je Schlüssel gespeichert (`api_keys.gueltig_tage`, bei älteren
+  Schlüsseln aus Anlage- und Ablaufdatum abgeleitet); „läuft bald ab“ erscheint 14 Tage vorher. Doku (OpenAPI-Hinweis,
+  `docs/API.md`) ergänzt.
+- Die Funktionsstatistik zählt nun auch die Suche. Hilfe ergänzt; Tests in `test/phase3-suche-api-verlaengern.test.js`.
+
 ## 0.148.0 - 2026-11-21
 
 ### Punkte gesamt mit Prozentwert

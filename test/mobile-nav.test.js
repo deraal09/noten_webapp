@@ -69,7 +69,7 @@ test('Alle Optionen der Leiste stecken im Menü: Navigation, Konto, App installi
     assert.ok(!vorMenue.includes(teil), `${teil} nicht direkt in der Leiste`);
   }
   // In der Leiste selbst: Name der Anwendung, (ab 900 px sichtbare) Hauptnavigation und Menü-Button.
-  assert.deepEqual([...vorMenue.matchAll(/<(a|button)\b[^>]*class="([^"]+)"/g)].map((m) => m[2]), ['brand', 'nav-toggle']);
+  assert.deepEqual([...vorMenue.matchAll(/<(a|button)\b[^>]*class="([^"]+)"/g)].map((m) => m[2]), ['brand', 'suche-knopf', 'nav-toggle']);
   assert.match(vorMenue, /<nav class="topnav" aria-label="Hauptnavigation">/);
 });
 

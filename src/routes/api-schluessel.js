@@ -6,7 +6,7 @@
 
 import { requireAuth } from '../auth.js';
 import {
-  erzeugeSchluessel, ladeSchluessel, widerrufeSchluessel, MAX_KEYS_PRO_USER, apiAktiv, darfApiNutzen,
+  erzeugeSchluessel, ladeSchluessel, widerrufeSchluessel, verlaengereSchluessel, MAX_KEYS_PRO_USER, apiAktiv, darfApiNutzen,
 } from '../api-keys.js';
 import { formatZeitLokal } from '../format.js';
 
@@ -32,6 +32,16 @@ export default async function apiSchluesselRoutes(fastify) {
     // Klartext nur in dieser einen Antwort (nicht per Redirect/Session), danach nur noch der Hash in der Datenbank.
     reply.header('Cache-Control', 'no-store');
     return zeige(request, reply, { neu: { key: r.key, name: String(request.body.name).trim(), scope: request.body.scope } });
+  });
+
+  // Gültigkeit verlängern: nur hier, mit Anmeldung in der App (Sitzung) -- die API selbst kann Schlüssel nie verlängern.
+  fastify.post('/konto/api/:id/verlaengern', async (request, reply) => {
+    if (!darfApiNutzen(request.user)) return reply.code(403).viewEjs('error.ejs', { code: 403, message: 'API-Schlüssel gibt es nur für Schulkonten (LDAP).' });
+    const r = verlaengereSchluessel(Number(request.params.id), request.user.id);
+    if (!r.ok) request.flash?.('error', r.fehler);
+    else if (r.geaendert) request.flash?.('success', `Gültigkeit verlängert: bis ${formatZeitLokal(r.expires_at)} (${r.tage} Tage ab heute).`);
+    else request.flash?.('info', `Der Schlüssel gilt schon bis ${formatZeitLokal(r.expires_at)} – mehr als ${r.tage} Tage im Voraus sind nicht möglich.`);
+    return reply.redirect('/konto/api');
   });
 
   fastify.post('/konto/api/:id/widerrufen', async (request, reply) => {
