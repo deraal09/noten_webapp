@@ -104,6 +104,50 @@ export function noteAusPunkten(punkte, maxPunkte, csvStr, extrapunkte = 0) {
   return nsCsvLookup(prozent, csvStr);
 }
 
+/** Höchstens so viele Punkte dürfen bis zur besseren Note fehlen, damit der Hinweis „knapp“ erscheint (pädagogischer Hinweis). */
+export const KNAPP_MAX_PUNKTE = 2;
+
+/**
+ * Wie viele Punkte fehlen bis zur nächsten besseren Note? Für den pädagogischen Hinweis „nur noch X Punkte bis zur Note Y“.
+ *
+ * „Bessere Note“: bei Notenschlüsseln mit Dezimalnoten (IHK 1,0–6,0) die nächste bessere GANZE Note (so wie die Anzeige
+ * „ganze Note“ rundet: 3,4 → 3, 2,5 → 3), sonst (BG, ganze Notenpunkte) die nächste bessere Stufe (z. B. 9 → 10 Punkte).
+ * Der Prozentwert wird wie bei der Notenvergabe auf ganze Prozent gerundet, die Schwelle ist die kleinste Prozentstufe des
+ * Schlüssels, die schon die bessere Note ergibt (Extrapunkte zählen zu den erreichten Punkten). Mehrteilige Klausuren
+ * (Teilnoten) und unvollständige Eingaben haben keine solche Schwelle (null), ebenso wer schon die beste Note hat.
+ *
+ * @returns {{ fehlend: number, ziel: number, prozent: number, jetzt: number } | null} `fehlend` in Punkten (auf 0,01 aufgerundet)
+ */
+export function punkteZurBesserenNote(punkte, maxPunkte, csvStr, extrapunkte = 0) {
+  const aktuell = noteAusPunkten(punkte, maxPunkte, csvStr, extrapunkte);
+  if (aktuell === null || aktuell === undefined) return null;
+  const eintraege = nsCsvParse(csvStr);
+  if (eintraege.length < 2) return null;
+  const besser = kleinerIstBesser(csvStr);
+  const dezimal = eintraege.some(([, n]) => !Number.isInteger(n));
+  const ziel = dezimal ? Math.round(aktuell) + (besser ? -1 : 1) : aktuell + (besser ? -1 : 1);
+  const erreicht = (n) => {
+    const wert = dezimal ? Math.round(n) : n;
+    return besser ? wert <= ziel : wert >= ziel;
+  };
+  const schwellen = eintraege.filter(([, n]) => erreicht(n)).map(([p]) => p);
+  if (!schwellen.length) return null; // schon die beste Note
+  const prozent = Math.min(...schwellen);
+  const maxP = maxPunkte.reduce((a, b) => a + b, 0);
+  const extra = Number(extrapunkte) > 0 ? Number(extrapunkte) : 0;
+  const summe = punkte.reduce((a, b) => a + b, 0) + extra;
+  const noetig = ((prozent - 0.5) / 100) * maxP; // gerundet >= prozent  <=>  Anteil >= prozent - 0,5 %
+  const fehlend = Math.ceil((noetig - summe) * 100 - 1e-9) / 100;
+  if (!(fehlend > 0)) return null;
+  return { fehlend, ziel, prozent, jetzt: aktuell };
+}
+
+/** Wie punkteZurBesserenNote, aber nur, wenn es höchstens `grenze` Punkte sind (sonst null). Einteilige Klausuren. */
+export function knappZurBesserenNote(punkte, maxPunkte, csvStr, extrapunkte = 0, grenze = KNAPP_MAX_PUNKTE) {
+  const r = punkteZurBesserenNote(punkte, maxPunkte, csvStr, extrapunkte);
+  return r && r.fehlend <= grenze + 1e-9 ? r : null;
+}
+
 /** Prozentwert der Klausur inkl. Extrapunkte (null, solange nicht alle Aufgaben eingetragen sind). */
 export function klausurProzent(punkte, maxPunkte, extrapunkte = 0) {
   if (!Array.isArray(punkte) || punkte.length === 0 || punkte.length !== maxPunkte.length) return null;

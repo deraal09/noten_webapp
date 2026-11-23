@@ -1170,3 +1170,8 @@ label.profil-karte { cursor: pointer; font-weight: 400; }
 label.profil-karte input[type="radio"] { width: auto; margin: 0 0.4rem 0 0; min-width: 1.1rem; min-height: 1.1rem; }
 .erste-schritte { text-align: left; }
 .start-links { text-align: center; }
+
+/* „Knapp“-Hinweis in der Klausurtabelle: höchstens 2 Punkte bis zur besseren Note */
+small.knapp { display: inline-block; margin-left: 0.3rem; padding: 0 0.35rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; background: #fff3cd; color: #664d03; border: 1px solid #ffda6a; white-space: nowrap; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) small.knapp { background: #4a3a05; color: #ffe08a; border-color: #8a6d0b; } }
+:root[data-theme="dark"] small.knapp { background: #4a3a05; color: #ffe08a; border-color: #8a6d0b; }

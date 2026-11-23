@@ -8,7 +8,7 @@ import { effektiveCsv, csvRechner } from './notenschluessel.js';
 import { getDb } from './db.js';
 import {
   noteAusPunkten, gesamtnoteHj, teilNote, unterrichtsleistungNote, nichtBestanden,
-  klausurNote, klausurTeilNoten, parseKlausurTeile,
+  klausurNote, klausurTeilNoten, parseKlausurTeile, knappZurBesserenNote,
   DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from './grade-calc.js';
 import { mitAbschlussStatus, sortiereFaecher, muendlichProzentFuerHalbjahr, verrechnungsProzent, wendeVerrechnungAn, halbjahrNr, halbjahrText } from './klassen-jahre.js';
@@ -393,7 +393,9 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       const note = punkte ? klausurNote(punkte, maxArr, teileInfo, csvStr, extrapunkte) : null;
       // Je Teil einer mehrteiligen Klausur eine eigene Note (sonst null).
       const teilNoten = teileInfo && punkte ? klausurTeilNoten(punkte, maxArr, teileInfo, csvStr) : null;
-      return { id: k.id, name: k.name, gewichtung: k.gewichtung, punkte, extrapunkte: extrapunkte || null, note, teilNoten };
+      // Pädagogischer Hinweis: höchstens 2 Punkte bis zur besseren Note (nur einteilige Klausuren mit vollständigen Punkten)
+      const knapp = !teileInfo && punkte && note !== null ? knappZurBesserenNote(punkte, maxArr, csvStr, extrapunkte) : null;
+      return { id: k.id, name: k.name, gewichtung: k.gewichtung, punkte, extrapunkte: extrapunkte || null, note, teilNoten, knapp };
     });
     const ulData = uls.map((u) => {
       const punkte = ulErgs.get(u.id)?.get(s.id) || null;

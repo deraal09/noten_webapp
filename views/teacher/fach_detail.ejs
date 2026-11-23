@@ -377,7 +377,7 @@
                 <td><input type="text" inputmode="decimal" autocomplete="off" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" max="<%= k.max_extrapunkte > 0 ? k.max_extrapunkte : maxSumme %>" value="<%= extra ? String(extra).replace('.', ',') : '' %>" placeholder="–" title="Extrapunkte (optional<%= k.max_extrapunkte > 0 ? ', höchstens ' + k.max_extrapunkte : '' %>; auch als Rechnung)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
               <% } %>
               <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe + extra %> / <%= maxSumme %><% if (maxSumme > 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
-              <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %></td>
+              <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %><% if (eintrag && eintrag.knapp) { %> <small class="knapp" title="Nur noch <%= String(eintrag.knapp.fehlend).replace('.', ',') %> Punkt(e) bis zur Note <%= eintrag.knapp.ziel %> (ab <%= eintrag.knapp.prozent %> %)">▲ <%= String(eintrag.knapp.fehlend).replace('.', ',') %></small><% } %></td>
             </tr>
           <% }); %>
         </tbody>
@@ -394,6 +394,7 @@
         <div class="statistik-inhalt" aria-live="polite"></div>
       </div>
       <% } %>
+      <% if (!k.teileInfo) { %><p class="hint knapp-erklaerung">▲ 1,5 = nur noch so viele Punkte (höchstens 2) fehlen bis zur nächsten besseren Note – ein Hinweis, z. B. für Gespräche oder Nachbesserungsangebote.</p><% } %>
       <label class="klausur-notiz-label">Notizen zur Klausur
         <textarea class="klausur-notiz" data-kid="<%= k.id %>" rows="4" maxlength="5000" placeholder="z. B. Auffälligkeiten, Nachschreiber, Hinweise zur Korrektur"><%= k.notiz || '' %></textarea>
       </label>
@@ -754,6 +755,14 @@
         document.querySelectorAll('.k-note[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
           const k = s.klausuren.find(function(x) { return x.id === Number(cell.dataset.kid); });
           cell.textContent = (k && k.note !== null) ? k.note.toString().replace('.', ',') : '–';
+          if (k && k.knapp) { // Hinweis: höchstens 2 Punkte bis zur besseren Note
+            const fehlt = String(k.knapp.fehlend).replace('.', ',');
+            const hinweis = document.createElement('small');
+            hinweis.className = 'knapp';
+            hinweis.textContent = ' ▲ ' + fehlt;
+            hinweis.title = 'Nur noch ' + fehlt + ' Punkt(e) bis zur Note ' + k.knapp.ziel + ' (ab ' + k.knapp.prozent + ' %)';
+            cell.appendChild(hinweis);
+          }
         });
         document.querySelectorAll('.k-teilnote[data-sid="' + s.schueler_id + '"]').forEach(function(cell) {
           const k = s.klausuren.find(function(x) { return x.id === Number(cell.dataset.kid); });

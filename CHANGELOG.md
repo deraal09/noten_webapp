@@ -6,6 +6,22 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.150.0 - 2026-11-23
+
+### Klausuren: Hinweis, wenn nur noch wenige Punkte zur besseren Note fehlen
+
+- Fehlen einer Person **höchstens 2 Punkte** bis zur nächsten besseren Note, steht in der
+  Klausurtabelle neben der Note ein kleines **▲ 1,5** (Mouseover: „Nur noch 1,5 Punkt(e) bis zur Note 2
+  (ab 81 %)“), erklärt in einer Zeile unter der Tabelle. Rein **pädagogisch** (Gespräche,
+  Nachbesserung); die Note bleibt unverändert. Der Hinweis aktualisiert sich beim Eintragen mit.
+- Berechnung (`punkteZurBesserenNote` in `src/grade-calc.js`): kleinste Prozentstufe des Notenschlüssels
+  der Klasse, die schon die bessere Note ergibt – bei Dezimalnoten (IHK) die nächste bessere
+  **ganze** Note wie bei „ganze Note“, bei BG die nächste Notenpunkt-Stufe; Rundung auf ganze Prozent wie
+  bei der Notenvergabe, Extrapunkte zählen mit. Keine Hinweise bei der besten Note, unvollständigen
+  Punkten und **mehrteiligen Klausuren**. Die Grenze (2 Punkte) steht in `KNAPP_MAX_PUNKTE`.
+- Die JSON-Daten der Fachseite (`/teacher/fach/:id/noten`) enthalten dafür je Klausur `knapp`.
+  Hilfe ergänzt; Tests in `test/knapp-hinweis.test.js`.
+
 ## 0.149.0 - 2026-11-23
 
 ### Suche „Was möchtest du tun?“, Erste Schritte, Standardprofil, API-Schlüssel verlängern
