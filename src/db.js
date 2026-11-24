@@ -919,6 +919,11 @@ function migrate(db) {
   ensureColumn(db, 'invitations', 'name_generiert', 'name_generiert INTEGER NOT NULL DEFAULT 0');
   // Gültigkeitsdauer eines API-Schlüssels in Tagen (für „Verlängern“ in der App); ältere Schlüssel: aus Anlage- und Ablaufdatum abgeleitet
   ensureColumn(db, 'api_keys', 'gueltig_tage', 'gueltig_tage INTEGER');
+  // Extras je Klausur („Klausur einstellen“ → Extras): Hinweis „knapp vor der besseren Note“ und Prozentanzeige bei „Punkte gesamt“
+  ensureColumn(db, 'klausuren', 'knapp_modus', "knapp_modus TEXT NOT NULL DEFAULT 'punkte'");
+  ensureColumn(db, 'klausuren', 'knapp_grenze_punkte', 'knapp_grenze_punkte REAL NOT NULL DEFAULT 2');
+  ensureColumn(db, 'klausuren', 'knapp_grenze_prozent', 'knapp_grenze_prozent REAL NOT NULL DEFAULT 5');
+  ensureColumn(db, 'klausuren', 'prozent_anzeige', 'prozent_anzeige INTEGER NOT NULL DEFAULT 1');
   // 0.127.0 hatte personenbezogene Nutzungsdaten eingeführt; seit 0.128.0 ist die Statistik anonym -- Altdaten entfernen.
   db.exec('DROP TABLE IF EXISTS nutzer_aktivitaet');
   for (const spalte of ['letzter_login', 'anmeldungen']) {

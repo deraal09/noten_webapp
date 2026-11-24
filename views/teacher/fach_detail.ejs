@@ -225,7 +225,28 @@
         var klausurHatPunkte = rows.some(function(r) { var e = r.klausuren.find(function(x) { return x.id === k.id; }); return e && e.punkte && e.punkte.some(function(p) { return p !== null && p !== undefined; }); });
       %>
       <details class="klausur-einstellungen"<%= klausurHatPunkte ? '' : ' open' %>>
-      <summary>⚙ Klausur einstellen <small class="hint">(Gewichtung, Datum, Teile, Aufgaben)</small></summary>
+      <summary>⚙ Klausur einstellen <small class="hint">(Gewichtung, Datum, Teile, Aufgaben, Extras)</small></summary>
+      <div class="reiter einst-reiter" data-storage-key="klausur-einst-reiter-<%= k.id %>">
+        <button type="button" class="active" data-target="klausur-einst-allgemein-<%= k.id %>">Allgemein</button>
+        <button type="button" data-target="klausur-einst-extras-<%= k.id %>">Extras</button>
+      </div>
+      <div id="klausur-einst-extras-<%= k.id %>" class="reiter-panel einst-panel">
+        <form method="post" action="/teacher/klausuren/<%= k.id %>/extras" class="einstellungen extras-form">
+          <fieldset class="extras-gruppe">
+            <legend>Hinweis „knapp vor der besseren Note“</legend>
+            <label class="extras-option"><input type="radio" name="knapp_modus" value="punkte"<%= k.knapp_modus === 'punkte' ? ' checked' : '' %>> Punkte bis zur nächsten Note anzeigen, wenn höchstens
+              <input type="text" inputmode="decimal" name="knapp_grenze_punkte" value="<%= String(k.knapp_grenze_punkte).replace('.', ',') %>" size="3" aria-label="Grenze in Punkten"> Punkte fehlen</label>
+            <label class="extras-option"><input type="radio" name="knapp_modus" value="prozent"<%= k.knapp_modus === 'prozent' ? ' checked' : '' %>> Prozent bis zur nächsten Note anzeigen, wenn höchstens
+              <input type="text" inputmode="decimal" name="knapp_grenze_prozent" value="<%= String(k.knapp_grenze_prozent).replace('.', ',') %>" size="3" aria-label="Grenze in Prozent"> % fehlen</label>
+            <label class="extras-option"><input type="radio" name="knapp_modus" value="aus"<%= k.knapp_modus === 'aus' ? ' checked' : '' %>> Hinweis ausschalten</label>
+            <p class="hint">Ein kleines ▲ neben der Note zeigt, wie weit eine Person von der nächsten besseren Note entfernt ist (nur bei einteiligen Klausuren, rein als pädagogischer Hinweis).</p>
+          </fieldset>
+          <label class="extras-option"><input type="checkbox" name="prozent_anzeige" value="1"<%= k.prozent_anzeige !== 0 ? ' checked' : '' %>> Prozentzahl bei „Punkte gesamt“ anzeigen</label>
+          <label class="extras-option"><input type="checkbox" name="fuer_alle" value="1"> Für alle Klausuren dieses Fachs übernehmen</label>
+          <button type="submit">Extras speichern</button>
+        </form>
+      </div>
+      <div id="klausur-einst-allgemein-<%= k.id %>" class="reiter-panel einst-panel active">
       <p class="hint">Änderungen werden automatisch gespeichert.</p>
       <div class="einstellungen-reihe">
         <form method="post" action="/teacher/klausuren/<%= k.id %>/gewichtung" class="einstellungen auto-speichern">
@@ -305,6 +326,7 @@
         <details class="info-ausklapp"><summary>ⓘ Hinweis zu Max. Punkten und Extra</summary><span class="hint">Die maximal erreichbaren Punkte je Aufgabe stehen direkt über den Spalten der Tabelle.<% if (!k.teileInfo) { %> In der Spalte „Extra“ steht die Höchstzahl der Extrapunkte (optional, Extra-Aufgaben): Sie zählt nicht zur Gesamtpunktzahl, erreichte Extrapunkte kommen aber zu den Punkten dazu.<% } %></span></details>
         <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       </form>
+      </div>
       </details>
       <% var maxSumme = maxArr.reduce(function(a, b) { return a + b; }, 0); %>
       <table class="tafel">
@@ -376,8 +398,8 @@
               <% if (!k.teileInfo) { %>
                 <td><input type="text" inputmode="decimal" autocomplete="off" class="extrapunkt" data-kid="<%= k.id %>" data-sid="<%= r.schueler_id %>" max="<%= k.max_extrapunkte > 0 ? k.max_extrapunkte : maxSumme %>" value="<%= extra ? String(extra).replace('.', ',') : '' %>" placeholder="–" title="Extrapunkte (optional<%= k.max_extrapunkte > 0 ? ', höchstens ' + k.max_extrapunkte : '' %>; auch als Rechnung)" aria-label="Extrapunkte für <%= r.vorname %> <%= r.nachname %>" <%= gesperrt ? 'disabled' : '' %>></td>
               <% } %>
-              <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>"><%= summe + extra %> / <%= maxSumme %><% if (maxSumme > 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
-              <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %><% if (eintrag && eintrag.knapp) { %> <small class="knapp" title="Nur noch <%= String(eintrag.knapp.fehlend).replace('.', ',') %> Punkt(e) bis zur Note <%= eintrag.knapp.ziel %> (ab <%= eintrag.knapp.prozent %> %)">▲ <%= String(eintrag.knapp.fehlend).replace('.', ',') %></small><% } %></td>
+              <td class="note-cell k-summe" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>" data-max="<%= maxSumme %>" data-prozent="<%= k.prozent_anzeige !== 0 ? 1 : 0 %>"><%= summe + extra %> / <%= maxSumme %><% if (maxSumme > 0 && k.prozent_anzeige !== 0) { %> <small>(<%= Math.round((summe + extra) / maxSumme * 100) %> %)</small><% } %></td>
+              <td class="note-cell k-note" data-sid="<%= r.schueler_id %>" data-kid="<%= k.id %>"><%= (eintrag && eintrag.note !== null) ? formatNote(eintrag.note) : '–' %><% if (eintrag && eintrag.knapp) { %> <small class="knapp" title="Nur noch <%= String(eintrag.knapp.fehlend).replace('.', ',') %> Punkt(e) (<%= String(eintrag.knapp.fehlendProzent).replace('.', ',') %> %) bis zur Note <%= eintrag.knapp.ziel %> (ab <%= eintrag.knapp.prozent %> %)">▲ <%= eintrag.knapp.modus === 'prozent' ? String(eintrag.knapp.fehlendProzent).replace('.', ',') + ' %' : String(eintrag.knapp.fehlend).replace('.', ',') %></small><% } %></td>
             </tr>
           <% }); %>
         </tbody>
@@ -394,7 +416,8 @@
         <div class="statistik-inhalt" aria-live="polite"></div>
       </div>
       <% } %>
-      <% if (!k.teileInfo) { %><p class="hint knapp-erklaerung">▲ 1,5 = nur noch so viele Punkte (höchstens 2) fehlen bis zur nächsten besseren Note – ein Hinweis, z. B. für Gespräche oder Nachbesserungsangebote.</p><% } %>
+      <% if (!k.teileInfo && k.knapp_modus === 'punkte') { %><p class="hint knapp-erklaerung">▲ 1,5 = nur noch so viele Punkte (höchstens <%= String(k.knapp_grenze_punkte).replace('.', ',') %>) fehlen bis zur nächsten besseren Note – ein Hinweis, z. B. für Gespräche oder Nachbesserungsangebote.</p><% } %>
+      <% if (!k.teileInfo && k.knapp_modus === 'prozent') { %><p class="hint knapp-erklaerung">▲ 3,2 % = nur noch so viele Prozentpunkte (höchstens <%= String(k.knapp_grenze_prozent).replace('.', ',') %> %) fehlen bis zur nächsten besseren Note – ein Hinweis, z. B. für Gespräche oder Nachbesserungsangebote.</p><% } %>
       <label class="klausur-notiz-label">Notizen zur Klausur
         <textarea class="klausur-notiz" data-kid="<%= k.id %>" rows="4" maxlength="5000" placeholder="z. B. Auffälligkeiten, Nachschreiber, Hinweise zur Korrektur"><%= k.notiz || '' %></textarea>
       </label>
@@ -757,10 +780,11 @@
           cell.textContent = (k && k.note !== null) ? k.note.toString().replace('.', ',') : '–';
           if (k && k.knapp) { // Hinweis: höchstens 2 Punkte bis zur besseren Note
             const fehlt = String(k.knapp.fehlend).replace('.', ',');
+            const fehltPct = String(k.knapp.fehlendProzent).replace('.', ',');
             const hinweis = document.createElement('small');
             hinweis.className = 'knapp';
-            hinweis.textContent = ' ▲ ' + fehlt;
-            hinweis.title = 'Nur noch ' + fehlt + ' Punkt(e) bis zur Note ' + k.knapp.ziel + ' (ab ' + k.knapp.prozent + ' %)';
+            hinweis.textContent = ' ▲ ' + (k.knapp.modus === 'prozent' ? fehltPct + ' %' : fehlt);
+            hinweis.title = 'Nur noch ' + fehlt + ' Punkt(e) (' + fehltPct + ' %) bis zur Note ' + k.knapp.ziel + ' (ab ' + k.knapp.prozent + ' %)';
             cell.appendChild(hinweis);
           }
         });
@@ -779,7 +803,7 @@
           const extra = (k && k.extrapunkte) || 0;
           const max = Number(cell.dataset.max);
           cell.textContent = (summe + extra) + ' / ' + cell.dataset.max;
-          if (max > 0) { // Prozentwert steht immer dabei (mit Extrapunkten auch über 100 %)
+          if (max > 0 && cell.dataset.prozent !== '0') { // Prozentwert steht dabei, solange er nicht in den Extras ausgeschaltet ist (mit Extrapunkten auch über 100 %)
             const prozent = document.createElement('small');
             prozent.textContent = ' (' + Math.round((summe + extra) / max * 100) + ' %)';
             cell.appendChild(prozent);
@@ -1152,6 +1176,18 @@
     text.addEventListener('keydown', function(e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); speichern(); } });
     document.getElementById('unterricht-notiz-schliessen').addEventListener('click', function() { dlg.close(); });
   })();
+
+  // „Klausur einstellen“ merkt sich, ob es aufgeklappt war (z. B. nach „Extras speichern“); ohne Merkzettel gilt die Vorgabe des Servers.
+  document.querySelectorAll('details.klausur-einstellungen').forEach(function(d) {
+    const panel = d.closest('[id^="klausur-panel-"]');
+    if (!panel) return;
+    const key = 'klausur-einst-offen-' + panel.id;
+    try {
+      const gemerkt = sessionStorage.getItem(key);
+      if (gemerkt === '1') d.open = true; else if (gemerkt === '0') d.open = false;
+    } catch (e) { /* ohne Speicher: Vorgabe */ }
+    d.addEventListener('toggle', function() { try { sessionStorage.setItem(key, d.open ? '1' : '0'); } catch (e) { /* egal */ } });
+  });
 
   // Tastaturnavigation in den Tabellen (Klausur, Zusatzleistung, Datumstabelle) wie in einer Tabellenkalkulation:
   //  - Pfeil hoch/runter und Enter springen in derselben Spalte (derselben Aufgabe/demselben Termin) zur vorherigen/nächsten Person

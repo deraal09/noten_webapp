@@ -101,17 +101,76 @@ test('Klausurtabelle: „▲ 0,25“ bei knapp verfehlter besserer Note, nicht b
   await punkte(sid.Claus, 0, 30); await punkte(sid.Claus, 1, 20);  // 50 von 50: beste Note
   const html = await (await admin(`/teacher/fach/${fachId}`)).text();
   const zelle = (s) => new RegExp(`<td class="note-cell k-note" data-sid="${s}" data-kid="${kid}">([^<]*(?:<small[\\s\\S]*?</small>)?)</td>`).exec(html)[1];
-  assert.match(zelle(sid.Adler), /<small class="knapp" title="Nur noch 0,25 Punkt\(e\) bis zur Note 2 \(ab 81 %\)">▲ 0,25<\/small>/);
+  assert.match(zelle(sid.Adler), /<small class="knapp" title="Nur noch 0,25 Punkt\(e\) \(0,5 %\) bis zur Note 2 \(ab 81 %\)">▲ 0,25<\/small>/);
   assert.doesNotMatch(zelle(sid.Berger), /knapp/);
   assert.doesNotMatch(zelle(sid.Claus), /knapp/);
   assert.match(html, /▲ 1,5 = nur noch so viele Punkte \(höchstens 2\)/, 'Erklärung unter der Tabelle');
   const daten = await (await admin(`/teacher/fach/${fachId}/noten?hj=${encodeURIComponent('1. Halbjahr')}`)).json();
   const k = (s) => daten.schueler.find((x) => x.schueler_id === s).klausuren[0];
-  assert.deepEqual({ ...k(sid.Adler).knapp }, { fehlend: 0.25, ziel: 2, prozent: 81, jetzt: 2.5 });
+  assert.deepEqual({ ...k(sid.Adler).knapp }, { fehlend: 0.25, ziel: 2, prozent: 81, jetzt: 2.5, fehlendProzent: 0.5, modus: 'punkte' });
   assert.equal(k(sid.Berger).knapp, null);
+  await extrasTest(fachId, kid, sid);
   // Mehrteilige Klausuren haben keinen Hinweis
   await form(admin, `/teacher/klausuren/${kid}/teile-anzahl`, { anzahl_teile: '2' });
   const mehr = await (await admin(`/teacher/fach/${fachId}`)).text();
   assert.doesNotMatch(mehr, /<small class="knapp"/);
-  assert.doesNotMatch(mehr, /knapp-erklaerung/);
+  assert.equal((mehr.match(/knapp-erklaerung/g) || []).length, 1, 'nur die einteilige Klausur K2 hat noch die Erklärung');
 });
+
+const grenzeText = (n) => String(n).replace('.', ',');
+
+async function extrasTest(fachId, kid, sid) {
+  const seite = async () => (await admin(`/teacher/fach/${fachId}`)).text();
+  const speichere = (body) => form(admin, `/teacher/klausuren/${kid}/extras`, body);
+  // Reiter „Extras“ in „Klausur einstellen“
+  let html = await seite();
+  assert.match(html, /<button type="button" class="active" data-target="klausur-einst-allgemein-\d+">Allgemein<\/button>\s*<button type="button" data-target="klausur-einst-extras-\d+">Extras<\/button>/);
+  assert.match(html, /name="knapp_modus" value="punkte" checked/);
+  assert.match(html, /name="knapp_grenze_punkte" value="2"/);
+  assert.match(html, /name="prozent_anzeige" value="1" checked/);
+  assert.match(html, /Hinweis „knapp vor der besseren Note“/);
+  assert.match(html, /\(80 %\)/, 'Prozentanzeige standardmäßig an');
+
+  // Modus „Prozent“: Anzeige in Prozentpunkten; die Grenze gilt in Prozent
+  let r = await speichere({ knapp_modus: 'prozent', knapp_grenze_punkte: '2', knapp_grenze_prozent: '1', prozent_anzeige: '1' });
+  assert.equal(r.status, 302);
+  html = await seite();
+  assert.match(html, /name="knapp_modus" value="prozent" checked/);
+  assert.match(html, /title="Nur noch 0,25 Punkt\(e\) \(0,5 %\) bis zur Note 2 \(ab 81 %\)">▲ 0,5 %<\/small>/);
+  assert.match(html, /▲ 3,2 % = nur noch so viele Prozentpunkte \(höchstens 1 %\)/);
+  let daten = await (await admin(`/teacher/fach/${fachId}/noten?hj=${encodeURIComponent('1. Halbjahr')}`)).json();
+  assert.equal(daten.schueler.find((x) => x.schueler_id === sid.Adler).klausuren[0].knapp.modus, 'prozent');
+  // Grenze 0,4 % -> 0,5 % ist zu viel: kein Hinweis
+  await speichere({ knapp_modus: 'prozent', knapp_grenze_prozent: '0,4', prozent_anzeige: '1' });
+  assert.doesNotMatch(await seite(), /<small class="knapp"/);
+  // Punkte-Modus mit Grenze 0,2 -> 0,25 ist zu viel; mit 0,25 gerade noch
+  await speichere({ knapp_modus: 'punkte', knapp_grenze_punkte: '0,2', prozent_anzeige: '1' });
+  assert.doesNotMatch(await seite(), /<small class="knapp"/);
+  await speichere({ knapp_modus: 'punkte', knapp_grenze_punkte: '0,25', prozent_anzeige: '1' });
+  assert.match(await seite(), /▲ 0,25<\/small>/);
+  // aus
+  await speichere({ knapp_modus: 'aus', prozent_anzeige: '1' });
+  html = await seite();
+  assert.doesNotMatch(html, /<small class="knapp"/);
+  assert.doesNotMatch(html, /knapp-erklaerung/);
+  // Prozentanzeige aus (Häkchen fehlt)
+  await speichere({ knapp_modus: 'punkte' });
+  html = await seite();
+  assert.doesNotMatch(html, /\(80 %\)/);
+  assert.match(html, /data-prozent="0">40 \/ 50<\/td>|data-prozent="0">/);
+  assert.match(html, /name="prozent_anzeige" value="1"(?! checked)/);
+  // Ungültige Eingaben fallen auf die Vorgaben zurück
+  await speichere({ knapp_modus: 'quatsch', knapp_grenze_punkte: 'abc', knapp_grenze_prozent: '-3', prozent_anzeige: '1' });
+  const z = getDb().prepare('SELECT knapp_modus, knapp_grenze_punkte, knapp_grenze_prozent, prozent_anzeige FROM klausuren WHERE id = ?').get(kid);
+  assert.deepEqual({ ...z }, { knapp_modus: 'punkte', knapp_grenze_punkte: 2, knapp_grenze_prozent: 5, prozent_anzeige: 1 });
+  // Für alle Klausuren des Fachs übernehmen
+  await form(admin, `/teacher/fach/${fachId}/klausuren/neu`, { name: 'K2', aufgaben: '1', halbjahr: '1. Halbjahr' });
+  const k2 = getDb().prepare("SELECT id FROM klausuren WHERE name = 'K2'").get().id;
+  assert.equal(getDb().prepare('SELECT knapp_modus FROM klausuren WHERE id = ?').get(k2).knapp_modus, 'punkte', 'Vorgabe bei neuen Klausuren');
+  await speichere({ knapp_modus: 'aus', prozent_anzeige: '', fuer_alle: '1' });
+  assert.deepEqual(getDb().prepare('SELECT knapp_modus, prozent_anzeige FROM klausuren ORDER BY id').all().map((r) => ({ ...r })), [{ knapp_modus: 'aus', prozent_anzeige: 0 }, { knapp_modus: 'aus', prozent_anzeige: 0 }]);
+  // zurück auf die Vorgaben für den restlichen Test; unbekannte Klausur und fehlende Anmeldung
+  await speichere({ knapp_modus: 'punkte', knapp_grenze_punkte: '2', prozent_anzeige: '1', fuer_alle: '1' });
+  assert.equal((await fetch(`${base}/teacher/klausuren/${kid}/extras`, { method: 'POST', redirect: 'manual' })).status, 401, 'ohne Anmeldung nicht möglich');
+  void grenzeText;
+}

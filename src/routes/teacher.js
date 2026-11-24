@@ -20,7 +20,7 @@ import {
   ladeMeineKlassen, ladeMeineKurse, userDarfSelbstKlasseAnlegen, istIrgendeineKlassenleitung, makeToken,
 } from '../auth.js';
 import {
-  HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE, TEIL_ARTEN, TEIL_ART_NAMEN, verrechnungsTabelle, hoechsteNote,
+  HALBJAHRE, autoDistribute, DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV, parseTendenzNote, NTG, parseKlausurTeile, passeTeileAnAufgabenzahl, passeTeileAnTeilzahl, MAX_KLAUSUR_TEILE, TEIL_ARTEN, TEIL_ART_NAMEN, verrechnungsTabelle, hoechsteNote, KNAPP_MODI,
 } from '../grade-calc.js';
 import { korrekturMoeglich, korrigiereGesamtnote, nimmKorrekturenZurueck, datumText } from '../notenkorrektur.js';
 import { parseFaecherIds, rundenSchluessel, aktuelleRunde, starteRunde, beendeRunde, waehleZufaellig, rundenAnsicht } from '../besprechung.js';
@@ -956,6 +956,28 @@ export default async function teacherRoutes(fastify) {
     const gw = Number(request.body?.gewichtung) || 0;
     getDb().prepare('UPDATE klausuren SET gewichtung = ? WHERE id = ?').run(gw, request.params.id);
     syncFallsAutoAktiv(k.fach_id, k.halbjahr, request.user.id);
+    return reply.redirect(`/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}`);
+  });
+
+  // Extras einer Klausur: Hinweis „knapp vor der besseren Note“ (Modus, Grenzen) und Prozentanzeige bei „Punkte gesamt“;
+  // optional für alle Klausuren dieses Fachs übernehmen.
+  fastify.post('/klausuren/:id/extras', async (request, reply) => {
+    const k = getDb().prepare('SELECT fach_id, halbjahr FROM klausuren WHERE id = ?').get(request.params.id);
+    if (!k) return reply.redirect('/teacher');
+    if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
+    const b = request.body || {};
+    const modus = KNAPP_MODI.includes(String(b.knapp_modus)) ? String(b.knapp_modus) : 'punkte';
+    const zahl = (wert, vorgabe, max) => {
+      const n = Number(String(wert ?? '').replace(',', '.'));
+      return Number.isFinite(n) && n >= 0 ? Math.min(Math.round(n * 100) / 100, max) : vorgabe;
+    };
+    const grenzeP = zahl(b.knapp_grenze_punkte, 2, 50);
+    const grenzePct = zahl(b.knapp_grenze_prozent, 5, 100);
+    const prozent = b.prozent_anzeige === '1' ? 1 : 0;
+    const db = getDb();
+    const sql = `UPDATE klausuren SET knapp_modus = ?, knapp_grenze_punkte = ?, knapp_grenze_prozent = ?, prozent_anzeige = ? WHERE ${b.fuer_alle === '1' ? 'fach_id = ?' : 'id = ?'}`;
+    const info = db.prepare(sql).run(modus, grenzeP, grenzePct, prozent, b.fuer_alle === '1' ? k.fach_id : request.params.id);
+    request.flash?.('success', b.fuer_alle === '1' ? `Extras für ${info.changes} Klausur(en) dieses Fachs gespeichert.` : 'Extras gespeichert.');
     return reply.redirect(`/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}`);
   });
 

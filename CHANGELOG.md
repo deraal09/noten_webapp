@@ -6,6 +6,21 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 0.151.0 - 2026-11-24
+
+### Klausur einstellen → Extras: Hinweis „knapp“ einstellbar, Prozentanzeige schaltbar
+
+- In **⚙ Klausur einstellen** gibt es jetzt die Reiter **Allgemein** und **Extras**. Unter **Extras**:
+  - **Hinweis „knapp vor der besseren Note“:** Anzeige in **Punkten** (▲ 1,5) oder in **Prozent** (▲ 3,2 %) bis zur
+    nächsten besseren Note, jeweils mit **eigener Grenze** (Vorgabe: 2 Punkte bzw. 5 %), oder **ausgeschaltet**.
+  - **Prozentzahl bei „Punkte gesamt“** ein-/ausschalten (Vorgabe: an).
+  - **„Für alle Klausuren dieses Fachs übernehmen“.**
+- Die Einstellungen gelten je Klausur (neue Klausuren starten mit den Vorgaben; Spalten `knapp_modus`,
+  `knapp_grenze_punkte`, `knapp_grenze_prozent`, `prozent_anzeige` in `klausuren`) und werden mit „Extras speichern“ übernommen;
+  danach bleiben „Klausur einstellen“ und der Reiter Extras offen. Die Erklärzeile unter der Tabelle und der Mouseover passen sich an.
+  `POST /teacher/klausuren/:id/extras`; die JSON-Daten der Fachseite liefern `knapp.modus` und `knapp.fehlendProzent`.
+- Hilfe ergänzt; Tests in `test/knapp-hinweis.test.js`.
+
 ## 0.150.0 - 2026-11-23
 
 ### Klausuren: Hinweis, wenn nur noch wenige Punkte zur besseren Note fehlen

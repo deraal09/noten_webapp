@@ -142,6 +142,26 @@ export function punkteZurBesserenNote(punkte, maxPunkte, csvStr, extrapunkte = 0
   return { fehlend, ziel, prozent, jetzt: aktuell };
 }
 
+export const KNAPP_MODI = ['punkte', 'prozent', 'aus'];
+
+/**
+ * Hinweis „knapp vor der besseren Note“ nach den Extras-Einstellungen einer Klausur: `modus` 'punkte' (Grenze in Punkten), 'prozent'
+ * (Grenze in Prozentpunkten der Gesamtpunktzahl) oder 'aus'. Gibt null zurück, wenn kein Hinweis erscheinen soll, sonst die Werte aus
+ * punkteZurBesserenNote plus `fehlendProzent` (Prozentpunkte, auf 0,1 aufgerundet) und `modus`.
+ */
+export function knappHinweis(punkte, maxPunkte, csvStr, extrapunkte = 0, einstellung = {}) {
+  const modus = KNAPP_MODI.includes(einstellung.modus) ? einstellung.modus : 'punkte';
+  if (modus === 'aus') return null;
+  const r = punkteZurBesserenNote(punkte, maxPunkte, csvStr, extrapunkte);
+  if (!r) return null;
+  const maxP = maxPunkte.reduce((a, b) => a + b, 0);
+  const fehlendProzent = Math.ceil((r.fehlend / maxP) * 1000 - 1e-9) / 10;
+  const grenzeP = Number.isFinite(Number(einstellung.grenzePunkte)) ? Number(einstellung.grenzePunkte) : KNAPP_MAX_PUNKTE;
+  const grenzePct = Number.isFinite(Number(einstellung.grenzeProzent)) ? Number(einstellung.grenzeProzent) : 5;
+  const knapp = modus === 'prozent' ? fehlendProzent <= grenzePct + 1e-9 : r.fehlend <= grenzeP + 1e-9;
+  return knapp ? { ...r, fehlendProzent, modus } : null;
+}
+
 /** Wie punkteZurBesserenNote, aber nur, wenn es höchstens `grenze` Punkte sind (sonst null). Einteilige Klausuren. */
 export function knappZurBesserenNote(punkte, maxPunkte, csvStr, extrapunkte = 0, grenze = KNAPP_MAX_PUNKTE) {
   const r = punkteZurBesserenNote(punkte, maxPunkte, csvStr, extrapunkte);
