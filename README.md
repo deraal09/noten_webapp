@@ -1136,12 +1136,12 @@ Dienste eingebunden, müssen Erklärung und Einwilligung entsprechend angepasst 
 
 ## Versionsnummer
 
-Die Fußzeile zeigt eine Version im Format `0.MINOR.PATCH` samt Release-Datum
-(z. B. `v0.36.0 (28.09.2026)`), ausgelesen aus `package.json` (`version` und
+Die Fußzeile zeigt eine Version im Format `MAJOR.MINOR.PATCH` samt Release-Datum
+(z. B. `v1.0.0 (24.11.2026)`), ausgelesen aus `package.json` (`version` und
 `releaseDate`; `app.js` → `reply.locals.appVersion`/`appReleaseDate` →
-`views/partials/layout.ejs`). Solange die App aktiv weiterentwickelt wird,
-bleibt die Hauptversion bei `0` (SemVer-Konvention: „kann sich noch
-grundlegend ändern").
+`views/partials/layout.ejs`). Mit `1.0.0` (24.11.2026) ging die App ans gesamte
+Kollegium; davor galt `0.x` (Entwicklungsphase). Die Hauptversion steigt nur bei
+einem Bruch, der auch Anwender:innen oder Schnittstellen (API) betrifft.
 
 Es gibt **keinen Automatismus**, der die Version aus der Commit-Historie
 ableitet — die Commit-Nachrichten folgen keiner strikten

@@ -6,6 +6,29 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.0.0 - 2026-11-24
+
+### Erste Version für das gesamte Kollegium
+
+Die Notenverwaltung verlässt die Entwicklungsphase (`0.x`) und geht ans Kollegium. Diese Version bringt keine neue Funktion;
+sie markiert den Stand, mit dem die Kolleginnen und Kollegen starten. Die Nummer folgt ab jetzt SemVer: Neue Fähigkeiten erhöhen die
+Minor-Zahl (`1.x.0`), Fehlerbehebungen und kleine Anpassungen die Patch-Zahl (`1.0.x`).
+
+Der Stand im Überblick (Einzelheiten stehen in den Einträgen darunter):
+
+- **Klassen und Noten:** Klassen, Kurse, Fächer und Schüler/innen anlegen (auch per CSV); Klausuren mit Teilen, Hörverstehen und
+  Inhalt & Sprache; Unterrichtsleistung mit Datumstabelle und Zusatzleistungen; Punkte als Zahl **oder Rechnung**, Pfeiltasten-Navigation;
+  Notenschlüssel IHK/BG/SPA; Verrechnung der Halbjahre, Endnoten, Notenbesprechung.
+- **Auswertung:** Klausur-Statistik (zu schwer/zu leicht, Trennschärfe), Hinweis „knapp vor der besseren Note“, Prozentanzeige – alles
+  je Klausur einstellbar (**Klausur einstellen → Extras**).
+- **Klassenleitung:** Notenkonferenz mit Sperren, Zeugnisse, Fehlzeiten, Abschluss- und Abgangsübersicht, Synchronisation.
+- **Übersichtlich für alle:** „Meine Funktionen“ mit Startprofilen (Standardprofil für neue Konten durch die Administration), Suche
+  „Was möchtest du tun?“ (Strg+K), „Erste Schritte“-Checkliste, Hilfe mit Bildern, Suche und geführtem Rundgang, Feedback.
+- **Zusammenarbeit und Betrieb:** Sitzpläne, Namen korrigieren (gilt für alle Lehrkräfte der Klasse), Papierkorb, Einladungen, LDAP-Anmeldung,
+  verschlüsselte Datenbank mit Sicherung, anonyme Nutzungs- und Funktionsstatistik für die Administration.
+- **API für KI-Agenten:** persönliche Schlüssel mit „nur lesen“/„schreiben“, Probelauf (`dry_run`), Dokumentation unter `/api/v1/docs`;
+  Schlüssel lassen sich nur in der App verlängern.
+
 ## 0.151.0 - 2026-11-24
 
 ### Klausur einstellen → Extras: Hinweis „knapp“ einstellbar, Prozentanzeige schaltbar
