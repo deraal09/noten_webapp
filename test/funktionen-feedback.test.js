@@ -211,11 +211,15 @@ test('Feedback in der Administration: nur Admin, Namen nur bei Freigabe, Status 
 });
 
 // ---------- Aufgeräumte Oberfläche ----------
-test('Fachseite: Eingabe vorn (Klausuren · Unterrichtsleistung · Notenübersicht), Klausur-Einstellungen offen bis Punkte da sind', async () => {
+test('Fachseite: Notenübersicht vorn, Menü „Noteneingabe“ (Unterrichtsleistung · Klausuren · Endnoteneingabe), Klausur-Einstellungen offen bis Punkte da sind', async () => {
   let fach = await text(anna(`/teacher/fach/${fachId}`));
-  assert.ok(fach.indexOf('data-target="panel-klausuren"') < fach.indexOf('data-target="panel-uls"'));
-  assert.ok(fach.indexOf('data-target="panel-uls"') < fach.indexOf('data-target="panel-uebersicht"'));
-  assert.match(fach, /<div id="panel-klausuren" class="reiter-panel active">/);
+  const pos = (t) => fach.indexOf(t);
+  assert.ok(pos('data-target="panel-uebersicht"') < pos('Noteneingabe ▾'));
+  assert.ok(pos('Noteneingabe ▾') < pos('data-target="panel-uls"'));
+  assert.ok(pos('data-target="panel-uls"') < pos('data-target="panel-klausuren"'));
+  assert.ok(pos('data-target="panel-klausuren"') < pos('data-target="panel-endnoten"'));
+  assert.match(fach, /<div id="panel-uebersicht" class="reiter-panel active">/, 'beim Öffnen steht die Notenübersicht vorn');
+  assert.match(fach, /<div id="panel-klausuren" class="reiter-panel">/);
   assert.match(fach, /<details class="klausur-einstellungen" open>/, 'ohne Punkte: Einstellungen offen');
   const kid = getDb().prepare('SELECT id FROM klausuren WHERE fach_id = ?').get(fachId).id;
   const sid = getDb().prepare('SELECT id FROM schueler').get().id;

@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.1.0 - 2026-11-24
+
+### Fachseite: Reiter neu sortiert
+
+- Die Reiter der Fachseite stehen jetzt so: **Notenübersicht** (beim Öffnen immer vorn) · **✏️ Noteneingabe ▾** · **⋮ Mehr**.
+  Das Menü **Noteneingabe** enthält **Unterrichtsleistung**, **Klausuren** und **✏️ Direkte Endnoteneingabe**; unter **Mehr** steckt die
+  Synchronisation (nur an Klassen mit Klassenleitung oder wenn in „Meine Funktionen“ eingeschaltet).
+- Die direkte Endnoteneingabe ist kein aufklappbarer Block in der Notenübersicht mehr, sondern ein eigener Menüpunkt mit eigener
+  Ansicht (bei SPA-Fächern weiter die eigene Seite). Der gewählte Reiter wird wie bisher nach Neuladen und Speichern gemerkt, beim
+  frischen Öffnen eines Fachs steht aber immer die Notenübersicht vorn.
+- Mehrere Menüs in der Reiter-Leiste sind möglich (Klick außerhalb schließt sie); der Umschalter des Menüs ist hervorgehoben, solange
+  einer seiner Punkte aktiv ist. Hilfe angepasst, Tests aktualisiert.
+
 ## 1.0.0 - 2026-11-24
 
 ### Erste Version für das gesamte Kollegium

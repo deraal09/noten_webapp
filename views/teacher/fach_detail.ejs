@@ -96,12 +96,26 @@
     <% }); %>
   </div>
 
-<%# Reihenfolge nach dem Arbeitsablauf: erst eintragen (Klausuren, Unterrichtsleistung), dann die Übersicht. Die Synchronisation steckt hinter
-    „⋮ Mehr“ und erscheint nur, wenn sie gebraucht wird (Klasse mit Klassenleitung) oder in „Meine Funktionen“ eingeschaltet ist. %>
+<%# Reiter: Notenübersicht (beim Öffnen vorn) · Noteneingabe ▾ (Menü: Unterrichtsleistung, Klausuren, Direkte Endnoteneingabe) · ⋮ Mehr
+    (Synchronisation; erscheint nur, wenn sie gebraucht wird: Klasse mit Klassenleitung oder in „Meine Funktionen“ eingeschaltet). %>
+<%
+  var endnotenSeite = Boolean(spaLeistung && !spaLeistung.komponente); // SPA-Fach: eigene Seite für die Endnoteneingabe
+  var endnotenText = spaLeistung && !endnotenSeite ? 'Direkte Eingabe der Gesamtpunkte' : 'Direkte Endnoteneingabe';
+%>
 <div class="reiter" data-storage-key="noteneingabe-reiter-<%= fach.id %>">
-  <button type="button" class="active" data-target="panel-klausuren">Klausuren</button>
-  <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
-  <button type="button" data-target="panel-uebersicht">Notenübersicht</button>
+  <button type="button" class="active" data-target="panel-uebersicht">Notenübersicht</button>
+  <div class="reiter-mehr-wrapper">
+    <button type="button" class="reiter-mehr-toggle reiter-menue-haupt" aria-haspopup="true" aria-expanded="false">✏️ Noteneingabe ▾</button>
+    <div class="reiter-mehr-menu">
+      <button type="button" data-target="panel-uls">Unterrichtsleistung</button>
+      <button type="button" data-target="panel-klausuren">Klausuren</button>
+      <% if (endnotenSeite) { %>
+        <a class="menue-link" href="/teacher/fach/<%= fach.id %>?ansicht=endnoten&hj=<%= spaLeistung.hjNr %>">✏️ <%= endnotenText %></a>
+      <% } else { %>
+        <button type="button" data-target="panel-endnoten">✏️ <%= endnotenText %></button>
+      <% } %>
+    </div>
+  </div>
   <% if (syncSichtbar && !spaLeistung) { %>
   <div class="reiter-mehr-wrapper">
     <button type="button" class="reiter-mehr-toggle" aria-haspopup="true" aria-expanded="false">⋮ Mehr</button>
@@ -117,43 +131,8 @@
   var zeigeNaSpalte = termine.length > 0;
   var sichtbareSpalten = 2 + (zeigeNaSpalte ? 1 : 0) + (verrechnung && verrechnung.prozent ? 1 : 0) + 2 + (spaLeistung ? (spaLeistung.komponente ? 1 : 2) : 0) + (fach.abgeschlossen ? 1 : 0);
 %>
-<div id="panel-uebersicht" class="reiter-panel">
+<div id="panel-uebersicht" class="reiter-panel active">
   <h2>Notenübersicht</h2>
-  <% if (spaLeistung && !spaLeistung.komponente) { %>
-    <p class="kopf-aktionen">
-      <a class="btn" href="/teacher/fach/<%= fach.id %>?ansicht=endnoten&hj=<%= spaLeistung.hjNr %>">✏️ Direkte Endnoteneingabe</a>
-    </p>
-  <% } else { %>
-    <p class="kopf-aktionen">
-      <button type="button" id="endnoten-toggle" aria-expanded="false" aria-controls="endnoten-direkt">✏️ Direkte <%= spaLeistung ? 'Eingabe der Gesamtpunkte' : 'Endnoteneingabe' %></button>
-    </p>
-    <div id="endnoten-direkt" class="card" hidden>
-      <p class="hint">
-        <%= spaLeistung ? 'Gesamtpunkte' : 'Endnote' %> für das <strong><%= halbjahr %></strong> direkt eintragen. Sie ersetzen die aus Klausuren und
-        Unterrichtsleistung berechnete Note<% if (spaLeistung && spaLeistung.komponente) { %> und fließen als Wert der Komponente <strong><%= spaLeistung.komponente.name %></strong> in <%= spaLeistung.komponente.elternName %> ein<% } %>. Leer lassen: die berechnete Note gilt. „ntg" = nicht teilgenommen.
-        Wird beim Verlassen des Feldes gespeichert; bei gesperrten Personen (Notenkonferenz) ist die Eingabe
-        erst nach dem Entsperren durch die Klassenleitung möglich.
-      </p>
-      <table class="data tabelle-fix" id="endnoten-tabelle">
-        <thead><tr><th>Schüler/in</th><th title="Aus Klausuren und Unterrichtsleistung berechnet">Berechnet</th><th><%= spaLeistung ? 'Gesamtpunkte' : 'Endnote' %> (Direkteingabe)</th></tr></thead>
-        <tbody>
-          <% rows.forEach(function(r) {
-               var gesperrtEn = Boolean(sperren.get(r.schueler_id));
-               var en = r.endnote; %>
-            <tr data-schueler="<%= r.schueler_id %>">
-              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrtEn) { %> 🔒<% } %></td>
-              <td class="note-cell berechnet"><%= r.gesamtBerechnet === null ? '–' : formatNote(r.gesamtBerechnet) %></td>
-              <td>
-                <input type="text" inputmode="decimal" autocomplete="off" class="endnote-eingabe" data-sid="<%= r.schueler_id %>"
-                  value="<%= en ? (en.ntg ? 'ntg' : String(en.note).replace('.', ',')) : '' %>" placeholder="–"
-                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer" <% if (fach.notenschluessel === 'IHK' || fach.notenschluessel === 'BG') { %> data-note-picker="<%= fach.notenschluessel %>" data-picker-ntg="1"<% } %> <%= gesperrtEn ? 'disabled' : '' %>>
-              </td>
-            </tr>
-          <% }); %>
-        </tbody>
-      </table>
-    </div>
-  <% } %>
   <table class="data tabelle-fix" id="uebersicht">
     <thead>
       <tr>
@@ -206,7 +185,39 @@
   </table>
 </div>
 
-<div id="panel-klausuren" class="reiter-panel active">
+<% if (!endnotenSeite) { %>
+<div id="panel-endnoten" class="reiter-panel">
+  <h2><%= endnotenText %></h2>
+    <div id="endnoten-direkt" class="card">
+      <p class="hint">
+        <%= spaLeistung ? 'Gesamtpunkte' : 'Endnote' %> für das <strong><%= halbjahr %></strong> direkt eintragen. Sie ersetzen die aus Klausuren und
+        Unterrichtsleistung berechnete Note<% if (spaLeistung && spaLeistung.komponente) { %> und fließen als Wert der Komponente <strong><%= spaLeistung.komponente.name %></strong> in <%= spaLeistung.komponente.elternName %> ein<% } %>. Leer lassen: die berechnete Note gilt. „ntg" = nicht teilgenommen.
+        Wird beim Verlassen des Feldes gespeichert; bei gesperrten Personen (Notenkonferenz) ist die Eingabe
+        erst nach dem Entsperren durch die Klassenleitung möglich.
+      </p>
+      <table class="data tabelle-fix" id="endnoten-tabelle">
+        <thead><tr><th>Schüler/in</th><th title="Aus Klausuren und Unterrichtsleistung berechnet">Berechnet</th><th><%= spaLeistung ? 'Gesamtpunkte' : 'Endnote' %> (Direkteingabe)</th></tr></thead>
+        <tbody>
+          <% rows.forEach(function(r) {
+               var gesperrtEn = Boolean(sperren.get(r.schueler_id));
+               var en = r.endnote; %>
+            <tr data-schueler="<%= r.schueler_id %>">
+              <td class="name"><%= r.nachname %>, <%= r.vorname %><% if (gesperrtEn) { %> 🔒<% } %></td>
+              <td class="note-cell berechnet"><%= r.gesamtBerechnet === null ? '–' : formatNote(r.gesamtBerechnet) %></td>
+              <td>
+                <input type="text" inputmode="decimal" autocomplete="off" class="endnote-eingabe" data-sid="<%= r.schueler_id %>"
+                  value="<%= en ? (en.ntg ? 'ntg' : String(en.note).replace('.', ',')) : '' %>" placeholder="–"
+                  title="<%= fach.notenschluessel === 'IHK' ? 'Note 1 bis 6' : 'Punkte 0 bis 15' %>, ntg oder leer" <% if (fach.notenschluessel === 'IHK' || fach.notenschluessel === 'BG') { %> data-note-picker="<%= fach.notenschluessel %>" data-picker-ntg="1"<% } %> <%= gesperrtEn ? 'disabled' : '' %>>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+</div>
+<% } %>
+
+<div id="panel-klausuren" class="reiter-panel">
   <div class="reiter unter-reiter card" data-storage-key="noteneingabe-subreiter-klausuren-<%= fach.id %>">
     <% klausuren.forEach(function(k, i) { %>
       <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-target="klausur-panel-<%= k.id %>"><%= k.name %> <small>(<%= k.gewichtung %>%<%= k.datum ? ', ' + k.datum.split('-').reverse().join('.') : '' %>)</small></button>
@@ -664,7 +675,7 @@
 
 <script src="/static/js/punkte-rechnen.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>"></script>
 <script>
-  // Reiter (Notenübersicht/Unterrichtsleistung/Klausuren, sowie die
+  // Reiter (Notenübersicht, Menü „Noteneingabe“ mit Unterrichtsleistung/Klausuren/Endnoteneingabe, Mehr, sowie die
   // Unter-Reiter je Klausur und je Zusatzleistung) umschalten (beim Öffnen des Fachs ist die Notenübersicht vorn, siehe unten). Jede
   // .reiter-Gruppe verwaltet nur ihre eigenen Buttons/Panels (sonst würde
   // ein Klick auf einen Unter-Reiter versehentlich auch die oberste
@@ -681,12 +692,15 @@
     // wird über das fehlende data-target automatisch ausgeschlossen.
     const buttons = Array.from(gruppe.querySelectorAll('button[data-target]'));
     const storageKey = gruppe.dataset.storageKey;
-    const mehrWrapper = gruppe.querySelector('.reiter-mehr-wrapper');
-    const mehrToggle = gruppe.querySelector('.reiter-mehr-toggle');
-    function schliesseMehrMenue() {
-      if (!mehrWrapper) return;
-      mehrWrapper.classList.remove('offen');
-      if (mehrToggle) mehrToggle.setAttribute('aria-expanded', 'false');
+    // Mehrere Dropdowns („✏️ Noteneingabe ▾“ und „⋮ Mehr“) sind möglich; jedes hat seinen Umschalter und sein Menü.
+    const wrapper = Array.from(gruppe.querySelectorAll('.reiter-mehr-wrapper'));
+    function schliesseMenues(ausser) {
+      wrapper.forEach(function(w) {
+        if (w === ausser) return;
+        w.classList.remove('offen');
+        const t = w.querySelector('.reiter-mehr-toggle');
+        if (t) t.setAttribute('aria-expanded', 'false');
+      });
     }
     function setzeReiter(targetId) {
       buttons.forEach(function(b) { b.classList.toggle('active', b.dataset.target === targetId); });
@@ -694,14 +708,13 @@
         const panel = document.getElementById(b.dataset.target);
         if (panel) panel.classList.toggle('active', b.dataset.target === targetId);
       });
-      // "⋮ Mehr" selbst hervorheben, wenn der aktive Reiter im Dropdown
-      // versteckt ist -- sonst wüsste man nach dem Schließen des Menüs
-      // nicht mehr, welcher (versteckte) Reiter gerade aktiv ist.
-      if (mehrToggle) {
-        const aktiverBtn = buttons.find(function(b) { return b.dataset.target === targetId; });
-        const imMenue = Boolean(aktiverBtn && aktiverBtn.closest('.reiter-mehr-menu'));
-        mehrToggle.classList.toggle('active', imMenue);
-      }
+      // Den Umschalter eines Dropdowns („Noteneingabe ▾“, „⋮ Mehr“) hervorheben, wenn der aktive Reiter in seinem Menü
+      // versteckt ist -- sonst wüsste man nach dem Schließen des Menüs nicht mehr, welcher Reiter gerade aktiv ist.
+      const aktiverBtn = buttons.find(function(b) { return b.dataset.target === targetId; });
+      wrapper.forEach(function(w) {
+        const t = w.querySelector('.reiter-mehr-toggle');
+        if (t) t.classList.toggle('active', Boolean(aktiverBtn && w.contains(aktiverBtn)));
+      });
     }
     buttons.forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -709,21 +722,23 @@
         if (storageKey) {
           try { localStorage.setItem(storageKey, btn.dataset.target); } catch (e) { /* z. B. privater Modus */ }
         }
-        if (btn.closest('.reiter-mehr-menu')) schliesseMehrMenue();
+        if (btn.closest('.reiter-mehr-menu')) schliesseMenues(null);
       });
     });
-    if (mehrWrapper && mehrToggle) {
-      mehrToggle.addEventListener('click', function(e) {
+    wrapper.forEach(function(w) {
+      const t = w.querySelector('.reiter-mehr-toggle');
+      if (!t) return;
+      t.addEventListener('click', function(e) {
         e.stopPropagation();
-        const offen = mehrWrapper.classList.toggle('offen');
-        mehrToggle.setAttribute('aria-expanded', offen ? 'true' : 'false');
+        schliesseMenues(w);
+        const offen = w.classList.toggle('offen');
+        t.setAttribute('aria-expanded', offen ? 'true' : 'false');
       });
-      // Klick außerhalb des Dropdowns schließt es wieder (übliches
-      // Dropdown-Verhalten).
-      document.addEventListener('click', function(e) {
-        if (mehrWrapper.classList.contains('offen') && !mehrWrapper.contains(e.target)) schliesseMehrMenue();
-      });
-    }
+    });
+    // Klick außerhalb der Dropdowns schließt sie wieder (übliches Dropdown-Verhalten).
+    document.addEventListener('click', function(e) {
+      wrapper.forEach(function(w) { if (w.classList.contains('offen') && !w.contains(e.target)) schliesseMenues(null); });
+    });
     // Der gemerkte Reiter gilt nur, solange man auf dieser Fachseite bleibt (Neuladen, Zurück, Formular senden, Halbjahr
     // wechseln). Wird das Fach neu geöffnet (z. B. aus der Noteneingabe-Übersicht), steht immer die Notenübersicht vorn.
     if (storageKey && sollGemerktenReiterNutzen()) {
@@ -944,28 +959,10 @@
     feld.addEventListener('input', debounce(speichern, 800));
     feld.addEventListener('blur', speichern);
   });
-  // Direkte Endnoteneingabe: Tabelle ein-/ausklappen und beim Verlassen eines Feldes speichern.
-  // Beim Öffnen der Seite ist sie eingeklappt; nur beim Wechsel des Halbjahres bleibt sie offen
-  // (dafür merkt sich der Klick auf einen Halbjahr-Reiter den offenen Zustand für genau einen Seitenaufruf).
+  // Direkte Endnoteneingabe (Menü „Noteneingabe“): beim Verlassen eines Feldes speichern.
   (function() {
-    const knopf = document.getElementById('endnoten-toggle');
     const box = document.getElementById('endnoten-direkt');
-    if (!knopf || !box) return;
-    const KEY = 'endnoten-bleibt-offen-' + FACH_ID_END;
-    function setze(offen) {
-      box.hidden = !offen;
-      knopf.setAttribute('aria-expanded', offen ? 'true' : 'false');
-      knopf.classList.toggle('aktiv', offen);
-    }
-    let offen = false;
-    try { offen = sessionStorage.getItem(KEY) === '1'; sessionStorage.removeItem(KEY); } catch (e) { /* ignorieren */ }
-    setze(offen);
-    document.querySelectorAll('.hj-tabs a.hj-tab').forEach(function(tab) {
-      tab.addEventListener('click', function() {
-        try { if (!box.hidden) sessionStorage.setItem(KEY, '1'); } catch (e) { /* ignorieren */ }
-      });
-    });
-    knopf.addEventListener('click', function() { setze(box.hidden); });
+    if (!box) return;
     box.querySelectorAll('input.endnote-eingabe').forEach(function(inp) {
       inp.addEventListener('change', async function() {
         const body = new URLSearchParams();

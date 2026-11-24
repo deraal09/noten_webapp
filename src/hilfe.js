@@ -152,7 +152,7 @@ export const ARTIKEL = [
         'Unter **Noteneingabe** siehst du deine Fächer, nach Klassen gruppiert, und die Kurse. Mit der **Schuljahr-Auswahl** blendest du ein Schuljahr ein; das laufende ist mit **(aktuell)** gekennzeichnet. Schuljahre, die erst noch beginnen, werden ausgeblendet (neues Schuljahr: 1. August).',
       ] },
       { titel: 'Ein Fach öffnen', absaetze: [
-        'Ein Klick auf ein Fach öffnet die Fachseite des aktuellen Halbjahres. Oben wechselst du das **Halbjahr**. Die Reiter folgen dem Arbeitsablauf: **Klausuren** (zuerst, dort trägst du Punkte ein), **Unterrichtsleistung**, **Notenübersicht**. Die **Synchronisation** steckt unter **⋮ Mehr**, sobald die Klasse eine Klassenleitung hat.',
+        'Ein Klick auf ein Fach öffnet die Fachseite des aktuellen Halbjahres. Oben wechselst du das **Halbjahr**. Beim Öffnen steht die **Notenübersicht** vorn. Über **✏️ Noteneingabe ▾** erreichst du **Unterrichtsleistung**, **Klausuren** und die **Direkte Endnoteneingabe**. Die **Synchronisation** steckt unter **⋮ Mehr**, sobald die Klasse eine Klassenleitung hat.',
         'Die Tabelle zeigt je Person die Note der Unterrichtsleistung, die schriftliche Note (Klausuren) und die **Gesamtnote**. Mit dem Haken **ganze Note** unter einer Spaltenüberschrift rundest du die Anzeige dieser Spalte auf ganze Noten (nur die Anzeige; gespeichert wird genau).',
       ] },
       { titel: 'Direkte Endnoteneingabe', absaetze: [
@@ -168,7 +168,7 @@ export const ARTIKEL = [
     bilder: [{ datei: 'klausur-eintragen', text: 'Klausur mit Punkten je Aufgabe' }],
     abschnitte: [
       { titel: 'Klausur anlegen', schritte: [
-        'In der Fachseite den Reiter **Klausuren** öffnen und mit **＋ Neu hinzufügen** eine Klausur anlegen (Name, optional Datum).',
+        'In der Fachseite **✏️ Noteneingabe ▾ → Klausuren** öffnen und mit **＋ Neu hinzufügen** eine Klausur anlegen (Name, optional Datum).',
         'Unter **⚙ Klausur einstellen** (bei einer neuen Klausur aufgeklappt, sobald Punkte da sind eingeklappt) stehen Gewichtung, Datum, Anzahl der Teile und **Anzahl Aufgaben**. In der Zeile **Max. Punkte** über der Tabelle trägst du die erreichbaren Punkte je Aufgabe ein.',
         'In der Tabelle je Person die **erreichten Punkte** je Aufgabe eintragen. Die Note erscheint sofort nach dem Notenschlüssel der Klasse; alles wird automatisch gespeichert.',
         'Statt einer Zahl darfst du auch eine **Rechnung** eintippen, z. B. `2+1,5+3` oder `(4+2)/2`: Beim Verlassen des Feldes (Tab, Enter oder Pfeiltaste) wird sie ausgerechnet, das Feld zeigt die **Summe**, und die Summe gilt als Punktzahl der Aufgabe. Erlaubt sind + − × ÷ (auch `*` und `/`) und Klammern, Komma oder Punkt. Das gilt auch für Zusatzleistungen und Extrapunkte. Ungültiges (z. B. `3+`) oder mehr als die Höchstpunkte wird rot markiert und nicht gespeichert; die Rechnung selbst wird nicht gespeichert.',
@@ -220,7 +220,7 @@ export const ARTIKEL = [
     bilder: [{ datei: 'datumstabelle', text: 'Datumstabelle mit Terminen und Noten' }],
     abschnitte: [
       { titel: 'Datumstabelle', schritte: [
-        'In der Fachseite den Reiter **Unterrichtsleistung** öffnen und ein Datum mit **+ Datum hinzufügen** anlegen. Im Datumsfeld steht schon **das heutige Datum**: Für heute genügt der Klick auf den Knopf, sonst wählst du vorher ein anderes Datum.',
+        'In der Fachseite **✏️ Noteneingabe ▾ → Unterrichtsleistung** öffnen und ein Datum mit **+ Datum hinzufügen** anlegen. Im Datumsfeld steht schon **das heutige Datum**: Für heute genügt der Klick auf den Knopf, sonst wählst du vorher ein anderes Datum.',
         'Je Person die Note für diesen Termin eintragen; **n.a.** steht für „nicht anwesend“ (zählt nicht mit). Am Handy erscheint beim Antippen eine Auswahl der Noten.',
         'Unter jedem Datum kannst du eine kurze Notiz zum **Unterrichtsinhalt** eintragen. Das Notizsymbol hinter dem Namen öffnet Notizen zur Person.',
       ] },
@@ -297,7 +297,7 @@ export const ARTIKEL = [
     slug: 'sync', kategorie: 'auswerten', titel: 'Synchronisation mit der Klassenleitung',
     kurz: 'Die Klassenleitung sieht nur den synchronisierten Notenstand: per Knopf oder automatisch.',
     schlagworte: ['sync', 'synchronisieren', 'synchronisation', 'klassenleitung', 'auto', 'automatisch', 'halbjahresübersicht', 'stand'],
-    bilder: [{ datei: 'fach-uebersicht', text: 'Fachseite (Reiter Klausuren, Unterrichtsleistung, Notenübersicht; Synchronisation unter „⋮ Mehr“)' }],
+    bilder: [{ datei: 'fach-uebersicht', text: 'Fachseite (Notenübersicht, Menü „Noteneingabe“, Synchronisation unter „⋮ Mehr“)' }],
     abschnitte: [
       { titel: 'Warum Sync?', absaetze: [
         'Die Klassenleitung sieht **nie** die Live-Noten deiner Fächer, nur den Stand, den du **synchronisiert** hast. So behältst du die Kontrolle, bis du die Noten freigeben möchtest.',
@@ -519,7 +519,7 @@ export const RUNDGANG = [
   { titel: 'Fächer und Lehrkräfte', bild: 'faecher-lehrkraefte', text: 'Lege die **Fächer** der Klasse an und ordne **Lehrkräfte** zu. Du kannst dich auch selbst für ein freies Fach eintragen oder dich als **Klassenleitung** eintragen.', artikel: 'faecher-lehrkraefte', href: '/teacher/klassen', linkText: 'Zu den Klassen' },
   { titel: 'Noteneingabe', bild: 'noteneingabe', text: 'In der **Noteneingabe** siehst du deine Fächer. Die **Schuljahr-Auswahl** zeigt das aktuelle Schuljahr mit „(aktuell)“, künftige Schuljahre sind ausgeblendet. Ein Klick auf ein Fach öffnet die Notenübersicht.', artikel: 'noteneingabe-ueberblick', href: '/teacher', linkText: 'Noteneingabe öffnen' },
   { titel: 'Notenübersicht', bild: 'fach-uebersicht', text: 'Oben wechselst du das **Halbjahr**. Die Tabelle zeigt Unterrichtsleistung, schriftliche Note und **Gesamtnote**. Mit dem Haken **ganze Note** rundest du die Anzeige einer Spalte. Weitere Reiter findest du unter **⋮ Mehr**.', artikel: 'noteneingabe-ueberblick', href: '/teacher', linkText: 'Ein Fach öffnen' },
-  { titel: 'Klausuren', bild: 'klausur-eintragen', text: 'Im Reiter **Klausuren** legst du Klausuren an: Aufgaben, **Max. Punkte** je Aufgabe und die erreichten Punkte je Person. Die Note erscheint sofort nach dem Notenschlüssel; alles wird automatisch gespeichert.', artikel: 'klausuren', href: '/teacher', linkText: 'Zur Noteneingabe' },
+  { titel: 'Klausuren', bild: 'klausur-eintragen', text: 'Unter **✏️ Noteneingabe ▾ → Klausuren** legst du Klausuren an: Aufgaben, **Max. Punkte** je Aufgabe und die erreichten Punkte je Person. Die Note erscheint sofort nach dem Notenschlüssel; alles wird automatisch gespeichert.', artikel: 'klausuren', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Mehrteilige Klausuren', bild: 'klausur-teile', text: 'Klausuren können aus **Teilen** bestehen: **Hörverstehen** (Verrechnungspunkte, Tabelle ohne Rundung) und **Inhalt & Sprache** (zwei direkt eingetragene Noten, meist 50:50). Die Teilnoten gehen gewichtet in die Gesamtnote ein.', artikel: 'klausur-teile', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Unterrichtsleistung', bild: 'datumstabelle', text: 'In der **Datumstabelle** trägst du je Unterrichtstermin eine Note ein (**n.a.** = nicht anwesend) und kannst den Unterrichtsinhalt notieren. Zusatzleistungen wie Referate legst du daneben an.', artikel: 'unterrichtsleistung', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Notenschlüssel', bild: 'notenschluessel', text: 'Unter **Notenschlüssel** siehst du, wie Prozent in Noten umgerechnet werden (IHK, BG, SPA). Ändert die Administration einen Schlüssel, bekommst du einen Hinweis.', artikel: 'notenschluessel', href: '/notenschluessel', linkText: 'Notenschlüssel ansehen' },

@@ -133,10 +133,11 @@ test('Direkte Endnote: ntg, leer löscht, ungültig wird abgelehnt, andere Halbj
   assert.equal(berechneGesamtnoten(fachId, '2. Halbjahr').get(annaId) ?? null, null);
 });
 
-test('Fachseite: Button "Direkte Endnoteneingabe" und Tabelle mit dem eingetragenen Wert', async () => {
+test('Fachseite: Menü „Noteneingabe“ mit „Direkte Endnoteneingabe“ und Tabelle mit dem eingetragenen Wert', async () => {
   const html = await (await admin(`/teacher/fach/${fachId}?hj=${enc(HJ1)}`)).text();
-  assert.match(html, /id="endnoten-toggle"[^>]*>✏️ Direkte Endnoteneingabe/);
-  assert.match(html, /id="endnoten-direkt" class="card" hidden/);
+  assert.match(html, /<button type="button" data-target="panel-endnoten">✏️ Direkte Endnoteneingabe<\/button>/);
+  assert.match(html, /<div id="panel-endnoten" class="reiter-panel">/);
+  assert.match(html, /id="endnoten-direkt" class="card">/);
   assert.match(html, /class="endnote-eingabe" data-sid="\d+"\s+value="3,3"/);
   assert.match(html, /class="gesamt-cell direkt"/, 'direkt eingetragene Note ist markiert');
 });
