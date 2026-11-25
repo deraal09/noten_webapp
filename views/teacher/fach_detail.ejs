@@ -1193,9 +1193,24 @@
       }
     }
   }
+  // Auto-Speichern per Formular-Reload darf nicht mit einem Löschen kollidieren: Läuft gerade die Rückfrage („Klausur löschen?“),
+  // wartet das Speichern bis zum Schließen des Dialogs (sonst lädt die Seite neu und der Dialog verschwindet); wurde bestätigt, entfällt
+  // es ganz (sonst träfe es nach dem Löschen die schon gelöschte Klausur und ersetzte die Rückkehr zur Fachseite).
+  let loeschtGerade = false;
+  document.addEventListener('submit', function(e) {
+    const aktion = (e.target && e.target.getAttribute && e.target.getAttribute('action')) || '';
+    if (/\/loeschen$/.test(aktion)) loeschtGerade = true;
+  });
+  function sendeAutoSpeichern(form) {
+    merkeAktivesFeld();
+    const los = function() { if (!loeschtGerade) form.submit(); };
+    const offen = document.querySelector('dialog.bestaetig-dialog[open]');
+    if (offen) offen.addEventListener('close', function() { setTimeout(los, 0); }, { once: true });
+    else los();
+  }
   function inputsVon(form) { return Array.from(form.elements).filter(function(el) { return el.tagName === 'INPUT' || el.tagName === 'SELECT'; }); }
   document.querySelectorAll('form.auto-speichern').forEach(function(form) {
-    const absenden = debounce(function() { merkeAktivesFeld(); form.submit(); }, 800);
+    const absenden = debounce(function() { sendeAutoSpeichern(form); }, 800);
     inputsVon(form).forEach(function(feld) {
       if (feld.name === 'anzahl_aufgaben' || feld.name === 'anzahl_teile') {
         // Aufgaben- und Teilezahl formen die Teile um: Zwischenstände beim Tippen
@@ -1205,7 +1220,7 @@
         const uebernehmen = function() {
           if (abgeschickt) return;
           abgeschickt = true;
-          setTimeout(function() { merkeAktivesFeld(); form.submit(); }, 0);
+          setTimeout(function() { sendeAutoSpeichern(form); }, 0);
         };
         feld.addEventListener('change', uebernehmen);
         feld.addEventListener('keydown', function(e) {
@@ -1218,7 +1233,7 @@
   });
   document.querySelectorAll('form.auto-speichern-sofort').forEach(function(form) {
     inputsVon(form).forEach(function(feld) {
-      feld.addEventListener('change', function() { setTimeout(function() { merkeAktivesFeld(); form.submit(); }, 0); });
+      feld.addEventListener('change', function() { setTimeout(function() { sendeAutoSpeichern(form); }, 0); });
     });
   });
   // Normale Absende-Buttons (z. B. "Teile speichern") bleiben ebenfalls an der Stelle.

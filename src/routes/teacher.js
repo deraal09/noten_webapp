@@ -248,6 +248,19 @@ function parseVerrechnungEingabe(body, laufzeit) {
 }
 
 const MAX_KLAUSUR_NOTIZ = 5000;
+/**
+ * Ziel nach einer Anfrage zu einem Eintrag, den es nicht mehr gibt (Klausur, Zusatzleistung, Termin, Abschnitt gelöscht, z. B. weil
+ * eine verspätete Auto-Speicherung nach dem Löschen eintrifft): zurück auf die Fachseite, von der die Anfrage kam -- nicht auf die
+ * Übersicht aller Klassen. Nur der Pfad der eigenen Fachseite wird übernommen (kein Weiterleiten auf fremde Adressen).
+ */
+function zurueckZurFachseite(request, reply) {
+  try {
+    const u = new URL(request.headers.referer || '', 'http://lokal.invalid');
+    if (/^\/teacher\/fach\/\d+$/.test(u.pathname)) return reply.redirect(u.pathname + u.search);
+  } catch (e) { /* ohne gültige Herkunft: Übersicht */ }
+  return reply.redirect('/teacher');
+}
+
 const MAX_TERMIN_INHALT = 300;
 const MAX_ABSCHNITT_TITEL = 60;
 const MAX_ABSCHNITT_NOTIZ = 1000;
@@ -947,7 +960,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/klausuren/:id/loeschen', async (request, reply) => {
     const k = getDb().prepare('SELECT fach_id, halbjahr FROM klausuren WHERE id = ?').get(request.params.id);
-    if (!k) return reply.redirect('/teacher');
+    if (!k) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     getDb().prepare('DELETE FROM klausuren WHERE id = ?').run(request.params.id);
     autoVerteileKlausuren(k.fach_id, k.halbjahr);
@@ -957,7 +970,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/klausuren/:id/gewichtung', async (request, reply) => {
     const k = getDb().prepare('SELECT fach_id, halbjahr FROM klausuren WHERE id = ?').get(request.params.id);
-    if (!k) return reply.redirect('/teacher');
+    if (!k) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const gw = Number(request.body?.gewichtung) || 0;
     getDb().prepare('UPDATE klausuren SET gewichtung = ? WHERE id = ?').run(gw, request.params.id);
@@ -969,7 +982,7 @@ export default async function teacherRoutes(fastify) {
   // optional für alle Klausuren dieses Fachs übernehmen.
   fastify.post('/klausuren/:id/extras', async (request, reply) => {
     const k = getDb().prepare('SELECT fach_id, halbjahr FROM klausuren WHERE id = ?').get(request.params.id);
-    if (!k) return reply.redirect('/teacher');
+    if (!k) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const b = request.body || {};
     const modus = KNAPP_MODI.includes(String(b.knapp_modus)) ? String(b.knapp_modus) : 'punkte';
@@ -989,7 +1002,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/klausuren/:id/datum', async (request, reply) => {
     const k = getDb().prepare('SELECT fach_id, halbjahr FROM klausuren WHERE id = ?').get(request.params.id);
-    if (!k) return reply.redirect('/teacher');
+    if (!k) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const datum = alsGueltigesDatumOderNull(request.body?.datum);
     getDb().prepare('UPDATE klausuren SET datum = ? WHERE id = ?').run(datum, request.params.id);
@@ -998,7 +1011,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/klausuren/:id/maxpunkte', async (request, reply) => {
     const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
-    if (!k) return reply.redirect('/teacher');
+    if (!k) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     // Bei einer mehrteiligen Klausur passen sich die Teile an die neue
     // Aufgabenzahl an (siehe passeTeileAnAufgabenzahl) -- Aufgaben kommen zum
@@ -1074,7 +1087,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/klausuren/:id/teile', async (request, reply) => {
     const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
-    if (!k) return reply.redirect('/teacher');
+    if (!k) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const zurueck = `/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}&tab=klausuren&open=klausur-panel-${request.params.id}`;
     const liste = (roh) => (Array.isArray(roh) ? roh : [roh]);
@@ -1138,7 +1151,7 @@ export default async function teacherRoutes(fastify) {
   // entfernt Teile, siehe passeTeileAnTeilzahl.
   fastify.post('/klausuren/:id/teile-anzahl', async (request, reply) => {
     const k = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe, teile FROM klausuren WHERE id = ?').get(request.params.id);
-    if (!k) return reply.redirect('/teacher');
+    if (!k) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, k.fach_id, k.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const zurueck = `/teacher/fach/${k.fach_id}?hj=${encodeURIComponent(k.halbjahr)}&tab=klausuren&open=klausur-panel-${request.params.id}`;
     const anzahl = Math.max(1, Math.min(MAX_KLAUSUR_TEILE, parseInt(request.body?.anzahl_teile, 10) || 1));
@@ -1276,7 +1289,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/uls/:id/loeschen', async (request, reply) => {
     const u = getDb().prepare('SELECT fach_id, halbjahr FROM unterrichtsleistungen WHERE id = ?').get(request.params.id);
-    if (!u) return reply.redirect('/teacher');
+    if (!u) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, u.fach_id, u.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     getDb().prepare('DELETE FROM unterrichtsleistungen WHERE id = ?').run(request.params.id);
     syncFallsAutoAktiv(u.fach_id, u.halbjahr, request.user.id);
@@ -1285,7 +1298,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/uls/:id/gewichtung', async (request, reply) => {
     const u = getDb().prepare('SELECT fach_id, halbjahr FROM unterrichtsleistungen WHERE id = ?').get(request.params.id);
-    if (!u) return reply.redirect('/teacher');
+    if (!u) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, u.fach_id, u.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const gw = Number(request.body?.gewichtung) || 0;
     getDb().prepare('UPDATE unterrichtsleistungen SET gewichtung = ? WHERE id = ?').run(gw, request.params.id);
@@ -1295,7 +1308,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/uls/:id/datum', async (request, reply) => {
     const u = getDb().prepare('SELECT fach_id, halbjahr FROM unterrichtsleistungen WHERE id = ?').get(request.params.id);
-    if (!u) return reply.redirect('/teacher');
+    if (!u) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, u.fach_id, u.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const datum = alsGueltigesDatumOderNull(request.body?.datum);
     getDb().prepare('UPDATE unterrichtsleistungen SET datum = ? WHERE id = ?').run(datum, request.params.id);
@@ -1304,7 +1317,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/uls/:id/maxpunkte', async (request, reply) => {
     const u = getDb().prepare('SELECT fach_id, halbjahr, max_punkte_pro_aufgabe FROM unterrichtsleistungen WHERE id = ?').get(request.params.id);
-    if (!u) return reply.redirect('/teacher');
+    if (!u) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, u.fach_id, u.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     const anzahl = Math.max(1, parseInt(request.body?.anzahl_aufgaben, 10) || JSON.parse(u.max_punkte_pro_aufgabe).length);
     const neueWerte = [];
@@ -1386,7 +1399,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/unterricht/termine/:id/loeschen', async (request, reply) => {
     const t = getDb().prepare('SELECT fach_id, halbjahr FROM unterricht_termine WHERE id = ?').get(request.params.id);
-    if (!t) return reply.redirect('/teacher');
+    if (!t) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, t.fach_id, t.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     getDb().prepare('DELETE FROM unterricht_termine WHERE id = ?').run(request.params.id);
     syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.user.id);
@@ -1491,7 +1504,7 @@ export default async function teacherRoutes(fastify) {
 
   fastify.post('/unterricht/abschnitte/:id/loeschen', async (request, reply) => {
     const a = getDb().prepare('SELECT * FROM unterricht_abschnitte WHERE id = ?').get(request.params.id);
-    if (!a) return reply.redirect('/teacher');
+    if (!a) return zurueckZurFachseite(request, reply);
     if (!userHatFachZgriff(request.user, a.fach_id, a.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
     getDb().prepare('DELETE FROM unterricht_abschnitte WHERE id = ?').run(a.id);
     syncFallsAutoAktiv(a.fach_id, a.halbjahr, request.user.id);

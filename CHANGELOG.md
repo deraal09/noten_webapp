@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.2.2 - 2026-11-25
+
+### Löschen: kein Sprung mehr auf die Klassenübersicht
+
+- Anfragen zu einer **schon gelöschten** Klausur, Zusatzleistung, Datumstabellen-Termin oder
+  -Abschnitt führten bisher auf die Übersicht aller Klassen („Meine Noteneingabe“). Sie führen
+  jetzt zurück auf die Fachseite, von der sie kamen (nur der eigene Pfad wird übernommen).
+- **Ursache für solche verspäteten Anfragen**: Das Auto-Speichern per Formular-Reload (Datum,
+  Gewichtung, Aufgabenzahl …) konnte mit dem Löschen kollidieren. Es wartet jetzt, solange die
+  Rückfrage „Klausur löschen?“ offen ist (vorher lud die Seite neu und der Dialog verschwand),
+  und entfällt nach bestätigtem Löschen; nach „Abbrechen“ wird wie gewohnt gespeichert.
+- Der Bestätigungsdialog sendet ein Formular nie zweimal ab (Doppelklick/doppeltes Ereignis).
+
 ## 1.2.1 - 2026-11-25
 
 ### Datumstabelle: Abschnittsnotiz aufklappbar, Reiter-Sprung behoben

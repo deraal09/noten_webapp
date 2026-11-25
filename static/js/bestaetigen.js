@@ -87,6 +87,10 @@
     var ausloeser = e.submitter || null;
     frage(text, ausloeser && ausloeser.classList.contains('danger'), ausloeser).then(function (ja) {
       if (!ja) return;
+      // Nie zweimal absenden (Doppelklick, doppelt ausgelöstes Ereignis): Das zweite Löschen träfe einen schon gelöschten Eintrag.
+      if (form.dataset.gesendet) return;
+      form.dataset.gesendet = '1';
+      setTimeout(function () { delete form.dataset.gesendet; }, 5000);
       form.dataset.bestaetigt = '1';
       mitJa(function () { absenden(form, ausloeser); });
       delete form.dataset.bestaetigt;
