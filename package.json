@@ -1,6 +1,6 @@
 {
   "name": "noten-webapp",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "releaseDate": "2026-11-25",
   "private": true,
   "description": "Multi-User-Notenverwaltung als Single-Process-Node.js-App, deploybar via Plesk Node.js-Support ohne Reverse-Proxy.",

@@ -211,7 +211,7 @@ export const ARTIKEL = [
         'Mit dieser Option legt ein Teil die beste erreichbare Gesamtnote fest: Die anderen Teile können sie dann nicht verbessern, nur verschlechtern.',
       ] },
     ],
-    links: [{ text: 'Zur Noteneingabe', href: '/teacher' }], verwandt: ['klausuren', 'notenschluessel'],
+    links: [{ text: 'Zur Noteneingabe', href: '/teacher' }], verwandt: ['klausuren', 'notenschluessel', 'faecher-tipps'],
   },
   {
     slug: 'unterrichtsleistung', kategorie: 'noten', titel: 'Unterrichtsleistung: Datumstabelle und Zusatzleistungen',
@@ -233,7 +233,7 @@ export const ARTIKEL = [
         'Mit **＋ Neu hinzufügen** neben der Datumstabelle legst du Zusatzleistungen an (z. B. Referat). Wie bei Klausuren trägst du Punkte ein; die **Gewichtung** bestimmt den Anteil am Topf der Unterrichtsleistung. Der Rest geht in die Datumstabelle.',
       ] },
     ],
-    links: [{ text: 'Zur Noteneingabe', href: '/teacher' }], verwandt: ['klausuren', 'verrechnung-endnoten'],
+    links: [{ text: 'Zur Noteneingabe', href: '/teacher' }], verwandt: ['klausuren', 'verrechnung-endnoten', 'faecher-tipps'],
   },
   {
     slug: 'notenschluessel', kategorie: 'noten', titel: 'Notenschlüssel IHK, BG und SPA',
@@ -464,6 +464,36 @@ export const ARTIKEL = [
     links: [{ text: 'Zur Startseite', href: '/start' }], verwandt: ['funktionen', 'noteneingabe-ueberblick'],
   },
   {
+    slug: 'faecher-tipps', kategorie: 'start', titel: 'Tipps je Fach: Englisch, Deutsch und Sport',
+    kurz: 'Welche Funktionen in welchem Fach wichtig sind: Hörverstehen und Teile (Englisch), Teile mit „bestimmt beste Note“ (Deutsch), Abschnitte und Zusatzleistungen (Sport).',
+    schlagworte: ['fach', 'fächer', 'tipps', 'beispiel', 'einstieg', 'neu hier', 'englisch', 'fremdsprache', 'deutsch', 'sport', 'bewertungstabelle', 'verrechnungstabelle', 'klausur teile', 'bestimmt beste note', 'abschnitte', 'zwischennote', 'gewichtung', 'zusatzleistung', 'weitere unterrichtsleistung'],
+    bilder: [{ datei: 'klausur-teile', text: 'Klausur mit Teilen (Englisch, Deutsch)' }, { datei: 'datumstabelle', text: 'Datumstabelle (Sport; Abschnitte teilen sie in Blöcke)' }],
+    abschnitte: [
+      { titel: 'Für alle Fächer', absaetze: [
+        'Jedes Fach hat zwei Seiten: die **Klausuren** (schriftlich) und die **Unterrichtsleistung** (mündlich: Datumstabelle plus Zusatzleistungen). Beides erreichst du in der Fachseite über **✏️ Noteneingabe ▾**. Wie beide Teile zur Gesamtnote beitragen, zeigt dir die **Notenübersicht** des Fachs.',
+        'Welche Funktionen du für dein Fach brauchst, steht unten. Alles andere kannst du zunächst ignorieren; unter **Meine Funktionen** lässt sich die Oberfläche zusätzlich verschlanken.',
+      ] },
+      { titel: 'Englisch: Hörverstehen und Klausurteile', schritte: [
+        'Öffne **✏️ Noteneingabe ▾ → Klausuren**, lege die Klausur an und stelle unter **⚙ Klausur einstellen** die **Anzahl Teile** ein, z. B. Hörverstehen, Mediation und Textaufgabe.',
+        'Je Teil wählst du **Name**, **Art** und **Gewichtung %**. Die Gesamtnote ist der gewichtete Mittelwert der Teilnoten.',
+        'Beim Teil **Hörverstehen** wählst du die Art **Hörverstehen (Verrechnungstabelle)** und trägst in einer Aufgabe die **Verrechnungspunkte** ein (meist 15, auch 20 oder 25). Die Note folgt der **Bewertungstabelle** ohne Rundung: bei 15 Punkten gibt es die 2 erst ab 4,05 Punkten. Die Tabelle lässt sich unter der Teile-Tabelle aufklappen und ansehen.',
+        'Bei **Mediation** und **Textaufgabe** wählst du die Art **Inhalt & Sprache**: Du trägst Inhalt und Sprache direkt als Note (BG: Notenpunkte) ein; das Verhältnis ist meist 50:50 und einstellbar.',
+      ], hinweis: 'Ausführlich mit Beispiel: Artikel „Mehrteilige Klausuren“.' },
+      { titel: 'Deutsch: Klausurteile, ein Teil gibt die beste Note vor', schritte: [
+        'Teile die Klausur wie oben in **mehrere Bereiche** (z. B. Textanalyse, Schreibaufgabe, Sprachrichtigkeit): **Anzahl Teile** einstellen und je Teil Name, Aufgaben und **Gewichtung %** festlegen.',
+        'In der letzten Spalte der Teile-Tabelle, **Bestimmt beste Note**, wählst du den Teil, der die **beste erreichbare Gesamtnote** vorgibt. Die anderen Teile können die Gesamtnote dann nur noch verschlechtern, nicht über diesen Teil hinaus verbessern.',
+        'Bestimmt kein Teil die beste Note, steht die Auswahl auf **„Kein Teil“**; dann zählt allein der gewichtete Mittelwert.',
+      ], hinweis: 'Beispiel: Bestimmt die Schreibaufgabe die beste Note und erreicht eine Person dort eine 4, kann die Gesamtnote auch mit glänzenden anderen Teilen nicht besser als 4 werden.' },
+      { titel: 'Sport: Abschnitte, Zwischennoten und weitere Unterrichtsleistungen', schritte: [
+        'Öffne **✏️ Noteneingabe ▾ → Unterrichtsleistung** und lege in der **Datumstabelle** mit **+ Datum hinzufügen** deine Termine an; je Person trägst du eine Note ein, **n.a.** und **e** (entschuldigt) zählen nicht, **ne** (nicht entschuldigt) zählt als schlechteste Note.',
+        'Unter **Abschnitte (optional)** teilst du die Tabelle in Blöcke, z. B. nach Sportarten oder Themen: Beginn-Datum und Titel wählen, **+ Abschnitt beginnen**. Jeder Abschnitt hat eine **Notiz für den ganzen Abschnitt**, eine **Zwischennote** je Person (in der Tabelle sichtbar) und eine **Gewichtung**.',
+        'Der Durchschnitt der Datumstabelle ist das nach den Gewichten der Abschnitte gewichtete Mittel der Zwischennoten (z. B. 1 und 2 oder 30 und 70).',
+        'Weitere Leistungen, die nicht in die Datumstabelle gehören (z. B. Sportpraxis-Prüfung, Theorietest, Referat), legst du daneben mit **＋ Neu hinzufügen** als **Zusatzleistung** an. Ihre **Gewichtung** ist der Anteil an der Unterrichtsleistung; der Rest bis 100 % entfällt auf die Datumstabelle.',
+      ], hinweis: 'Beispiel: Zusatzleistung „Sportpraxis“ mit 40 % – dann zählt die Datumstabelle (mit ihren Abschnitten) zu 60 % der Unterrichtsleistung.' },
+    ],
+    links: [{ text: 'Zur Noteneingabe', href: '/teacher' }], verwandt: ['klausur-teile', 'klausuren', 'unterrichtsleistung', 'notenschluessel'],
+  },
+  {
     slug: 'funktionen', kategorie: 'mehr', titel: 'Meine Funktionen: nur sehen, was du brauchst',
     kurz: 'Startprofil wählen und Funktionen wie Sitzpläne, Notenbesprechung oder Statistik ein- und ausschalten.',
     schlagworte: ['funktionen', 'profil', 'einfach', 'ausblenden', 'einblenden', 'sitzplan', 'sitzpläne', 'notenbesprechung', 'statistik', 'favoriten', 'api', 'klassenleitung', 'synchronisation', 'übersichtlich', 'menü', 'einschalten', 'ausschalten'],
@@ -526,7 +556,8 @@ export const RUNDGANG = [
   { titel: 'Notenübersicht', bild: 'fach-uebersicht', text: 'Oben wechselst du das **Halbjahr**. Die Tabelle zeigt Unterrichtsleistung, schriftliche Note und **Gesamtnote**. Mit dem Haken **ganze Note** rundest du die Anzeige einer Spalte. Weitere Reiter findest du unter **⋮ Mehr**.', artikel: 'noteneingabe-ueberblick', href: '/teacher', linkText: 'Ein Fach öffnen' },
   { titel: 'Klausuren', bild: 'klausur-eintragen', text: 'Unter **✏️ Noteneingabe ▾ → Klausuren** legst du Klausuren an: Aufgaben, **Max. Punkte** je Aufgabe und die erreichten Punkte je Person. Die Note erscheint sofort nach dem Notenschlüssel; alles wird automatisch gespeichert.', artikel: 'klausuren', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Mehrteilige Klausuren', bild: 'klausur-teile', text: 'Klausuren können aus **Teilen** bestehen: **Hörverstehen** (Verrechnungspunkte, Tabelle ohne Rundung) und **Inhalt & Sprache** (zwei direkt eingetragene Noten, meist 50:50). Die Teilnoten gehen gewichtet in die Gesamtnote ein.', artikel: 'klausur-teile', href: '/teacher', linkText: 'Zur Noteneingabe' },
-  { titel: 'Unterrichtsleistung', bild: 'datumstabelle', text: 'In der **Datumstabelle** trägst du je Unterrichtstermin eine Note ein (**n.a.** = nicht anwesend) und kannst den Unterrichtsinhalt notieren. Zusatzleistungen wie Referate legst du daneben an.', artikel: 'unterrichtsleistung', href: '/teacher', linkText: 'Zur Noteneingabe' },
+  { titel: 'Unterrichtsleistung', bild: 'datumstabelle', text: 'In der **Datumstabelle** trägst du je Unterrichtstermin eine Note ein (**n.a.** = nicht anwesend, **e** = entschuldigt, **ne** = nicht entschuldigt) und kannst den Unterrichtsinhalt notieren; optional teilst du sie in **Abschnitte** mit Zwischennote. Zusatzleistungen wie Referate legst du daneben an.', artikel: 'unterrichtsleistung', href: '/teacher', linkText: 'Zur Noteneingabe' },
+  { titel: 'Tipps für dein Fach', bild: 'klausur-teile', text: '**Englisch:** Klausur in Teile aufteilen, Hörverstehen mit Bewertungstabelle (Verrechnungspunkte). **Deutsch:** Klausurteile, von denen einer die **beste Note vorgibt**. **Sport:** Datumstabelle in **Abschnitte** mit Zwischennoten und Gewichtung teilen und **weitere Unterrichtsleistungen** mit Gewichtung ergänzen. Der Artikel zeigt je Fach, wo du was findest.', artikel: 'faecher-tipps', href: '/hilfe/faecher-tipps', linkText: 'Tipps je Fach lesen' },
   { titel: 'Notenschlüssel', bild: 'notenschluessel', text: 'Unter **Notenschlüssel** siehst du, wie Prozent in Noten umgerechnet werden (IHK, BG, SPA). Ändert die Administration einen Schlüssel, bekommst du einen Hinweis.', artikel: 'notenschluessel', href: '/notenschluessel', linkText: 'Notenschlüssel ansehen' },
   { titel: 'Notenbesprechung', bild: 'besprechung', text: 'Mit **🗣 Notenbesprechung starten** gehst du Person für Person durch; der **Würfel** wählt zufällig die nächste Person, jede nur einmal. Die Gesamtnote lässt sich korrigieren.', artikel: 'notenbesprechung', href: '/teacher', linkText: 'Zur Noteneingabe' },
   { titel: 'Sync mit der Klassenleitung', bild: 'klassenleitung', text: 'Die Klassenleitung sieht nur den **synchronisierten** Stand. Mit **Jetzt synchronisieren** oder dem Haken **automatisch synchronisieren** gibst du deine Noten frei.', artikel: 'sync', href: '/klassenlehrer', linkText: 'Klassenleitung öffnen' },

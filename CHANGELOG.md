@@ -6,6 +6,19 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.3.0 - 2026-11-25
+
+### Hilfe: Tipps je Fach (Englisch, Deutsch, Sport)
+
+- Neuer Hilfe-Artikel **„Tipps je Fach: Englisch, Deutsch und Sport“** in der Kategorie
+  „Erste Schritte“: Englisch (Klausur in Teile aufteilen, Hörverstehen mit Bewertungstabelle),
+  Deutsch (Klausurteile, ein Teil „bestimmt beste Note“), Sport (Datumstabelle in Abschnitte mit
+  Zwischennoten und Gewichtung teilen, weitere Unterrichtsleistungen als Zusatzleistung mit Gewichtung).
+- **Neu hier?**: Der Banner auf der Startseite verlinkt die Tipps, der geführte Rundgang hat dazu
+  den neuen Schritt „Tipps für dein Fach“; der Rundgang-Schritt „Unterrichtsleistung“ nennt jetzt
+  auch e/ne und die Abschnitte. Die Artikel „Mehrteilige Klausuren“ und „Unterrichtsleistung“
+  verweisen auf die Tipps.
+
 ## 1.2.2 - 2026-11-25
 
 ### Löschen: kein Sprung mehr auf die Klassenübersicht

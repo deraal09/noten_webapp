@@ -39,6 +39,25 @@ test('Inhalte: eindeutige Slugs, gültige Kategorien und Verweise, alle Bilder e
   }
 });
 
+test('Tipps je Fach: Artikel für Englisch, Deutsch und Sport in „Erste Schritte“, im Rundgang und im Neu-hier-Banner verlinkt', async () => {
+  const a = ARTIKEL.find((x) => x.slug === 'faecher-tipps');
+  assert.ok(a);
+  assert.equal(a.kategorie, 'start');
+  const text = JSON.stringify(a.abschnitte);
+  for (const wort of ['Englisch', 'Hörverstehen', 'Bewertungstabelle', 'Deutsch', 'Bestimmt beste Note', 'Sport', 'Abschnitte', 'Zwischennote', 'Zusatzleistung', 'Gewichtung']) {
+    assert.ok(text.includes(wort), `Artikel nennt ${wort}`);
+  }
+  assert.ok(RUNDGANG.some((s) => s.artikel === 'faecher-tipps'), 'Rundgang-Schritt');
+  assert.equal(sucheHilfe('sport abschnitte')[0].slug, 'faecher-tipps');
+  assert.ok(sucheHilfe('Hörverstehen').some((t) => t.slug === 'faecher-tipps'));
+  const seite = await (await get('/hilfe/faecher-tipps')).text();
+  assert.match(seite, /Tipps je Fach: Englisch, Deutsch und Sport/);
+  const start = fs.readFileSync(path.join(ROOT, 'views', 'start.ejs'), 'utf8');
+  assert.match(start, /Neu hier\?[\s\S]*href="\/hilfe\/faecher-tipps"/, 'Banner „Neu hier?“');
+  const index = await (await get('/hilfe')).text();
+  assert.match(index, /href="\/hilfe\/faecher-tipps"/);
+});
+
 test('Suche: Umlaute und Schreibweisen, Rangfolge, mehrere Wörter, Unsinn', () => {
   assert.equal(sucheHilfe('Hörverstehen')[0].slug, 'klausur-teile');
   assert.equal(sucheHilfe('hoerverstehen')[0].slug, 'klausur-teile', 'oe = ö');
