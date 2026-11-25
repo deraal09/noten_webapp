@@ -68,5 +68,5 @@ test('Fachseite: gemerkter Reiter wird nur beim Neuladen/Zurück/aus der Fachsei
   assert.match(html, /function sollGemerktenReiterNutzen\(\)/);
   assert.match(html, /nav\.type === 'reload' \|\| nav\.type === 'back_forward'/);
   assert.match(html, /new URL\(document\.referrer\)\.pathname === location\.pathname/);
-  assert.match(html, /if \(storageKey && sollGemerktenReiterNutzen\(\)\)/);
+  assert.match(html, /sollGemerktenReiterNutzen\(\) \? localStorage\.getItem\(storageKey\) : null/);
 });

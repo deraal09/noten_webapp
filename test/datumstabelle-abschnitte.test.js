@@ -202,6 +202,7 @@ test('Abschnitte in der Fachansicht: Kopf mit Titel, Notiz, Gewicht, Zwischennot
   const html = await (await lehrer(`/teacher/fach/${ihk}?hj=${q}`)).text();
   assert.match(html, /class="abschnitt-titel"[^>]*value="Herbst 2025"/);
   assert.match(html, /<textarea class="abschnitt-notiz"[^>]*>Themenblock Lyrik\nmit Gedichtvergleich<\/textarea>/);
+  assert.match(html, /<details class="abschnitt-notiz-box" data-abschnitt="\d+">\s*<summary>📝 Notiz zum Abschnitt<span class="abschnitt-notiz-vorschau"> – Themenblock Lyrik mit Gedichtvergleich<\/span><\/summary>/, 'Notiz ist aufklappbar, Vorschau in der Überschrift');
   assert.match(html, /class="abschnitt-gewicht"[^>]*value="0\.5"/);
   assert.match(html, /Ø Abschn\./);
   assert.match(html, new RegExp(`<td class="note-cell abschnitt-note" data-sid="${s2}" data-abschnitt="${abA}">3,0</td>`));
@@ -265,6 +266,11 @@ test('Touch-Auswahl bietet n.a., e und ne an; Hilfe erklärt Abschnitte und Fehl
   const hilfe = await (await lehrer('/hilfe/unterrichtsleistung')).text();
   assert.match(hilfe, /Abschnitte \(optional\)/);
   assert.match(hilfe, /nicht entschuldigt/);
+});
+
+test('Fachseite setzt den Merkzettel der Reiter auf den vorgegebenen Reiter (kein Sprung auf alten Unter-Reiter nach dem Neuladen)', async () => {
+  const html = await (await lehrer(`/teacher/fach/${ihk}?hj=${q}`)).text();
+  assert.match(html, /localStorage\.setItem\(storageKey, vorgabe\.dataset\.target\)/);
 });
 
 test.after(async () => {

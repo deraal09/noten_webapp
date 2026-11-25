@@ -611,6 +611,8 @@ table.tafel th.abschnitt-head { min-width: 17rem; text-align: left; vertical-ali
 .abschnitt-kopf input.abschnitt-titel { flex: 1 1 8rem; min-width: 6rem; font-weight: 600; }
 .abschnitt-kopf .abschnitt-feld { font-size: 0.8rem; font-weight: 400; color: var(--text-muted); white-space: nowrap; }
 .abschnitt-kopf input.abschnitt-gewicht { width: 4.5rem; }
+details.abschnitt-notiz-box > summary { cursor: pointer; font-size: 0.85rem; font-weight: 400; color: var(--text-muted); padding: 0.15rem 0; }
+.abschnitt-notiz-vorschau { font-style: italic; }
 textarea.abschnitt-notiz { width: 100%; box-sizing: border-box; font-size: 0.85rem; font-weight: 400; }
 table.tafel th.abschnitt-zw, table.tafel td.abschnitt-note { background: var(--bg-header); font-weight: 600; }
 .notiz-datum-zeile { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0; }

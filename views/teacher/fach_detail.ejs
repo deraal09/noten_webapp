@@ -526,7 +526,10 @@
                     <button type="submit" class="danger" title="Abschnitt löschen" aria-label="Abschnitt ab <%= deDatum(a.ab_datum) %> löschen">🗑</button>
                   </form>
                 </div>
-                <textarea class="abschnitt-notiz" data-abschnitt="<%= a.id %>" rows="2" maxlength="1000" placeholder="Notiz zum gesamten Abschnitt" aria-label="Notiz zum Abschnitt ab <%= deDatum(a.ab_datum) %>"><%= a.notiz %></textarea>
+                <details class="abschnitt-notiz-box" data-abschnitt="<%= a.id %>">
+                  <summary>📝 Notiz zum Abschnitt<span class="abschnitt-notiz-vorschau"><%= a.notiz ? ' – ' + (a.notiz.length > 40 ? a.notiz.slice(0, 40) + '…' : a.notiz).replace(/\s+/g, ' ') : '' %></span></summary>
+                  <textarea class="abschnitt-notiz" data-abschnitt="<%= a.id %>" rows="3" maxlength="1000" placeholder="Notiz zum gesamten Abschnitt" aria-label="Notiz zum Abschnitt ab <%= deDatum(a.ab_datum) %>"><%= a.notiz %></textarea>
+                </details>
               </th>
             <% }); %>
             <th rowspan="2">Ø</th>
@@ -808,11 +811,17 @@
     });
     // Der gemerkte Reiter gilt nur, solange man auf dieser Fachseite bleibt (Neuladen, Zurück, Formular senden, Halbjahr
     // wechseln). Wird das Fach neu geöffnet (z. B. aus der Noteneingabe-Übersicht), steht immer die Notenübersicht vorn.
-    if (storageKey && sollGemerktenReiterNutzen()) {
+    if (storageKey) {
       try {
-        const gemerkterReiter = localStorage.getItem(storageKey);
+        const gemerkterReiter = sollGemerktenReiterNutzen() ? localStorage.getItem(storageKey) : null;
         if (gemerkterReiter && document.getElementById(gemerkterReiter)) {
           setzeReiter(gemerkterReiter);
+        } else {
+          // Es gilt der vorgegebene Reiter (frisch geöffnetes Fach). Dann auch den Merkzettel darauf setzen: Sonst bliebe
+          // ein alter Eintrag aus einem früheren Besuch stehen, und der nächste Reload (z. B. nach „+ Abschnitt beginnen“
+          // oder „+ Datum hinzufügen“) spränge plötzlich auf diesen alten Reiter, z. B. die nächste Zusatzleistung.
+          const vorgabe = buttons.find(function(b) { return b.classList.contains('active'); });
+          if (vorgabe) localStorage.setItem(storageKey, vorgabe.dataset.target);
         }
       } catch (e) { /* z. B. privater Modus */ }
     }
@@ -1090,6 +1099,19 @@
     });
   });
 
+  // Notiz je Abschnitt ist aufklappbar; die Kurzvorschau in der Überschrift zeigt, ob eine Notiz da ist. Der Zustand
+  // (offen/zu) bleibt je Abschnitt bis zum Schließen des Tabs erhalten (z. B. nach dem Neuladen).
+  function aktualisiereNotizVorschau(box, text) {
+    const v = box && box.querySelector('.abschnitt-notiz-vorschau');
+    if (!v) return;
+    const kurz = String(text || '').replace(/\s+/g, ' ').trim();
+    v.textContent = kurz ? ' – ' + (kurz.length > 40 ? kurz.slice(0, 40) + '…' : kurz) : '';
+  }
+  document.querySelectorAll('details.abschnitt-notiz-box').forEach(function(box) {
+    const key = 'abschnitt-notiz-offen-' + box.dataset.abschnitt;
+    try { if (sessionStorage.getItem(key) === '1') box.open = true; } catch (e) { /* ohne Speicher: zu */ }
+    box.addEventListener('toggle', function() { try { sessionStorage.setItem(key, box.open ? '1' : '0'); } catch (e) { /* egal */ } });
+  });
   // Abschnitte der Datumstabelle: Titel, Notiz, Gewichtung und Beginn speichern sich beim Verlassen des Feldes.
   document.querySelectorAll('.abschnitt-titel, .abschnitt-notiz, .abschnitt-gewicht, .abschnitt-ab').forEach(function(feld) {
     const name = feld.classList.contains('abschnitt-titel') ? 'titel' : feld.classList.contains('abschnitt-notiz') ? 'notiz'
@@ -1103,6 +1125,7 @@
       try { d = await (await fetch('/teacher/unterricht/abschnitte/' + feld.dataset.abschnitt, { method: 'POST', body })).json(); } catch (e) { /* ignorieren */ }
       if (d && d.ok) {
         zuletzt = feld.value; feld.classList.remove('speicherfehler'); feld.title = '';
+        if (name === 'notiz') aktualisiereNotizVorschau(feld.closest('details.abschnitt-notiz-box'), d.notiz);
         if (name === 'ab_datum') window.location.reload(); // die Termine ordnen sich neu den Abschnitten zu
         else if (name === 'gewichtung') refresh();
       } else {

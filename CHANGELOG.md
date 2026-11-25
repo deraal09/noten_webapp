@@ -6,6 +6,18 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.2.1 - 2026-11-25
+
+### Datumstabelle: Abschnittsnotiz aufklappbar, Reiter-Sprung behoben
+
+- **Notiz je Abschnitt aufklappbar**: Im Tabellenkopf steht nur noch „📝 Notiz zum Abschnitt“
+  mit einer Kurzvorschau; die Notiz klappt per Klick auf (Zustand bleibt je Abschnitt erhalten).
+- **Fehler behoben**: Nach „+ Abschnitt beginnen“ (und ebenso „+ Datum hinzufügen“) sprang die
+  Seite auf eine Zusatzleistung und verließ die Datumstabelle. Ursache: Beim Öffnen des Fachs
+  gilt der vorgegebene Reiter, der Merkzettel (`localStorage`) behielt aber einen alten Eintrag
+  aus einem früheren Besuch, den der Reload nach dem Absenden wieder anwandte. Jetzt wird der
+  Merkzettel beim Öffnen auf den tatsächlich angezeigten Reiter gesetzt (gilt für alle Reiter-Gruppen).
+
 ## 1.2.0 - 2026-11-25
 
 ### Datumstabelle: e und ne, Abschnitte, Notizdatum
