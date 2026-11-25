@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.3.1 - 2026-11-25
+
+### Hilfe: „Anforderung nicht erfüllt“ führt zum Feedback
+
+- Kann die Notenapp eine Anforderung nicht erfüllen (Funktion fehlt, keine Antwort in der Hilfe), leitet die
+  Hilfe zum Feedback-Formular (vorausgewählt „💡 Ich wünsche mir …“) weiter: Hinweis auf der Hilfe-Startseite,
+  am Ende jedes Hilfe-Artikels, bei „Nichts gefunden“ in der Hilfe-Suche (Seite und Live-Suche) und in der
+  Suche **Strg+K**. Die Seite, von der man kommt, wird als Herkunft mitgegeben.
+- Der Artikel „Feedback geben“ erklärt, wie man eine fehlende Anforderung beschreibt, und wird bei Suchwörtern
+  wie „Anforderung“, „fehlt“ oder „geht nicht“ gefunden.
+
 ## 1.3.0 - 2026-11-25
 
 ### Hilfe: Tipps je Fach (Englisch, Deutsch, Sport)

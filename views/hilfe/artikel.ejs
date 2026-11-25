@@ -37,4 +37,8 @@
   <h2>Weiterlesen</h2>
   <ul class="hilfe-liste"><% verwandt.forEach(function(v) { %><li><a href="/hilfe/<%= v.slug %>"><%= v.titel %></a> <span class="hint">– <%= v.kurz %></span></li><% }); %></ul>
 <% } %>
+<p class="hilfe-feedback-hinweis card">
+  💡 Passt das nicht zu dem, was du brauchst? Kann die Notenapp deine Anforderung nicht erfüllen, sag es uns –
+  <a href="/feedback?art=wunsch&amp;von=/hilfe/<%= artikel.slug %>">Wunsch als Feedback senden →</a>
+</p>
 <p><a class="btn" href="/hilfe/rundgang">🧭 Geführter Rundgang</a> <% if (artikel.kategorie === 'leitung') { %><a class="btn" href="/hilfe/rundgang-klassenleitung">🎓 Rundgang Klassenleitung</a> <% } %> <a class="btn btn-zurueck" href="/hilfe">← Alle Themen</a></p>

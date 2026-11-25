@@ -16,10 +16,16 @@
 </div>
 <% }); %>
 
+<p class="hilfe-feedback-hinweis card">
+  💡 <strong>Kann die Notenapp deine Anforderung nicht erfüllen?</strong> Findest du keine Antwort oder fehlt eine Funktion, dann sag es uns –
+  <a href="/feedback?art=wunsch&amp;von=/hilfe">Wunsch als Feedback senden →</a>
+</p>
+
 <% if (treffer) { %>
   <h2>Suchergebnisse für „<%= q %>“</h2>
   <% if (!treffer.length) { %>
     <p class="hint">Nichts gefunden. Versuche ein anderes Wort (z. B. „Klausur“, „Schüler“, „Notenschlüssel“) oder stöbere unten in den Themen.</p>
+    <p>Kann die Notenapp deine Anforderung nicht erfüllen? <a class="btn" href="/feedback?art=wunsch&amp;von=/hilfe">💡 Wunsch als Feedback senden →</a></p>
   <% } else { %>
     <ul class="hilfe-liste">
       <% treffer.forEach(function(t) { %>
@@ -64,7 +70,11 @@
       if (!treffer.length) {
         var leer = document.createElement('li');
         leer.className = 'hilfe-treffer-leer';
-        leer.textContent = 'Nichts gefunden für „' + q + '“.';
+        leer.textContent = 'Nichts gefunden für „' + q + '“. ';
+        var fb = document.createElement('a');
+        fb.href = '/feedback?art=wunsch&von=/hilfe';
+        fb.textContent = 'Anforderung nicht erfüllt? Wunsch senden →';
+        leer.appendChild(fb);
         liste.appendChild(leer);
       }
       treffer.forEach(function (t) {

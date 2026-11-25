@@ -74,7 +74,14 @@
       abschnitt('Hilfe');
       daten.hilfe.forEach(function (h) { zeile({ href: h.href }, h.titel, h.kurz, '❓'); });
     }
-    info.textContent = eintraege.length ? '' : (anfrage ? 'Nichts gefunden. Versuche ein anderes Wort, z. B. „Klausur“, „Zeugnis“ oder „Sitzplan“.' : '');
+    info.textContent = eintraege.length ? '' : (anfrage ? 'Nichts gefunden. Versuche ein anderes Wort, z. B. „Klausur“, „Zeugnis“ oder „Sitzplan“. ' : '');
+    if (!eintraege.length && anfrage) {
+      // Findet die Suche nichts: die Anforderung als Wunsch an die Administration weitergeben (Feedback)
+      var fb = document.createElement('a');
+      fb.href = '/feedback?art=wunsch';
+      fb.textContent = 'Anforderung nicht erfüllt? Wunsch senden →';
+      info.appendChild(fb);
+    }
     markiere(0);
   }
   function lade() {

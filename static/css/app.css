@@ -1208,3 +1208,6 @@ small.knapp { display: inline-block; margin-left: 0.3rem; padding: 0 0.35rem; bo
 .reiter-mehr-menu a.menue-link { display: block; padding: 0.6rem 0.9rem; min-height: 44px; box-sizing: border-box; text-align: left; text-decoration: none; color: var(--primary-text); white-space: nowrap; }
 .reiter-mehr-menu a.menue-link:hover { background: var(--bg-tint); }
 .reiter-mehr-menu button { white-space: nowrap; }
+
+/* Hilfe: Hinweis „Anforderung nicht erfüllt“ → Feedback */
+.hilfe-feedback-hinweis { margin: 1rem 0; padding: 0.7rem 1rem; }

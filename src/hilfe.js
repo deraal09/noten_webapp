@@ -513,15 +513,19 @@ export const ARTIKEL = [
   {
     slug: 'feedback', kategorie: 'mehr', titel: 'Feedback geben: Lob, Wünsche und Probleme',
     kurz: 'Der Administration mitteilen, was gut funktioniert, was fehlt oder was nicht stimmt – anonym oder mit Namen.',
-    schlagworte: ['feedback', 'rückmeldung', 'wunsch', 'wünsche', 'lob', 'problem', 'fehler', 'verbesserung', 'vorschlag', 'melden', 'anonym'],
+    schlagworte: ['feedback', 'rückmeldung', 'wunsch', 'wünsche', 'lob', 'problem', 'fehler', 'verbesserung', 'vorschlag', 'melden', 'anonym', 'anforderung', 'anforderung nicht erfüllt', 'fehlt', 'funktion fehlt', 'geht nicht', 'nicht möglich', 'kann nicht', 'vermisse', 'wunschfunktion'],
     abschnitte: [
       { titel: 'Feedback senden', schritte: [
         'Unten auf jeder Seite (**Feedback**) oder im Menü **☰ → 💬 Feedback** öffnen.',
         'Wählen, worum es geht: **👍 Das gefällt mir**, **💡 Ich wünsche mir …** oder **🐞 Etwas stimmt nicht**.',
         'Text schreiben (mindestens 5, höchstens 2000 Zeichen), optional die betroffene **Funktion** wählen und **Feedback senden**.',
       ], hinweis: 'Dein Feedback ist **anonym**: Es wird kein Konto gespeichert, solange du nicht **Meinen Namen mitsenden** ankreuzt. Bitte schreibe keine Namen oder Noten von Schüler/innen hinein.' },
+      { titel: 'Die Notenapp erfüllt meine Anforderung nicht', absaetze: [
+        'Fehlt dir eine Funktion, lässt sich eine Bewertungsregel deines Fachs nicht abbilden oder findest du in der Hilfe keine Antwort? Dann sag es uns: Wähle **💡 Ich wünsche mir …** und beschreibe kurz, **was du erreichen möchtest** (z. B. „Ich muss in Sport drei Teilnoten unterschiedlich gewichten“) und **wie du es heute löst**. So lässt sich prüfen, ob es schon geht oder was ergänzt werden kann.',
+        'Du erreichst das Formular aus jedem Hilfe-Artikel, aus der Hilfe-Suche („Nichts gefunden“) und aus der Suche **Strg+K** mit dem Hinweis **Anforderung nicht erfüllt? Wunsch senden**.',
+      ] },
     ],
-    links: [{ text: 'Feedback geben', href: '/feedback' }], verwandt: ['funktionen'],
+    links: [{ text: 'Feedback geben', href: '/feedback?art=wunsch' }], verwandt: ['funktionen'],
   },
   {
     slug: 'api', kategorie: 'mehr', titel: 'API-Zugang für KI-Agenten',

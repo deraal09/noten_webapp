@@ -58,6 +58,23 @@ test('Tipps je Fach: Artikel für Englisch, Deutsch und Sport in „Erste Schrit
   assert.match(index, /href="\/hilfe\/faecher-tipps"/);
 });
 
+test('Anforderung nicht erfüllt: Hilfe, Artikel, „Nichts gefunden“ und Strg+K leiten zum Feedback (Wunsch) weiter', async () => {
+  const index = await (await get('/hilfe')).text();
+  assert.match(index, /Kann die Notenapp deine Anforderung nicht erfüllen\?[\s\S]*href="\/feedback\?art=wunsch&amp;von=\/hilfe"/);
+  const leer = await (await get('/hilfe?q=qwxyzunsinn')).text();
+  assert.match(leer, /Nichts gefunden\.[\s\S]*href="\/feedback\?art=wunsch&amp;von=\/hilfe"/);
+  assert.match(index, /fb\.href = '\/feedback\?art=wunsch&von=\/hilfe'/, 'Live-Suche ohne Treffer');
+  const artikel = await (await get('/hilfe/klausuren')).text();
+  assert.match(artikel, /href="\/feedback\?art=wunsch&amp;von=\/hilfe\/klausuren"/);
+  const fb = await (await get('/hilfe/feedback')).text();
+  assert.match(fb, /Die Notenapp erfüllt meine Anforderung nicht/);
+  assert.equal(sucheHilfe('anforderung nicht erfüllt')[0].slug, 'feedback');
+  assert.equal(sucheHilfe('funktion fehlt')[0].slug, 'feedback');
+  const js = await (await get('/static/js/suche.js')).text();
+  assert.match(js, /Anforderung nicht erfüllt\? Wunsch senden/);
+  assert.match(js, /\/feedback\?art=wunsch/);
+});
+
 test('Suche: Umlaute und Schreibweisen, Rangfolge, mehrere Wörter, Unsinn', () => {
   assert.equal(sucheHilfe('Hörverstehen')[0].slug, 'klausur-teile');
   assert.equal(sucheHilfe('hoerverstehen')[0].slug, 'klausur-teile', 'oe = ö');
