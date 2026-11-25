@@ -249,6 +249,8 @@ function parseVerrechnungEingabe(body, laufzeit) {
 
 const MAX_KLAUSUR_NOTIZ = 5000;
 const MAX_TERMIN_INHALT = 300;
+const MAX_ABSCHNITT_TITEL = 60;
+const MAX_ABSCHNITT_NOTIZ = 1000;
 
 export default async function teacherRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
@@ -473,7 +475,7 @@ export default async function teacherRoutes(fastify) {
       HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id), spaLeistung, spaTendenz, spaTendenzAusNote,
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
-      termine: uebersicht.termine, unterrichtNotizAnzahl,
+      termine: uebersicht.termine, abschnitte: uebersicht.abschnitte || [], unterrichtNotizAnzahl,
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct, verrechnung: uebersicht.verrechnung,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       abschlussnoten, sperren, teilnehmer,
@@ -870,12 +872,14 @@ export default async function teacherRoutes(fastify) {
   // erscheinen auch in der Notenbesprechung (typ 'unterricht').
   const unterrichtNotizen = (schuelerId, fachId, halbjahr, userId, isAdmin) =>
     getDb().prepare(`
-      SELECT n.id, n.text, n.created_at, n.created_by_id, u.display_name, u.username
+      SELECT n.id, n.text, n.created_at, n.created_by_id, u.display_name, u.username,
+             COALESCE(n.datum, substr(n.created_at, 1, 10)) AS bezugsdatum
       FROM notenbesprechung_notizen n LEFT JOIN users u ON u.id = n.created_by_id
       WHERE n.schueler_id = ? AND n.fach_id = ? AND n.halbjahr = ? AND n.typ = 'unterricht'
-      ORDER BY n.created_at DESC, n.id DESC
+      ORDER BY bezugsdatum DESC, n.created_at DESC, n.id DESC
     `).all(schuelerId, fachId, halbjahr).map((n) => ({
-      id: n.id, text: n.text, von: n.display_name || n.username || 'unbekannt',
+      // datum = Tag, auf den sich die Notiz bezieht (nachträglich wählbar); am = Zeitpunkt des Anlegens.
+      id: n.id, text: n.text, von: n.display_name || n.username || 'unbekannt', datum: n.bezugsdatum,
       am: formatZeitLokal(n.created_at), loeschbar: isAdmin || n.created_by_id === userId,
     }));
   const unterrichtNotizKontext = (request, reply) => {
@@ -903,10 +907,12 @@ export default async function teacherRoutes(fastify) {
     if (!ctx) return;
     const text = String(request.body?.text || '').trim().slice(0, 4000);
     if (!text) return reply.code(400).send({ ok: false, error: 'leer' });
+    // Bezugsdatum: frei wählbar, damit Notizen auch nachträglich zu einem bestimmten Tag angelegt werden können.
+    const datum = alsGueltigesDatumOderNull(request.body?.datum);
     getDb().prepare(`
-      INSERT INTO notenbesprechung_notizen (schueler_id, fach_id, halbjahr, typ, text, created_by_id)
-      VALUES (?, ?, ?, 'unterricht', ?, ?)
-    `).run(ctx.schuelerId, ctx.fach.id, ctx.halbjahr, text, request.user.id);
+      INSERT INTO notenbesprechung_notizen (schueler_id, fach_id, halbjahr, typ, text, created_by_id, datum)
+      VALUES (?, ?, ?, 'unterricht', ?, ?, ?)
+    `).run(ctx.schuelerId, ctx.fach.id, ctx.halbjahr, text, request.user.id, datum);
     return reply.send({ ok: true, notizen: unterrichtNotizen(ctx.schuelerId, ctx.fach.id, ctx.halbjahr, request.user.id, request.user.isAdmin) });
   });
 
@@ -1412,22 +1418,84 @@ export default async function teacherRoutes(fastify) {
     }
     const fach = ladeFachMitUmfeld(t.fach_id);
     const [min, max] = fach.notenschluessel === 'BG' ? [0, 15] : [1, 6];
-    // Eingabe: leer = nichts eingetragen, Zahl im Notenbereich = Note, alles
-    // andere ("n.a.", Text, Zahl außerhalb des Bereichs) = n.a. (nicht anwesend).
+    // Eingabe: leer = nichts eingetragen, Zahl im Notenbereich = Note, "e" = entschuldigt, "ne" = nicht
+    // entschuldigt, alles andere ("n.a.", Text, Zahl außerhalb des Bereichs) = n.a. (nicht anwesend).
     const roh = String(request.body?.wert ?? '').trim();
     let wert = null;
-    let na = 0;
+    let status = '';
     if (roh !== '') {
       const zahl = /^[+-]?\d+([.,]\d+)?$/.test(roh) ? Number(roh.replace(',', '.')) : NaN;
       if (Number.isFinite(zahl) && zahl >= min && zahl <= max) wert = zahl;
-      else na = 1;
+      else if (/^e\.?$/i.test(roh)) status = 'e';
+      else if (/^n\.?e\.?$/i.test(roh)) status = 'ne';
+      else status = 'na';
     }
     getDb().prepare(`
-      INSERT INTO unterricht_noten (termin_id, schueler_id, wert, nicht_anwesend) VALUES (?, ?, ?, ?)
-      ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert, nicht_anwesend = excluded.nicht_anwesend
-    `).run(request.params.id, schuelerId, wert, na);
+      INSERT INTO unterricht_noten (termin_id, schueler_id, wert, nicht_anwesend, status) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert, nicht_anwesend = excluded.nicht_anwesend, status = excluded.status
+    `).run(request.params.id, schuelerId, wert, status === 'na' ? 1 : 0, status);
     syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.user.id);
-    return reply.send({ ok: true, wert, na: Boolean(na) });
+    return reply.send({ ok: true, wert, na: status === 'na', status });
+  });
+
+  // ---------- Abschnitte der Datumstabelle (optional) ----------
+  // Ein Abschnitt beginnt an einem Datum und gilt bis zum nächsten Abschnitt. Er hat eine übergeordnete
+  // Notiz, eine Zwischennote (Schnitt seiner Termine) und eine relative Gewichtung.
+  fastify.post('/fach/:id/unterricht/abschnitte/neu', async (request, reply) => {
+    if (!userHatFachZgriff(request.user, request.params.id)) return reply.code(403).send({ error: 'forbidden' });
+    const halbjahr = halbjahrFuerFachId(request.params.id, request.body?.halbjahr);
+    if (!userHatFachZgriff(request.user, request.params.id, halbjahr)) return reply.code(403).send({ ok: false, error: 'forbidden', message: KEIN_HALBJAHR });
+    const ziel = `/teacher/fach/${request.params.id}?hj=${encodeURIComponent(halbjahr)}`;
+    const datum = alsGueltigesDatumOderNull(request.body?.datum);
+    if (!datum) { request.flash?.('error', 'Ungültiges Datum.'); return reply.redirect(ziel); }
+    const titel = String(request.body?.titel || '').replace(/\s+/g, ' ').trim().slice(0, MAX_ABSCHNITT_TITEL);
+    getDb().prepare('INSERT INTO unterricht_abschnitte (fach_id, halbjahr, ab_datum, titel) VALUES (?, ?, ?, ?)')
+      .run(request.params.id, halbjahr, datum, titel);
+    syncFallsAutoAktiv(request.params.id, halbjahr, request.user.id);
+    return reply.redirect(ziel);
+  });
+
+  const ladeAbschnittMitZugriff = (request, reply) => {
+    const a = getDb().prepare('SELECT * FROM unterricht_abschnitte WHERE id = ?').get(request.params.id);
+    if (!a) { reply.code(404).send({ ok: false, error: 'not found' }); return null; }
+    if (!userHatFachZgriff(request.user, a.fach_id, a.halbjahr)) { reply.code(403).send({ ok: false, error: 'forbidden' }); return null; }
+    return a;
+  };
+
+  // Titel, Notiz, Gewichtung und/oder Beginn eines Abschnitts ändern (nur die übergebenen Felder).
+  fastify.post('/unterricht/abschnitte/:id', async (request, reply) => {
+    const a = ladeAbschnittMitZugriff(request, reply);
+    if (!a) return;
+    const b = request.body || {};
+    const neu = { titel: a.titel, notiz: a.notiz, gewichtung: a.gewichtung, ab_datum: a.ab_datum };
+    if (b.titel !== undefined) neu.titel = String(b.titel).replace(/\s+/g, ' ').trim().slice(0, MAX_ABSCHNITT_TITEL);
+    if (b.notiz !== undefined) {
+      neu.notiz = String(b.notiz).trim();
+      if (neu.notiz.length > MAX_ABSCHNITT_NOTIZ) return reply.code(400).send({ ok: false, error: `Die Notiz ist zu lang (höchstens ${MAX_ABSCHNITT_NOTIZ} Zeichen).` });
+    }
+    if (b.gewichtung !== undefined) {
+      const g = Number(String(b.gewichtung).replace(',', '.'));
+      if (!Number.isFinite(g) || g < 0 || g > 1000) return reply.code(400).send({ ok: false, error: 'Die Gewichtung muss eine Zahl von 0 bis 1000 sein.' });
+      neu.gewichtung = Math.round(g * 100) / 100;
+    }
+    if (b.ab_datum !== undefined) {
+      const d = alsGueltigesDatumOderNull(b.ab_datum);
+      if (!d) return reply.code(400).send({ ok: false, error: 'Ungültiges Datum.' });
+      neu.ab_datum = d;
+    }
+    getDb().prepare('UPDATE unterricht_abschnitte SET titel = ?, notiz = ?, gewichtung = ?, ab_datum = ? WHERE id = ?')
+      .run(neu.titel, neu.notiz, neu.gewichtung, neu.ab_datum, a.id);
+    syncFallsAutoAktiv(a.fach_id, a.halbjahr, request.user.id);
+    return reply.send({ ok: true, ...neu });
+  });
+
+  fastify.post('/unterricht/abschnitte/:id/loeschen', async (request, reply) => {
+    const a = getDb().prepare('SELECT * FROM unterricht_abschnitte WHERE id = ?').get(request.params.id);
+    if (!a) return reply.redirect('/teacher');
+    if (!userHatFachZgriff(request.user, a.fach_id, a.halbjahr)) return reply.code(403).send({ error: 'forbidden' });
+    getDb().prepare('DELETE FROM unterricht_abschnitte WHERE id = ?').run(a.id);
+    syncFallsAutoAktiv(a.fach_id, a.halbjahr, request.user.id);
+    return reply.redirect(`/teacher/fach/${a.fach_id}?hj=${encodeURIComponent(a.halbjahr)}`);
   });
 
   // ---------- Notensperre: Entsperrung anfragen (Fachlehrkraft) ----------

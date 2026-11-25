@@ -53,7 +53,7 @@ curl -H "Authorization: Bearer nk_DEIN_SCHLUESSEL" https://<server>/api/v1/me
 | POST | `/faecher/{id}/unterrichtsleistungen` | schreiben | Zusatzleistung anlegen |
 | PUT | `/unterrichtsleistungen/{id}/ergebnisse` | schreiben | Punkte der Zusatzleistung |
 | POST | `/faecher/{id}/termine` | schreiben | Termin der Datumstabelle anlegen |
-| PUT | `/termine/{id}/noten` | schreiben | Noten je Termin (auch `"n.a."`) |
+| PUT | `/termine/{id}/noten` | schreiben | Noten je Termin (auch `"n.a."`, `"e"`, `"ne"`) |
 | PUT | `/faecher/{id}/endnoten` | schreiben | Endnoten / `"ntg"` |
 | POST | `/faecher/{id}/sync` | schreiben | mit der Klassenleitung synchronisieren („Jetzt synchronisieren“) |
 | PUT | `/faecher/{id}/auto-sync` | schreiben | automatischen Sync ein-/ausschalten |

@@ -101,7 +101,11 @@
     raster.textContent = '';
     var aktuell = aktiv.value.trim().toLowerCase();
     var optionen = [];
-    if (aktiv.dataset.pickerNa) optionen.push({ text: 'n.a.', wert: 'n.a.', klasse: 'note-picker-na' });
+    if (aktiv.dataset.pickerNa) {
+      optionen.push({ text: 'n.a.', wert: 'n.a.', klasse: 'note-picker-na' });
+      optionen.push({ text: 'e', wert: 'e', klasse: 'note-picker-na' });
+      optionen.push({ text: 'ne', wert: 'ne', klasse: 'note-picker-na' });
+    }
     if (aktiv.dataset.pickerNtg) optionen.push({ text: 'ntg', wert: 'ntg', klasse: 'note-picker-na' });
     werte(aktiv.dataset.notePicker).forEach(function (w) { optionen.push({ text: w, wert: w, klasse: '' }); });
     optionen.forEach(function (o) {

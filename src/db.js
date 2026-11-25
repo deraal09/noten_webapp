@@ -524,6 +524,21 @@ CREATE TABLE IF NOT EXISTS unterricht_termine (
 );
 CREATE INDEX IF NOT EXISTS idx_unterricht_termine_fach ON unterricht_termine(fach_id, halbjahr);
 
+-- Optionale Abschnitte der Datumstabelle: Ein Termin gehört zum Abschnitt mit dem
+-- spätesten ab_datum <= Termin-Datum (liegt er vor dem ersten, zum ersten). Jeder
+-- Abschnitt hat eine übergeordnete Notiz, eine Zwischennote (Schnitt seiner
+-- Termine) und eine relative Gewichtung für den Datumstabellen-Durchschnitt.
+CREATE TABLE IF NOT EXISTS unterricht_abschnitte (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fach_id INTEGER NOT NULL REFERENCES faecher(id) ON DELETE CASCADE,
+    halbjahr TEXT NOT NULL,
+    ab_datum TEXT NOT NULL,
+    titel TEXT NOT NULL DEFAULT '',
+    notiz TEXT NOT NULL DEFAULT '',
+    gewichtung REAL NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_unterricht_abschnitte_fach ON unterricht_abschnitte(fach_id, halbjahr, ab_datum);
+
 CREATE TABLE IF NOT EXISTS unterricht_noten (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     termin_id INTEGER NOT NULL REFERENCES unterricht_termine(id) ON DELETE CASCADE,
@@ -960,6 +975,12 @@ function migrate(db) {
   ensureColumn(db, 'unterrichtsleistungen', 'datum', 'datum TEXT');
   // Datumstabelle: "n.a." (nicht anwesend) statt einer Note; wert bleibt dann NULL und zählt nicht in den Schnitt.
   ensureColumn(db, 'unterricht_noten', 'nicht_anwesend', 'nicht_anwesend INTEGER NOT NULL DEFAULT 0');
+  // Datumstabelle: Status statt Note ('' = keiner, 'na' = nicht anwesend, 'e' = entschuldigt -- beide zählen nicht,
+  // 'ne' = nicht entschuldigt -- zählt als schlechteste Note). nicht_anwesend bleibt für 'na' mitgeführt.
+  ensureColumn(db, 'unterricht_noten', 'status', "status TEXT NOT NULL DEFAULT ''");
+  db.exec("UPDATE unterricht_noten SET status = 'na' WHERE nicht_anwesend = 1 AND status = ''");
+  // Datum, auf das sich eine Unterrichtsnotiz bezieht (nachträglich wählbar); NULL = Tag des Anlegens.
+  ensureColumn(db, 'notenbesprechung_notizen', 'datum', 'datum TEXT');
   ensureColumn(db, 'klassen', 'offen_fuer_beitritt', 'offen_fuer_beitritt INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'faecher', 'ist_kurs', 'ist_kurs INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'schueler', 'status', "status TEXT NOT NULL DEFAULT 'aktiv'");

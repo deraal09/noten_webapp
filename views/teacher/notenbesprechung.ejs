@@ -118,7 +118,7 @@
 <% if (!zeile.terminNoten.length) { %><p class="hint">Noch keine Termine in diesem Halbjahr.</p><% } else { %>
   <p>
     <% zeile.terminNoten.forEach(function(tn) { %>
-      <span class="tag<%= tn.korrektur ? ' korrektur' : '' %>" title="<%= tn.korrektur ? 'Korrekturwert' : '' %> <%= tn.datum %><%= tn.inhalt ? ' – ' + tn.inhalt : '' %>"><%= tn.korrektur ? 'Korrektur ' : '' %><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.na ? 'n.a.' : (tn.wert === null ? '–' : Number(tn.wert).toString().replace('.', ',')) %></span>
+      <span class="tag<%= tn.korrektur ? ' korrektur' : '' %>" title="<%= tn.korrektur ? 'Korrekturwert' : '' %> <%= tn.datum %><%= tn.inhalt ? ' – ' + tn.inhalt : '' %>"><%= tn.korrektur ? 'Korrektur ' : '' %><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.status ? { na: 'n.a.', e: 'e', ne: 'ne' }[tn.status] : (tn.wert === null ? '–' : Number(tn.wert).toString().replace('.', ',')) %></span>
     <% }); %>
   </p>
   <% var mitInhalt = zeile.terminNoten.filter(function(tn) { return tn.inhalt; }); %>
@@ -127,7 +127,7 @@
       <% mitInhalt.forEach(function(tn, i) { %><%= i ? ' · ' : ' ' %><%= tn.datum.split('-').reverse().join('.') %>: <%= tn.inhalt %><% }); %>
     </p>
   <% } %>
-  <p>Ø Datumstabelle: <strong><%= zeile.datumsDurchschnitt === null ? '–' : formatNote(zeile.datumsDurchschnitt) %></strong> · nicht anwesend (n.a.): <strong><%= zeile.naAnzahl %></strong></p>
+  <p>Ø Datumstabelle: <strong><%= zeile.datumsDurchschnitt === null ? '–' : formatNote(zeile.datumsDurchschnitt) %></strong> · nicht anwesend (n.a.): <strong><%= zeile.naAnzahl %></strong> · entschuldigt (e): <strong><%= zeile.eAnzahl %></strong> · nicht entschuldigt (ne): <strong><%= zeile.neAnzahl %></strong></p>
 <% } %>
 <% var unterrichtNotizen = notizen.filter(function(n) { return n.typ === 'unterricht'; }); %>
 <% if (unterrichtNotizen.length) { %>
@@ -137,7 +137,7 @@
       <% unterrichtNotizen.forEach(function(n) { %>
         <li>
           <div class="notiz-text"><%= n.text %></div>
-          <div class="notiz-meta hint"><%= n.display_name || n.username || 'unbekannt' %> · <%= formatZeitLokal(n.created_at) %></div>
+          <div class="notiz-meta hint"><strong><%= (n.datum || n.created_at.slice(0, 10)).split('-').reverse().join('.') %></strong> · <%= n.display_name || n.username || 'unbekannt' %> · angelegt <%= formatZeitLokal(n.created_at) %></div>
         </li>
       <% }); %>
     </ul>

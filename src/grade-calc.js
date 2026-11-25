@@ -438,6 +438,27 @@ export function teilNote(items) {
 }
 
 /**
+ * Wert, mit dem ein „ne“ (nicht entschuldigt gefehlt) in den Durchschnitt der Datumstabelle eingeht:
+ * schlechteste Note -- 6 (IHK/SPA) bzw. 0 Punkte (BG).
+ */
+export function neWert(notenschluessel) {
+  return notenschluessel === 'BG' ? 0 : 6;
+}
+
+/**
+ * Datumstabelle mit Abschnitten: Zwischennote je Abschnitt = Durchschnitt seiner Werte; der Durchschnitt der
+ * ganzen Tabelle = mit der (relativen) Gewichtung der Abschnitte gewichtetes Mittel der Zwischennoten.
+ * Abschnitte ohne Wert oder mit Gewichtung 0 zählen nicht mit.
+ * @param {{ werte: number[], gewichtung: number }[]} abschnitte
+ * @returns {{ durchschnitt: number|null, noten: (number|null)[] }}
+ */
+export function abschnittsDurchschnitt(abschnitte) {
+  const noten = abschnitte.map((a) => durchschnitt(a.werte));
+  const durchschnittGesamt = teilNote(abschnitte.map((a, i) => ({ note: noten[i], gewichtung: a.gewichtung })));
+  return { durchschnitt: durchschnittGesamt, noten };
+}
+
+/**
  * Note für die Unterrichtsleistung aus der Datumstabelle (unbewertet
  * eingetragene Noten je Unterrichtstermin, gleich gewichtet) und optionalen
  * Zusatzleistungen (z. B. Präsentationen, wie bisherige Unterrichtsleistungen
@@ -454,8 +475,9 @@ export function teilNote(items) {
  * @param {Array<{note: number|null, gewichtung: number}>} zusatzleistungen
  * @returns {{ datumsDurchschnitt: number|null, note: number|null }}
  */
-export function unterrichtsleistungNote(datumsWerte, zusatzleistungen) {
-  const datumsDurchschnitt = durchschnitt(datumsWerte);
+export function unterrichtsleistungNote(datumsWerte, zusatzleistungen, datumsDurchschnittVorgabe) {
+  // Mit Abschnitten kommt der Datumstabellen-Durchschnitt aus den gewichteten Zwischennoten (siehe abschnittsDurchschnitt).
+  const datumsDurchschnitt = datumsDurchschnittVorgabe !== undefined ? datumsDurchschnittVorgabe : durchschnitt(datumsWerte);
   const belegt = zusatzleistungen.reduce((summe, z) => (
     z.note !== null && z.note !== undefined && z.gewichtung > 0 ? summe + z.gewichtung : summe
   ), 0);

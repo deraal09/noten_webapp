@@ -7,9 +7,10 @@ import { csvRechner } from '../notenschluessel.js';
 import { sortiereNachName } from '../format.js';
 import { klassenLaufzeit, halbjahrNr, schuljahrDesHalbjahrs, muendlichProzentFuerHalbjahr } from '../klassen-jahre.js';
 import { getDb } from '../db.js';
+import { ladeUnterrichtTermine, datumsAuswertung } from '../noten-service.js';
 import { requireAuth, userDarfKlasseExportieren } from '../auth.js';
 import {
-  noteAusPunkten, klausurNote, parseKlausurTeile, gesamtnoteHj, gesamtnoteJahr, unterrichtsleistungNote, formatNote,
+  noteAusPunkten, klausurNote, parseKlausurTeile, gesamtnoteHj, gesamtnoteJahr, unterrichtsleistungNote, formatNote, neWert,
 } from '../grade-calc.js';
 
 export default async function exportRoutes(fastify) {
@@ -168,16 +169,9 @@ function zeileFuerSchuelerFachHj(klasse, csv, fach, schueler, halbjahr) {
     const note = punkte ? noteAusPunkten(punkte, JSON.parse(u.max_punkte_pro_aufgabe), csv) : null;
     return { note, gewichtung: u.gewichtung };
   });
-  const termine = db.prepare(
-    'SELECT id, datum FROM unterricht_termine WHERE fach_id = ? AND halbjahr = ? ORDER BY datum, id'
-  ).all(fach.id, halbjahr);
-  const datumsWerte = [];
-  for (const t of termine) {
-    const row = db.prepare('SELECT wert FROM unterricht_noten WHERE termin_id = ? AND schueler_id = ?')
-      .get(t.id, schueler.id);
-    if (row?.wert !== null && row?.wert !== undefined) datumsWerte.push(row.wert);
-  }
-  const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen);
+  const da = datumsAuswertung(schueler.id, ladeUnterrichtTermine(fach.id, halbjahr), neWert(fach.notenschluessel || klasse.notenschluessel));
+  const datumsWerte = da.werte;
+  const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen, da.durchschnitt);
   const ulPct = muendlichProzentFuerHalbjahr(klasse.id, halbjahr, 60);
   const schriftlichPct = 100 - ulPct;
   const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csv);

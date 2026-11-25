@@ -66,7 +66,7 @@
     <li><strong>Halbjahr:</strong> als Zahl (<code>5</code>) oder Text (<code>"5. Halbjahr"</code>). Ohne Angabe gilt das aktuelle Halbjahr des Fachs.</li>
     <li><strong>Noten:</strong> IHK 1–6 (kleiner = besser), BG 0–15 Notenpunkte (größer = besser); SPA-Klassen bewerten Klausuren nach dem SPA-Schlüssel (Noten 1–6), daraus entstehen Punkte und Tendenz. Die Schlüssel liefert <code>GET /notenschluessel</code>.</li>
     <li><strong>Klausur:</strong> <code>max_punkte</code> hat einen Eintrag je Aufgabe. Mehrteilige Klausuren haben Teile; bei <em>Hörverstehen</em> trägt man die Verrechnungspunkte ein (Note nach Verrechnungstabelle, ohne Rundung), bei <em>Inhalt &amp; Sprache</em> direkt je eine Note (Teilnote = gewichtetes Mittel).</li>
-    <li><strong>Unterrichtsleistung:</strong> aus Zusatzleistungen (z. B. Referat) und der Datumstabelle (Note je Unterrichtstermin, <code>"n.a."</code> = nicht anwesend).</li>
+    <li><strong>Unterrichtsleistung:</strong> aus Zusatzleistungen (z. B. Referat) und der Datumstabelle (Note je Unterrichtstermin; <code>"n.a."</code> = nicht anwesend und <code>"e"</code> = entschuldigt zählen nicht, <code>"ne"</code> = nicht entschuldigt zählt als schlechteste Note; optional in Abschnitte mit Zwischennote und Gewichtung geteilt).</li>
     <li><strong>Endnote:</strong> feste Halbjahresnote, die die berechnete ersetzt; <code>"ntg"</code> = nicht teilgenommen.</li>
   </ul>
 </div>

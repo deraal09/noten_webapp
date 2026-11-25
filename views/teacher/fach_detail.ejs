@@ -463,13 +463,25 @@
   </div>
 
   <div id="ul-panel-datumstabelle" class="reiter-panel unter-panel card active">
+    <%
+      var abs = (typeof abschnitte !== 'undefined' && abschnitte) || [];
+      var mitAbschnitten = abs.length > 0;
+      var datumsGruppen = mitAbschnitten
+        ? abs.map(function(a) { return { a: a, termine: termine.filter(function(t) { return t.abschnitt_id === a.id; }) }; })
+        : [{ a: null, termine: termine }];
+      var statusText = { na: 'n.a.', e: 'e', ne: 'ne' };
+      var deDatum = function(d) { return d.split('-').reverse().join('.'); };
+      var fehlText = function(e, ne) { return (e || ne) ? 'e ' + e + ' · ne ' + ne : '–'; };
+    %>
     <details class="hinweis-aufklappbar" id="datumstabelle-hinweis">
       <summary>Hinweis zur Datumstabelle</summary>
       <p class="hint">
         Eine Spalte je Unterrichtstermin, eine Note je Schüler/in ohne
-        Einzelgewichtung. Eingetragen werden nur Noten oder <strong>n.a.</strong>
-        (nicht anwesend) – alles andere wird automatisch zu n.a.; n.a. zählt nicht
-        in den Durchschnitt, wird aber je Person gezählt. Der Durchschnitt aller eingetragenen Noten bildet die
+        Einzelgewichtung. Eingetragen werden Noten oder ein Fehlstatus:
+        <strong>n.a.</strong> (nicht anwesend) und <strong>e</strong> (entschuldigt) zählen nicht
+        in den Durchschnitt, <strong>ne</strong> (nicht entschuldigt) zählt als schlechteste Note
+        (<%= fach.notenschluessel === 'BG' ? '0 Punkte' : 'Note 6' %>). Alles andere wird automatisch zu n.a.
+        Der Durchschnitt aller eingetragenen Noten bildet die
         Basis der Unterrichtsleistungsnote — Zusatzleistungen (eigene Reiter)
         zählen zusätzlich mit ihrer eigenen Gewichtung.
       </p>
@@ -479,25 +491,69 @@
       <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
       <button type="submit">+ Datum hinzufügen</button>
     </form>
+    <details class="hinweis-aufklappbar" id="abschnitte-hinweis"<%= mitAbschnitten ? ' open' : '' %>>
+      <summary>Abschnitte (optional)<%= mitAbschnitten ? ' – ' + abs.length : '' %></summary>
+      <p class="hint">
+        Die Datumstabelle lässt sich in Abschnitte teilen. Ein Abschnitt gilt ab seinem Beginn bis zum nächsten Abschnitt
+        (der erste umfasst auch frühere Termine). Jeder Abschnitt hat eine übergeordnete Notiz, eine Zwischennote
+        (Durchschnitt seiner Termine, in der Tabelle sichtbar) und eine Gewichtung: Der Durchschnitt der Datumstabelle ist
+        das nach diesen Gewichten (z. B. 1 und 2 oder 30 und 70) gewichtete Mittel der Zwischennoten. Die Notizen zu den
+        einzelnen Tagen bleiben erhalten.
+      </p>
+      <form method="post" action="/teacher/fach/<%= fach.id %>/unterricht/abschnitte/neu" class="inline">
+        <input type="date" name="datum" value="<%= mitAbschnitten || !termine.length ? heute : termine[0].datum %>" required aria-label="Beginn des Abschnitts">
+        <input type="text" name="titel" maxlength="60" placeholder="Titel (optional)" aria-label="Titel des Abschnitts">
+        <input type="hidden" name="halbjahr" value="<%= halbjahr %>">
+        <button type="submit">+ Abschnitt beginnen</button>
+      </form>
+    </details>
 
     <% if (!termine.length) { %><p class="hint">Noch keine Termine.</p><% } else { %>
       <div class="tabelle-scroll">
       <table class="tafel" id="datumstabelle">
         <thead>
-          <tr>
-            <th>Schüler/in</th>
-            <% termine.forEach(function(t) { %>
-              <th class="datum-head<%= t.korrektur ? ' korrektur-head' : '' %>">
-                <%= t.datum.split('-').reverse().join('.') %><% if (t.korrektur) { %> <small class="hint" title="Korrekturwerte aus der Notenbesprechung">Korrektur</small><% } %>
-                <form method="post" action="/teacher/unterricht/termine/<%= t.id %>/loeschen" class="inline"
-                      onsubmit="return confirm('<%= t.korrektur ? 'Korrektur-Termin löschen? Alle Korrekturwerte dieses Tages gehen verloren.' : 'Termin löschen? Alle Noten dieses Termins gehen verloren.' %>')">
-                  <button type="submit" class="danger" title="Termin löschen" aria-label="Termin vom <%= t.datum.split('-').reverse().join('.') %> löschen">🗑</button>
-                </form>
-                <textarea class="termin-inhalt" data-termin="<%= t.id %>" rows="2" maxlength="300" placeholder="Unterrichtsinhalt" title="Unterrichtsinhalt dieses Termins (kurze Notiz)" aria-label="Unterrichtsinhalt am <%= t.datum.split('-').reverse().join('.') %>"><%= t.inhalt || '' %></textarea>
+          <% if (mitAbschnitten) { %>
+          <tr class="abschnitt-zeile">
+            <th rowspan="2">Schüler/in</th>
+            <% datumsGruppen.forEach(function(g) { var a = g.a; %>
+              <th class="abschnitt-head" colspan="<%= g.termine.length + 1 %>" data-abschnitt="<%= a.id %>">
+                <div class="abschnitt-kopf">
+                  <input type="text" class="abschnitt-titel" data-abschnitt="<%= a.id %>" maxlength="60" value="<%= a.titel %>" placeholder="Titel des Abschnitts" aria-label="Titel des Abschnitts ab <%= deDatum(a.ab_datum) %>">
+                  <span class="abschnitt-feld" title="Beginn des Abschnitts">ab <input type="date" class="abschnitt-ab" data-abschnitt="<%= a.id %>" value="<%= a.ab_datum %>" aria-label="Beginn des Abschnitts"></span>
+                  <span class="abschnitt-feld" title="Relative Gewichtung dieses Abschnitts im Durchschnitt der Datumstabelle">Gewicht <input type="number" class="abschnitt-gewicht" data-abschnitt="<%= a.id %>" min="0" max="1000" step="any" value="<%= a.gewichtung %>" aria-label="Gewichtung des Abschnitts"></span>
+                  <form method="post" action="/teacher/unterricht/abschnitte/<%= a.id %>/loeschen" class="inline"
+                        onsubmit="return confirm('Abschnitt löschen? Die Termine und Noten bleiben erhalten, sie gehören dann zum vorherigen Abschnitt.')">
+                    <button type="submit" class="danger" title="Abschnitt löschen" aria-label="Abschnitt ab <%= deDatum(a.ab_datum) %> löschen">🗑</button>
+                  </form>
+                </div>
+                <textarea class="abschnitt-notiz" data-abschnitt="<%= a.id %>" rows="2" maxlength="1000" placeholder="Notiz zum gesamten Abschnitt" aria-label="Notiz zum Abschnitt ab <%= deDatum(a.ab_datum) %>"><%= a.notiz %></textarea>
               </th>
             <% }); %>
+            <th rowspan="2">Ø</th>
+            <th rowspan="2" title="Anzahl der Termine mit n.a. (nicht anwesend)">n.a.</th>
+            <th rowspan="2" title="Anzahl der Termine mit e (entschuldigt) und ne (nicht entschuldigt)">e / ne</th>
+          </tr>
+          <% } %>
+          <tr>
+            <% if (!mitAbschnitten) { %><th>Schüler/in</th><% } %>
+            <% datumsGruppen.forEach(function(g) { %>
+            <% g.termine.forEach(function(t) { %>
+              <th class="datum-head<%= t.korrektur ? ' korrektur-head' : '' %>">
+                <%= deDatum(t.datum) %><% if (t.korrektur) { %> <small class="hint" title="Korrekturwerte aus der Notenbesprechung">Korrektur</small><% } %>
+                <form method="post" action="/teacher/unterricht/termine/<%= t.id %>/loeschen" class="inline"
+                      onsubmit="return confirm('<%= t.korrektur ? 'Korrektur-Termin löschen? Alle Korrekturwerte dieses Tages gehen verloren.' : 'Termin löschen? Alle Noten dieses Termins gehen verloren.' %>')">
+                  <button type="submit" class="danger" title="Termin löschen" aria-label="Termin vom <%= deDatum(t.datum) %> löschen">🗑</button>
+                </form>
+                <textarea class="termin-inhalt" data-termin="<%= t.id %>" rows="2" maxlength="300" placeholder="Unterrichtsinhalt" title="Unterrichtsinhalt dieses Termins (kurze Notiz)" aria-label="Unterrichtsinhalt am <%= deDatum(t.datum) %>"><%= t.inhalt || '' %></textarea>
+              </th>
+            <% }); %>
+            <% if (mitAbschnitten) { %><th class="abschnitt-zw" title="Zwischennote des Abschnitts (Durchschnitt seiner Termine)">Ø Abschn.</th><% } %>
+            <% }); %>
+            <% if (!mitAbschnitten) { %>
             <th>Ø</th>
             <th title="Anzahl der Termine mit n.a. (nicht anwesend)">n.a.</th>
+            <th title="Anzahl der Termine mit e (entschuldigt) und ne (nicht entschuldigt)">e / ne</th>
+            <% } %>
           </tr>
         </thead>
         <tbody>
@@ -510,16 +566,23 @@
                         data-name="<%= r.nachname %>, <%= r.vorname %>" data-anzahl="<%= nAnz %>"
                         title="<%= nAnz ? nAnz + ' Notiz(en) zum Unterricht' : 'Notiz zum Unterricht' %>" aria-label="Notizen zum Unterricht von <%= r.vorname %> <%= r.nachname %>">📝<% if (nAnz) { %><sup><%= nAnz %></sup><% } %></button>
               </td>
-              <% r.terminNoten.forEach(function(tn) { %>
+              <% datumsGruppen.forEach(function(g) {
+                   var gIds = g.termine.map(function(t) { return t.id; }); %>
+              <% r.terminNoten.filter(function(tn) { return gIds.indexOf(tn.termin_id) !== -1; }).forEach(function(tn) { %>
                 <td>
-                  <input type="text" inputmode="decimal" autocomplete="off" class="note-datum<%= tn.na ? ' ist-na' : '' %>" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"<% if (fach.notenschluessel === 'IHK' || fach.notenschluessel === 'BG') { %> data-note-picker="<%= fach.notenschluessel %>" data-picker-na="1"<% } %>
-                    value="<%= tn.na ? 'n.a.' : (tn.wert === null ? '' : String(tn.wert).replace('.', ',')) %>" placeholder="–" title="Note oder n.a. (nicht anwesend)" <%= gesperrt ? 'disabled' : '' %>>
+                  <input type="text" inputmode="decimal" autocomplete="off" class="note-datum<%= (tn.status === 'na' || tn.status === 'e') ? ' ist-na' : '' %><%= tn.status === 'ne' ? ' ist-ne' : '' %>" data-termin="<%= tn.termin_id %>" data-sid="<%= r.schueler_id %>"<% if (fach.notenschluessel === 'IHK' || fach.notenschluessel === 'BG') { %> data-note-picker="<%= fach.notenschluessel %>" data-picker-na="1"<% } %>
+                    value="<%= tn.status ? statusText[tn.status] : (tn.wert === null ? '' : String(tn.wert).replace('.', ',')) %>" placeholder="–" title="Note, n.a. (nicht anwesend), e (entschuldigt) oder ne (nicht entschuldigt: zählt als <%= fach.notenschluessel === 'BG' ? '0 Punkte' : 'Note 6' %>)" <%= gesperrt ? 'disabled' : '' %>>
                 </td>
+              <% }); %>
+              <% if (mitAbschnitten) { var zw = (r.datumsAbschnitte || []).find(function(x) { return x.id === g.a.id; }); %>
+                <td class="note-cell abschnitt-note" data-sid="<%= r.schueler_id %>" data-abschnitt="<%= g.a.id %>"><%= !zw || zw.note === null ? '–' : formatNote(zw.note) %></td>
+              <% } %>
               <% }); %>
               <td class="note-cell datums-durchschnitt" data-sid="<%= r.schueler_id %>">
                 <%= r.datumsDurchschnitt === null ? '–' : formatNote(r.datumsDurchschnitt) %>
               </td>
               <td class="note-cell na-summe" data-sid="<%= r.schueler_id %>"><%= r.naAnzahl %></td>
+              <td class="note-cell fehl-summe" data-sid="<%= r.schueler_id %>"><%= fehlText(r.eAnzahl, r.neAnzahl) %></td>
             </tr>
           <% }); %>
         </tbody>
@@ -533,6 +596,10 @@
         </p>
         <ul class="notiz-liste" id="unterricht-notiz-liste"></ul>
         <p class="hint" id="unterricht-notiz-leer">Noch keine Notizen.</p>
+        <p class="notiz-datum-zeile">
+          <span class="hint">Datum der Notiz</span>
+          <input type="date" id="unterricht-notiz-datum" value="<%= heute %>" aria-label="Datum, auf das sich die Notiz bezieht (auch nachträglich wählbar)">
+        </p>
         <textarea id="unterricht-notiz-text" rows="3" maxlength="4000" placeholder="Neue Notiz hinzufügen…"></textarea>
         <div class="form-actions">
           <button type="button" id="unterricht-notiz-speichern">+ Notiz hinzufügen</button>
@@ -865,6 +932,14 @@
           }
         }
         document.querySelectorAll('.na-summe[data-sid="' + s.schueler_id + '"]').forEach(function(z) { z.textContent = String(s.naAnzahl); });
+        document.querySelectorAll('.fehl-summe[data-sid="' + s.schueler_id + '"]').forEach(function(z) {
+          z.textContent = (s.eAnzahl || s.neAnzahl) ? 'e ' + s.eAnzahl + ' · ne ' + s.neAnzahl : '–';
+        });
+        (s.datumsAbschnitte || []).forEach(function(ab) {
+          document.querySelectorAll('.abschnitt-note[data-sid="' + s.schueler_id + '"][data-abschnitt="' + ab.id + '"]').forEach(function(z) {
+            z.textContent = ab.note !== null ? String(ab.note).replace('.', ',') : '–';
+          });
+        });
         const berZelle = document.querySelector('#endnoten-tabelle tr[data-schueler="' + s.schueler_id + '"] .berechnet');
         if (berZelle) berZelle.textContent = s.gesamtBerechnet !== null ? s.gesamtBerechnet.toString().replace('.', ',') : '–';
         const datumsZelle = document.querySelector('.datums-durchschnitt[data-sid="' + s.schueler_id + '"]');
@@ -983,10 +1058,10 @@
     });
   })();
 
-  // Datumstabelle: nur Noten oder "n.a." (nicht anwesend). Beim Tippen wird
-  // gespeichert, sobald der Wert eine gültige Zahl oder n.a. ist; beim
-  // Verlassen des Feldes (change) wird jede andere Eingabe zu n.a. und das Feld
-  // mit dem gespeicherten Wert überschrieben.
+  // Datumstabelle: Noten oder ein Fehlstatus -- "n.a." (nicht anwesend), "e" (entschuldigt), "ne" (nicht
+  // entschuldigt). Beim Tippen wird gespeichert, sobald der Wert eine gültige Zahl oder ein Status ist; beim
+  // Verlassen des Feldes (change) wird jede andere Eingabe zu n.a. und das Feld mit dem gespeicherten Wert überschrieben.
+  const STATUS_TEXT = { na: 'n.a.', e: 'e', ne: 'ne' };
   document.querySelectorAll('input.note-datum').forEach(function(inp) {
     const speichern = async function() {
       const body = new URLSearchParams();
@@ -999,10 +1074,11 @@
     };
     const zeigeWert = function(d) {
       if (!d || !d.ok) return;
-      inp.value = d.na ? 'n.a.' : (d.wert === null ? '' : String(d.wert).replace('.', ','));
-      inp.classList.toggle('ist-na', Boolean(d.na));
+      inp.value = d.status ? STATUS_TEXT[d.status] : (d.wert === null ? '' : String(d.wert).replace('.', ','));
+      inp.classList.toggle('ist-na', d.status === 'na' || d.status === 'e');
+      inp.classList.toggle('ist-ne', d.status === 'ne');
     };
-    const istGueltig = function(v) { return v === '' || /^(n\.?a\.?)$/i.test(v) || /^\d+([.,]\d+)?$/.test(v); };
+    const istGueltig = function(v) { return v === '' || /^(n\.?a\.?|e\.?|n\.?e\.?)$/i.test(v) || /^\d+([.,]\d+)?$/.test(v); };
     inp.addEventListener('input', debounce(async function() {
       if (!istGueltig(inp.value.trim())) return; // erst beim Verlassen zu n.a. machen
       await speichern();
@@ -1011,6 +1087,28 @@
     inp.addEventListener('change', async function() {
       zeigeWert(await speichern());
       refresh();
+    });
+  });
+
+  // Abschnitte der Datumstabelle: Titel, Notiz, Gewichtung und Beginn speichern sich beim Verlassen des Feldes.
+  document.querySelectorAll('.abschnitt-titel, .abschnitt-notiz, .abschnitt-gewicht, .abschnitt-ab').forEach(function(feld) {
+    const name = feld.classList.contains('abschnitt-titel') ? 'titel' : feld.classList.contains('abschnitt-notiz') ? 'notiz'
+      : feld.classList.contains('abschnitt-gewicht') ? 'gewichtung' : 'ab_datum';
+    let zuletzt = feld.value;
+    feld.addEventListener('change', async function() {
+      if (feld.value === zuletzt) return;
+      const body = new URLSearchParams();
+      body.append(name, feld.value);
+      let d = null;
+      try { d = await (await fetch('/teacher/unterricht/abschnitte/' + feld.dataset.abschnitt, { method: 'POST', body })).json(); } catch (e) { /* ignorieren */ }
+      if (d && d.ok) {
+        zuletzt = feld.value; feld.classList.remove('speicherfehler'); feld.title = '';
+        if (name === 'ab_datum') window.location.reload(); // die Termine ordnen sich neu den Abschnitten zu
+        else if (name === 'gewichtung') refresh();
+      } else {
+        feld.classList.add('speicherfehler');
+        feld.title = (d && d.error) || 'Nicht gespeichert.';
+      }
     });
   });
 
@@ -1114,6 +1212,8 @@
     const liste = document.getElementById('unterricht-notiz-liste');
     const leer = document.getElementById('unterricht-notiz-leer');
     const text = document.getElementById('unterricht-notiz-text');
+    const datum = document.getElementById('unterricht-notiz-datum');
+    const HEUTE = '<%= heute %>';
     const FACH = '<%= fach.id %>';
     const HJ = '<%= halbjahr %>';
     let aktuell = null; // { sid, btn }
@@ -1123,7 +1223,10 @@
       notizen.forEach(function(n) {
         const li = document.createElement('li');
         const t = document.createElement('div'); t.className = 'notiz-text'; t.textContent = n.text;
-        const m = document.createElement('div'); m.className = 'notiz-meta hint'; m.textContent = n.von + ' · ' + n.am + ' ';
+        const m = document.createElement('div'); m.className = 'notiz-meta hint';
+        const tag = document.createElement('strong'); tag.textContent = n.datum.split('-').reverse().join('.');
+        m.appendChild(tag);
+        m.appendChild(document.createTextNode(' · ' + n.von + ' · angelegt ' + n.am + ' '));
         if (n.loeschbar) {
           const x = document.createElement('button');
           x.type = 'button'; x.className = 'danger'; x.textContent = '🗑'; x.title = 'Notiz löschen';
@@ -1154,6 +1257,7 @@
         aktuell = { sid: btn.dataset.sid, btn: btn };
         document.getElementById('unterricht-notiz-name').textContent = btn.dataset.name;
         text.value = '';
+        datum.value = HEUTE;
         liste.textContent = '';
         leer.hidden = true;
         dlg.showModal();
@@ -1164,7 +1268,7 @@
     function speichern() {
       const wert = text.value.trim();
       if (!wert || !aktuell) return;
-      const body = new URLSearchParams({ text: wert, halbjahr: HJ });
+      const body = new URLSearchParams({ text: wert, halbjahr: HJ, datum: datum.value || HEUTE });
       fetch(url(aktuell.sid), { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: body })
         .then(function(r) { return r.json(); })
         .then(function(d) { if (d.ok) { text.value = ''; zeige(d.notizen); text.focus(); } });

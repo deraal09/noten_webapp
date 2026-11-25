@@ -558,13 +558,15 @@ export default async function apiV1Routes(fastify) {
       return {
         fach: fachMeta(fach, halbjahr),
         anteil_schriftlich_prozent: uebersicht.schriftlichPct, anteil_unterrichtsleistung_prozent: uebersicht.ulPct,
+        datumstabelle_abschnitte: (uebersicht.abschnitte || []).length ? uebersicht.abschnitte.map((a) => ({ id: a.id, titel: a.titel, ab_datum: a.ab_datum, gewichtung: a.gewichtung, notiz: a.notiz })) : undefined,
         zusammensetzung_aus_unterfaechern: Boolean(uebersicht.komposition),
         unterfaecher: uebersicht.komposition ? uebersicht.komposition.unterfaecher.map((u) => ({ id: u.id, name: u.kurzname, anteil_prozent: u.anteil })) : undefined,
         schueler: uebersicht.rows.map((r) => ({
           id: r.schueler_id, nachname: r.nachname, vorname: r.vorname, gesperrt: Boolean(sperren.get(r.schueler_id)),
           klausuren: (r.klausuren || []).map((k) => ({ id: k.id, name: k.name, punkte: k.punkte, extrapunkte: k.extrapunkte, note: k.note, teilnoten: k.teilNoten })),
           unterrichtsleistungen: (r.uls || []).map((u) => ({ id: u.id, name: u.name, punkte: u.punkte, note: u.note })),
-          datumsnoten: (r.terminNoten || []).map((t) => ({ termin_id: t.termin_id, datum: t.datum, note: t.wert, nicht_anwesend: t.na })),
+          datumsnoten: (r.terminNoten || []).map((t) => ({ termin_id: t.termin_id, datum: t.datum, note: t.wert, nicht_anwesend: t.na, status: t.status ? ({ na: 'n.a.', e: 'e', ne: 'ne' })[t.status] : null })),
+          datums_abschnittsnoten: (r.datumsAbschnitte || []).length ? r.datumsAbschnitte.map((a) => ({ abschnitt_id: a.id, note: a.note })) : undefined,
           unterfaecher_noten: r.unterfachNoten || undefined,
           note_schriftlich: r.schriftlicheNote, note_unterrichtsleistung: r.muendlicheNote, vorhalbjahr: r.vorhalbjahrNote,
           gesamtnote: r.gesamt, endnote: r.endnote ? { note: r.endnote.note, ntg: Boolean(r.endnote.ntg) } : null,
@@ -799,19 +801,20 @@ export default async function apiV1Routes(fastify) {
         if (!teilnehmer.has(sid)) return fehler.push({ stelle: wo, schueler_id: sid, fehler: 'Die Person nimmt nicht an diesem Fach teil.' });
         if (istSchuelerGesperrtInFach(t.fach_id, sid, t.halbjahr)) return fehler.push({ stelle: wo, schueler_id: sid, fehler: 'Die Noten dieser Person sind gesperrt (Notenkonferenz).' });
         const n = e.note;
-        if (n === 'n.a.') return geprueft.push({ sid, wert: null, na: 1 });
-        if (n === null) return geprueft.push({ sid, wert: null, na: 0 });
-        if (!istZahl(n) || n < min || n > max) return fehler.push({ stelle: wo, schueler_id: sid, fehler: `note: Zahl von ${min} bis ${max}, "n.a." oder null.` });
-        return geprueft.push({ sid, wert: n, na: 0 });
+        if (n === 'n.a.') return geprueft.push({ sid, wert: null, status: 'na' });
+        if (n === 'e' || n === 'ne') return geprueft.push({ sid, wert: null, status: n });
+        if (n === null) return geprueft.push({ sid, wert: null, status: '' });
+        if (!istZahl(n) || n < min || n > max) return fehler.push({ stelle: wo, schueler_id: sid, fehler: `note: Zahl von ${min} bis ${max}, "n.a.", "e", "ne" oder null.` });
+        return geprueft.push({ sid, wert: n, status: '' });
       });
       if (fehler.length) return senden(reply, 422, 'invalid', 'Es wurde nichts gespeichert: mindestens ein Eintrag ist ungültig.', fehler);
       if (!speichern(request)) return { gespeichert: false, dry_run: true, anzahl: geprueft.length };
       const db = getDb();
       const upsert = db.prepare(`
-        INSERT INTO unterricht_noten (termin_id, schueler_id, wert, nicht_anwesend) VALUES (?, ?, ?, ?)
-        ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert, nicht_anwesend = excluded.nicht_anwesend
+        INSERT INTO unterricht_noten (termin_id, schueler_id, wert, nicht_anwesend, status) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert, nicht_anwesend = excluded.nicht_anwesend, status = excluded.status
       `);
-      db.transaction(() => { for (const g of geprueft) upsert.run(t.id, g.sid, g.wert, g.na); })();
+      db.transaction(() => { for (const g of geprueft) upsert.run(t.id, g.sid, g.wert, g.status === 'na' ? 1 : 0, g.status); })();
       syncFallsAutoAktiv(t.fach_id, t.halbjahr, request.apiUser.id);
       request.log.info({ key: request.apiKey.id, termin: t.id, anzahl: geprueft.length }, 'api: Datumsnoten eingetragen');
       return { gespeichert: true, anzahl: geprueft.length };

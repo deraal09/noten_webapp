@@ -58,8 +58,8 @@ export function korrigiereGesamtnote({ fach, halbjahr, schuelerId, ziel, datum }
         termin = { id: db.prepare('INSERT INTO unterricht_termine (fach_id, halbjahr, datum, korrektur) VALUES (?, ?, ?, 1)').run(fach.id, halbjahr, datum).lastInsertRowid };
       }
       const setze = db.prepare(`
-        INSERT INTO unterricht_noten (termin_id, schueler_id, wert, nicht_anwesend) VALUES (?, ?, ?, 0)
-        ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert, nicht_anwesend = 0
+        INSERT INTO unterricht_noten (termin_id, schueler_id, wert, nicht_anwesend, status) VALUES (?, ?, ?, 0, '')
+        ON CONFLICT(termin_id, schueler_id) DO UPDATE SET wert = excluded.wert, nicht_anwesend = 0, status = ''
       `);
       const f = (v) => { setze.run(termin.id, schuelerId, v); return gesamtVon(fach, halbjahr, schuelerId); };
       // Die Gesamtnote vor der Korrektur; für die Rechnung zählt ein früherer Korrekturwert dieses Tages nicht mit.

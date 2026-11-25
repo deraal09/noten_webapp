@@ -215,14 +215,19 @@ export const ARTIKEL = [
   },
   {
     slug: 'unterrichtsleistung', kategorie: 'noten', titel: 'Unterrichtsleistung: Datumstabelle und Zusatzleistungen',
-    kurz: 'Noten je Unterrichtstermin, n.a. für Abwesende, Unterrichtsinhalt; Zusatzleistungen wie Referate.',
-    schlagworte: ['unterrichtsleistung', 'mündlich', 'datumstabelle', 'termin', 'datum', 'n.a.', 'nicht anwesend', 'unterrichtsinhalt', 'referat', 'zusatzleistung', 'durchschnitt', 'notiz', 'korrektur'],
+    kurz: 'Noten je Unterrichtstermin, n.a./e/ne für Fehlende, Abschnitte mit Zwischennote, Notizen; Zusatzleistungen wie Referate.',
+    schlagworte: ['unterrichtsleistung', 'mündlich', 'datumstabelle', 'termin', 'datum', 'n.a.', 'nicht anwesend', 'entschuldigt', 'nicht entschuldigt', 'abschnitt', 'zwischennote', 'gewichtung', 'unterrichtsinhalt', 'referat', 'zusatzleistung', 'durchschnitt', 'notiz', 'korrektur'],
     bilder: [{ datei: 'datumstabelle', text: 'Datumstabelle mit Terminen und Noten' }],
     abschnitte: [
       { titel: 'Datumstabelle', schritte: [
         'In der Fachseite **✏️ Noteneingabe ▾ → Unterrichtsleistung** öffnen und ein Datum mit **+ Datum hinzufügen** anlegen. Im Datumsfeld steht schon **das heutige Datum**: Für heute genügt der Klick auf den Knopf, sonst wählst du vorher ein anderes Datum.',
-        'Je Person die Note für diesen Termin eintragen; **n.a.** steht für „nicht anwesend“ (zählt nicht mit). Am Handy erscheint beim Antippen eine Auswahl der Noten.',
-        'Unter jedem Datum kannst du eine kurze Notiz zum **Unterrichtsinhalt** eintragen. Das Notizsymbol hinter dem Namen öffnet Notizen zur Person.',
+        'Je Person die Note für diesen Termin eintragen. Statt einer Note gibt es drei Fehlstatus: **n.a.** (nicht anwesend) und **e** (entschuldigt) **zählen nicht** in den Durchschnitt, **ne** (nicht entschuldigt) zählt als **schlechteste Note** (IHK: 6, BG: 0 Punkte). Am Handy erscheint beim Antippen eine Auswahl mit Noten und diesen drei Status. Die Spalten **n.a.** und **e / ne** zählen die Termine je Person.',
+        'Unter jedem Datum kannst du eine kurze Notiz zum **Unterrichtsinhalt** eintragen. Das Notizsymbol hinter dem Namen öffnet Notizen zur Person; dort wählst du das **Datum der Notiz** frei, auch rückwirkend für einen früheren Tag.',
+      ] },
+      { titel: 'Abschnitte (optional)', schritte: [
+        'Über der Tabelle **Abschnitte (optional)** aufklappen, ein **Beginn-Datum** (und optional einen Titel) wählen und **+ Abschnitt beginnen** klicken. Ein Abschnitt gilt ab seinem Beginn bis zum nächsten Abschnitt; der erste umfasst auch frühere Termine.',
+        'Jeder Abschnitt hat im Tabellenkopf eine **Notiz für den gesamten Abschnitt** (die Notizen je Tag bleiben daneben erhalten), einen **Titel**, den **Beginn** und eine **Gewichtung**. Rechts neben seinen Terminen steht je Person die **Zwischennote** (Durchschnitt des Abschnitts).',
+        'Der **Ø der Datumstabelle** ist dann das nach den Gewichten gewichtete Mittel der Zwischennoten (z. B. Gewicht 1 und 2 oder 30 und 70; ein Abschnitt ohne Note zählt nicht). Ohne Abschnitte gilt weiter der einfache Durchschnitt aller Termine. Löschst du einen Abschnitt, bleiben Termine und Noten erhalten.',
       ] },
       { titel: 'Zusatzleistungen', absaetze: [
         'Mit **＋ Neu hinzufügen** neben der Datumstabelle legst du Zusatzleistungen an (z. B. Referat). Wie bei Klausuren trägst du Punkte ein; die **Gewichtung** bestimmt den Anteil am Topf der Unterrichtsleistung. Der Rest geht in die Datumstabelle.',

@@ -70,7 +70,7 @@ export const ENDPOINTS = [
         id: 301, nachname: 'Adler', vorname: 'Anna', gesperrt: false,
         klausuren: [{ id: 7, name: 'Klausur 1', punkte: [12, 11, 6], extrapunkte: null, note: 9.9, teilnoten: [12, 8.5] }],
         unterrichtsleistungen: [{ id: 3, name: 'Referat', punkte: [9], note: 9 }],
-        datumsnoten: [{ termin_id: 90, datum: '2025-09-01', note: 10, nicht_anwesend: false }],
+        datumsnoten: [{ termin_id: 90, datum: '2025-09-01', note: 10, nicht_anwesend: false, status: null }],
         note_schriftlich: 9.9, note_unterrichtsleistung: 10, gesamtnote: 9.96, endnote: null, nicht_bestanden: false,
       }],
     },
@@ -145,10 +145,10 @@ export const ENDPOINTS = [
   {
     id: 'termin-noten', method: 'PUT', path: '/termine/{id}/noten', scope: 'schreiben',
     summary: 'Noten für einen Termin der Datumstabelle eintragen',
-    beschreibung: '`note` ist eine Zahl im Bereich des Notenschlüssels (IHK 1–6, BG und SPA-Fächer nach Schlüssel des Fachs), `"n.a."` für nicht anwesend oder `null` zum Leeren. Alles oder nichts.',
+    beschreibung: '`note` ist eine Zahl im Bereich des Notenschlüssels (IHK 1–6, BG und SPA-Fächer nach Schlüssel des Fachs), `"n.a."` für nicht anwesend, `"e"` für entschuldigt (beide zählen nicht in den Durchschnitt), `"ne"` für nicht entschuldigt (zählt als schlechteste Note: 6 bzw. 0 Punkte) oder `null` zum Leeren. Hat die Datumstabelle Abschnitte (nur in der App einrichtbar), liefert der Lesezugriff `datumstabelle_abschnitte` und je Person `datums_abschnittsnoten` (Zwischennoten). Alles oder nichts.',
     query: [{ name: 'dry_run', beschreibung: 'true: nur prüfen, nichts speichern' }],
-    body: { noten: [{ schueler_id: 301, note: 11 }, { schueler_id: 302, note: 'n.a.' }, { schueler_id: 303, note: null }] },
-    antwort: { gespeichert: true, anzahl: 3 },
+    body: { noten: [{ schueler_id: 301, note: 11 }, { schueler_id: 302, note: 'n.a.' }, { schueler_id: 303, note: 'ne' }, { schueler_id: 304, note: null }] },
+    antwort: { gespeichert: true, anzahl: 4 },
   },
   {
     id: 'endnoten', method: 'PUT', path: '/faecher/{id}/endnoten', scope: 'schreiben',

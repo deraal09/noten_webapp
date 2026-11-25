@@ -6,6 +6,30 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.2.0 - 2026-11-25
+
+### Datumstabelle: e und ne, Abschnitte, Notizdatum
+
+- **Neue Fehlstatus `e` und `ne`** neben `n.a.`: **e** (entschuldigt) zählt wie n.a.
+  nicht in den Durchschnitt, **ne** (nicht entschuldigt) zählt als schlechteste Note
+  (IHK/SPA: 6, BG: 0 Punkte). Eingabe per Tastatur oder Touch-Auswahl; eigene Spalte
+  **e / ne** mit den Zählern je Person, Anzeige auch in der Notenbesprechung.
+  Neue Spalte `unterricht_noten.status` (bestehende n.a.-Einträge gelten unverändert).
+- **Abschnitte (optional)**: Die Datumstabelle lässt sich ab einem Beginn-Datum in
+  Abschnitte teilen. Jeder Abschnitt hat Titel, eine **übergeordnete Notiz** (die
+  Notizen je Tag bleiben), eine **Zwischennote** je Person (Durchschnitt des
+  Abschnitts, in der Tabelle sichtbar) und eine relative **Gewichtung**. Der Ø der
+  Datumstabelle ist dann das gewichtete Mittel der Zwischennoten; ohne Abschnitte
+  ändert sich nichts. Neue Tabelle `unterricht_abschnitte`.
+- **Datum der Unterrichtsnotizen wählbar**: Im Notizdialog der Datumstabelle lässt
+  sich das Datum der Notiz frei wählen, so können Notizen auch rückwirkend zu einem
+  bestimmten Tag angelegt werden (Vorgabe: heute). Liste und Notenbesprechung zeigen
+  das Bezugsdatum. Neue Spalte `notenbesprechung_notizen.datum`.
+- **API**: `PUT /termine/{id}/noten` nimmt zusätzlich `"e"` und `"ne"`; die Noten-Abfrage
+  liefert `status` je Datumsnote sowie `datumstabelle_abschnitte` und
+  `datums_abschnittsnoten` (Abschnitte lassen sich nur in der App einrichten).
+- Hilfe-Artikel „Unterrichtsleistung“ um Fehlstatus, Abschnitte und Notizdatum ergänzt.
+
 ## 1.1.0 - 2026-11-24
 
 ### Fachseite: Reiter neu sortiert

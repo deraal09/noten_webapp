@@ -167,7 +167,7 @@ export const NUTZUNG_FUNKTIONEN = [
   { id: 'fach', gruppe: 'Kern', titel: 'Fachseite öffnen', re: /^GET \/teacher\/fach\/:id$/ },
   { id: 'klausur-anlegen', gruppe: 'Kern', titel: 'Klausur anlegen', re: /^POST \/teacher\/fach\/:id\/klausuren\/neu$/ },
   { id: 'punkte', gruppe: 'Kern', titel: 'Punkte und Noten eintragen', re: /^POST \/teacher\/(klausuren\/:id\/(punkte|extrapunkte)|uls\/:id\/punkte|unterricht\/termine\/:id\/note|fach\/:id\/(endnote|spa\/eingabe)|klassen\/:id\/endnote)$/ },
-  { id: 'unterricht', gruppe: 'Kern', titel: 'Unterrichtsleistung (Datumstabelle, Zusatzleistung)', re: /^POST \/teacher\/(fach\/:id\/(uls\/neu|unterricht\/termine\/neu)|unterricht\/termine\/:id\/inhalt)$/ },
+  { id: 'unterricht', gruppe: 'Kern', titel: 'Unterrichtsleistung (Datumstabelle, Zusatzleistung)', re: /^POST \/teacher\/(fach\/:id\/(uls\/neu|unterricht\/(termine|abschnitte)\/neu)|unterricht\/termine\/:id\/inhalt|unterricht\/abschnitte\/:id)$/ },
   { id: 'klassen', gruppe: 'Kern', titel: 'Meine Klassen', re: /^GET \/teacher\/klassen$/ },
   { id: 'klasse-anlegen', gruppe: 'Kern', titel: 'Klasse anlegen', re: /^POST \/teacher\/klassen\/neu$/ },
   { id: 'klasse', gruppe: 'Kern', titel: 'Klassenseite öffnen', re: /^GET \/teacher\/klassen\/:id$/ },

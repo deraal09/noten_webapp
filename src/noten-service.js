@@ -7,7 +7,7 @@
 import { effektiveCsv, csvRechner } from './notenschluessel.js';
 import { getDb } from './db.js';
 import {
-  noteAusPunkten, gesamtnoteHj, teilNote, unterrichtsleistungNote, nichtBestanden,
+  noteAusPunkten, gesamtnoteHj, teilNote, unterrichtsleistungNote, nichtBestanden, neWert, abschnittsDurchschnitt,
   klausurNote, klausurTeilNoten, parseKlausurTeile, knappHinweis,
   DEFAULT_GEWICHTUNG, DEFAULT_NS_CSV,
 } from './grade-calc.js';
@@ -16,17 +16,32 @@ import { ladeEndnoten } from './halbjahr-endnoten.js';
 import { unterfaecherImHalbjahr } from './unterfaecher.js';
 import { sortiereNachName } from './format.js';
 
-/** Lädt Unterrichtstermine + eingetragene Noten für ein Fach+Halbjahr (Datumstabelle). */
-function ladeUnterrichtTermine(fachId, halbjahr) {
+/**
+ * Lädt Unterrichtstermine + eingetragene Noten für ein Fach+Halbjahr (Datumstabelle).
+ * Rückgabe: termine (je mit abschnitt_id oder null), noten (Schüler → Termin → Wert),
+ * status (Schüler → Termin → 'na' | 'e' | 'ne'), na (Schüler → Termine mit n.a.) und die Abschnitte.
+ */
+export function ladeUnterrichtTermine(fachId, halbjahr) {
   const db = getDb();
   const termine = db.prepare(
     'SELECT * FROM unterricht_termine WHERE fach_id = ? AND halbjahr = ? ORDER BY datum, id'
   ).all(fachId, halbjahr);
+  const abschnitte = db.prepare(
+    'SELECT * FROM unterricht_abschnitte WHERE fach_id = ? AND halbjahr = ? ORDER BY ab_datum, id'
+  ).all(fachId, halbjahr);
+  // Ein Termin gehört zum Abschnitt mit dem spätesten Beginn bis zu seinem Datum, davor zum ersten Abschnitt.
+  for (const t of termine) {
+    let treffer = abschnitte[0] || null;
+    for (const a of abschnitte) if (a.ab_datum <= t.datum) treffer = a;
+    t.abschnitt_id = treffer ? treffer.id : null;
+  }
+  for (const a of abschnitte) a.anzahlTermine = termine.filter((t) => t.abschnitt_id === a.id).length;
   const noten = new Map(); // schueler_id -> Map<termin_id, wert>
+  const status = new Map(); // schueler_id -> Map<termin_id, 'na'|'e'|'ne'>
   const na = new Map(); // schueler_id -> Set<termin_id> mit "n.a." (nicht anwesend)
   if (termine.length) {
     const rows = db.prepare(`
-      SELECT un.termin_id, un.schueler_id, un.wert, un.nicht_anwesend
+      SELECT un.termin_id, un.schueler_id, un.wert, un.nicht_anwesend, un.status
       FROM unterricht_noten un
       JOIN unterricht_termine ut ON ut.id = un.termin_id
       WHERE ut.fach_id = ? AND ut.halbjahr = ?
@@ -34,25 +49,47 @@ function ladeUnterrichtTermine(fachId, halbjahr) {
     for (const r of rows) {
       if (!noten.has(r.schueler_id)) noten.set(r.schueler_id, new Map());
       noten.get(r.schueler_id).set(r.termin_id, r.wert);
-      if (r.nicht_anwesend) {
+      const st = r.status || (r.nicht_anwesend ? 'na' : '');
+      if (st) {
+        if (!status.has(r.schueler_id)) status.set(r.schueler_id, new Map());
+        status.get(r.schueler_id).set(r.termin_id, st);
+      }
+      if (st === 'na') {
         if (!na.has(r.schueler_id)) na.set(r.schueler_id, new Set());
         na.get(r.schueler_id).add(r.termin_id);
       }
     }
   }
-  return { termine, noten, na };
+  return { termine, noten, na, status, abschnitte };
 }
 
-/** Eingetragene Datumstabellen-Werte eines/einer Schüler/in (ohne Lücken). */
-function datumsWerteFuerSchueler(schuelerId, termine, notenMap) {
-  const eigene = notenMap.get(schuelerId);
-  if (!eigene) return [];
+/**
+ * Auswertung der Datumstabelle für eine Person: die zählenden Werte (n.a. und „e“ fehlen, „ne“ zählt als
+ * schlechteste Note) und -- falls es Abschnitte gibt -- Zwischennote je Abschnitt sowie der daraus
+ * gewichtete Durchschnitt (`durchschnitt` ist ohne Abschnitte undefined: dann gilt der einfache Schnitt).
+ */
+export function datumsAuswertung(schuelerId, daten, schlechtesterWert) {
+  const eigene = daten.noten.get(schuelerId);
+  const st = daten.status.get(schuelerId);
   const werte = [];
-  for (const t of termine) {
-    const w = eigene.get(t.id);
-    if (w !== null && w !== undefined) werte.push(w);
+  const proAbschnitt = new Map();
+  const zaehler = { na: 0, e: 0, ne: 0 };
+  for (const t of daten.termine) {
+    const s = st?.get(t.id) || '';
+    if (s) zaehler[s] = (zaehler[s] || 0) + 1;
+    let w = s === 'ne' ? schlechtesterWert : (s ? null : eigene?.get(t.id));
+    if (w === null || w === undefined) continue;
+    werte.push(w);
+    if (!proAbschnitt.has(t.abschnitt_id)) proAbschnitt.set(t.abschnitt_id, []);
+    proAbschnitt.get(t.abschnitt_id).push(w);
   }
-  return werte;
+  if (!daten.abschnitte.length) return { werte, durchschnitt: undefined, abschnitte: [], zaehler };
+  const gruppen = daten.abschnitte.map((a) => ({ werte: proAbschnitt.get(a.id) || [], gewichtung: a.gewichtung }));
+  const { durchschnitt, noten } = abschnittsDurchschnitt(gruppen);
+  return {
+    werte, durchschnitt, zaehler,
+    abschnitte: daten.abschnitte.map((a, i) => ({ id: a.id, note: noten[i], anzahl: gruppen[i].werte.length })),
+  };
 }
 
 export function ladeFachMitUmfeld(id) {
@@ -224,7 +261,8 @@ export function berechneRohnoten(fachId, halbjahr) {
     const rows = db.prepare('SELECT schueler_id, punkte FROM ul_ergebnisse WHERE ul_id = ?').all(u.id);
     ulErgs.set(u.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
   }
-  const { termine, noten: terminNoten } = ladeUnterrichtTermine(fachId, halbjahr);
+  const terminDaten = ladeUnterrichtTermine(fachId, halbjahr);
+  const ne = neWert(fach.notenschluessel);
 
   for (const s of schueler) {
     const csvStr = csvFuer(s.id);
@@ -238,8 +276,8 @@ export function berechneRohnoten(fachId, halbjahr) {
       const note = punkte ? noteAusPunkten(punkte, JSON.parse(u.max_punkte_pro_aufgabe), csvStr) : null;
       return { note, gewichtung: u.gewichtung };
     });
-    const datumsWerte = datumsWerteFuerSchueler(s.id, termine, terminNoten);
-    const { note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen);
+    const da = datumsAuswertung(s.id, terminDaten, ne);
+    const { note: muendlicheNote } = unterrichtsleistungNote(da.werte, zusatzleistungen, da.durchschnitt);
     const gn = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
     ergebnis.set(s.id, gn);
   }
@@ -283,9 +321,8 @@ export function berechneGesamtnoteEinerPerson(fachId, halbjahr, schuelerId) {
     const note = punkte ? noteAusPunkten(punkte, JSON.parse(u.max_punkte_pro_aufgabe), csvStr) : null;
     return { note, gewichtung: u.gewichtung };
   });
-  const { termine, noten: terminNoten } = ladeUnterrichtTermine(fachId, halbjahr);
-  const datumsWerte = datumsWerteFuerSchueler(schuelerId, termine, terminNoten);
-  const { note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, zusatzleistungen);
+  const da = datumsAuswertung(schuelerId, ladeUnterrichtTermine(fachId, halbjahr), neWert(fach.notenschluessel));
+  const { note: muendlicheNote } = unterrichtsleistungNote(da.werte, zusatzleistungen, da.durchschnitt);
   return gesamtnoteHj(100 - ulPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
 }
 
@@ -313,14 +350,14 @@ function ladeKompositionsuebersicht(fach, halbjahr, unterfaecher, schueler) {
       endnote, gesamtBerechnet: berechnet, gesamtOhneVerrechnung: ohneVerrechnung, vorhalbjahrNote: vorherNote,
       herkunftKlasse: s.klasse_id === fach.klasse_id ? null : s.herkunft_klasse_name,
       klausuren: [], uls: [], terminNoten: [],
-      schriftlicheNote: null, datumsDurchschnitt: null, naAnzahl: 0, muendlicheNote: null,
+      schriftlicheNote: null, datumsDurchschnitt: null, naAnzahl: 0, eAnzahl: 0, neAnzahl: 0, datumsAbschnitte: [], muendlicheNote: null,
       unterfachNoten: proUnterfach.map(({ noten }) => noten.get(s.id) ?? null),
       gesamt: gn,
       nicht_bestanden: gn !== null ? nichtBestanden(gn, nsTypFuerGesamt(fach, endnote)) : false,
     };
   });
   return {
-    schriftlichPct: 0, ulPct: 0, csvStr: notenschluesselFuerHalbjahr(fach, halbjahr)(), uls: [], termine: [], schueler, rows,
+    schriftlichPct: 0, ulPct: 0, csvStr: notenschluesselFuerHalbjahr(fach, halbjahr)(), uls: [], termine: [], abschnitte: [], schueler, rows,
     verrechnung: { prozent: verrechnungProzent, vorhalbjahr }, klausuren: [],
     komposition: {
       unterfaecher: proUnterfach.map(({ u }) => ({
@@ -376,7 +413,9 @@ export function ladeNotenuebersicht(fach, halbjahr) {
     const rows = db.prepare('SELECT schueler_id, punkte FROM ul_ergebnisse WHERE ul_id = ?').all(u.id);
     ulErgs.set(u.id, new Map(rows.map((r) => [r.schueler_id, JSON.parse(r.punkte)])));
   }
-  const { termine, noten: terminNoten, na: terminNa } = ladeUnterrichtTermine(fach.id, halbjahr);
+  const terminDaten = ladeUnterrichtTermine(fach.id, halbjahr);
+  const { termine, noten: terminNoten, status: terminStatus, abschnitte: terminAbschnitte } = terminDaten;
+  const ne = neWert(fach.notenschluessel);
 
   const endnoten = ladeEndnoten(fach.id, halbjahr);
   // Verrechnung mit dem Vorhalbjahr (Einstellung der Klasse, siehe verrechnungsProzent).
@@ -405,10 +444,13 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       return { id: u.id, name: u.name, gewichtung: u.gewichtung, punkte, note };
     });
     const eigeneTerminNoten = terminNoten.get(s.id) || new Map();
-    const eigeneNa = terminNa.get(s.id) || new Set();
-    const terminZeile = termine.map((t) => ({ termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null, na: eigeneNa.has(t.id), korrektur: Boolean(t.korrektur), inhalt: t.inhalt || '' }));
-    const datumsWerte = datumsWerteFuerSchueler(s.id, termine, terminNoten);
-    const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(datumsWerte, ulData);
+    const eigenerStatus = terminStatus.get(s.id) || new Map();
+    const terminZeile = termine.map((t) => {
+      const st = eigenerStatus.get(t.id) || '';
+      return { termin_id: t.id, datum: t.datum, wert: eigeneTerminNoten.get(t.id) ?? null, na: st === 'na', status: st, abschnitt_id: t.abschnitt_id, korrektur: Boolean(t.korrektur), inhalt: t.inhalt || '' };
+    });
+    const da = datumsAuswertung(s.id, terminDaten, ne);
+    const { datumsDurchschnitt, note: muendlicheNote } = unterrichtsleistungNote(da.werte, ulData, da.durchschnitt);
     const ohneVerrechnung = gesamtnoteHj(schriftlichPct, ulPct, klausurData, [{ note: muendlicheNote, gewichtung: 1 }], csvStr);
     const vorherNote = vorherNoten.get(s.id) ?? null;
     const berechnet = wendeVerrechnungAn(ohneVerrechnung, vorherNote, verrechnungProzent);
@@ -424,7 +466,10 @@ export function ladeNotenuebersicht(fach, halbjahr) {
       klausuren: klausurData, uls: ulData, terminNoten: terminZeile,
       schriftlicheNote: teilNote(klausurData),
       datumsDurchschnitt,
-      naAnzahl: eigeneNa.size,
+      naAnzahl: da.zaehler.na,
+      eAnzahl: da.zaehler.e,
+      neAnzahl: da.zaehler.ne,
+      datumsAbschnitte: da.abschnitte,
       muendlicheNote,
       gesamt: gn,
       // SPA: berechnete Noten wie IHK, direkt eingetragene Punkte (0-15) bestehen wie BG-Punkte ab 4.
@@ -433,7 +478,7 @@ export function ladeNotenuebersicht(fach, halbjahr) {
   });
 
   return {
-    schriftlichPct, ulPct, csvStr, uls, termine, schueler, rows, verrechnung: { prozent: verrechnungProzent, vorhalbjahr },
+    schriftlichPct, ulPct, csvStr, uls, termine, schueler, rows, abschnitte: terminAbschnitte, verrechnung: { prozent: verrechnungProzent, vorhalbjahr },
     klausuren: klausuren.map((k) => ({ ...k, teileInfo: parseKlausurTeile(k.teile) })),
   };
 }

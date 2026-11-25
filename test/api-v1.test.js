@@ -264,6 +264,17 @@ test('Datumstabelle: Termin anlegen, Noten (auch n.a. und leeren) eintragen, Ber
   const n = await api(leseKey, 'GET', `/faecher/${fachId}/noten?halbjahr=1`);
   assert.equal(n.json.schueler.find((s) => s.nachname === 'Adler').datumsnoten[0].note, 11);
   assert.equal(n.json.schueler.find((s) => s.nachname === 'Berger').datumsnoten[0].nicht_anwesend, true);
+  assert.equal(n.json.schueler.find((s) => s.nachname === 'Berger').datumsnoten[0].status, 'n.a.');
+  // e (entschuldigt) und ne (nicht entschuldigt): eigener Status, ne zählt als schlechteste Note
+  const es = await api(schreibKey, 'PUT', `/termine/${tid}/noten`, { noten: [{ schueler_id: sid1, note: 'e' }, { schueler_id: sid2, note: 'ne' }] });
+  assert.equal(es.status, 200);
+  const n2 = await api(leseKey, 'GET', `/faecher/${fachId}/noten?halbjahr=1`);
+  const a = n2.json.schueler.find((x) => x.nachname === 'Adler').datumsnoten[0];
+  assert.deepEqual([a.note, a.status, a.nicht_anwesend], [null, 'e', false]);
+  const b = n2.json.schueler.find((x) => x.nachname === 'Berger');
+  assert.deepEqual([b.datumsnoten[0].status, b.datumsnoten[0].nicht_anwesend], ['ne', false]);
+  assert.equal(db().prepare("SELECT status FROM unterricht_noten WHERE termin_id = ? AND schueler_id = ?").get(tid, sid2).status, 'ne');
+  assert.equal((await api(schreibKey, 'PUT', `/termine/${tid}/noten`, { noten: [{ schueler_id: sid1, note: 'x' }] })).status, 422);
 });
 
 test('Endnoten: eintragen, ntg, Bereich prüfen, leeren; Probelauf; Sperre verhindert die Eingabe', async () => {
