@@ -422,7 +422,7 @@
         if (k.teileInfo) { var sPos = 0; k.teileInfo.teile.forEach(function(t) { if (t.art === 'inhalt_sprache') { for (var si = 0; si < t.aufgaben; si++) statAusschluss.push(sPos + si); } sPos += t.aufgaben; }); }
       %>
       <% if (!funktionen || funktionen.statistik) { %>
-      <div class="klausur-statistik card" data-klausur-statistik data-klausur="<%= k.id %>" data-ausschluss="<%= JSON.stringify(statAusschluss) %>" data-labels="<%= JSON.stringify(statLabels) %>" hidden>
+      <div class="klausur-statistik card" data-klausur-statistik data-an="<%= typeof statistikAn !== 'undefined' && statistikAn !== null ? statistikAn : '' %>" data-klausur="<%= k.id %>" data-ausschluss="<%= JSON.stringify(statAusschluss) %>" data-labels="<%= JSON.stringify(statLabels) %>" hidden>
         <h3>📊 Statistik zur Klausur</h3>
         <div class="statistik-inhalt" aria-live="polite"></div>
       </div>

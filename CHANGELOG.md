@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.3.2 - 2026-11-25
+
+### Klausur-Statistik: Haken wird zuverlässig gespeichert
+
+- Der Haken „📊 Statistik“ lag nur im Browser-Speicher (`localStorage`) und ging verloren, wenn der Browser
+  seine Website-Daten löschte (Schul-Rechner, privater Modus, Safari nach längerer Pause) oder ein anderes
+  Gerät/ein anderer Browser benutzt wurde. Er gehört jetzt zum **Konto** und wird serverseitig gespeichert
+  (neue Tabelle `user_einstellungen`, `POST /konto/einstellung`); der Server-Wert hat Vorrang.
+- Eine früher im Browser gespeicherte Wahl wird beim ersten Öffnen einmalig aufs Konto übernommen.
+- Beim Zurück-Navigieren aus dem Seiten-Cache wird die Anzeige wieder zum Haken passend gesetzt.
+
 ## 1.3.1 - 2026-11-25
 
 ### Hilfe: „Anforderung nicht erfüllt“ führt zum Feedback

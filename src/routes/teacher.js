@@ -69,6 +69,7 @@ import {
   zeugnisMitQuellen, ladeQuellenSeite, speichereQuellenAuswahl, loescheQuellenAuswahl,
 } from '../spa-zeugnis-quellen.js';
 import { leistungsZiel, setzeLeistungsZiel, spaTendenz, spaTendenzAusNote } from '../spa-leistung.js';
+import { ladeEinstellung } from '../einstellungen.js';
 import Busboy from '@fastify/busboy';
 import { Readable } from 'node:stream';
 
@@ -488,7 +489,7 @@ export default async function teacherRoutes(fastify) {
       HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id), spaLeistung, spaTendenz, spaTendenzAusNote,
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
-      termine: uebersicht.termine, abschnitte: uebersicht.abschnitte || [], unterrichtNotizAnzahl,
+      termine: uebersicht.termine, abschnitte: uebersicht.abschnitte || [], unterrichtNotizAnzahl, statistikAn: ladeEinstellung(request.user.id, 'statistik_an'),
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct, verrechnung: uebersicht.verrechnung,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       abschlussnoten, sperren, teilnehmer,

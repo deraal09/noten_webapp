@@ -674,6 +674,14 @@ CREATE TABLE IF NOT EXISTS user_funktionen (
     profil TEXT,
     aktiv TEXT NOT NULL DEFAULT '[]'
 );
+-- Kleine persönliche Einstellungen je Konto (src/einstellungen.js), z. B. ob die Klausur-Statistik eingeblendet ist; sie gelten
+-- auf jedem Gerät und Browser (nicht nur im localStorage des einen Browsers).
+CREATE TABLE IF NOT EXISTS user_einstellungen (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    schluessel TEXT NOT NULL,
+    wert TEXT NOT NULL,
+    PRIMARY KEY (user_id, schluessel)
+);
 -- Anonyme Funktionsnutzung (siehe src/aktivitaet.js): wie nutzung_tage nur ein nicht umkehrbares Profil je Person, nur Tage.
 CREATE TABLE IF NOT EXISTS nutzung_funktionen (
     profil TEXT NOT NULL,

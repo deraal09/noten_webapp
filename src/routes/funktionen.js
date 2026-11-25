@@ -7,6 +7,7 @@
 import { requireAuth } from '../auth.js';
 import { FUNKTIONEN, FUNKTION_IDS, PROFILE, setzeProfil, setzeFunktionen, schalteFunktionEin, funktionenFuer } from '../funktionen.js';
 import { suche } from '../suche.js';
+import { setzeEinstellung } from '../einstellungen.js';
 import { istIrgendeineKlassenleitung } from '../auth.js';
 
 /** Nur interne Ziele zulassen (kein offener Weiterleiter). */
@@ -54,6 +55,14 @@ export default async function funktionenRoutes(fastify) {
     istAdmin: Boolean(request.user.isAdmin), ldap: request.user.authSource === 'ldap',
     kannEinladen: !request.user.isAdmin && istIrgendeineKlassenleitung(request.user), funktionen: funktionenFuer(request.user),
   }));
+
+  // Persönliche Einstellung speichern (z. B. Statistik-Haken der Klausuren): { schluessel, wert: '1' | '0' }
+  fastify.post('/konto/einstellung', async (request, reply) => {
+    if (!setzeEinstellung(request.user.id, String(request.body?.schluessel || ''), String(request.body?.wert ?? ''))) {
+      return reply.code(400).send({ ok: false });
+    }
+    return reply.send({ ok: true });
+  });
 
   // Zählt die Nutzung einer im Browser laufenden Funktion (nur bekannte Namen; die Zählung selbst macht der onResponse-Hook).
   fastify.post('/funktion-genutzt', async (request, reply) => {

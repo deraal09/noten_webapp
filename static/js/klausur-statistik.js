@@ -200,8 +200,18 @@
     var panels = document.querySelectorAll('[data-klausur-statistik]');
     if (!panels.length) return;
     var schalter = document.querySelectorAll('input[data-statistik-schalter]');
-    var an = gemerkt();
+    // Der Haken gehört zum Konto und liegt auf dem Server (data-an der Statistik-Felder: '1' / '0'; leer = nie gesetzt). So gilt er auf
+    // jedem Gerät und geht nicht verloren, wenn der Browser seine Website-Daten löscht. Der Browser-Speicher dient nur als Rückfall und
+    // übernimmt eine früher dort gespeicherte Wahl einmalig aufs Konto.
+    var serverWert = panels[0].dataset.an;
+    var an = serverWert === '1' || serverWert === '0' ? serverWert === '1' : gemerkt();
     var timer = null;
+    function speichereAufServer(wert) {
+      try {
+        fetch('/konto/einstellung', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'schluessel=statistik_an&wert=' + (wert ? '1' : '0'), credentials: 'same-origin', keepalive: true });
+      } catch (e) { /* bleibt im Browser-Speicher */ }
+    }
+    if (serverWert !== '1' && serverWert !== '0' && an) speichereAufServer(true);
 
     function anwenden() {
       Array.prototype.forEach.call(schalter, function (s) { s.checked = an; });
@@ -217,10 +227,12 @@
       try { fetch('/funktion-genutzt', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'funktion=statistik', credentials: 'same-origin' }); } catch (e) { /* egal */ }
     }
     Array.prototype.forEach.call(schalter, function (s) {
-      s.addEventListener('change', function () { an = s.checked; merke(an); anwenden(); if (an) melde(); });
+      s.addEventListener('change', function () { an = s.checked; merke(an); speichereAufServer(an); anwenden(); if (an) melde(); });
     });
     document.addEventListener('input', function (ev) { if (ev.target && ev.target.classList && ev.target.classList.contains('punkt')) spaeter(); });
     document.addEventListener('change', function (ev) { if (ev.target && ev.target.classList && ev.target.classList.contains('punkt')) spaeter(); });
+    // Zurück-Navigation aus dem Seiten-Cache: der Browser kann den Haken anders wiederherstellen als die Anzeige
+    window.addEventListener('pageshow', function (ev) { if (ev.persisted) anwenden(); });
     anwenden();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

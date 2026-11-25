@@ -123,7 +123,7 @@ test('Fachseite: Statistik-Schalter, Bereich standardmäßig versteckt, „Neu h
   await form(lehrer, `/teacher/fach/${fachId}/klausuren/neu`, { name: 'K1', aufgaben: '3', halbjahr: '1. Halbjahr' });
   const html = await (await lehrer(`/teacher/fach/${fachId}`)).text();
   assert.match(html, /<input type="checkbox" data-statistik-schalter> 📊 Statistik/);
-  assert.match(html, /<div class="klausur-statistik card" data-klausur-statistik data-klausur="\d+" data-ausschluss="\[\]"[^>]* hidden>/, 'standardmäßig ausgeblendet');
+  assert.match(html, /<div class="klausur-statistik card" data-klausur-statistik data-an="" data-klausur="\d+" data-ausschluss="\[\]"[^>]* hidden>/, 'standardmäßig ausgeblendet');
   assert.match(html, /\/static\/js\/klausur-statistik\.js\?v=/);
   assert.equal((await fetch(`${base}/static/js/klausur-statistik.js`)).status, 200);
   assert.equal((html.match(/＋ Neu hinzufügen/g) || []).length, 2, 'Klausuren und Unterrichtsleistung');
