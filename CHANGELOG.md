@@ -6,6 +6,16 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.4.1 - 2026-11-26
+
+### Abhängigkeiten: Sicherheitsupdates ohne Umbau
+
+- `npm audit fix` (ohne Breaking Changes): `proxy-addr` 2.0.8, `brace-expansion` 2.1.8 und `fast-uri` 2.4.8/3.1.9
+  (indirekte Abhängigkeiten) auf die gepatchten Versionen gehoben; dazu Patch-Updates `@fastify/busboy` 3.2.6,
+  `better-sqlite3-multiple-ciphers` 13.2.0 und `semver` 7.8.6. Keine Änderung am Programmcode.
+- Offen bleibt der Umstieg auf Fastify 5 (und passende Plugin-Versionen), weil die Fixes für `fastify`,
+  `@fastify/static` und `find-my-way` nur dort erscheinen; geplant als eigene Version.
+
 ## 1.4.0 - 2026-11-26
 
 ### Klausuren: Notenspiegel und Klassendurchschnitt
