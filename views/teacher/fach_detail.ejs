@@ -231,6 +231,7 @@
       <form method="post" action="/teacher/klausuren/<%= k.id %>/loeschen" class="inline right" onsubmit="return confirm('Klausur löschen?')">
         <button type="submit" class="danger" aria-label="Klausur <%= k.name %> löschen" title="Klausur löschen">🗑</button>
       </form>
+      <label class="statistik-schalter" title="Zeigt unter der Tabelle den Notenspiegel (Verteilung der Noten) und den Klassendurchschnitt dieser Klausur"><input type="checkbox" data-notenspiegel-schalter> 📈 Notenspiegel</label>
       <% if (!funktionen || funktionen.statistik) { %><label class="statistik-schalter" title="Zeigt unter der Tabelle, welche Aufgaben für die Klasse zu schwer oder zu leicht waren"><input type="checkbox" data-statistik-schalter> 📊 Statistik</label><% } %>
       <%
         var klausurHatPunkte = rows.some(function(r) { var e = r.klausuren.find(function(x) { return x.id === k.id; }); return e && e.punkte && e.punkte.some(function(p) { return p !== null && p !== undefined; }); });
@@ -421,6 +422,10 @@
         var statLabels = maxArr.map(function(_, i) { return aufgabenKopf[i] ? aufgabenKopf[i].replace(/-/g, '') : 'A' + (i + 1); });
         if (k.teileInfo) { var sPos = 0; k.teileInfo.teile.forEach(function(t) { if (t.art === 'inhalt_sprache') { for (var si = 0; si < t.aufgaben; si++) statAusschluss.push(sPos + si); } sPos += t.aufgaben; }); }
       %>
+      <div class="klausur-notenspiegel card" data-notenspiegel data-an="<%= typeof notenspiegelAn !== 'undefined' && notenspiegelAn !== null ? notenspiegelAn : '' %>" data-klausur="<%= k.id %>" data-ns="<%= fach.notenschluessel === 'BG' ? 'BG' : 'IHK' %>" hidden>
+        <h3>📈 Notenspiegel und Klassendurchschnitt</h3>
+        <div class="notenspiegel-inhalt" aria-live="polite"></div>
+      </div>
       <% if (!funktionen || funktionen.statistik) { %>
       <div class="klausur-statistik card" data-klausur-statistik data-an="<%= typeof statistikAn !== 'undefined' && statistikAn !== null ? statistikAn : '' %>" data-klausur="<%= k.id %>" data-ausschluss="<%= JSON.stringify(statAusschluss) %>" data-labels="<%= JSON.stringify(statLabels) %>" hidden>
         <h3>📊 Statistik zur Klausur</h3>
@@ -1378,3 +1383,4 @@
 
 </script>
 <script src="/static/js/klausur-statistik.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>
+<script src="/static/js/notenspiegel.js?v=<%= typeof jsVersion !== 'undefined' ? jsVersion : '' %>" defer></script>

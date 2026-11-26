@@ -92,6 +92,7 @@ try {
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'speicher-status.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'bestaetigen.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'klausur-statistik.js')))
+    .update(readFileSync(path.join(__dirname, 'static', 'js', 'notenspiegel.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'punkte-rechnen.js')))
     .update(readFileSync(path.join(__dirname, 'static', 'js', 'suche.js')))
     .digest('hex').slice(0, 10);

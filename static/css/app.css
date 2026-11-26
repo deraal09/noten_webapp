@@ -1211,3 +1211,17 @@ small.knapp { display: inline-block; margin-left: 0.3rem; padding: 0 0.35rem; bo
 
 /* Hilfe: Hinweis „Anforderung nicht erfüllt“ → Feedback */
 .hilfe-feedback-hinweis { margin: 1rem 0; padding: 0.7rem 1rem; }
+
+/* Klausur: Notenspiegel und Klassendurchschnitt (static/js/notenspiegel.js) */
+.klausur-notenspiegel { margin-top: 1rem; }
+.klausur-notenspiegel[hidden] { display: none; }
+.klausur-notenspiegel h3 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+.notenspiegel-kopf { margin: 0.25rem 0 0.75rem; }
+.notenspiegel-saeulen { display: flex; gap: 0.35rem; align-items: stretch; height: 9rem; max-width: 40rem; }
+.notenspiegel-spalte { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0.15rem; }
+.notenspiegel-balkenbox { flex: 1 1 auto; width: 100%; display: flex; align-items: flex-end; }
+.notenspiegel-balken { display: block; width: 100%; background: var(--accent-fill); border-radius: 3px 3px 0 0; min-height: 0; }
+.notenspiegel-spalte.leer .notenspiegel-balken { background: transparent; }
+.notenspiegel-anzahl { font-size: 0.85rem; font-weight: 600; }
+.notenspiegel-note { font-size: 0.85rem; color: var(--text-muted); border-top: 1px solid var(--border-strong); width: 100%; text-align: center; padding-top: 0.1rem; }
+.notenspiegel-hinweis { margin-top: 0.5rem; }

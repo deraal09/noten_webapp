@@ -489,7 +489,7 @@ export default async function teacherRoutes(fastify) {
       HALBJAHR_SCHULJAHR: halbjahrSchuljahrMap(fach.klasse_id), spaLeistung, spaTendenz, spaTendenzAusNote,
       user: request.user, fach, halbjahr,
       schueler: uebersicht.schueler, klausuren: uebersicht.klausuren, uls: uebersicht.uls,
-      termine: uebersicht.termine, abschnitte: uebersicht.abschnitte || [], unterrichtNotizAnzahl, statistikAn: ladeEinstellung(request.user.id, 'statistik_an'),
+      termine: uebersicht.termine, abschnitte: uebersicht.abschnitte || [], unterrichtNotizAnzahl, statistikAn: ladeEinstellung(request.user.id, 'statistik_an'), notenspiegelAn: ladeEinstellung(request.user.id, 'notenspiegel_an'),
       rows: uebersicht.rows, schriftlichPct: uebersicht.schriftlichPct, ulPct: uebersicht.ulPct, verrechnung: uebersicht.verrechnung,
       autoSync: Boolean(zuweisung?.auto_sync), syncMeta,
       abschlussnoten, sperren, teilnehmer,

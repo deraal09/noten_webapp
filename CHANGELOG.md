@@ -6,6 +6,17 @@ Versionsnummer (`package.json`: `version`) und Release-Datum
 `0.36.0` laufend bei jedem Versionssprung um einen Eintrag ergänzt -- ältere
 Versionen sind hier nicht rückwirkend erfasst.
 
+## 1.4.0 - 2026-11-26
+
+### Klausuren: Notenspiegel und Klassendurchschnitt
+
+- Neuer Haken **📈 Notenspiegel** je Klausur: blendet unter der Tabelle den **Klassendurchschnitt**
+  (mit Median, bester und schlechtester Note, Anzahl der Personen) und den **Notenspiegel** als
+  Säulengrafik ein (IHK: ganze Noten 1–6, BG: Notenpunkte 15 bis 0). Der Durchschnitt nutzt die genauen
+  Noten; die Anzeige aktualisiert sich beim Eintragen von selbst. Standardmäßig ausgeblendet.
+- Der Haken gehört zum Konto (serverseitig gespeichert wie der Statistik-Haken, `notenspiegel_an`).
+- Hilfe-Artikel „Klausuren eintragen“ um den Abschnitt „Notenspiegel und Klassendurchschnitt“ ergänzt.
+
 ## 1.3.2 - 2026-11-25
 
 ### Klausur-Statistik: Haken wird zuverlässig gespeichert

@@ -164,7 +164,7 @@ export const ARTIKEL = [
   {
     slug: 'klausuren', kategorie: 'noten', titel: 'Klausuren eintragen',
     kurz: 'Klausur anlegen, Punkte je Aufgabe, Extrapunkte, Gewichtung, Notizen.',
-    schlagworte: ['klausur', 'klassenarbeit', 'punkte', 'aufgaben', 'maximale punkte', 'extrapunkte', 'gewichtung', 'datum', 'notiz', 'note berechnen', 'eintragen'],
+    schlagworte: ['klausur', 'klassenarbeit', 'notenspiegel', 'klassendurchschnitt', 'durchschnitt', 'verteilung', 'punkte', 'aufgaben', 'maximale punkte', 'extrapunkte', 'gewichtung', 'datum', 'notiz', 'note berechnen', 'eintragen'],
     bilder: [{ datei: 'klausur-eintragen', text: 'Klausur mit Punkten je Aufgabe' }],
     abschnitte: [
       { titel: 'Klausur anlegen', schritte: [
@@ -178,6 +178,10 @@ export const ARTIKEL = [
         'Fehlen einer Person nur wenige Punkte bis zur nächsten besseren Note (Vorgabe: **höchstens 2 Punkte**), steht neben ihrer Note ein kleines **▲ 1,5** (so viele Punkte fehlen noch; Mouseover: „bis zur Note 2, ab 81 %“). Das ist ein **pädagogischer Hinweis**, z. B. für Gespräche oder Nachbesserungsangebote – die Note selbst ändert sich dadurch nicht.',
         'Unter **⚙ Klausur einstellen → Extras** stellst du ein, ob der Hinweis die fehlenden **Punkte** oder **Prozent** zeigt (▲ 3,2 %), ab wie vielen Punkten bzw. Prozent er erscheint, oder ob er ganz **ausgeschaltet** ist. Dort lässt sich auch die **Prozentzahl bei „Punkte gesamt“** ein- und ausschalten. Mit „Für alle Klausuren dieses Fachs übernehmen“ gilt die Einstellung für alle Klausuren des Fachs; neue Klausuren starten mit den Vorgaben.',
         'Bei Notenschlüsseln mit Dezimalnoten (IHK) zählt die nächste bessere **ganze Note** (wie bei „ganze Note“: 2,5 → 3), bei BG die nächste Notenpunkt-Stufe. Extrapunkte zählen mit. Bei **mehrteiligen Klausuren** und solange noch Punkte fehlen, gibt es keinen Hinweis.',
+      ] },
+      { titel: 'Notenspiegel und Klassendurchschnitt', absaetze: [
+        'Mit dem Haken **📈 Notenspiegel** oben in der Klausur blendest du unter der Tabelle den **Klassendurchschnitt** (mit Median, bester und schlechtester Note, Anzahl der Personen) und den **Notenspiegel** ein: eine Säulengrafik, wie viele Personen welche Note haben. Bei IHK zählt der Spiegel auf ganze Noten gerundet (1–6), bei BG je Notenpunkt (15 bis 0). Der Durchschnitt wird aus den genauen Noten gebildet.',
+        'Die Anzeige **aktualisiert sich beim Eintragen** von selbst; berücksichtigt werden nur Personen mit Note. Der Haken gehört zu deinem Konto und gilt auf jedem Gerät. Standardmäßig ist der Notenspiegel ausgeblendet.',
       ] },
       { titel: 'Statistik: welche Aufgaben waren zu schwer oder zu leicht?', absaetze: [
         'Über dem Eingabefeld der Klausur schaltest du mit **📊 Statistik** eine Auswertung unter der Tabelle ein oder aus (sie ist zunächst aus; die Wahl merkt sich der Browser; die Funktion lässt sich unter **Meine Funktionen** ganz ausblenden). Sie rechnet beim Eintragen von selbst mit und zeigt je Aufgabe: **Ø Punkte**, den **Lösungsgrad** (Ø Punkte geteilt durch die Höchstpunkte) mit der Einschätzung **zu schwer** (unter 30 %), **ausgewogen** oder **zu leicht** (ab 85 %), den Anteil mit **voller Punktzahl** und mit **0 Punkten** sowie die **Trennschärfe**.',

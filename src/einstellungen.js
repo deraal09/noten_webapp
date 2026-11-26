@@ -7,7 +7,7 @@
 import { getDb } from './db.js';
 
 /** Erlaubte Schlüssel. */
-export const EINSTELLUNGEN = ['statistik_an'];
+export const EINSTELLUNGEN = ['statistik_an', 'notenspiegel_an'];
 
 /** @returns {'1'|'0'|null} null = noch nie gesetzt */
 export function ladeEinstellung(userId, schluessel) {
